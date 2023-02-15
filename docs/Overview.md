@@ -1,0 +1,274 @@
+# Overview
+
+zkSync Era is a permissionless general-purpose ZK rollup. Similar to many L1 blockchains and sidechains it enables
+deployment and interaction with Turing-complete smart contracts.
+
+- L2 smart contracts are executed on a zkEVM.
+- zkEVM bytecode is different from the L1 EVM.
+- There is a Solidity and Vyper compilers for L2 smart contracts.
+- There is a standard way to pass messages between L1 and L2. That is a part of the protocol.
+- There is no escape hatch mechanism yet, but there will be one.
+
+All data that is needed to restore the L2 state are also pushed on-chain. There are two approaches, publishing inputs of
+L2 transactions on-chain and publishing the state transition diff. zkSync follows the second option.
+
+See the [documentation](https://v2-docs.zksync.io/dev/fundamentals/rollups.html) to read more!
+
+## Glossary
+
+- **Governor** - privileged address that controls the upgradability of the network and sets other privileged addresses.
+- **Validator/Operator** - a privileged address that can commit/verify/execute L2 blocks.
+- **Facet** - implementation contract. The word comes from the EIP-2535.
+- **Security council** - set of trusted addresses that can decrease upgrade timelock.
+- **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
+  zkSync v2 network.
+
+### L1 Smart contracts
+
+#### Diamond
+
+Technically, this L1 smart contract acts as a connector between Ethereum (L1) and zkSync (L2). This contract checks the
+validity proof and data availability, handles L2 <-> L1 communication, finalizes L2 state transition, and more.
+
+There are also important contracts deployed on the L2 that can also execute logic called _system contracts_. Using L2
+<-> L1 communication, they can affect both the L1 and the L2.
+
+#### DiamondProxy
+
+The main contract uses [EIP-2535](https://eips.ethereum.org/EIPS/eip-2535) diamond proxy pattern. It is an in-house
+implementation that is inspired by the [mudgen reference implementation](https://github.com/mudgen/Diamond). It has no
+external functions, only the fallback that delegates a call to one of the facets (target/implementation contract). So
+even an upgrade system is a separate facet that can be replaced.
+
+One of the differences from the reference implementation is access freezability. Each of the facets has an associated
+parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor unfreezes
+the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then the
+diamond will be frozen forever.
+
+#### DiamondInit
+
+It is a one-function contract that implements the logic of initializing a diamond proxy. It is called only once on the
+diamond constructor and is not saved in the diamond as a facet.
+
+Implementation detail - function returns a magic value just like it is designed in
+[EIP-1271](https://eips.ethereum.org/EIPS/eip-1271), but the magic value is 32 bytes in size.
+
+#### DiamondCutFacet
+
+These smart contracts manage the freezing/unfreezing and upgrades of the diamond proxy. That being said, the contract
+must never be frozen.
+
+Currently, freezing and unfreezing are implemented as access control functions. It is fully controlled by the governor
+but can be changed later. The governor can call `freezeDiamond` to freeze the diamond and `unfreezeDiamond` to restore
+it.
+
+Another purpose of `DiamondCutFacet` is to upgrade the facets. The upgrading is split into 2-3 phases:
+
+- `proposeTransparentUpgrade`/`proposeShadowUpgrade` - propose an upgrade with visible/hidden parameters.
+- `cancelUpgradeProposal` - cancel the upgrade proposal.
+- `securityCouncilUpgradeApprove` - approve the upgrade by the security council.
+- `executeUpgrade` - finalize the upgrade.
+
+The upgrade itself characterizes by three variables:
+
+- `facetCuts` - a set of changes to the facets (adding new facets, removing facets, and replacing them).
+- pair `(address _initAddress, bytes _calldata)` for initializing the upgrade by making a delegate call to
+  `_initAddress` with `_calldata` inputs.
+
+#### GettersFacet
+
+Separate facet, whose only function is providing `view` and `pure` methods. It also implements
+[diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier.
+
+#### GovernanceFacet
+
+Controls changing the privileged addresses such as governor and validators or one of the system parameters (L2
+bootloader bytecode hash, verifier address, verifier parameters, etc).
+
+At the current stage, the governor has permission to instantly change the key system parameters with `GovernanceFacet`.
+Later such functionality will be removed and changing system parameters will be possible only via Diamond upgrade (see
+_DiamondCutFacet_).
+
+#### MailboxFacet
+
+The facet that handles L2 <-> L1 communication, an overview for which can be found in
+[docs](https://v2-docs.zksync.io/dev/developer-guides/bridging/l1-l2-interop.html).
+
+The Mailbox performs three functions:
+
+- L1 <-> L2 communication.
+- Bridging native Ether to the L2.
+- Censorship resistance mechanism (not yet implemented).
+
+L1 -> L2 communication is implemented as requesting an L2 transaction on L1 and executing it on L2. This means a user
+can call the function on the L1 contract to save the data about the transaction in some queue. Later on, a validator can
+process it on L2 and mark them as processed on the L1 priority queue. Currently, it is used for sending information from
+L1 to L2 or implementing multi-layer protocols.
+
+_NOTE_: While user requests the transaction from L1, the initiated transaction on L2 will have such a `msg.sender`:
+
+```solidity
+  address sender = msg.sender;
+  if (sender != tx.origin) {
+      sender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+  }
+```
+
+where
+
+```solidity
+uint160 constant offset = uint160(0x1111000000000000000000000000000000001111);
+
+function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Address) {
+  unchecked {
+    l2Address = address(uint160(l1Address) + offset);
+  }
+}
+
+```
+
+The L1 -> L2 communication is also used for bridging ether. The user should include a `msg.value` when initiating a
+transaction request on the L1 contract. Before executing a transaction on L2, the specified address will be credited
+with the funds. To withdraw funds user should call `withdraw` function on the `L2EtherToken` system contracts. This will
+burn the funds on L2, allowing the user to reclaim them through the `finalizeEthWithdrawal` function on the
+`MailboxFacet`.
+
+L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
+the transaction execution on L1.
+
+From the L2 side, there is a special zkEVM opcode that saves `l2ToL1Log` in the L2 block. A validator will send all
+`l2ToL1Logs` when sending an L2 block to the L1 (see `ExecutorFacet`). Later on, users will be able to both read their
+`l2ToL1logs` on L1 and _prove_ that they sent it.
+
+From the L1 side, for each L2 block, a Merkle root with such logs in leaves is calculated. Thus, a user can provide
+Merkle proof for each `l2ToL1Logs`.
+
+_NOTE_: For each executed L1 -> L2 transaction, the system program necessarily sends an L2 -> L1 log. To verify the
+execution status user may use the `proveL1ToL2TransactionStatus`.
+
+_NOTE_: The `l2ToL1Log` structure consists of fixed-size fields! Because of this, it is inconvenient to send a lot of
+data from L2 and to prove that they were sent on L1 using only `l2ToL1log`. To send a variable-length message we use
+this trick:
+
+- One of the system contracts accepts an arbitrary length message and sends a fixed length message with parameters
+  `senderAddress == this`, `marker == true`, `key == msg.sender`, `value == keccak256(message)`.
+- The contract on L1 accepts all sent messages and if the message came from this system contract it requires that the
+  preimage of `value` be provided.
+
+#### ExecutorFacet
+
+A contract that accepts L2 blocks, enforces data availability and checks the validity of zk-proofs.
+
+The state transition is divided into three stages:
+
+- `commitBlocks` - check L2 block timestamp, process the L2 logs, save data for a block, and prepare data for zk-proof.
+- `proveBlocks` - validate zk-proof.
+- `executeBlocks` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
+
+When a block is committed, we process L2 -> L1 logs. Here are the invariants that are expected there:
+
+- The only L2 -> L1 log from the `L2_SYSTEM_CONTEXT_ADDRESS`, with the `key == l2BlockTimestamp` and
+  `value == l2BlockHash`.
+- Several (or none) logs from the `L2_KNOWN_CODE_STORAGE_ADDRESS` with the `key == bytecodeHash`, where bytecode is
+  marked as a known factory dependency.
+- Several (or none) logs from the `L2_BOOTLOADER_ADDRESS` with the `key == canonicalTxHash` where `canonicalTxHash` is a
+  hash of processed L1 -> L2 transaction.
+- Several (of none) logs from the `L2_TO_L1_MESSENGER` with the `value == hashedMessage` where `hashedMessage` is a hash
+  of an arbitrary-length message that is sent from L2
+- None logs from other addresses (may be changed in future).
+
+#### Bridges
+
+Bridges are completely separate contracts from the Diamond. They are a wrapper for L1 <-> L2 communication on contracts
+on both L1 and L2. Upon locking assets on one layer, a request is sent to mint these bridged assets on the other layer.
+Upon burning assets on one layer, a request is sent to unlock them on the other.
+
+Unlike the native Ether bridging, all other assets can be bridged by the custom implementation relying on the trustless
+L1 <-> L2 communication.
+
+##### L1ERC20Bridge
+
+- `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
+- `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
+- `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
+
+##### L2ERC20Bridge
+
+- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
+- `finalizeDeposit` - finalize the deposit and mint funds on L2.
+
+#### Allowlist
+
+The auxiliary contract controls the permission access list. It is used in bridges and diamond proxies to control which
+addresses can interact with them in the Alpha release.
+
+### L2 specifics
+
+#### Deployment
+
+The L2 deployment process is different from Ethereum.
+
+In L1, the deployment always goes through two opcodes `create` and `create2`, each of which provides its address
+derivation. The parameter of these opcodes is the so-called "init bytecode" - a bytecode that returns the bytecode to be
+deployed. This works well in L1 but is suboptimal for L2.
+
+In the case of L2, there are also two ways to deploy contracts - `create` and `create2`. However, the expected input
+parameters for `create` and `create2` are different. It accepts the hash of the bytecode, rather than the full bytecode.
+Therefore, users pay less for contract creation and don't need to send the full contract code by the network upon
+deploys.
+
+A good question could be, _how does the validator know the preimage of the bytecode hashes to execute the code?_ Here
+comes the concept of factory dependencies! Factory dependencies are a list of bytecode hashes whose preimages were shown
+on L1 (data is always available). Such bytecode hashes can be deployed, others - no. Note that they can be added to the
+system by either L2 transaction or L1 -> L2 communication, where you can specify the full bytecode and the system will
+mark it as known and allow you to deploy it.
+
+Besides that, due to the bytecode differences for L1 and L2 contracts, address derivation is different. This applies to
+both `create` and `create2` and means that contracts deployed on the L1 cannot have a collision with contracts deployed
+on the L2. Please note that EOA address derivation is the same as on Ethereum.
+
+Thus:
+
+- L2 contracts are deployed by bytecode hash, not by full bytecode
+- Factory dependencies - list of bytecode hashes that can be deployed on L2
+- Address derivation for `create`/`create2` on L1 and L2 is different
+
+### Withdrawal/Deposit Limitation
+
+It is decided to have a limit on the amount of fund being deposited and withdrawn from the protocol.
+
+#### Withdrawal Limitation
+
+In case a malicious user could mint illegally some tokens on L2, there should be limitation to not allow the malicious
+user withdrwing all the funds on L1. The current plan is to put withdrawal limitation on protocol level. In other words,
+it is not allowed to withdraw more than some percent of the protocol balance for the defined tokens every day. Through
+governance transaction, it is possible to add tokens to the list of withdrawal limitation, and also define the percent
+that is allowed to withdraw daily.
+
+```solidity
+struct Withdrawal {
+  bool withdrawalLimitation;
+  uint256 withdrawalFactor;
+}
+
+```
+
+#### Deposit Limitation
+
+To be on the safe side, the amount of deposit is also going to be limited. This limitation is applied on account level,
+and is not time-based. In other words, each account can not deposit more than the cap defined. The tokens and the cap
+can be set through governance transaction. Moreover, there is a whitelisting mechanism as well (only some whitelisted
+accounts can call some specific functions). So, the combination of deposit limiation and whitelisting lead to limiting
+deposit of whitelisted account to be less than the defined cap.
+
+```solidity
+struct Deposit {
+  bool depositLimitation;
+  uint256 depositCap;
+}
+
+```
+
+See the [documentation](https://v2-docs.zksync.io/dev/developer-guides/contracts/contracts.html#solidity-vyper-support)
+to read more!

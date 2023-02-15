@@ -1,0 +1,7 @@
+/build
+/artifacts
+/artifacts-zk
+/cache
+/cache-zk
+/typechain
+node_modules
