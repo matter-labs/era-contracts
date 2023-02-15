@@ -1,0 +1,295 @@
+[
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "facet",
+              "type": "address"
+            },
+            {
+              "internalType": "enum Diamond.Action",
+              "name": "action",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFreezable",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes4[]",
+              "name": "selectors",
+              "type": "bytes4[]"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct Diamond.FacetCut[]",
+          "name": "_facetCuts",
+          "type": "tuple[]"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "_initAddress",
+          "type": "address"
+        }
+      ],
+      "name": "DiamondCutProposal",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "currentProposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "proposedDiamondCutHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "DiamondCutProposalCancelation",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "initCalldata",
+              "type": "bytes"
+            }
+          ],
+          "indexed": false,
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "_diamondCut",
+          "type": "tuple"
+        }
+      ],
+      "name": "DiamondCutProposalExecution",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "_address",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "currentProposalId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "securityCouncilEmergencyApprovals",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "proposedDiamondCutHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "EmergencyDiamondCutApproved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "EmergencyFreeze",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "lastDiamondFreezeTimestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "Unfreeze",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_diamondCutHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "approveEmergencyDiamondCutAsSecurityCouncilMember",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cancelDiamondCutProposal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "emergencyFreezeDiamond",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "components": [
+                {
+                  "internalType": "address",
+                  "name": "facet",
+                  "type": "address"
+                },
+                {
+                  "internalType": "enum Diamond.Action",
+                  "name": "action",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "isFreezable",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bytes4[]",
+                  "name": "selectors",
+                  "type": "bytes4[]"
+                }
+              ],
+              "internalType": "struct Diamond.FacetCut[]",
+              "name": "facetCuts",
+              "type": "tuple[]"
+            },
+            {
+              "internalType": "address",
+              "name": "initAddress",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes",
+              "name": "initCalldata",
+              "type": "bytes"
+            }
+          ],
+          "internalType": "struct Diamond.DiamondCutData",
+          "name": "_diamondCut",
+          "type": "tuple"
+        }
+      ],
+      "name": "executeDiamondCutProposal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "facet",
+              "type": "address"
+            },
+            {
+              "internalType": "enum Diamond.Action",
+              "name": "action",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bool",
+              "name": "isFreezable",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes4[]",
+              "name": "selectors",
+              "type": "bytes4[]"
+            }
+          ],
+          "internalType": "struct Diamond.FacetCut[]",
+          "name": "_facetCuts",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "address",
+          "name": "_initAddress",
+          "type": "address"
+        }
+      ],
+      "name": "proposeDiamondCut",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "unfreezeDiamond",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+]
