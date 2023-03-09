@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IL1Messenger.sol";
 import "./libraries/SystemContractHelper.sol";
+import "./libraries/EfficientCall.sol";
 
 /**
  * @author Matter Labs
@@ -18,8 +19,8 @@ import "./libraries/SystemContractHelper.sol";
  * it requires that the preimage of `value` be provided.
  */
 contract L1Messenger is IL1Messenger {
-    function sendToL1(bytes memory _message) external override returns (bytes32 hash) {
-        hash = keccak256(_message);
+    function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
+        hash = EfficientCall.keccak(_message);
 
         // Get cost of one byte pubdata in gas from context.
         uint256 meta = SystemContractHelper.getZkSyncMetaBytes();

@@ -10,6 +10,7 @@ import "./interfaces/IImmutableSimulator.sol";
 import "./interfaces/IEthToken.sol";
 import "./interfaces/IL1Messenger.sol";
 import "./interfaces/ISystemContext.sol";
+import "./interfaces/IBytecodeCompressor.sol";
 import "./BootloaderUtilities.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
@@ -22,6 +23,13 @@ uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
 
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
+
+/// @dev The current maximum deployed precompile address.
+/// Note: currently only two precompiles are deployed:
+/// 0x01 - ecrecover
+/// 0x02 - sha256
+/// Important! So the constant should be updated if more precompiles are deployed.
+uint256 constant CURRENT_MAX_PRECOMPILE_ADDRESS = uint256(uint160(SHA256_SYSTEM_CONTRACT));
 
 address payable constant BOOTLOADER_FORMAL_ADDRESS = payable(address(SYSTEM_CONTRACTS_OFFSET + 0x01));
 IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
@@ -50,11 +58,13 @@ BootloaderUtilities constant BOOTLOADER_UTILITIES = BootloaderUtilities(address(
 
 address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d);
 
+IBytecodeCompressor constant BYTECODE_COMPRESSOR_CONTRACT = IBytecodeCompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
+
 /// @dev The number of bytes that are published during the contract deployment
 /// in addition to the bytecode itself.
 uint256 constant BYTECODE_PUBLISHING_OVERHEAD = 100;
 
-/// @dev If the bitwise AND of the third extraAbi param when calling the MSG_VALUE_SIMULATOR
+/// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
 

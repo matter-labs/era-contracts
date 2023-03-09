@@ -40,7 +40,7 @@
     ]
   },
   "scripts": {
-    "test": "zk f mocha test/transaction-helper.test.ts",
+    "test": "zk f mocha test/system-contract-test.test.ts",
     "build": "hardhat compile",
     "clean": "hardhat clean",
     "fmt": "prettier --config prettier.js --write contracts/*.sol contracts/**/*.sol",

@@ -2,10 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "./interfaces/IAccountCodeStorage.sol";
-import "./interfaces/IKnownCodesStorage.sol";
-import "./interfaces/IImmutableSimulator.sol";
-import "./interfaces/INonceHolder.sol";
+import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import "./interfaces/IContractDeployer.sol";
 import {
     CREATE2_PREFIX,
@@ -20,6 +17,7 @@ import {
 } from "./Constants.sol";
 
 import "./libraries/Utils.sol";
+import "./libraries/EfficientCall.sol";
 import {SystemContractHelper, ISystemContract} from "./libraries/SystemContractHelper.sol";
 
 /**
@@ -36,7 +34,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     mapping(address => AccountInfo) internal _accountInfo;
 
     modifier onlySelf() {
-        require(msg.sender == address(this));
+        require(msg.sender == address(this), "Callable only by self");
         _;
     }
 
@@ -74,9 +72,12 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev Note that it allows changes from account to non-account and vice versa.
     function updateAccountVersion(AccountAbstractionVersion _version) external onlySystemCall {
         _accountInfo[msg.sender].supportedAAVersion = _version;
+
+        emit AccountVersionUpdated(msg.sender, _version);
     }
 
-    /// @notice Updates the nonce ordering of the account
+    /// @notice Updates the nonce ordering of the account. Currently, 
+    /// it only allows changes from sequential to arbitrary ordering.
     /// @param _nonceOrdering The new nonce ordering to use.
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
         AccountInfo memory currentInfo = _accountInfo[msg.sender];
@@ -89,6 +90,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         currentInfo.nonceOrdering = _nonceOrdering;
         _storeAccountInfo(msg.sender, currentInfo);
+
+        emit AccountNonceOrderingUpdated(msg.sender, _nonceOrdering);
     }
 
     /// @notice Calculates the address of a deployed contract via create2
@@ -102,10 +105,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _bytecodeHash,
         bytes32 _salt,
         bytes calldata _input
-    ) public pure override returns (address newAddress) {
-        // No colission is not possible with the Ethereum's CREATE2, since
+    ) public view override returns (address newAddress) {
+        // No collision is possible with the Ethereum's CREATE2, since
         // the prefix begins with 0x20....
-        bytes32 constructorInputHash = keccak256(_input);
+        bytes32 constructorInputHash = EfficientCall.keccak(_input);
 
         bytes32 hash = keccak256(
             bytes.concat(CREATE2_PREFIX, bytes32(uint256(uint160(_sender))), _salt, _bytecodeHash, constructorInputHash)
@@ -121,7 +124,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         address _sender,
         uint256 _senderNonce
     ) public pure override returns (address newAddress) {
-        // No colission is possible with the Ethereum's CREATE2, since
+        // No collision is possible with the Ethereum's CREATE, since
         // the prefix begins with 0x63....
         bytes32 hash = keccak256(
             bytes.concat(CREATE_PREFIX, bytes32(uint256(uint160(_sender))), bytes32(_senderNonce))
@@ -139,32 +142,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _salt,
         bytes32 _bytecodeHash,
         bytes calldata _input
-    ) external payable override onlySystemCall returns (address) {
-        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
-        address newAddress = getNewAddressCreate2(msg.sender, _bytecodeHash, _salt, _input);
-
-        _nonSystemDeployOnAddress(_bytecodeHash, newAddress, AccountAbstractionVersion.None, _input);
-
-        return newAddress;
-    }
-
-    /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.
-    /// @param _salt The CREATE2 salt
-    /// @param _bytecodeHash The correctly formatted hash of the bytecode.
-    /// @param _input The constructor calldata
-    /// @dev In case of a revert, the zero address should be returned.
-    function create2Account(
-        bytes32 _salt,
-        bytes32 _bytecodeHash,
-        bytes calldata _input,
-        AccountAbstractionVersion _aaVersion
-    ) external payable override onlySystemCall returns (address) {
-        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
-        address newAddress = getNewAddressCreate2(msg.sender, _bytecodeHash, _salt, _input);
-
-        _nonSystemDeployOnAddress(_bytecodeHash, newAddress, _aaVersion, _input);
-
-        return newAddress;
+    ) external payable override returns (address) {
+        return create2Account(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
     }
 
     /// @notice Deploys a contract with similar address derivation rules to the EVM's `CREATE` opcode.
@@ -173,23 +152,43 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev This method also accepts nonce as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
     /// @dev In case of a revert, the zero address should be returned.
+    /// Note: this method may be callable only in system mode, 
+    /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create(
-        bytes32, // salt
+        bytes32 _salt,
         bytes32 _bytecodeHash,
         bytes calldata _input
-    ) external payable override onlySystemCall returns (address) {
-        uint256 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
-        address newAddress = getNewAddressCreate(msg.sender, senderNonce);
+    ) external payable override returns (address) {
+        return createAccount(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
+    }
 
-        _nonSystemDeployOnAddress(_bytecodeHash, newAddress, AccountAbstractionVersion.None, _input);
+    /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE2` opcode.
+    /// @param _salt The CREATE2 salt
+    /// @param _bytecodeHash The correctly formatted hash of the bytecode.
+    /// @param _input The constructor calldata.
+    /// @param _aaVersion The account abstraction version to use.
+    /// @dev In case of a revert, the zero address should be returned.
+    /// Note: this method may be callable only in system mode, 
+    /// that is checked in the `createAccount` by `onlySystemCall` modifier.
+    function create2Account(
+        bytes32 _salt,
+        bytes32 _bytecodeHash,
+        bytes calldata _input,
+        AccountAbstractionVersion _aaVersion
+    ) public payable override onlySystemCall returns (address) {
+        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
+        address newAddress = getNewAddressCreate2(msg.sender, _bytecodeHash, _salt, _input);
+
+        _nonSystemDeployOnAddress(_bytecodeHash, newAddress, _aaVersion, _input);
 
         return newAddress;
     }
 
     /// @notice Deploys a contract account with similar address derivation rules to the EVM's `CREATE` opcode.
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
-    /// @param _input The constructor calldata
-    /// @dev This method also accepts nonce as one of its parameters.
+    /// @param _input The constructor calldata.
+    /// @param _aaVersion The account abstraction version to use.
+    /// @dev This method also accepts salt as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
     /// @dev In case of a revert, the zero address should be returned.
     function createAccount(
@@ -197,7 +196,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _bytecodeHash,
         bytes calldata _input,
         AccountAbstractionVersion _aaVersion
-    ) external payable override onlySystemCall returns (address) {
+    ) public payable override onlySystemCall returns (address) {
         uint256 senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = getNewAddressCreate(msg.sender, senderNonce);
 
@@ -252,19 +251,16 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER_CONTRACT");
 
         uint256 deploymentsLength = _deployments.length;
+        // We need to ensure that the `value` provided by the call is enough to provide `value`
+        // for all of the deployments
+        uint256 sumOfValues = 0;
+        for(uint256 i = 0; i < deploymentsLength; ++i){
+            sumOfValues += _deployments[i].value;
+        }
+        require(msg.value == sumOfValues, "`value` provided is not equal to the combined `value`s of deployments");
 
-        unchecked {
-            // We need to ensure that the `value` provided by the call is enough to provide `value`
-            // for all of the deployments
-            uint256 sumOfValues = 0;
-            for(uint256 i = 0; i < deploymentsLength; ++i){
-                sumOfValues += _deployments[i].value;
-            }
-            require(msg.value == sumOfValues, "`value` provided is not equal to the combined `value`s of deployments");
-
-            for(uint256 i = 0; i < deploymentsLength; ++i){
-                this.forceDeployOnAddress{value: _deployments[i].value}(_deployments[i], msg.sender);
-            }   
+        for(uint256 i = 0; i < deploymentsLength; ++i){
+            this.forceDeployOnAddress{value: _deployments[i].value}(_deployments[i], msg.sender);
         }
     }
 
@@ -285,7 +281,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // Do not allow deploying contracts to default accounts that have already executed transactions.
         require(NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(_newAddress) == 0x00, "Account is occupied");
 
-        _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, msg.sender, _input);
+        _performDeployOnAddress(_bytecodeHash, _newAddress, _aaVersion, _input);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -297,7 +293,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _bytecodeHash,
         address _newAddress,
         AccountAbstractionVersion _aaVersion,
-        address _sender,
         bytes calldata _input
     ) internal {
         _ensureBytecodeIsKnown(_bytecodeHash);
@@ -309,8 +304,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
-        _constructContract(_sender, _newAddress, _input, false);
-        emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
+        _constructContract(msg.sender, _newAddress, _input, false);
+        emit ContractDeployed(msg.sender, _bytecodeHash, _newAddress);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -343,7 +338,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             SystemContractHelper.setValueForNextFarCall(uint128(value));
         }
 
-        bytes memory returnData = SystemContractHelper.mimicCall(_newAddress, _sender, _input, true, _isSystem);
+        bytes memory returnData = EfficientCall.mimicCall(gasleft(), _newAddress, _input, _sender, true, _isSystem);
         ImmutableData[] memory immutables = abi.decode(returnData, (ImmutableData[]));
         IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT.setImmutables(_newAddress, immutables);
         ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.markAccountCodeHashAsConstructed(_newAddress);

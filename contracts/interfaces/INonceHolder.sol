@@ -11,6 +11,8 @@ pragma solidity ^0.8.0;
  * for the transaction.
  */
 interface INonceHolder {
+    event ValueSetUnderNonce(address indexed accountAddress, uint256 indexed key, uint256 value);
+
     /// @dev Returns the current minimal nonce for account.
     function getMinNonce(address _address) external view returns (uint256);
 
@@ -39,4 +41,7 @@ interface INonceHolder {
 
     /// @dev Determines whether a certain nonce has been already used for an account.
     function validateNonceUsage(address _address, uint256 _key, bool _shouldBeUsed) external view;
+
+    /// @dev Returns whether a nonce has been used for an account.
+    function isNonceUsed(address _address, uint256 _nonce) external view returns (bool);
 }

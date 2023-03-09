@@ -67,6 +67,52 @@ library SystemContractHelper {
         }
     }
 
+    /// @notice Provide a compiler hint, by placing calldata fat pointer into virtual `ACTIVE_PTR`, 
+    /// that can be manipulated by `ptr.add`/`ptr.sub`/`ptr.pack`/`ptr.shrink` later.
+    /// @dev This allows making a call by forwarding calldata pointer to the child call.
+    /// It is a much more efficient way to forward calldata, than standard EVM bytes copying.
+    function loadCalldataIntoActivePtr() internal view {
+        address callAddr = LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS;
+        assembly {
+            pop(staticcall(0, callAddr, 0, 0xFFFF, 0, 0))
+        }
+    }
+
+    /// @notice Compiler simulation of the `ptr.pack` opcode for the virtual `ACTIVE_PTR` pointer.
+    /// @dev Do the concatenation between lowest part of `ACTIVE_PTR` and highest part of `_farCallAbi` 
+    /// forming packed fat pointer for a far call or ret ABI when necessary.
+    /// Note: Panics if the lowest 128 bits of `_farCallAbi` are not zeroes.
+    function ptrPackIntoActivePtr(uint256 _farCallAbi) internal view {
+        address callAddr = PTR_PACK_INTO_ACTIVE_CALL_ADDRESS;
+        assembly {
+            pop(staticcall(_farCallAbi, callAddr, 0, 0xFFFF, 0, 0))
+        }
+    }
+    
+    /// @notice Compiler simulation of the `ptr.add` opcode for the virtual `ACTIVE_PTR` pointer. 
+    /// @dev Transforms `ACTIVE_PTR.offset` into `ACTIVE_PTR.offset + u32(_value)`. If overflow happens then it panics.
+    function ptrAddIntoActive(uint32 _value) internal view {
+        address callAddr = PTR_ADD_INTO_ACTIVE_CALL_ADDRESS;
+        uint256 cleanupMask = UINT32_MASK;
+        assembly {
+            // Clearing input params as they are not cleaned by Solidity by default
+            _value := and(_value, cleanupMask)
+            pop(staticcall(_value, callAddr, 0, 0xFFFF, 0, 0))
+        }
+    }
+
+    /// @notice Compiler simulation of the `ptr.shrink` opcode for the virtual `ACTIVE_PTR` pointer.
+    /// @dev Transforms `ACTIVE_PTR.length` into `ACTIVE_PTR.length - u32(_shrink)`. If underflow happens then it panics.
+    function ptrShrinkIntoActive(uint32 _shrink) internal view {
+        address callAddr = PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS;
+        uint256 cleanupMask = UINT32_MASK;
+        assembly {
+            // Clearing input params as they are not cleaned by Solidity by default
+            _shrink := and(_shrink, cleanupMask)
+            pop(staticcall(_shrink, callAddr, 0, 0xFFFF, 0, 0))
+        }
+    }
+
     /// @notice packs precompile parameters into one word
     /// @param _inputMemoryOffset The memory offset in 32-byte words for the input data for calling the precompile.
     /// @param _inputMemoryLength The length of the input data in words.
@@ -122,95 +168,6 @@ library SystemContractHelper {
             // Clearing input params as they are not cleaned by Solidity by default
             _value := and(_value, cleanupMask)
             success := call(0, callAddr, _value, 0, 0xFFFF, 0, 0)
-        }
-    }
-
-    /// @notice Perform a `mimicCall`, i.e. a call with custom msg.sender.
-    /// @param to The address to call
-    /// @param whoToMimic The `msg.sender` for the next call.
-    /// @param data The calldata
-    /// @param isConstructor Whether the call should contain the `isConstructor` flag.
-    /// @param isSystem Whether the call should contain the `isSystem` flag.
-    /// @return The returndata if the call was successful. Reverts otherwise.
-    /// @dev If called not in kernel mode, it will result in a revert (enforced by the VM)
-    function mimicCall(
-        address to,
-        address whoToMimic,
-        bytes memory data,
-        bool isConstructor,
-        bool isSystem
-    ) internal returns (bytes memory) {
-        bool success = rawMimicCall(
-            to,
-            whoToMimic,
-            data,
-            isConstructor,
-            isSystem
-        );
-
-        uint256 size;
-        assembly {
-            size := returndatasize()
-        }
-        if(!success) {
-            assembly {
-                returndatacopy(0, 0, size)
-                revert(0, size)
-            }
-        }
-
-        bytes memory result = new bytes(size);
-        assembly {
-            mstore(result, size)
-            returndatacopy(add(result, 0x20), 0, size)
-        }
-        return result;
-    }
-
-    /// @notice Perform a `mimicCall`, i.e. a call with custom msg.sender.
-    /// @param to The address to call
-    /// @param whoToMimic The `msg.sender` for the next call.
-    /// @param data The calldata
-    /// @param isConstructor Whether the call should contain the `isConstructor` flag.
-    /// @param isSystem Whether the call should contain the `isSystem` flag.
-    /// @return success whether the call was successful.
-    /// @dev If called not in kernel mode, it will result in a revert (enforced by the VM)
-    function rawMimicCall(
-        address to,
-        address whoToMimic,
-        bytes memory data,
-        bool isConstructor,
-        bool isSystem
-    ) internal returns (bool success) {
-        address callAddr = MIMIC_CALL_CALL_ADDRESS;
-
-        uint32 dataStart;
-        assembly {
-            dataStart := add(data, 0x20)
-        }
-        uint32 dataLength = Utils.safeCastToU32(data.length);
-        uint32 gas = Utils.safeCastToU32(gasleft());
-
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            gas,
-            // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            isConstructor,
-            isSystem
-        );
-
-        uint256 cleanupMask = ADDRESS_MASK;
-        assembly {
-            // Clearing values before usage in assembly, since Solidity
-            // doesn't do it by default
-            whoToMimic := and(whoToMimic, cleanupMask)
-
-            success := call(to, callAddr, 0, farCallAbi, whoToMimic, 0, 0)
         }
     }
 

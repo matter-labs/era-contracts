@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/IAccountCodeStorage.sol";
 import "./libraries/Utils.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -22,18 +22,18 @@ contract AccountCodeStorage is IAccountCodeStorage {
     bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     modifier onlyDeployer() {
-        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT));
+        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT), "Callable only by the deployer system contract");
         _;
     }
 
     /// @notice Stores the bytecodeHash of constructing contract.
     /// @param _address The address of the account to set the codehash to.
-    /// @param _hash The new bytecode hash of the constructed account.
+    /// @param _hash The new bytecode hash of the constructing account.
     /// @dev This method trusts the ContractDeployer to make sure that the bytecode is known and well-formed,
     /// but checks whether the bytecode hash corresponds to the constructing smart contract.
     function storeAccountConstructingCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConsructing(_hash));
+        require(Utils.isContractConstructing(_hash), "Code hash is not for a contract on constructor");
 
         uint256 addressAsKey = uint256(uint160(_address));
         assembly {
@@ -47,7 +47,7 @@ contract AccountCodeStorage is IAccountCodeStorage {
         bytes32 codeHash = getRawCodeHash(_address);
 
         // Check that the code hash corresponds to the deploying smart contract
-        require(Utils.isContractConsructing(codeHash));
+        require(Utils.isContractConstructing(codeHash), "Code hash is not for a contract on constructor");
         // Get the bytecode hash with "isConstructor" flag equal to false
         bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);
 
@@ -71,11 +71,15 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// @notice Simulate the behavior of the `extcodehash` EVM opcode.
     /// @param _input The 256-bit account address.
     /// @return codeHash - hash of the bytecode according to the EIP-1052 specification.
-    function getCodeHash(uint256 _input) external view override returns (bytes32 codeHash) {
+    function getCodeHash(uint256 _input) external view override returns (bytes32) {
         // We consider the account bytecode hash of the last 20 bytes of the input, because
         // according to the spec "If EXTCODEHASH of A is X, then EXTCODEHASH of A + 2**160 is X".
         address account = address(uint160(_input));
-        codeHash = getRawCodeHash(account);
+        if (uint160(account) <= CURRENT_MAX_PRECOMPILE_ADDRESS) {
+            return EMPTY_STRING_KECCAK;
+        }
+
+        bytes32 codeHash = getRawCodeHash(account);
 
         // The code hash is equal to the `keccak256("")` if the account is an EOA with at least one transaction.
         // Otherwise, the account is either deployed smart contract or an empty account,
@@ -85,9 +89,11 @@ contract AccountCodeStorage is IAccountCodeStorage {
         }
         // The contract is still on the constructor, which means it is not deployed yet,
         // so set `keccak256("")` as a code hash. The EVM has the same behavior.
-        else if (Utils.isContractConsructing(codeHash)) {
+        else if (Utils.isContractConstructing(codeHash)) {
             codeHash = EMPTY_STRING_KECCAK;
         }
+
+        return codeHash;
     }
 
     /// @notice Simulate the behavior of the `extcodesize` EVM opcode.
@@ -101,7 +107,13 @@ contract AccountCodeStorage is IAccountCodeStorage {
 
         // If the contract is a default account or is on constructor the code size is zero,
         // otherwise extract the proper value for it from the bytecode hash.
-        if (codeHash != 0x00 && !Utils.isContractConsructing(codeHash)) {
+        // NOTE: zero address and precompiles are a special case, they are contracts, but we 
+        // want to preserve EVM invariants (see EIP-1052 specification). That's why we automatically 
+        // return `0` length in the following cases:
+        // - `codehash(0) == 0`
+        // - `account` is a precompile.
+        // - `account` is currently being constructed
+        if (uint160(account) > CURRENT_MAX_PRECOMPILE_ADDRESS && codeHash != 0x00 && !Utils.isContractConstructing(codeHash)) {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
     }

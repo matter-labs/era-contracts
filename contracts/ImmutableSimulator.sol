@@ -31,7 +31,7 @@ contract ImmutableSimulator is IImmutableSimulator {
     /// @param _dest The address which to store the immutables for.
     /// @param _immutables The list of the immutables.
     function setImmutables(address _dest, ImmutableData[] calldata _immutables) external override {
-        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT));
+        require(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT), "Callable only by the deployer system contract");
         unchecked {
             uint256 immutablesLength = _immutables.length;
             for (uint256 i = 0; i < immutablesLength; ++i) {

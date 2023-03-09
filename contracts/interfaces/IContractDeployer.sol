@@ -37,12 +37,22 @@ interface IContractDeployer {
         address indexed contractAddress
     );
 
+    event AccountNonceOrderingUpdated(
+        address indexed accountAddress,
+        AccountNonceOrdering nonceOrdering
+    );
+
+    event AccountVersionUpdated(
+        address indexed accountAddress,
+        AccountAbstractionVersion aaVersion
+    );
+
     function getNewAddressCreate2(
         address _sender,
         bytes32 _bytecodeHash,
         bytes32 _salt,
         bytes calldata _input
-    ) external pure returns (address newAddress);
+    ) external view returns (address newAddress);
 
     function getNewAddressCreate(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
 

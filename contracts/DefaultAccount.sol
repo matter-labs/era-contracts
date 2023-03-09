@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "./interfaces/IAccount.sol";
 import "./libraries/TransactionHelper.sol";
 import "./libraries/SystemContractHelper.sol";
+import "./libraries/EfficientCall.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
 
 /**
@@ -81,18 +82,12 @@ contract DefaultAccount is IAccount {
 			0,
 			abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
 		);
-		
-		bytes32 txHash;
 
 		// Even though for the transaction types present in the system right now,
 		// we always provide the suggested signed hash, this should not be 
 		// always expected. In case the bootloader has no clue what the default hash 
 		// is, the bytes32(0) will be supplied.
-		if(_suggestedSignedHash == bytes32(0)) {
-			txHash = _transaction.encodeHash();
-		} else {
-			txHash = _suggestedSignedHash;
-		}
+        bytes32 txHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
 
         if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
             require(_transaction.data.length >= 4, "Invalid call to ContractDeployer");
@@ -142,24 +137,18 @@ contract DefaultAccount is IAccount {
     function _execute(Transaction calldata _transaction) internal {
         address to = address(uint160(_transaction.to));
         uint128 value = Utils.safeCastToU128(_transaction.value);
-        bytes memory data = _transaction.data;
+        bytes calldata data = _transaction.data;
+        uint32 gas = Utils.safeCastToU32(gasleft());
 
         if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            uint32 gas = Utils.safeCastToU32(gasleft());
-
             // Note, that the deployer contract can only be called
             // with a "systemCall" flag.
             SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value, data);
         } else {
-            assembly {
-                let success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
-
-                if iszero(success) {
-                    let sz := returndatasize()
-                    returndatacopy(0,0,sz)
-                    revert(0,sz)
-                }
-            }
+            bool success = EfficientCall.rawCall(gas, to, value, data);
+            if(!success) {
+                EfficientCall.propagateRevert(); 
+            }  
         }
 	}
 

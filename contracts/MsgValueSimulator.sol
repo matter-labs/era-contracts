@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import "./libraries/EfficientCall.sol";
 import {SystemContractHelper, ISystemContract} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT, MAX_MSG_VALUE} from "./Constants.sol";
 
@@ -58,6 +59,6 @@ contract MsgValueSimulator is ISystemContract {
         // For the next call this `msg.value` will be used.
         SystemContractHelper.setValueForNextFarCall(uint128(value));
 
-        return SystemContractHelper.mimicCall(to, msg.sender, _data, false, isSystemCall);
+        return EfficientCall.mimicCall(gasleft(), to, _data, msg.sender, false, isSystemCall);
     }
 }

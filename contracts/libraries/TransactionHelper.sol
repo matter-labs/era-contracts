@@ -9,6 +9,7 @@ import "../interfaces/IPaymasterFlow.sol";
 import "../interfaces/IContractDeployer.sol";
 import {ETH_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 import "./RLPEncoder.sol";
+import "./EfficientCall.sol";
 
 /// @dev The type id of zkSync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
@@ -138,9 +139,9 @@ library TransactionHelper {
                 _transaction.paymaster,
                 _transaction.nonce,
                 _transaction.value,
-                keccak256(_transaction.data),
+                EfficientCall.keccak(_transaction.data),
                 keccak256(abi.encodePacked(_transaction.factoryDeps)),
-                keccak256(_transaction.paymasterInput)
+                EfficientCall.keccak(_transaction.paymasterInput)
             )
         );
 

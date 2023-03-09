@@ -14,15 +14,14 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
  * unique transaction hashes.
  * @dev The account allows for both ascending growth in nonces and mapping nonces to specific
  * stored values in them.
- * The users can eiher marked a range of nonces by increasing the `minNonce`. This way all the nonces
+ * The users can either marked a range of nonces by increasing the `minNonce`. This way all the nonces
  * less than `minNonce` will become used. The other way to mark a certain 256-bit key as nonce is to set
- * some value value under it in this contract.
+ * some value under it in this contract.
  * @dev Apart from transaction nonces, this contract also stores the deployment nonce for accounts, that
  * will be used for address derivation using CREATE. For the economy of space, this nonce is stored tightly
  * packed with the `minNonce`.
  * @dev The behavior of some of the methods depends on the nonce ordering of the account. Nonce ordering is a mere suggestion and all the checks that are present
- * here server more as a help to users to prevent from doing mistakes, rather 
- * rather than any invariants.
+ * here serve more as a help to users to prevent from doing mistakes, rather than any invariants.
  */
 contract NonceHolder is INonceHolder, ISystemContract {
     uint256 constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
@@ -60,7 +59,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
     }
 
     /// @notice Increases the minimal nonce for the msg.sender and returns the previous one.
-    /// @param _value The number by which to increase the minimal nonce for msg.sneder.
+    /// @param _value The number by which to increase the minimal nonce for msg.sender.
     /// @return oldMinNonce The value of the minimal nonce for msg.sender before the increase.
     function increaseMinNonce(uint256 _value) public onlySystemCall returns (uint256 oldMinNonce) {
         require(_value <= MAXIMAL_MIN_NONCE_INCREMENT, "The value for incrementing the nonce is too high");
@@ -92,6 +91,8 @@ contract NonceHolder is INonceHolder, ISystemContract {
         uint256 addressAsKey = uint256(uint160(msg.sender));
 
         nonceValues[addressAsKey][_key] = _value;
+
+        emit ValueSetUnderNonce(msg.sender, _key, _value);
     }
 
     /// @notice Gets the value stored under a custom nonce for msg.sender.
@@ -153,7 +154,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @param _shouldBeUsed The flag for the method. If `true`, the method checks that whether this nonce
     /// is marked as used and reverts if this is not the case. If `false`, this method will check that the nonce
     /// has *not* been used yet, and revert otherwise.
-    /// @dev This methodd should be used by the bootloader.
+    /// @dev This method should be used by the bootloader.
     function validateNonceUsage(address _address, uint256 _key, bool _shouldBeUsed) external view {
         bool isUsed = isNonceUsed(_address, _key);
 

@@ -9,12 +9,18 @@ import "../Constants.sol";
 
 import "../DefaultAccount.sol";
 
+import "../libraries/EfficientCall.sol";
 import {SystemContractHelper, ISystemContract} from "../libraries/SystemContractHelper.sol";
 import {TestSystemContractHelper} from "./TestSystemContractHelper.sol";
 
 /// @notice An example of a system contract that be used for local testing.
 /// @dev It is not used anywhere except for testing
 contract TestSystemContract is ISystemContract {
+    modifier onlySelf() {
+        require(msg.sender == address(this));
+        _;
+    }
+
     function testPrecompileCall() external view {
         // Without precompile call
         {
@@ -39,7 +45,7 @@ contract TestSystemContract is ISystemContract {
     ) external {
         // Note that we don't need to actually have the needed balance to set the `msg.value` for the next call
         SystemContractHelper.setValueForNextFarCall(value);
-        SystemContractHelper.mimicCall(
+        this.performMimicCall(
             address(this),
             whoToMimic,
             abi.encodeCall(
@@ -75,7 +81,7 @@ contract TestSystemContract is ISystemContract {
         require(success, "System contracts can call onlySystemCall methods");
 
         // Non-system contract accounts should not be able to call it.
-        success = SystemContractHelper.rawMimicCall(
+        success = this.performRawMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
             abi.encodeCall(
@@ -86,7 +92,7 @@ contract TestSystemContract is ISystemContract {
         );
         require(!success, "Normal acounts can not call onlySystemCall methods without proper flags");
 
-        success = SystemContractHelper.rawMimicCall(
+        success = this.performRawMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
             abi.encodeCall(
@@ -101,7 +107,7 @@ contract TestSystemContract is ISystemContract {
     function requireOnlySystem() external onlySystemCall {}
 
     function testSystemMimicCall() external {
-        TestSystemContractHelper.systemMimicCall(
+        this.performSystemMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
             abi.encodeCall(
@@ -114,5 +120,57 @@ contract TestSystemContract is ISystemContract {
 
         require(extraAbiData1 == 100, "extraAbiData1 passed incorrectly");
         require(extraAbiData2 == 120, "extraAbiData2 passed incorrectly");
+    }
+
+    function performMimicCall(
+        address to,
+        address whoToMimic,
+        bytes calldata data,
+        bool isConstructor,
+        bool isSystem
+    ) external onlySelf returns(bytes memory) {
+        return EfficientCall.mimicCall(
+            uint32(gasleft()),
+            to,
+            data,
+            whoToMimic,
+            isConstructor,
+            isSystem
+        );
+    }
+
+    function performRawMimicCall(
+        address to,
+        address whoToMimic,
+        bytes calldata data,
+        bool isConstructor,
+        bool isSystem
+    ) external onlySelf returns(bool) {
+        return EfficientCall.rawMimicCall(
+            uint32(gasleft()),
+            to,
+            data,
+            whoToMimic,
+            isConstructor,
+            isSystem
+        );
+    }
+
+    function performSystemMimicCall(
+        address to,
+        address whoToMimic,
+        bytes calldata data,
+        bool isConstructor,
+        uint256 extraAbiParam1,
+        uint256 extraAbiParam2
+    ) external onlySelf {
+        TestSystemContractHelper.systemMimicCall(
+            to,
+            whoToMimic,
+            data,
+            isConstructor,
+            extraAbiParam1,
+            extraAbiParam2
+        );
     }
 }

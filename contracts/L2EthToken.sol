@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 import {IEthToken} from "./interfaces/IEthToken.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
@@ -12,7 +11,7 @@ import {IMailbox} from "./interfaces/IMailbox.sol";
  * @author Matter Labs
  * @notice Native ETH contract.
  * @dev It does NOT provide interfaces for personal interaction with tokens like `transfer`, `approve`, and `transferFrom`.
- * Instead, this contract is used by `MsgValueSimulator` and `ContractDeployer` system contracts
+ * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts 
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2EthToken is IEthToken {
@@ -46,9 +45,14 @@ contract L2EthToken is IEthToken {
             "Only system contracts with special access can call this method"
         );
 
-        // We rely on the compiler "Checked Arithmetic" to revert if the user does not have enough balance.
-        balance[_from] -= _amount;
-        balance[_to] += _amount;
+        uint256 fromBalance = balance[_from];
+        require(fromBalance >= _amount, "Transfer amount exceeds balance");
+        unchecked {
+            balance[_from] = fromBalance - _amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            balance[_to] += _amount;
+        }        
 
         emit Transfer(_from, _to, _amount);
     }
@@ -62,7 +66,7 @@ contract L2EthToken is IEthToken {
     }
 
     /// @notice Increase the total supply of tokens and balance of the receiver.
-    /// @dev This method is only callable by the L2 ETH bridge.
+    /// @dev This method is only callable by the bootloader.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
@@ -71,7 +75,7 @@ contract L2EthToken is IEthToken {
         emit Mint(_account, _amount);
     }
 
-    /// @notice Initiate the ETH withdrawal, funds will be available to claim on L1 `finalizeWithdrawal` method.
+    /// @notice Initiate the ETH withdrawal, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(address _l1Receiver) external payable override {
         uint256 amount = msg.value;
@@ -86,7 +90,6 @@ contract L2EthToken is IEthToken {
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
         L1_MESSENGER_CONTRACT.sendToL1(message);
 
-        SystemContractHelper.toL1(true, bytes32(uint256(uint160(_l1Receiver))), bytes32(amount));
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
 

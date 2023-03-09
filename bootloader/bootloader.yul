@@ -95,7 +95,7 @@ object "Bootloader" {
                 // what the value of the baseFee will be. In the future, 
                 // a better system, aided by EIP1559 should be added. 
 
-                let pubdataBytePriceETH := mul(l1GasPrice, L1_GAS_PER_PUBDATA_BYTE())
+                let pubdataBytePriceETH := safeMul(l1GasPrice, L1_GAS_PER_PUBDATA_BYTE(), "aoa")
 
                 baseFee := max(
                     fairL2GasPrice,
@@ -173,6 +173,8 @@ object "Bootloader" {
                 ret := 8
             }
 
+            /// @dev The byte from which the scratch space starts.
+            /// Scratch space is used for various temporary values
             function SCRATCH_SPACE_BEGIN_BYTE() -> ret {
                 ret := mul(SCRATCH_SPACE_BEGIN_SLOT(), 32)
             }
@@ -289,9 +291,28 @@ object "Bootloader" {
                 ret := MAX_TRANSACTIONS_IN_BLOCK()
             }
 
+            /// @dev The slot starting from which the maximum number of gas that the operator "trusts"
+            /// the transaction to use for its execution is stored. Sometimes, the operator may know that
+            /// a certain transaction can be allowed more gas that what the protocol-level worst-case allows.
+            function TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT() -> ret {
+                ret := add(TX_SUGGESTED_OVERHEAD_BEGIN_SLOT(), TX_SUGGESTED_OVERHEAD_SLOTS())
+            }
+
+            /// @dev byte starting from which the maximum number of gas that the operator "trusts"
+            /// the transaction to use for its execution is stored. 
+            function TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_BYTE() -> ret {
+                ret := mul(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), 32)
+            }
+
+            /// @dev The number of slots dedicated for the trusted gas limits for the transactions.
+            /// It is equal to the number of transactions in the block.
+            function TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS() -> ret {
+                ret := MAX_TRANSACTIONS_IN_BLOCK()
+            }
+
             /// @dev The slot from which the bootloader transactions' descriptions begin
             function TX_DESCRIPTION_BEGIN_SLOT() -> ret {
-                ret := add(TX_SUGGESTED_OVERHEAD_BEGIN_SLOT(), TX_SUGGESTED_OVERHEAD_SLOTS())
+                ret := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS())
             }
 
             /// @dev The byte from which the bootloader transactions' descriptions begin
@@ -379,6 +400,10 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000008001
             }
 
+            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000ffff
+            }
+
             function ACCOUNT_CODE_STORAGE_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008002
             }
@@ -413,7 +438,7 @@ object "Bootloader" {
 
             /// @dev Whether the bootloader should enforce that accounts have returned the correct
             /// magic value for signature. This value is enforced to be "true" on the main proved block, but 
-            /// we need to the ability to ignore invalid signature results during fee estimation,
+            /// we need the ability to ignore invalid signature results during fee estimation,
             /// where the signature for the transaction is usually not known beforehand
             function SHOULD_ENSURE_CORRECT_RETURNED_MAGIC() -> ret {
                 ret := {{ENSURE_RETURNED_MAGIC}}
@@ -428,9 +453,6 @@ object "Bootloader" {
             function CHECK_ENOUGH_GAS_OVERHEAD() -> ret {
                 ret := 1000000
             }
-
-            // Starting from the memory slot NEW_CODE_HASHES_START_PTR there are `MAX_NEW_CODE_HASHES` 256-bit code 
-            // hashes. Then there are `MAX_TRANSACTIONS_IN_BLOCK` basic transaction data pointers.
 
             // Now, we iterate over all transactions, processing each of them
             // one by one.
@@ -462,7 +484,7 @@ object "Bootloader" {
                     break
                 }                
 
-                let txDataOffset := mload(add(txPtr, 32))
+                let txDataOffset := mload(add(txPtr, 0x20))
 
                 // We strongly enforce the positions of transactions
                 if iszero(eq(currentExpectedTxOffset, txDataOffset)) {
@@ -472,7 +494,7 @@ object "Bootloader" {
                     assertionError("Tx data offset is incorrect")
                 }
 
-                currentExpectedTxOffset := validateAbiEncoding(add(txDataOffset, 0x20))
+                currentExpectedTxOffset := validateAbiEncoding(txDataOffset)
 
                 // Checking whether the last slot of the transaction's description
                 // does not go out of bounds.
@@ -523,37 +545,27 @@ object "Bootloader" {
             setGasPrice(0)
 
             // Transfering all the ETH received in the block to the operator
-            let rewardingOperatorSuccess := call(
-                gas(),
-                OPERATOR_ADDRESS,
+            directETHTransfer(
                 selfbalance(),
-                0,
-                0,
-                0,
-                0
+                OPERATOR_ADDRESS
             )
-
-            if iszero(rewardingOperatorSuccess) {
-                // If failed to send ETH to the operator, panic
-                revertWithReason(
-                    FAILED_TO_SEND_FEES_TO_THE_OPERATOR(),
-                    1
-                )
-            }
 
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
-                let tmp := sub(add(x,y), 1)
-                ret := div(tmp, y)
-                if iszero(y) {
-                    ret := y
+                switch or(eq(x, 0), eq(y, 0))
+                case 0 {
+                    // (x + y - 1) / y can overflow on addition, so we distribute.
+                    ret := add(div(sub(x, 1), y), 1)
+                }
+                default {
+                    ret := 0
                 }
             }
             
             /// @dev Calculates the length of a given number of bytes rounded up to the nearest multiple of 32.
             function lengthRoundedByWords(len) -> ret {
                 let neededWords := div(add(len, 31), 32)
-                ret := mul(neededWords, 32)
+                ret := safeMul(neededWords, 32, "xv")
             }
 
             /// @dev Function responsible for processing the transaction
@@ -629,7 +641,7 @@ object "Bootloader" {
                 mstore(txDataOffset, 0x20)
 
                 let innerTxDataOffset := add(txDataOffset, 0x20)
-                let dataLength := add(32, getDataLength(innerTxDataOffset))
+                let dataLength := safeAdd(32, getDataLength(innerTxDataOffset), "qev")
 
                 debugLog("HASH_OFFSET", innerTxDataOffset)
                 debugLog("DATA_LENGTH", dataLength)
@@ -645,7 +657,7 @@ object "Bootloader" {
                 // Skipping the first 0x20 byte in the encoding of the transaction.
                 let innerTxDataOffset := add(txDataOffset, 0x20)
                 let from := getFrom(innerTxDataOffset)
-                let requiredETH := mul(getGasLimit(innerTxDataOffset), gasPrice)
+                let requiredETH := safeMul(getGasLimit(innerTxDataOffset), gasPrice, "lal")
 
                 let bootloaderBalanceETH := balance(BOOTLOADER_FORMAL_ADDR())
                 let paymaster := getPaymaster(innerTxDataOffset)
@@ -700,7 +712,7 @@ object "Bootloader" {
                     setHook(VM_HOOK_NO_VALIDATION_ENTERED())
                 }
 
-                let bootloaderReceivedFunds := sub(balance(BOOTLOADER_FORMAL_ADDR()), bootloaderBalanceETH)
+                let bootloaderReceivedFunds := safeSub(balance(BOOTLOADER_FORMAL_ADDR()), bootloaderBalanceETH, "qsx")
 
                 // If the amount of funds provided to the bootloader is less than the minimum required one
                 // then this transaction should be rejected.                
@@ -711,7 +723,7 @@ object "Bootloader" {
                     )
                 }
 
-                let excessiveFunds := sub(bootloaderReceivedFunds, requiredETH) 
+                let excessiveFunds := safeSub(bootloaderReceivedFunds, requiredETH, "llm") 
 
                 if gt(excessiveFunds, 0) {
                     // Returning back the excessive funds taken.
@@ -761,8 +773,8 @@ object "Bootloader" {
                 // This means that the returndata is encoded the following way:
                 // 0x20 || context_len || context_bytes...
                 let returnlen := returndatasize()
-                // The minimal allowed returndatasize is 96: magicValue || 0x40 || 0x00
-                if lt(returnlen, 96) {
+                // The minimal allowed returndatasize is 64: magicValue || offset
+                if lt(returnlen, 0x40) {
                     revertWithReason(
                         PAYMASTER_RETURNED_INVALID_CONTEXT(),
                         0
@@ -774,7 +786,7 @@ object "Bootloader" {
                 // but it is so in fee estimation and we want to preserve as many operations as 
                 // in the original operation.
                 {
-                    returndatacopy(0, 0, 32)
+                    returndatacopy(0, 0, 0x20)
                     let magic := mload(0)
 
                     let isMagicCorrect := eq(magic, {{SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE}})
@@ -787,33 +799,42 @@ object "Bootloader" {
                     }
                 }
 
-                // We don't care about the first 64 bytes as they contain the magic and the formal 0x20 byte
-                let effectiveContextLen := sub(returnlen, 0x40)
+                returndatacopy(0, 32, 32)
+                let returnedContextOffset := mload(0)
 
+                // Can not read the returned length
+                if gt(safeAdd(returnedContextOffset, 32, "lhf"), returnlen) {
+                    revertWithReason(
+                        PAYMASTER_RETURNED_INVALID_CONTEXT(),
+                        0
+                    )
+                }
+
+                // Reading the length of the context
+                returndatacopy(0, returnedContextOffset, 32)
+                let returnedContextLen := lengthRoundedByWords(mload(0))
 
                 // The returned context's size should not exceed the maximum length
-                if gt(effectiveContextLen, PAYMASTER_CONTEXT_BYTES()) {
+                if gt(returnedContextLen, PAYMASTER_CONTEXT_BYTES()) {
                     revertWithReason(
                         PAYMASTER_RETURNED_CONTEXT_IS_TOO_LONG(),
                         0
                     )
                 }
 
-                returndatacopy(PAYMASTER_CONTEXT_BEGIN_BYTE(), 64, effectiveContextLen)
-                
-                // The last sanity check: the first word contains the actual length of the context and so 
-                // it should not be greater than effectiveReturnLen - 32
-                let lenFromSlot := mload(PAYMASTER_CONTEXT_BEGIN_BYTE())
-                if gt(lenFromSlot, sub(effectiveContextLen, 32)) {
+                if gt(add(returnedContextOffset, add(0x20, returnedContextLen)), returnlen) {
                     revertWithReason(
-                        PAYMASTER_RETURNED_INVALID_CONTEXT(),
+                        PAYMASTER_RETURNED_CONTEXT_IS_TOO_LONG(),
                         0
                     )
                 }
+
+                returndatacopy(PAYMASTER_CONTEXT_BEGIN_BYTE(), returnedContextOffset, add(0x20, returnedContextLen))
             }
 
             /// @dev The function responsible for processing L1->L2 transactions.
             /// @param txDataOffset The offset to the transaction's information
+            /// @param resultPtr The pointer at which the result of the execution of this transaction
             /// @param transactionIndex The index of the transaction
             /// @param gasPerPubdata The price per pubdata to be used
             /// should be stored.
@@ -831,7 +852,8 @@ object "Bootloader" {
                     transactionIndex, 
                     gasPerPubdata, 
                     L1_TX_INTRINSIC_L2_GAS(), 
-                    L1_TX_INTRINSIC_PUBDATA()
+                    L1_TX_INTRINSIC_PUBDATA(),
+                    0
                 )
 
                 let gasUsedOnPreparation := 0
@@ -841,6 +863,20 @@ object "Bootloader" {
 
                 let refundGas := 0
                 let success := 0
+
+                // The invariant that the user deposited more than the value needed
+                // for the transaction must be enforced on L1, but we double check it here
+                let gasLimit := getGasLimit(innerTxDataOffset)
+
+                // Note, that for now the property of block.base <= tx.maxFeePerGas does not work 
+                // for L1->L2 transactions. For now, these transactions are processed with the same gasPrice
+                // they were provided on L1. In the future, we may apply a new logic for it.
+                let gasPrice := getMaxFeePerGas(innerTxDataOffset)
+                let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                let value := getValue(innerTxDataOffset)
+                if lt(getReserved0(innerTxDataOffset), safeAdd(value, txInternalCost, "ol")) {
+                    assertionError("deposited eth too low")
+                }
                 
                 if gt(gasLimitForTx, gasUsedOnPreparation) {
                     let potentialRefund := 0
@@ -850,30 +886,40 @@ object "Bootloader" {
                     // Asking the operator for refund
                     askOperatorForRefund(potentialRefund)
 
-                    // In case the operator provided smaller refund that the one calculated
+                    // In case the operator provided smaller refund than the one calculated
                     // by the bootloader, we return the refund calculated by the bootloader.
                     refundGas := max(getOperatorRefundForTx(transactionIndex), potentialRefund)
                 }
+
+                let payToOperator := safeMul(gasPrice, safeSub(gasLimit, refundGas, "lpah"), "mnk")
 
                 // Note, that for now, the L1->L2 transactions are free, i.e. the gasPrice
                 // for such transactions is always zero, so the `refundGas` is not used anywhere
                 // except for notifications for the operator for API purposes. 
                 notifyAboutRefund(refundGas)
 
+                // Paying the fee to the operator
+                mintEther(BOOTLOADER_FORMAL_ADDR(), payToOperator, false)
+
+                let toRefundRecipient
                 switch success
                 case 0 {
                     // If the transaction reverts, then minting the msg.value to the user has been reverted
                     // as well, so we can simply mint everything that the user has deposited to 
                     // the refund recipient
-                    mintEther(getReserved1(innerTxDataOffset), getReserved0(innerTxDataOffset), false)
+
+                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
                 }
                 default {
-                    // If the transaction succeeds, then it is assumed that msg.value was transfered correctly. However, the remaining 
+                    // If the transaction succeeds, then it is assumed that msg.value was transferred correctly. However, the remaining 
                     // ETH deposited will be given to the refund recipient.
 
-                    let toRefundRecipient := sub(getReserved0(innerTxDataOffset), getValue(innerTxDataOffset))
-                    mintEther(getReserved1(innerTxDataOffset), toRefundRecipient, false)
+                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), safeAdd(getValue(innerTxDataOffset), payToOperator, "kpa"), "ysl")
                 }
+
+                if gt(toRefundRecipient, 0) {
+                    mintEther(getReserved1(innerTxDataOffset), toRefundRecipient, false)
+                } 
 
                 mstore(resultPtr, success)
                 
@@ -906,6 +952,10 @@ object "Bootloader" {
                 }
             }
 
+            /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.
+            /// @param txDataOffset The offset to the transaction's information
+            /// @return canonicalL1TxHash The hash of processed L1->L2 transaction
+            /// @return gasUsedOnPreparation The number of L2 gas used in the preparation stage
             function l1TxPreparation(txDataOffset) -> canonicalL1TxHash, gasUsedOnPreparation {
                 let innerTxDataOffset := add(txDataOffset, 0x20)
                 
@@ -919,7 +969,7 @@ object "Bootloader" {
 
                 markFactoryDepsForTx(innerTxDataOffset, true)
 
-                gasUsedOnPreparation := sub(gasBeforePreparation, gas())
+                gasUsedOnPreparation := safeSub(gasBeforePreparation, gas(), "xpa")
                 debugLog("gasUsedOnPreparation", gasUsedOnPreparation)
             }
 
@@ -970,7 +1020,16 @@ object "Bootloader" {
             ) {
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                let gasLimitForTx := getGasLimitForTx(innerTxDataOffset, transactionIndex, gasPerPubdata, L2_TX_INTRINSIC_GAS(), L2_TX_INTRINSIC_PUBDATA())
+                // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
+                // bytecodes usually form the bulk of the L2 gas prices.
+                let spentOnFactoryDeps
+                {
+                    let preFactoryDep := gas()
+                    markFactoryDepsForTx(innerTxDataOffset, false)
+                    spentOnFactoryDeps := sub(preFactoryDep, gas())
+                }
+                
+                let gasLimitForTx := getGasLimitForTx(innerTxDataOffset, transactionIndex, gasPerPubdata, L2_TX_INTRINSIC_GAS(), L2_TX_INTRINSIC_PUBDATA(), spentOnFactoryDeps)
                 let gasPrice := getGasPrice(getMaxFeePerGas(innerTxDataOffset), getMaxPriorityFeePerGas(innerTxDataOffset))
 
                 debugLog("gasLimitForTx", gasLimitForTx)
@@ -1003,37 +1062,65 @@ object "Bootloader" {
                 mstore(resultPtr, success)
             }
 
+            /// @dev Calculates the L2 gas limit for the transaction's body, i.e. without intrinsic costs and overhead.
+            /// @param innerTxDataOffset The offset for the ABI-encoded Transaction struct fields.
+            /// @param transactionIndex The index of the transaction within the block.
+            /// @param gasPerPubdata The price for a pubdata byte in L2 gas.
+            /// @param intrinsicGas The intrinsic number of L2 gas required for transaction processing.
+            /// @param intrinsicPubdata The intrinsic number of pubdata bytes required for transaction processing.
+            /// @return gasLimitForTx The maximum number of L2 gas that can be spent on a transaction.
             function getGasLimitForTx(
                 innerTxDataOffset,
                 transactionIndex,
                 gasPerPubdata,
                 intrinsicGas,
-                intrinsicPubdata
+                intrinsicPubdata,
+                preSpent
             ) -> gasLimitForTx {
                 let totalGasLimit := getGasLimit(innerTxDataOffset)
-                let txEncodingLen := add(0x20, getDataLength(innerTxDataOffset))
 
-                // TODO (SMA-1715): charge overhead for transaction after refining the fee model
-                let operatorOverheadForTransaction := 0
+                // `MAX_GAS_PER_TRANSACTION` is the amount of gas each transaction 
+                // is guaranteed to get, so even if the operator does not trust the account enough,
+                // it is still obligated to provide at least that
+                let operatorTrustedErgsLimit := max(MAX_GAS_PER_TRANSACTION(), getOperatorTrustedGasLimitForTx(transactionIndex))
+                totalGasLimit := min(operatorTrustedErgsLimit, totalGasLimit)
 
-                // let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
-                //     transactionIndex,
-                //     totalGasLimit,
-                //     gasPerPubdata,
-                //     txEncodingLen
-                // )
-                gasLimitForTx := sub(totalGasLimit, operatorOverheadForTransaction)
+                let txEncodingLen := safeAdd(0x20, getDataLength(innerTxDataOffset), "lsh")
 
-                let intrinsicOverhead := add(intrinsicGas, mul(intrinsicPubdata, gasPerPubdata))
-                switch lt(gasLimitForTx, intrinsicOverhead)
+                let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
+                    transactionIndex,
+                    totalGasLimit,
+                    gasPerPubdata,
+                    txEncodingLen
+                )
+                gasLimitForTx := safeSub(totalGasLimit, operatorOverheadForTransaction, "qr")
+
+                let intrinsicOverhead := safeAdd(
+                    intrinsicGas, 
+                    // the error messages are trimmed to fit into 32 bytes
+                    safeMul(intrinsicPubdata, gasPerPubdata, "qw"),
+                    "fj" 
+                )
+                preSpent := safeAdd(preSpent, intrinsicOverhead, "pl")
+
+                switch lt(gasLimitForTx, preSpent)
                 case 1 {
                     gasLimitForTx := 0
                 }
                 default {
-                    gasLimitForTx := sub(gasLimitForTx, intrinsicOverhead)
+                    gasLimitForTx := sub(gasLimitForTx, preSpent)
                 }
+
+                // Making sure that the body of the transaction does not have more gas
+                // than allowed by DDoS safety
+                gasLimitForTx := min(MAX_GAS_PER_TRANSACTION(), gasLimitForTx)
             }
 
+            /// @dev The function responsible for the L2 transaction validation.
+            /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param gasLimitForTx The L2 gas limit for the transaction validation & execution.
+            /// @param gasPrice The L2 gas price that should be used by the transaction.
+            /// @return ergsLeft The ergs left after the validation step.
             function l2TxValidation(
                 txDataOffset,
                 gasLimitForTx,
@@ -1081,6 +1168,11 @@ object "Bootloader" {
                 setHook(VM_HOOK_VALIDATION_STEP_ENDED())
             }
 
+            /// @dev The function responsible for the execution step of the L2 transaction.
+            /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param ergsLeft The ergs left after the validation step.
+            /// @return success Whether or not the execution step was successful.
+            /// @return ergsSpentOnExecute The ergs spent on the transaction execution.
             function l2TxExecution(
                 txDataOffset,
                 gasLeft,
@@ -1115,7 +1207,6 @@ object "Bootloader" {
                 let innerTxDataOffset := add(txDataOffset, 0x20)
                 debugLog("Starting validation", 0)
 
-                markFactoryDepsForTx(innerTxDataOffset, false)
                 accountValidateTx(txDataOffset)
                 debugLog("Tx validation complete", 1)
                 
@@ -1161,6 +1252,8 @@ object "Bootloader" {
                 gasLeft,
                 gasPrice
             ) -> finalRefund {
+                setTxOrigin(BOOTLOADER_FORMAL_ADDR())
+
                 finalRefund := 0
 
                 let innerTxDataOffset := add(txDataOffset, 0x20)
@@ -1205,7 +1298,15 @@ object "Bootloader" {
                 // If the operator provides the value that is lower than the one suggested for 
                 // the bootloader, we will use the one calculated by the bootloader.
                 let refundInGas := max(operatorProvidedRefund, gasLeft)
-                let ethToRefund := mul(refundInGas, gasPrice)
+                if iszero(validateUint32(refundInGas)) {
+                    assertionError("refundInGas is not uint32")
+                }
+
+                let ethToRefund := safeMul(
+                    refundInGas, 
+                    gasPrice, 
+                    "fdf" // The message is shortened to fit into 32 bytes
+                ) 
 
                 directETHTransfer(ethToRefund, refundRecipient)
 
@@ -1236,27 +1337,40 @@ object "Bootloader" {
                 }
             }
 
+            /// @dev Return the operator suggested transaction refund.
             function getOperatorRefundForTx(transactionIndex) -> ret {
                 let refundPtr := add(TX_OPERATOR_REFUND_BEGIN_BYTE(), mul(transactionIndex, 32))
                 ret := mload(refundPtr)
             }
 
+            /// @dev Return the operator suggested transaction overhead cost.
             function getOperatorOverheadForTx(transactionIndex) -> ret {
                 let txBlockOverheadPtr := add(TX_SUGGESTED_OVERHEAD_BEGIN_BYTE(), mul(transactionIndex, 32))
                 ret := mload(txBlockOverheadPtr)
             }
 
+            /// @dev Return the operator's "trusted" transaction gas limit
+            function getOperatorTrustedGasLimitForTx(transactionIndex) -> ret {
+                let txTrustedGasLimitPtr := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_BYTE(), mul(transactionIndex, 32))
+                ret := mload(txTrustedGasLimitPtr)
+            }
+
+            /// @dev Get checked for overcharged operator's overhead for the transaction.
+            /// @param transactionIndex The index of the transaction in the batch
+            /// @param txTotalGasLimit The total gass limit of the transaction (including the overhead).
+            /// @param gasPerPubdataByte The price for pubdata byte in ergs.
+            /// @param txEncodeLen The length of the ABI-encoding of the transaction
             function getVerifiedOperatorOverheadForTx(
                 transactionIndex,
                 txTotalGasLimit,
                 gasPerPubdataByte,
                 txEncodeLen
             ) -> ret {
-                let overhead := getOperatorOverheadForTx(transactionIndex)
-                if gt(overhead, txTotalGasLimit) {
+                let operatorOverheadForTransaction := getOperatorOverheadForTx(transactionIndex)
+                if gt(operatorOverheadForTransaction, txTotalGasLimit) {
                     assertionError("Overhead higher than gasLimit")
                 }
-                let txGasLimit := sub(txTotalGasLimit, overhead)
+                let txGasLimit := min(safeSub(txTotalGasLimit, operatorOverheadForTransaction, "www"), MAX_GAS_PER_TRANSACTION())
 
                 let requiredOverhead := getTransactionUpfrontOverhead(
                     txGasLimit,
@@ -1264,16 +1378,17 @@ object "Bootloader" {
                     txEncodeLen
                 )
 
+                debugLog("txTotalGasLimit", txTotalGasLimit)
                 debugLog("requiredOverhead", requiredOverhead)
-                debugLog("overhead", overhead)
+                debugLog("operatorOverheadForTransaction", operatorOverheadForTransaction)
 
                 // The required overhead is less than the overhead that the operator
                 // has requested from the user, meaning that the operator tried to overcharge the user
-                if lt(requiredOverhead, overhead) {
+                if lt(requiredOverhead, operatorOverheadForTransaction) {
                     assertionError("Operator's overhead too high")
                 }
 
-                ret := overhead
+                ret := operatorOverheadForTransaction
             }
 
             /// @dev Function responsible for the execution of the L1->L2 transaction.
@@ -1302,14 +1417,8 @@ object "Bootloader" {
                 setGasPrice(gasPrice)
 
                 debugLog("execution itself", 0)
-                
-                let value := getValue(innerTxDataOffset)
-                // The invariant that the user deposited more than the value needed
-                // for the transaction must be enforced on L1, but we double check it here
-                if lt(getReserved0(innerTxDataOffset), value) {
-                    assertionError("deposited eth too low")
-                }
 
+                let value := getValue(innerTxDataOffset)
                 if value {
                     mintEther(from, value, true)
                 }
@@ -1440,7 +1549,7 @@ object "Bootloader" {
 
                 // Using margin of CHECK_ENOUGH_GAS_OVERHEAD gas to make sure that the operation will indeed
                 // have enough gas 
-                if lt(gas(), add(gasToProvide, CHECK_ENOUGH_GAS_OVERHEAD())) {
+                if lt(gas(), safeAdd(gasToProvide, CHECK_ENOUGH_GAS_OVERHEAD(), "cjq")) {
                     revertWithReason(NOT_ENOUGH_GAS_PROVIDED_ERR_CODE(), 0)
                 }
             }
@@ -1456,9 +1565,13 @@ object "Bootloader" {
                 // pubdata to pay for.
                 // The difference between ceil and floor division here is negligible,
                 // so we prefer doing the cheaper operation for the end user
-                let pubdataEquivalentForL1Gas := div(l1GasOverhead, l1GasPerPubdata)
+                let pubdataEquivalentForL1Gas := safeDiv(l1GasOverhead, l1GasPerPubdata, "dd")
                 
-                ret := add(computationOverhead, mul(gasPerPubdata, pubdataEquivalentForL1Gas))
+                ret := safeAdd(
+                    computationOverhead, 
+                    safeMul(gasPerPubdata, pubdataEquivalentForL1Gas, "aa"),
+                    "ab"
+                )
             }
 
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
@@ -1489,7 +1602,7 @@ object "Bootloader" {
                 debugLog("totalBlockOverhead", totalBlockOverhead)
 
                 let overheadForCircuits := ceilDiv(
-                    mul(totalBlockOverhead, txGasLimit),
+                    safeMul(totalBlockOverhead, txGasLimit, "ac"),
                     MAX_GAS_PER_TRANSACTION()
                 )
                 ret := max(ret, overheadForCircuits)
@@ -1497,7 +1610,7 @@ object "Bootloader" {
 
                 
                 let overheadForLength := ceilDiv(
-                    mul(txEncodeLen, totalBlockOverhead),
+                    safeMul(txEncodeLen, totalBlockOverhead, "ad"),
                     BOOTLOADER_MEMORY_FOR_TXS()
                 )
                 ret := max(ret, overheadForLength)
@@ -1522,12 +1635,13 @@ object "Bootloader" {
 
                 // We use "ceil" here for formal reasons to allow easier approach for calculating the overhead in O(1) for L1
                 // calculation.
-                let maxPubdataInTx := ceilDiv(txGasLimit, gasPerPubdataByte)
-                let overheadForPubdata := ceilDiv(
-                    mul(maxPubdataInTx, totalBlockOverhead),
-                    MAX_PUBDATA_PER_BLOCK()
-                )
-                ret := max(ret, overheadForPubdata)
+                // TODO: possibly pay for pubdata overhead
+                // let maxPubdataInTx := ceilDiv(txGasLimit, gasPerPubdataByte)
+                // let overheadForPubdata := ceilDiv(
+                //     safeMul(maxPubdataInTx, totalBlockOverhead),
+                //     MAX_PUBDATA_PER_BLOCK()
+                // )
+                // ret := max(ret, overheadForPubdata)
             }
 
             /// @dev A method where all panics in the nearCalls get to.
@@ -1814,7 +1928,7 @@ object "Bootloader" {
                     // valid encoding of the transaction
                 }
 
-                let calldataLen := add(preTxLen, getDataLength(innerTxDataOffset))
+                let calldataLen := safeAdd(preTxLen, getDataLength(innerTxDataOffset), "jiq")
                 
                 success := call(
                     gas(),
@@ -1835,7 +1949,7 @@ object "Bootloader" {
                     assertionError("Memcopy with unaligned length")
                 }
 
-                let finalFrom := add(from, len)
+                let finalFrom := safeAdd(from, len, "cka")
 
                 for { } lt(from, finalFrom) { 
                     from := add(from, 32)
@@ -1896,7 +2010,7 @@ object "Bootloader" {
                 // `SHOULD_ENSURE_CORRECT_RETURNED_MAGIC` is false. It is never false in production
                 // but it is so in fee estimation and we want to preserve as many operations as 
                 // in the original operation.
-                returndatacopy(0, 0, 32)
+                returndatacopy(0, 0, 0x20)
                 let returnedValue := mload(0)
                 let isMagicCorrect := eq(returnedValue, {{SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE}})
 
@@ -1937,7 +2051,7 @@ object "Bootloader" {
                 // Saving the array
 
                 // We also need to include 32 bytes for the length itself
-                let arrayLengthBytes := add(32, mul(factoryDepsLength, 32))
+                let arrayLengthBytes := safeAdd(32, safeMul(factoryDepsLength, 32, "ag"), "af")
                 // Copying factory deps array
                 memCopy(factoryDepsPtr, ptr, arrayLengthBytes)
     
@@ -1948,7 +2062,7 @@ object "Bootloader" {
                     // Shifting by 28 to start from the selector
                     add(NEW_FACTORY_DEPS_BEGIN_BYTE(), 28),
                     // 4 (selector) + 32 (send to l1 flag) + 32 (factory deps offset)+ 32 (factory deps length)
-                    add(100, mul(factoryDepsLength, 32)),
+                    safeAdd(100, safeMul(factoryDepsLength, 32, "op"), "ae"),
                     0,
                     0
                 )
@@ -2303,6 +2417,11 @@ object "Bootloader" {
                         // whether the transaction should include chainId in its encoding.
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
+                        
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
@@ -2316,6 +2435,11 @@ object "Bootloader" {
 
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
+                        
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
@@ -2326,6 +2450,11 @@ object "Bootloader" {
                     case 2 {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
+                        
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
@@ -2334,6 +2463,12 @@ object "Bootloader" {
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
                     }
                     case 113 {
+                        let paymaster := getPaymaster(innerTxDataOffset)
+
+                        assertEq(or(gt(paymaster, MAX_SYSTEM_CONTRACT_ADDR()), iszero(paymaster)), 1, "paymaster in kernel space")
+                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
@@ -2436,7 +2571,7 @@ object "Bootloader" {
     
             function getFactoryDepsBytesLength(innerTxDataOffset) -> ret {
                 let ptr := getFactoryDepsPtr(innerTxDataOffset)
-                ret := mul(mload(ptr),32)
+                ret := safeMul(mload(ptr),32, "fwop")
             }
     
             function getPaymasterInputPtr(innerTxDataOffset) -> ret {
@@ -2465,7 +2600,13 @@ object "Bootloader" {
     
             /// This method checks that the transaction's structure is correct
             /// and tightly packed
-            function validateAbiEncoding(innerTxDataOffset) -> ret {
+            function validateAbiEncoding(txDataOffset) -> ret {
+                if iszero(eq(mload(txDataOffset), 0x20)) {
+                    assertionError("Encoding offset")
+                }
+
+                let innerTxDataOffset := add(txDataOffset, 0x20)
+
                 let fromValue := getFrom(innerTxDataOffset)
                 if iszero(validateAddress(fromValue)) {
                     assertionError("Encoding from")
@@ -2487,12 +2628,12 @@ object "Bootloader" {
                 }
 
                 let maxFeePerGas := getMaxFeePerGas(innerTxDataOffset)
-                if iszero(validateUint64(maxFeePerGas)) {
+                if iszero(validateUint128(maxFeePerGas)) {
                     assertionError("Encoding maxFeePerGas")
                 }
 
                 let maxPriorityFeePerGas := getMaxPriorityFeePerGas(innerTxDataOffset)
-                if iszero(validateUint64(maxPriorityFeePerGas)) {
+                if iszero(validateUint128(maxPriorityFeePerGas)) {
                     assertionError("Encoding maxPriorityFeePerGas")
                 }
     
@@ -2542,11 +2683,11 @@ object "Bootloader" {
                 // in bytes.
                 ret := 768
 
-                ret := add(ret, getDataBytesLength(innerTxDataOffset))        
-                ret := add(ret, getSignatureBytesLength(innerTxDataOffset))
-                ret := add(ret, getFactoryDepsBytesLength(innerTxDataOffset))
-                ret := add(ret, getPaymasterInputBytesLength(innerTxDataOffset))
-                ret := add(ret, getReservedDynamicBytesLength(innerTxDataOffset))
+                ret := safeAdd(ret, getDataBytesLength(innerTxDataOffset), "asx")        
+                ret := safeAdd(ret, getSignatureBytesLength(innerTxDataOffset), "qwqa")
+                ret := safeAdd(ret, getFactoryDepsBytesLength(innerTxDataOffset), "sic")
+                ret := safeAdd(ret, getPaymasterInputBytesLength(innerTxDataOffset), "tpiw")
+                ret := safeAdd(ret, getReservedDynamicBytesLength(innerTxDataOffset), "shy")
             }
 
             /// 
@@ -2571,6 +2712,12 @@ object "Bootloader" {
                 ret := lt(x, shl(64,1))
             }
 
+            /// @dev Accepts an uint32 and returns whether or not it is
+            /// a valid uint64
+            function validateUint128(x) -> ret {
+                ret := lt(x, shl(128,1))
+            }
+
             /// Validates that the `bytes` is formed correctly
             /// and returns the pointer right after the end of the bytes
             function validateBytes(bytesPtr) -> bytesEnd {
@@ -2582,7 +2729,7 @@ object "Bootloader" {
                     // If the length is divisible by 32, then 
                     // the bytes occupy whole words, so there is
                     // nothing to validate
-                    bytesEnd := add(bytesPtr, add(length, 32)) 
+                    bytesEnd := safeAdd(bytesPtr, safeAdd(length, 32, "pol"), "aop") 
                 }
                 default {
                     // If the length is not divisible by 32, then 
@@ -2595,7 +2742,7 @@ object "Bootloader" {
                     let mask := sub(shl(mul(zeroBytes,8),1),1)
 
                     let fullLen := lengthRoundedByWords(length)
-                    bytesEnd := add(bytesPtr, add(32, fullLen))
+                    bytesEnd := safeAdd(bytesPtr, safeAdd(32, fullLen, "dza"), "dzp")
 
                     let lastWord := mload(sub(bytesEnd, 32))
 
@@ -2613,7 +2760,50 @@ object "Bootloader" {
                 // The bytes32[] array takes full words which may contain any content.
                 // Thus, there is nothing to validate.
                 let length := mload(arrayPtr)
-                arrayEnd := add(arrayPtr, add(32, mul(length, 32)))
+                arrayEnd := safeAdd(arrayPtr, safeAdd(32, safeMul(length, 32, "lop"), "asa"), "sp")
+            }
+
+            ///
+            /// Safe math utilities
+            ///
+
+            /// @dev Returns the multiplication of two unsigned integers, reverting on overflow.
+            function safeMul(x, y, errMsg) -> ret {
+                switch y
+                case 0 {
+                    ret := 0
+                }
+                default {
+                    ret := mul(x, y)
+                    if iszero(eq(div(ret, y), x)) {
+                        assertionError(errMsg)
+                    }
+                }
+            }
+
+            /// @dev Returns the integer division of two unsigned integers. Reverts with custom message on
+            /// division by zero. The result is rounded towards zero.
+            function safeDiv(x, y, errMsg) -> ret {
+                if iszero(y) {
+                    assertionError(errMsg)
+                }
+                ret := div(x, y)
+            }
+
+            /// @dev Returns the addition of two unsigned integers, reverting on overflow.
+            function safeAdd(x, y, errMsg) -> ret {
+                ret := add(x, y)
+                if lt(ret, x) {
+                    assertionError(errMsg)
+                }
+            }
+
+            /// @dev Returns the addition of two unsigned integers, reverting on overflow.
+            function safeSub(x, y, errMsg) -> ret {
+                if gt(y, x) {
+                    assertionError(errMsg)
+                }
+                ret := sub(x, y)
             }
 
             ///
@@ -2662,7 +2852,7 @@ object "Bootloader" {
             }
 
             /// @dev Asks operator for the refund for the transaction. The function provides
-            /// provides the operator with the leftover gas found by the bootloader. 
+            /// the operator with the leftover gas found by the bootloader. 
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
             /// bring us to closing the block as well as how much the transaction 

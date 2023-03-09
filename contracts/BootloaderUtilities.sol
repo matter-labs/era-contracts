@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "./interfaces/IBootloaderUtilities.sol";
 import "./libraries/TransactionHelper.sol";
 import "./libraries/RLPEncoder.sol";
+import "./libraries/EfficientCall.sol";
 
 /**
  * @author Matter Labs
@@ -24,7 +25,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
     ) external view override returns (bytes32 txHash, bytes32 signedTxHash) {
         signedTxHash = _transaction.encodeHash();
         if (_transaction.txType == EIP_712_TX_TYPE) {
-            txHash = keccak256(bytes.concat(signedTxHash, keccak256(_transaction.signature)));
+            txHash = keccak256(bytes.concat(signedTxHash, EfficientCall.keccak(_transaction.signature)));
         } else if (_transaction.txType == LEGACY_TX_TYPE) {
             txHash = encodeLegacyTransactionHash(_transaction);
         } else if (_transaction.txType == EIP_1559_TX_TYPE) {
