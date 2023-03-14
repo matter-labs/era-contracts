@@ -6,21 +6,21 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IL2WethToken } from "./interfaces/IL2WethToken.sol";
 
 contract L2WethToken is IL2WethToken, Initializable {
-    string public _name;
-    string public _symbol;
-    uint8 public _decimals;
+    string public name;
+    string public symbol;
+    uint8 public decimals;
 
     mapping(address => uint) public override balanceOf;
     mapping(address => mapping(address => uint)) public override allowance;
 
     function initialize(
-        string memory name,
-        string memory symbol,
-        uint8 decimals
+        // string memory _name,
+        // string memory _symbol,
+        // uint8 _decimals
     ) external onlyInitializing {
-        _name = name;
-        _symbol = symbol;
-        _decimals = decimals;
+        name = "Wrapped Ether";
+        symbol = "WETH";
+        decimals = 18;
     }
 
     function deposit() public payable {
