@@ -2,11 +2,14 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+// import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+// import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "../../../ethereum/contracts/bridge/interfaces/IL1WethBridge.sol";
+import "./interfaces/IL1WethBridge.sol";
 import "./interfaces/IL2WethBridge.sol";
+import "./interfaces/IL2WethToken.sol";
 import "./interfaces/IEthToken.sol";
 
 import { L2WethToken } from "./L2WethToken.sol";
@@ -16,19 +19,21 @@ import { L2ContractHelper } from "../L2ContractHelper.sol";
 
 /// @title L2WethBridge
 /// @author Matter Labs
-contract L2WethBridge is IL2WethBridge , Initiazible {
+contract L2WethBridge is IL2WethBridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
 
     /// @dev WETH address on L1.
     address public override l1WethAddress;
 
+    address public l2EthAddress;
+
     /// @dev ETH token address on L2.
     address public l2EthTokenAddress;
 
     /// @dev Contract that store the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public l2WethBeaconProxy;
+    TransparentUpgradeableProxy public l2WethTransparentProxy;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -43,8 +48,8 @@ contract L2WethBridge is IL2WethBridge , Initiazible {
         address _governor
     ) external initializer {
         require(_l1Bridge != address(0), "bf");
-        require(_l1WethAddress != bytes32(0), "df");
-        require(_l2EthAddress != bytes32(0), "df");
+        require(_l1WethAddress != address(0), "df");
+        require(_l2EthAddress != address(0), "df");
         require(_governor != address(0), "sf");
 
         l1Bridge = _l1Bridge;
@@ -53,8 +58,7 @@ contract L2WethBridge is IL2WethBridge , Initiazible {
 
         // Deploy L2WethToken and transfer ownership to governor
         address l2WethToken = address(new L2WethToken{salt: bytes32(0)}());
-        l2WethBeaconProxy = new UpgradeableBeacon{salt: bytes32(0)}(l2WethToken);
-        l2WethBeaconProxy.transferOwnership(_governor);
+        l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, "");
     }
 
     /// @notice Initiate the withdrawal of WETH from L2 to L1 by sending a message to L1 and calling withdraw on L2EthToken contract
@@ -111,18 +115,18 @@ contract L2WethBridge is IL2WethBridge , Initiazible {
         address _to,
         uint256 _amount
     ) internal returns (uint256) {
-        IL2WethToken l2WethToken = IL2WethToken(l2WethBeaconProxy);
+        IL2WethToken l2WethToken = IL2WethToken(l2WethAddress());
 
-        uint256 balanceBefore = l2Weth.balanceOf(_to);
+        uint256 balanceBefore = l2WethToken.balanceOf(_to);
         l2WethToken.transferFrom(_from, _to, _amount);
-        uint256 balanceAfter = l2Weth.balanceOf(_to);
+        uint256 balanceAfter = l2WethToken.balanceOf(_to);
 
         return balanceAfter - balanceBefore;
     }
 
     /// @notice Get the address of the L2 WETH token
     /// @return The address of the L2 WETH token
-    function l2WethAddress() external view override returns (address) {
-        return l2WethBeaconProxy.implementation();
+    function l2WethAddress() public view override returns (address) {
+        return address(l2WethTransparentProxy);
     }
 }

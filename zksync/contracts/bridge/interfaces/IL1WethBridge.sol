@@ -4,6 +4,21 @@ pragma solidity ^0.8.0;
 
 /// @author Matter Labs
 interface IL1WethBridge {
+    struct FinalizeWithdrawalL2MessageIndexes {
+        uint256 ethL2MessageIndex;
+        uint256 wethL2MessageIndex;
+    }
+
+    struct FinalizeWithdrawalMessages {
+        bytes ethMessage;
+        bytes wethMessage;
+    }
+
+    struct FinalizeWithdrawalMerkleProofs {
+        bytes32[] ethProof;
+        bytes32[] wethProof;
+    }
+
     event DepositInitiated(address indexed from, address indexed to, address indexed l1Token, uint256 amount);
 
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
@@ -31,9 +46,9 @@ interface IL1WethBridge {
 
     function finalizeWithdrawal(
         uint256 _l2BlockNumber,
-        uint256[2] _l2MessageIndexes,
+        FinalizeWithdrawalL2MessageIndexes calldata _l2MessageIndexes,
         uint16 _l2TxNumberInBlock,
-        bytes[2] calldata _messages,
-        bytes32[2][] calldata _merkleProofs
+        FinalizeWithdrawalMessages calldata _messages,
+        FinalizeWithdrawalMerkleProofs calldata _merkleProofs
     ) external;
 }

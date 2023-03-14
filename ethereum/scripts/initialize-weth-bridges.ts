@@ -43,11 +43,11 @@ const L2_WETH_BRIDGE_PROXY_BYTECODE = readBytecode(
 );
 const L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethBridge');
 const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethToken');
-const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, 'BeaconProxy');
-const L2_WETH_PROXY_FACTORY_BYTECODE = readBytecode(
-    openzeppelinBeaconProxyArtifactsPath,
-    'UpgradeableBeacon'
-);
+const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, 'TransparentUpgradeableProxy');
+// const L2_WETH_PROXY_FACTORY_BYTECODE = readBytecode(
+//     openzeppelinBeaconProxyArtifactsPath,
+//     'UpgradeableBeacon'
+// );
 const L2_WETH_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2WethBridge');
 
 async function main() {
@@ -126,8 +126,8 @@ async function main() {
             );
             const l2WethProxyAddr = computeL2Create2Address(
                 l2WethBridgeProxyAddr,
-                L2_WETH_PROXY_FACTORY_BYTECODE,
-                ethers.utils.arrayify(abiCoder.encode(['address'], [l2WethAddr])),
+                L2_WETH_PROXY_BYTECODE,
+                ethers.utils.arrayify(abiCoder.encode(['address', 'address'], [l2WethAddr, governorAddress])),
                 ethers.constants.HashZero
             );
 
@@ -138,7 +138,7 @@ async function main() {
                     '0x',
                     priorityTxMaxGasLimit,
                     DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
-                    [L2_WETH_PROXY_FACTORY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
+                    [L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
                     deployWallet.address,
                     { gasPrice, nonce }
                 ),

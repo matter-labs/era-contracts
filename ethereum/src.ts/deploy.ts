@@ -65,7 +65,9 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         },
         Bridges: {
             ERC20BridgeImplementation: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR'),
-            ERC20BridgeProxy: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR')
+            ERC20BridgeProxy: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR'),
+            WethBridgeImplementation: getAddressFromEnv('CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR'),
+            WethBridgeProxy: getAddressFromEnv('CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR'),
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
         Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR')
