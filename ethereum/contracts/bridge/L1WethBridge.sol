@@ -316,7 +316,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     {
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + L2 sender address + L1 receiver address + uint256 = 4 + 20 + 20 + 32 = 76 (bytes).
-        require(_message.length == 72);
+        require(_message.length == 76);
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(bytes4(functionSignature) == this.finalizeWithdrawal.selector);
