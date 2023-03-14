@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IL1WethBridge.sol";
+import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IWETH9.sol";
 
 import "../zksync/interfaces/IMailbox.sol";
@@ -15,12 +16,13 @@ import "../common/ReentrancyGuard.sol";
 import "../common/L2ContractHelper.sol";
 import "../zksync/Storage.sol";
 import "../zksync/Config.sol";
+import "../vendor/AddressAliasHelper.sol";
 
 contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1
-    address public immutable l1WethAddress;
+    address payable public immutable l1WethAddress;
 
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList immutable allowList;
@@ -35,8 +37,8 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     /// NOTE: this constant will be accurately calculated in the future.
     uint256 constant DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = $(PRIORITY_TX_MAX_GAS_LIMIT);
 
-    /// @dev The default l2GasPricePerPubdata to be used in bridges.
-    uint256 constant DEFAULT_L2_GAS_PRICE_PER_PUBDATA = $(DEFAULT_L2_GAS_PRICE_PER_PUBDATA);
+    // /// @dev The default l2GasPricePerPubdata to be used in bridges.
+    // uint256 constant DEFAULT_L2_GAS_PRICE_PER_PUBDATA = $(DEFAULT_L2_GAS_PRICE_PER_PUBDATA);
 
     /// @dev A mapping L2 block number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
@@ -61,7 +63,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        address _l1WethAddress,
+        address payable _l1WethAddress,
         IMailbox _mailbox,
         IAllowList _allowList
     ) reentrancyGuardInitializer {
@@ -103,7 +105,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         {
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
-                IL2Bridge.initialize,
+                IL2WethBridge.initialize,
                 (address(this), l1WethAddress, L2_ETH_TOKEN_ADDRESS, _governor)
             );
             l2WethBridgeProxyConstructorData = abi.encode(wethBridgeImplementationAddr, _governor, proxyInitializationParams);
@@ -181,9 +183,9 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         );
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositAmount[msg.sender][l1WethAddress][txHash] = amount;
+        depositAmount[msg.sender][l1WethAddress][txHash] = _amount;
 
-        emit DepositInitiated(msg.sender, _l2Receiver, l1WethAddress, amount);
+        emit DepositInitiated(msg.sender, _l2Receiver, l1WethAddress, _amount);
     }
 
     /// @dev Transfers WETH tokens from the depositor to the receiver address
@@ -223,50 +225,40 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     function _getDepositL2Calldata(
         address _l1Sender,
         address _l2Receiver
-    ) internal view returns (bytes memory txCalldata) {
+    ) internal pure returns (bytes memory txCalldata) {
         txCalldata = abi.encodeCall(
-            IL2Bridge.finalizeDeposit,
+            IL2WethBridge.finalizeDeposit,
             (_l1Sender, _l2Receiver)
         );
     }
 
     /// @notice Finalize the WETH withdrawal and release funds
     /// @param _l2BlockNumber The L2 block number where the WETH withdrawal was processed
-    /// @param _l2MessageIndexes The position in the L2 logs Merkle tree of the l2Logs that were sent with the ETH and WETH withdrawal messages, respectively
+    /// @param _l2MessageIndexes The position in the L2 logs Merkle tree of the l2Logs that were sent with the ETH and WETH withdrawal messages
     /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the ETH and WETH withdrawal logs were sent
     /// @param _messages The L2 ETH and WETH withdraw data, stored in an L2 -> L1 messages
     /// @param _merkleProofs The Merkle proofs of the inclusion L2 -> L1 messages about ETH and WETH withdrawal initializations
     function finalizeWithdrawal(
         uint256 _l2BlockNumber,
-        uint256[2] _l2MessageIndexes,
+        FinalizeWithdrawalL2MessageIndexes calldata _l2MessageIndexes,
         uint16 _l2TxNumberInBlock,
-        bytes[2] calldata _messages,
-        bytes32[2][] calldata _merkleProofs
+        FinalizeWithdrawalMessages calldata _messages,
+        FinalizeWithdrawalMerkleProofs calldata _merkleProofs
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes[1]], "WETH withdrawal is already finalized");
+        require(!isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex], "WETH withdrawal is already finalized");
 
-        L2Message memory l2ToL1EthMessage = L2Message({
-            txNumberInBlock: _l2TxNumberInBlock,
-            sender: L2_ETH_TOKEN_ADDRESS,
-            data: _messages[0]
-        });
+        _proveL2MessagesInclusion(
+            _l2BlockNumber,
+            _l2MessageIndexes,
+            _l2TxNumberInBlock,
+            _messages,
+            _merkleProofs
+        );
 
-        bool ethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes[0], l2ToL1EthMessage, _merkleProofs[0]);
-        require(ethMessageProofValid, "ETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that ETH withdrawal was actually initialized on L2
-
-        L2Message memory l2ToL1WethMessage = L2Message({
-            txNumberInBlock: _l2TxNumberInBlock,
-            sender: l2WethBridge,
-            data: _messages[1]
-        });
-
-        bool wethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes[1], l2ToL1WethMessage, _merkleProofs[1]);
-        require(wethMessageProofValid, "WETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that WETH withdrawal was actually initialized on L2
-
-        (address _l1EthWithdrawReceiver, uint256 _ethAmount) = _parseL2EthWithdrawalMessage(_messages[0]);
+        (address _l1EthWithdrawReceiver, uint256 _ethAmount) = _parseL2EthWithdrawalMessage(_messages.ethMessage);
         require(_l1EthWithdrawReceiver == address(this), "Wrong L1 ETH withdraw receiver");
 
-        (address _l1WethWithdrawReceiver, uint256 _wethAmount) = _parseL2WethWithdrawalMessage(_messages[1]);
+        (address _l1WethWithdrawReceiver, uint256 _wethAmount) = _parseL2WethWithdrawalMessage(_messages.wethMessage);
         require(_l1WethWithdrawReceiver != address(0), "L1 WETH withdraw receiver is zero address");
 
         require(_ethAmount == _wethAmount, "Unequal ETH and WETH amounts in the L2 -> L1 messages");
@@ -274,10 +266,10 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         // Widthdraw ETH to smart contract address
         zkSyncMailbox.finalizeEthWithdrawal(
             _l2BlockNumber,
-            _l2MessageIndexes[0],
+            _l2MessageIndexes.ethL2MessageIndex,
             _l2TxNumberInBlock,
-            _messages[0],
-            _merkleProofs[0]
+            _messages.ethMessage,
+            _merkleProofs.ethProof
         );
 
         // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
@@ -285,10 +277,37 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
 
         // Transfer WETH tokens from the smart contract address to the withdrawal receiver
         uint256 withdrawnAmount = _transferWethFunds(address(this), _l1WethWithdrawReceiver, _wethAmount);
+        require(withdrawnAmount == _wethAmount, "Incorrect amount of funds withdrawn");
 
-        isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes[1]] = true;
+        isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex] = true;
 
         emit WithdrawalFinalized(_l1WethWithdrawReceiver, l1WethAddress, _wethAmount);
+    }
+
+    function _proveL2MessagesInclusion(
+        uint256 _l2BlockNumber,
+        FinalizeWithdrawalL2MessageIndexes calldata _l2MessageIndexes,
+        uint16 _l2TxNumberInBlock,
+        FinalizeWithdrawalMessages calldata _messages,
+        FinalizeWithdrawalMerkleProofs calldata _merkleProofs
+    ) internal view {
+        L2Message memory l2ToL1EthMessage = L2Message({
+            txNumberInBlock: _l2TxNumberInBlock,
+            sender: L2_ETH_TOKEN_ADDRESS,
+            data: _messages.ethMessage
+        });
+
+        bool ethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes.ethL2MessageIndex, l2ToL1EthMessage, _merkleProofs.ethProof);
+        require(ethMessageProofValid, "ETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that ETH withdrawal was actually initialized on L2
+
+        L2Message memory l2ToL1WethMessage = L2Message({
+            txNumberInBlock: _l2TxNumberInBlock,
+            sender: l2WethBridge,
+            data: _messages.wethMessage
+        });
+
+        bool wethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes.wethL2MessageIndex, l2ToL1WethMessage, _merkleProofs.wethProof);
+        require(wethMessageProofValid, "WETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that WETH withdrawal was actually initialized on L2
     }
 
     /// @dev Decode the ETH withdraw message that came from L2EthToken contract
@@ -302,7 +321,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         require(_message.length == 56);
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(bytes4(functionSignature) == zkSyncMailbox.finalizeEthWithdrawal.selector);
+        require(bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector);
 
         (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_message, offset);
@@ -321,6 +340,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(bytes4(functionSignature) == this.finalizeWithdrawal.selector);
 
+        address l2WethSender;
         (l2WethSender, offset) = UnsafeBytes.readAddress(_message, offset);
         (l1WethReceiver, offset) = UnsafeBytes.readAddress(_message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_message, offset);
