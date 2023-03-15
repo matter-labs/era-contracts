@@ -3,8 +3,8 @@ import * as chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SYSTEM_CONTRACTS_PATH = path.join(process.env.ZKSYNC_HOME as string);
-const BOOTLOADER_PATH = path.join(process.env.ZKSYNC_HOME as string);
+// const SYSTEM_CONTRACTS_PATH = path.join(process.env.ZKSYNC_HOME as string);
+// const BOOTLOADER_PATH = path.join(process.env.ZKSYNC_HOME as string);
 
 const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
@@ -64,12 +64,12 @@ export function applyL1ToL2Alias(address: string): string {
 }
 
 export function readBlockBootloaderBytecode() {
-    return fs.readFileSync(`${BOOTLOADER_PATH}/build/artifacts/proved_block.yul/proved_block.yul.zbin`);
+    return fs.readFileSync(`/build/artifacts/proved_block.yul/proved_block.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
     const artifact = fs.readFileSync(
-        `${SYSTEM_CONTRACTS_PATH}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
+        `/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
     );
     return JSON.parse(artifact.toString()).bytecode;
 }

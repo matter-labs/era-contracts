@@ -19,8 +19,8 @@ import {
     readBlockBootloaderBytecode
 } from '../scripts/utils';
 
-const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+// const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+// const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
 
 export interface DeployedAddresses {
     ZkSync: {
@@ -42,6 +42,7 @@ export interface DeployedAddresses {
     };
     AllowList: string;
     Create2Factory: string;
+    WethToken: string;
 }
 
 export interface DeployerConfig {
@@ -70,7 +71,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             WethBridgeProxy: getAddressFromEnv('CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR'),
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
-        Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR')
+        Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR'),
+        WethToken: getAddressFromEnv('CONTRACTS_L1_WETH_TOKEN_ADDR')
     };
 }
 
@@ -126,22 +128,22 @@ export class Deployer {
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
-        const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
-            this.addresses.ZkSync.Verifier,
-            this.governorAddress,
-            validatorAddress,
-            genesisBlockHash,
-            genesisRollupLeafIndex,
-            genesisBlockCommitment,
-            this.addresses.AllowList,
-            verifierParams,
-            false, // isPorterAvailable
-            L2_BOOTLOADER_BYTECODE_HASH,
-            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-            priorityTxMaxGasLimit
-        ]);
+        // const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
+        //     this.addresses.ZkSync.Verifier,
+        //     this.governorAddress,
+        //     validatorAddress,
+        //     genesisBlockHash,
+        //     genesisRollupLeafIndex,
+        //     genesisBlockCommitment,
+        //     this.addresses.AllowList,
+        //     verifierParams,
+        //     false, // isPorterAvailable
+        //     L2_BOOTLOADER_BYTECODE_HASH,
+        //     L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+        //     priorityTxMaxGasLimit
+        // ]);
 
-        return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
+        // return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
     }
 
     public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -329,6 +331,25 @@ export class Deployer {
         this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
     }
 
+    public async deployWethToken(
+        create2Salt: string,
+        ethTxOptions: ethers.providers.TransactionRequest
+    ) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2(
+            'WETH9',
+            [],
+            create2Salt,
+            ethTxOptions
+        );
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_L1_WETH_TOKEN_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.WethToken = contractAddress;
+    }
+
     public async deployWethBridgeImplementation(
         create2Salt: string,
         ethTxOptions: ethers.providers.TransactionRequest
@@ -443,8 +464,9 @@ export class Deployer {
     public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
-        await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+        await this.deployWethToken(create2Salt, { gasPrice, nonce: nonce });
+        await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce + 1 });
+        await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 2 });
     }
 
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

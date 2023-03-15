@@ -15,10 +15,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+// const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+// const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, 'contracts/zksync/artifacts-zk/');
+const contractArtifactsPath = path.join('/home/miroslav/TxFusion/forks/era-contracts/zksync/artifacts-zk/');
 
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
 
@@ -26,7 +26,7 @@ const openzeppelinTransparentProxyArtifactsPath = path.join(
     contractArtifactsPath,
     '@openzeppelin/contracts/proxy/transparent/'
 );
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, '@openzeppelin/contracts/proxy/beacon');
+// const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, '@openzeppelin/contracts/proxy/beacon');
 
 function readBytecode(path: string, fileName: string) {
     return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).bytecode;
@@ -43,7 +43,7 @@ const L2_WETH_BRIDGE_PROXY_BYTECODE = readBytecode(
 );
 const L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethBridge');
 const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethToken');
-const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, 'TransparentUpgradeableProxy');
+const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
 // const L2_WETH_PROXY_FACTORY_BYTECODE = readBytecode(
 //     openzeppelinBeaconProxyArtifactsPath,
 //     'UpgradeableBeacon'
@@ -66,7 +66,8 @@ async function main() {
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
-                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                    //   process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                    process.env.MNEMONIC,
                       "m/44'/60'/0'/0/0"
                   ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
@@ -77,8 +78,8 @@ async function main() {
             const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
             console.log(`Using nonce: ${nonce}`);
 
-            const l1WethAddress = cmd.l1WethAddress;
-            const l2EthAddress = cmd.l2EthAddress;
+            const l1WethAddress = cmd.l1WethAddress || process.env.CONTRACTS_L1_WETH_TOKEN_ADDR;
+            const l2EthAddress = cmd.l2EthAddress || process.env.CONTRACTS_L1_WETH_TOKEN_ADDR;
 
             const deployer = new Deployer({
                 deployWallet,
@@ -90,7 +91,8 @@ async function main() {
             const wethBridge = deployer.defaultWethBridge(deployWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-            const governorAddress = await zkSync.getGovernor();
+            // const governorAddress = await zkSync.getGovernor();
+            const governorAddress = '0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE';
             const abiCoder = new ethers.utils.AbiCoder();
 
             const l2WethBridgeImplAddr = computeL2Create2Address(
@@ -127,7 +129,7 @@ async function main() {
             const l2WethProxyAddr = computeL2Create2Address(
                 l2WethBridgeProxyAddr,
                 L2_WETH_PROXY_BYTECODE,
-                ethers.utils.arrayify(abiCoder.encode(['address', 'address'], [l2WethAddr, governorAddress])),
+                ethers.utils.arrayify(abiCoder.encode(['address', 'address', 'bytes'], [l2WethAddr, governorAddress, '0x'])),
                 ethers.constants.HashZero
             );
 
@@ -160,7 +162,7 @@ async function main() {
             const receipts = await Promise.all(txs.map((tx) => tx.wait()));
 
             console.log(`WETH bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);
-            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await wethBridge.l2Bridge()}`);
+            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await wethBridge.l2WethBridge()}`);
         });
 
     await program.parseAsync(process.argv);

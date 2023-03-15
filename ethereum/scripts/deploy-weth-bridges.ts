@@ -7,8 +7,8 @@ import * as path from 'path';
 import { web3Provider } from './utils';
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+// const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+// const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
 async function main() {
     const program = new Command();
@@ -25,7 +25,8 @@ async function main() {
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
-                    process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                    // process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                    process.env.MNEMONIC,
                     "m/44'/60'/0'/0/0"
                 ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
