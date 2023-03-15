@@ -26,10 +26,8 @@ contract L2WethBridge is IL2WethBridge, Initializable {
     /// @dev WETH address on L1.
     address public override l1WethAddress;
 
-    address public l2EthAddress;
-
     /// @dev ETH token address on L2.
-    address public l2EthTokenAddress;
+    address public constant l2EthAddress = address(0x800a);
 
     /// @dev Contract that store the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -44,21 +42,27 @@ contract L2WethBridge is IL2WethBridge, Initializable {
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,
-        address _l2EthAddress,
         address _governor
     ) external initializer {
         require(_l1Bridge != address(0), "bf");
         require(_l1WethAddress != address(0), "df");
-        require(_l2EthAddress != address(0), "df");
         require(_governor != address(0), "sf");
 
         l1Bridge = _l1Bridge;
         l1WethAddress = _l1WethAddress;
-        l2EthAddress = _l2EthAddress;
 
         // Deploy L2WethToken and transfer ownership to governor
         address l2WethToken = address(new L2WethToken{salt: bytes32(0)}());
-        l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, "");
+
+        // Prepare the proxy constructor data
+        bytes memory l2WethTokenProxyConstructorData;
+        {
+            // Data to be used in delegate call to initialize the proxy
+            bytes memory proxyInitializationParams = abi.encodeWithSelector(IL2WethToken.initialize.selector, "Wrapped Ether", "WETH", 18);
+            l2WethTokenProxyConstructorData = abi.encode(proxyInitializationParams);
+        }
+        
+        l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, l2WethTokenProxyConstructorData);
     }
 
     /// @notice Initiate the withdrawal of WETH from L2 to L1 by sending a message to L1 and calling withdraw on L2EthToken contract

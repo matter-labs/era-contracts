@@ -87,7 +87,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         require(_l2ProxyWethAddress != address(0), "nf");
         require(_governor != address(0), "nh");
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-        require(_factoryDeps.length == 3, "mk");
+        require(_factoryDeps.length == 2, "mk");
         l2ProxyWethAddress = _l2ProxyWethAddress;
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -106,7 +106,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, L2_ETH_TOKEN_ADDRESS, _governor)
+                (address(this), l1WethAddress, _governor)
             );
             l2WethBridgeProxyConstructorData = abi.encode(wethBridgeImplementationAddr, _governor, proxyInitializationParams);
         }

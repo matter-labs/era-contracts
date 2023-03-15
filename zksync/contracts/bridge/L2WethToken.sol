@@ -14,13 +14,13 @@ contract L2WethToken is IL2WethToken, Initializable {
     mapping(address => mapping(address => uint)) public override allowance;
 
     function initialize(
-        // string memory _name,
-        // string memory _symbol,
-        // uint8 _decimals
+        string memory _name,
+        string memory _symbol,
+        uint8 _decimals
     ) external onlyInitializing {
-        name = "Wrapped Ether";
-        symbol = "WETH";
-        decimals = 18;
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
     }
 
     function deposit() public payable {

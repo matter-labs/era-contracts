@@ -357,7 +357,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'L1WethBridge',
-            [this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
+            [this.addresses.WethToken, this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
             create2Salt,
             ethTxOptions
         );

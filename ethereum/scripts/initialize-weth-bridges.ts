@@ -37,10 +37,7 @@ function readInterface(path: string, fileName: string) {
     return new ethers.utils.Interface(abi);
 }
 
-const L2_WETH_BRIDGE_PROXY_BYTECODE = readBytecode(
-    openzeppelinTransparentProxyArtifactsPath,
-    'TransparentUpgradeableProxy'
-);
+const L2_WETH_BRIDGE_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
 const L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethBridge');
 const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethToken');
 const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
@@ -76,10 +73,10 @@ async function main() {
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
             const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);
+            console.log(`Using deployer nonce: ${nonce}`);
 
             const l1WethAddress = cmd.l1WethAddress || process.env.CONTRACTS_L1_WETH_TOKEN_ADDR;
-            const l2EthAddress = cmd.l2EthAddress || process.env.CONTRACTS_L1_WETH_TOKEN_ADDR;
+            // const l2EthAddress = cmd.l2EthAddress || process.env.CONTRACTS_L1_WETH_TOKEN_ADDR;
 
             const deployer = new Deployer({
                 deployWallet,
@@ -88,11 +85,19 @@ async function main() {
             });
 
             const zkSync = deployer.zkSyncContract(deployWallet);
-            const wethBridge = deployer.defaultWethBridge(deployWallet);
+
+            const initializerWallet = Wallet.fromMnemonic(
+                'stuff slice staff easily soup parent arm payment cotton trade scatter struggle',
+                "m/44'/60'/0'/0/0"
+            ).connect(provider);
+            console.log(`Using initializer wallet: ${initializerWallet.address}`);
+            const initializerNonce = await initializerWallet.getTransactionCount();
+            console.log(`Using initializer nonce: ${initializerNonce}`);
+            const wethBridge = deployer.defaultWethBridge(initializerWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-            // const governorAddress = await zkSync.getGovernor();
-            const governorAddress = '0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE';
+            const governorAddress = await zkSync.getGovernor();
+            // const governorAddress = '0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE';
             const abiCoder = new ethers.utils.AbiCoder();
 
             const l2WethBridgeImplAddr = computeL2Create2Address(
@@ -105,7 +110,7 @@ async function main() {
             const proxyInitializationParams = L2_WETH_BRIDGE_INTERFACE.encodeFunctionData('initialize', [
                 wethBridge.address,
                 l1WethAddress,
-                l2EthAddress, // l2EthAddress is the address of the L2 ETH token, pick this from CONFIG
+                // l2EthAddress, // l2EthAddress is the address of the L2 ETH token, pick this from CONFIG
                 governorAddress
             ]);
             const l2WethBridgeProxyAddr = computeL2Create2Address(
@@ -153,7 +158,7 @@ async function main() {
                     governorAddress,
                     {
                         gasPrice,
-                        nonce: nonce + 1
+                        nonce: initializerNonce
                     }
                 )
             ];
