@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 interface IL2WethToken {
-    function initialize(
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals
-    ) external;
+    // function initialize(
+    //     string memory _name,
+    //     string memory _symbol,
+    //     uint8 _decimals
+    // ) external;
     
     function deposit() external payable;
 

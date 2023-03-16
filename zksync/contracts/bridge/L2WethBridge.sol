@@ -55,14 +55,22 @@ contract L2WethBridge is IL2WethBridge, Initializable {
         address l2WethToken = address(new L2WethToken{salt: bytes32(0)}());
 
         // Prepare the proxy constructor data
-        bytes memory l2WethTokenProxyConstructorData;
-        {
-            // Data to be used in delegate call to initialize the proxy
-            bytes memory proxyInitializationParams = abi.encodeWithSelector(IL2WethToken.initialize.selector, "Wrapped Ether", "WETH", 18);
-            l2WethTokenProxyConstructorData = abi.encode(proxyInitializationParams);
-        }
+        // string memory name = "Wrapped Ether";
+        // string memory symbol = "WETH";
+        // uint8 decimals = 18;
+
+        // bytes memory initializeData = abi.encode(name, symbol, decimals);
+        // bytes memory prefix = abi.encodePacked(bytes4(keccak256("initialize(string,string,uint8)")), bytes32(0));
+        // bytes memory l2WethTokenProxyConstructorData = abi.encodePacked(prefix, initializeData);
+
+        // {
+        //     // Data to be used in delegate call to initialize the proxy
+        //     bytes memory proxyInitializationParams = abi.encodeWithSelector(IL2WethToken.initialize.selector, "Wrapped Ether", "WETH", 18);
+        //     l2WethTokenProxyConstructorData = abi.encode(proxyInitializationParams);
+        // }
         
-        l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, l2WethTokenProxyConstructorData);
+        // l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, l2WethTokenProxyConstructorData);
+        l2WethTransparentProxy = new TransparentUpgradeableProxy{salt: bytes32(0)}(l2WethToken, _governor, "");
     }
 
     /// @notice Initiate the withdrawal of WETH from L2 to L1 by sending a message to L1 and calling withdraw on L2EthToken contract

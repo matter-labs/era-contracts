@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+// import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import { IL2WethToken } from "./interfaces/IL2WethToken.sol";
 
-contract L2WethToken is IL2WethToken, Initializable {
+contract L2WethToken is IL2WethToken {
+
     string public name;
     string public symbol;
     uint8 public decimals;
+    
+    constructor() {
+        name = "Wrapped Ether";
+        symbol = "WETH";
+        decimals = 18;
+    }
 
     mapping(address => uint) public override balanceOf;
     mapping(address => mapping(address => uint)) public override allowance;
-
-    function initialize(
-        string memory _name,
-        string memory _symbol,
-        uint8 _decimals
-    ) external onlyInitializing {
-        name = _name;
-        symbol = _symbol;
-        decimals = _decimals;
-    }
 
     function deposit() public payable {
         balanceOf[msg.sender] += msg.value;

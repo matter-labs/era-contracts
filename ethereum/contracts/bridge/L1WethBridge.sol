@@ -157,33 +157,34 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
-    ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
+    ) external payable nonReentrant returns (bytes32 txHash) {
+    // ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
         require(_amount != 0, "Empty deposit amount");
         require(_l2Receiver != address(0), "L2 receiver address is zero");
 
-        // Deposit WETH tokens from the depositor address to the smart contract address
-        uint256 depositedAmount = _transferWethFunds(msg.sender, address(this), _amount);
-        require(depositedAmount == _amount, "Incorrect amount of funds deposited");
-        // verify the deposit amount is allowed
-        _verifyWethDepositLimit(msg.sender, _amount, false);
+        // // Deposit WETH tokens from the depositor address to the smart contract address
+        // uint256 depositedAmount = _transferWethFunds(msg.sender, address(this), _amount);
+        // require(depositedAmount == _amount, "Incorrect amount of funds deposited");
+        // // verify the deposit amount is allowed
+        // _verifyWethDepositLimit(msg.sender, _amount, false);
 
         // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
         IWETH9(l1WethAddress).withdraw(_amount);
 
         // Request the finalization of the deposit on the L2 side
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver);
-        txHash = zkSyncMailbox.requestL2Transaction{value: msg.value}(
-            l2WethBridge,
-            _amount,
-            l2TxCalldata,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
-            new bytes[](0),
-            msg.sender
-        );
+        // txHash = zkSyncMailbox.requestL2Transaction{value: msg.value}(
+        //     l2WethBridge,
+        //     _amount,
+        //     l2TxCalldata,
+        //     _l2TxGasLimit,
+        //     _l2TxGasPerPubdataByte,
+        //     new bytes[](0),
+        //     msg.sender
+        // );
 
-        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        depositAmount[msg.sender][l1WethAddress][txHash] = _amount;
+        // // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+        // depositAmount[msg.sender][l1WethAddress][txHash] = _amount;
 
         emit DepositInitiated(msg.sender, _l2Receiver, l1WethAddress, _amount);
     }
@@ -244,7 +245,8 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         uint16 _l2TxNumberInBlock,
         FinalizeWithdrawalMessages calldata _messages,
         FinalizeWithdrawalMerkleProofs calldata _merkleProofs
-    ) external nonReentrant senderCanCallFunction(allowList) {
+    ) external nonReentrant {
+    // ) external nonReentrant senderCanCallFunction(allowList) {
         require(!isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex], "WETH withdrawal is already finalized");
 
         _proveL2MessagesInclusion(
