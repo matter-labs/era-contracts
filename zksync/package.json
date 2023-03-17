@@ -33,5 +33,7 @@
     "deploy-testnet-paymaster": "hardhat run src/deployTestnetPaymaster.ts",
     "publish-bridge-preimages": "hardhat run src/publish-bridge-preimages.ts"
   },
-  "dependencies": {}
+  "dependencies": {
+    "dotenv": "^16.0.3"
+  }
 }
