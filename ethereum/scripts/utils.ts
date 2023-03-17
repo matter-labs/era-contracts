@@ -3,8 +3,8 @@ import * as chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SYSTEM_CONTRACTS_PATH = path.join(process.env.ZKSYNC_HOME as string);
-const BOOTLOADER_PATH = path.join(process.env.ZKSYNC_HOME as string);
+const SYSTEM_CONTRACTS_PATH = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts`);
+const BOOTLOADER_PATH = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
 
 const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
