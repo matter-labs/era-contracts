@@ -11,11 +11,7 @@ contract WETH9 is IWETH9 {
     mapping(address => uint) public override balanceOf;
     mapping(address => mapping(address => uint)) public override allowance;
 
-    constructor(
-        // string memory _name,
-        // string memory _symbol,
-        // uint8 _decimals
-    ) public {
+    constructor() public {
         name = "Wrapped Ether";
         symbol = "WETH";
         decimals = 18;

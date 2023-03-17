@@ -25,7 +25,7 @@ interface IL1WethBridge {
 
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
-    function isWethWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool);
+    function isWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     function deposit(
         address _l2Receiver,
@@ -34,15 +34,14 @@ interface IL1WethBridge {
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 txHash);
 
-    // function claimFailedDeposit(
-    //     address _depositSender,
-    //     address _l1Token,
-    //     bytes32 _l2TxHash,
-    //     uint256 _l2BlockNumber,
-    //     uint256 _l2MessageIndex,
-    //     uint16 _l2TxNumberInBlock,
-    //     bytes32[] calldata _merkleProof
-    // ) external;
+    function claimFailedDeposit(
+        address _depositSender,
+        bytes32 _l2TxHash,
+        uint256 _l2BlockNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBlock,
+        bytes32[] calldata _merkleProof
+    ) external;
 
     function finalizeWithdrawal(
         uint256 _l2BlockNumber,

@@ -13,18 +13,21 @@ interface IL2WethBridge {
     event FinalizeDeposit(
         address indexed l1Sender,
         address indexed l2Receiver,
+        address indexed l2Weth,
         uint256 amount
     );
 
     event WithdrawalInitiated(
         address indexed l2Sender,
         address indexed l1Receiver,
+        address indexed l2Weth,
         uint256 amount
     );
 
     function finalizeDeposit(
         address _l1Sender,
-        address _l2Receiver
+        address _l2Receiver,
+        uint256 _amount
     ) external payable;
 
     function withdraw(
@@ -36,5 +39,5 @@ interface IL2WethBridge {
 
     function l2WethAddress() external view returns (address);
 
-    function l1Bridge() external view returns (address);
+    function l1WethBridge() external view returns (address);
 }

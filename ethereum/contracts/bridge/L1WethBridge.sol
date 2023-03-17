@@ -7,9 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IL1WethBridge.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IWETH9.sol";
-
 import "../zksync/interfaces/IMailbox.sol";
 import "../common/interfaces/IAllowList.sol";
+
 import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
@@ -24,6 +24,9 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     /// @dev The address of the WETH token on L1
     address payable public immutable l1WethAddress;
 
+    /// @dev The address of deployed L2 WETH bridge counterpart
+    address public l2WethBridge;
+
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList immutable allowList;
 
@@ -37,28 +40,13 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     /// NOTE: this constant will be accurately calculated in the future.
     uint256 constant DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = $(PRIORITY_TX_MAX_GAS_LIMIT);
 
-    // /// @dev The default l2GasPricePerPubdata to be used in bridges.
-    // uint256 constant DEFAULT_L2_GAS_PRICE_PER_PUBDATA = $(DEFAULT_L2_GAS_PRICE_PER_PUBDATA);
-
     /// @dev A mapping L2 block number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
-    mapping(uint256 => mapping(uint256 => bool)) public isWethWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
 
-    /// @dev The address of deployed L2 WETH bridge counterpart
-    address public l2WethBridge;
-
-    // /// @dev The address of the factory that deploys proxy for L2 WETH tokens
-    // address public l2WethFactory;
-
-    // TODO: Should we remove L1 token address?
-    /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
-    /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(address => mapping(address => mapping(bytes32 => uint256))) depositAmount;
-
-    // TODO: Should we remove L1 token address?
     /// @dev The accumulated deposited amount per user.
-    /// @dev A mapping L1 token address => user address => the total deposited amount by the user
-    mapping(address => mapping(address => uint256)) public totalDepositedAmountPerUser;
+    /// @dev A mapping user address => the total deposited WETH amount by the user
+    mapping(address => uint256) public totalDepositedAmountPerUser;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -84,10 +72,10 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         address _l2ProxyWethAddress,
         address _governor
     ) external reentrancyGuardInitializer {
-        require(_l2ProxyWethAddress != address(0), "nf");
-        require(_governor != address(0), "nh");
-        // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-        require(_factoryDeps.length == 2, "mk");
+        require(_l2ProxyWethAddress != address(0), "L2 proxy WETH address can not be zero");
+        require(_governor != address(0), "Governor address can not be zero");
+        require(_factoryDeps.length == 2, "Invalid factory deps length provided");
+
         l2ProxyWethAddress = _l2ProxyWethAddress;
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -159,32 +147,34 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte
     ) external payable nonReentrant returns (bytes32 txHash) {
     // ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
-        require(_amount != 0, "Empty deposit amount");
-        require(_l2Receiver != address(0), "L2 receiver address is zero");
+        require(_amount != 0, "Amount can not be zero");
+        require(_l2Receiver != address(0), "L2 receiver address can not be zero");
 
-        // // Deposit WETH tokens from the depositor address to the smart contract address
-        // uint256 depositedAmount = _transferWethFunds(msg.sender, address(this), _amount);
-        // require(depositedAmount == _amount, "Incorrect amount of funds deposited");
+        // Deposit WETH tokens from the depositor address to the smart contract address
+        uint256 depositedAmount = _transferWethFunds(msg.sender, address(this), _amount);
+        require(depositedAmount == _amount, "Incorrect amount of funds deposited");
+
         // // verify the deposit amount is allowed
-        // _verifyWethDepositLimit(msg.sender, _amount, false);
+        // _verifyDepositLimit(msg.sender, _amount, false);
 
         // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
         IWETH9(l1WethAddress).withdraw(_amount);
 
         // Request the finalization of the deposit on the L2 side
-        bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver);
-        // txHash = zkSyncMailbox.requestL2Transaction{value: msg.value}(
-        //     l2WethBridge,
-        //     _amount,
-        //     l2TxCalldata,
-        //     _l2TxGasLimit,
-        //     _l2TxGasPerPubdataByte,
-        //     new bytes[](0),
-        //     msg.sender
-        // );
+        bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _amount);
 
-        // // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        // depositAmount[msg.sender][l1WethAddress][txHash] = _amount;
+        uint256 baseCost = zkSyncMailbox.l2TransactionBaseCost(tx.gasprice, _l2TxGasLimit, _l2TxGasPerPubdataByte);
+        require(msg.value >= baseCost, "Insufficient ETH value for the base cost");
+
+        txHash = zkSyncMailbox.requestL2Transaction{value: _amount + msg.value}(
+            l2WethBridge,
+            _amount,
+            l2TxCalldata,
+            _l2TxGasLimit,
+            _l2TxGasPerPubdataByte,
+            new bytes[](0),
+            msg.sender
+        );
 
         emit DepositInitiated(msg.sender, _l2Receiver, l1WethAddress, _amount);
     }
@@ -206,7 +196,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     }
 
     /// @dev Verify the WETH deposit limit is reached to its cap or not
-    function _verifyWethDepositLimit(
+    function _verifyDepositLimit(
         address _depositor,
         uint256 _amount,
         bool _claiming
@@ -215,21 +205,38 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         if (!limitData.depositLimitation) return; // no deposit limitation is placed for this token
 
         if (_claiming) {
-            totalDepositedAmountPerUser[l1WethAddress][_depositor] -= _amount;
+            totalDepositedAmountPerUser[_depositor] -= _amount;
         } else {
-            require(totalDepositedAmountPerUser[l1WethAddress][_depositor] + _amount <= limitData.depositCap, "Deposit cap reached");
-            totalDepositedAmountPerUser[l1WethAddress][_depositor] += _amount;
+            require(totalDepositedAmountPerUser[_depositor] + _amount <= limitData.depositCap, "Deposit cap reached");
+            totalDepositedAmountPerUser[_depositor] += _amount;
         }
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 WETH bridge contract
     function _getDepositL2Calldata(
         address _l1Sender,
-        address _l2Receiver
+        address _l2Receiver,
+        uint256 _amount
     ) internal pure returns (bytes memory txCalldata) {
         txCalldata = abi.encodeCall(
             IL2WethBridge.finalizeDeposit,
-            (_l1Sender, _l2Receiver)
+            (_l1Sender, _l2Receiver, _amount)
+        );
+    }
+
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// Note: Refund is performed by sending equivalent amount of ETH to refund recipient address on L2.
+    function claimFailedDeposit(
+        address, // _depositSender,
+        bytes32, // _l2TxHash
+        uint256, // _l2BlockNumber,
+        uint256, // _l2MessageIndex,
+        uint16, // _l2TxNumberInBlock,
+        bytes32[] calldata // _merkleProof
+    ) external nonReentrant {
+    // ) external nonReentrant senderCanCallFunction(allowList) {
+        revert(
+            "Method not supported. ETH refund is handled by the zkSync contract."
         );
     }
 
@@ -247,7 +254,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         FinalizeWithdrawalMerkleProofs calldata _merkleProofs
     ) external nonReentrant {
     // ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex], "WETH withdrawal is already finalized");
+        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex], "WETH withdrawal is already finalized");
 
         _proveL2MessagesInclusion(
             _l2BlockNumber,
@@ -261,9 +268,9 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         require(_l1EthWithdrawReceiver == address(this), "Wrong L1 ETH withdraw receiver");
 
         (address _l1WethWithdrawReceiver, uint256 _wethAmount) = _parseL2WethWithdrawalMessage(_messages.wethMessage);
-        require(_l1WethWithdrawReceiver != address(0), "L1 WETH withdraw receiver is zero address");
+        require(_l1WethWithdrawReceiver != address(0), "L1 WETH withdraw receiver can not be zero");
 
-        require(_ethAmount == _wethAmount, "Unequal ETH and WETH amounts in the L2 -> L1 messages");
+        require(_ethAmount == _wethAmount, "Unequal ETH and WETH amounts in the L2 messages");
 
         // Widthdraw ETH to smart contract address
         zkSyncMailbox.finalizeEthWithdrawal(
@@ -281,7 +288,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
         uint256 withdrawnAmount = _transferWethFunds(address(this), _l1WethWithdrawReceiver, _wethAmount);
         require(withdrawnAmount == _wethAmount, "Incorrect amount of funds withdrawn");
 
-        isWethWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex] = true;
+        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndexes.wethL2MessageIndex] = true;
 
         emit WithdrawalFinalized(_l1WethWithdrawReceiver, l1WethAddress, _wethAmount);
     }
@@ -299,8 +306,13 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
             data: _messages.ethMessage
         });
 
-        bool ethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes.ethL2MessageIndex, l2ToL1EthMessage, _merkleProofs.ethProof);
-        require(ethMessageProofValid, "ETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that ETH withdrawal was actually initialized on L2
+        bool ethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(
+            _l2BlockNumber,
+            _l2MessageIndexes.ethL2MessageIndex,
+            l2ToL1EthMessage,
+            _merkleProofs.ethProof
+        );
+        require(ethMessageProofValid, "ETH L2 message inclusion proof is invalid");
 
         L2Message memory l2ToL1WethMessage = L2Message({
             txNumberInBlock: _l2TxNumberInBlock,
@@ -308,8 +320,13 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
             data: _messages.wethMessage
         });
 
-        bool wethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndexes.wethL2MessageIndex, l2ToL1WethMessage, _merkleProofs.wethProof);
-        require(wethMessageProofValid, "WETH L2 -> L1 message inclusion proof is invalid"); // Failed to verify that WETH withdrawal was actually initialized on L2
+        bool wethMessageProofValid = zkSyncMailbox.proveL2MessageInclusion(
+            _l2BlockNumber,
+            _l2MessageIndexes.wethL2MessageIndex,
+            l2ToL1WethMessage,
+            _merkleProofs.wethProof
+        );
+        require(wethMessageProofValid, "WETH L2 message inclusion proof is invalid");
     }
 
     /// @dev Decode the ETH withdraw message that came from L2EthToken contract
@@ -320,7 +337,7 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     {
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + address + uint256 = 4 + 20 + 32 = 56 (bytes).
-        require(_message.length == 56);
+        require(_message.length == 56, "Incorrect ETH message length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector);
@@ -337,14 +354,16 @@ contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     {
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + L2 sender address + L1 receiver address + uint256 = 4 + 20 + 20 + 32 = 76 (bytes).
-        require(_message.length == 76);
+        require(_message.length == 76, "Incorrect WETH message length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(bytes4(functionSignature) == this.finalizeWithdrawal.selector);
+        require(bytes4(functionSignature) == this.finalizeWithdrawal.selector, "Incorrect WETH message function selector");
 
         address l2WethSender;
         (l2WethSender, offset) = UnsafeBytes.readAddress(_message, offset);
         (l1WethReceiver, offset) = UnsafeBytes.readAddress(_message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_message, offset);
     }
+
+    receive() external payable {}
 }

@@ -464,9 +464,11 @@ export class Deployer {
     public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        await this.deployWethToken(create2Salt, { gasPrice, nonce: nonce });
-        await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce + 1 });
-        await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 2 });
+        if (process.env.CHAIN_ETH_NETWORK === 'localhost') {
+            await this.deployWethToken(create2Salt, { gasPrice, nonce: nonce++ });
+        }
+        await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
+        await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
     }
 
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
