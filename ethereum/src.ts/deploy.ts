@@ -19,8 +19,8 @@ import {
     readBlockBootloaderBytecode
 } from '../scripts/utils';
 
-// const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
-// const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
 
 export interface DeployedAddresses {
     ZkSync: {
@@ -128,22 +128,22 @@ export class Deployer {
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
-        // const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
-        //     this.addresses.ZkSync.Verifier,
-        //     this.governorAddress,
-        //     validatorAddress,
-        //     genesisBlockHash,
-        //     genesisRollupLeafIndex,
-        //     genesisBlockCommitment,
-        //     this.addresses.AllowList,
-        //     verifierParams,
-        //     false, // isPorterAvailable
-        //     L2_BOOTLOADER_BYTECODE_HASH,
-        //     L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-        //     priorityTxMaxGasLimit
-        // ]);
+        const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
+            this.addresses.ZkSync.Verifier,
+            this.governorAddress,
+            validatorAddress,
+            genesisBlockHash,
+            genesisRollupLeafIndex,
+            genesisBlockCommitment,
+            this.addresses.AllowList,
+            verifierParams,
+            false, // isPorterAvailable
+            L2_BOOTLOADER_BYTECODE_HASH,
+            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+            priorityTxMaxGasLimit
+        ]);
 
-        // return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
+        return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
     }
 
     public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {

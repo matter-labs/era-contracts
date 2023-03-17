@@ -51,7 +51,7 @@ async function main() {
 
     program
         .option('--deployer-private-key <deployer-private-key>')
-        .option('--initializer-private-key <initializer-private-key>')
+        .requiredOption('--initializer-private-key <initializer-private-key>')
         .option('--gas-price <gas-price>')
         .option('--l1-weth-address <l1-weth-address>')
         .option('--nonce <nonce>')
