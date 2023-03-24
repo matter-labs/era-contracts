@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "./Plonk4VerifierWithAccessToDNext.sol";
 import "../common/libraries/UncheckedMath.sol";
@@ -64,8 +64,8 @@ contract Verifier is Plonk4VerifierWithAccessToDNext {
             0x14ca234fe9b3bb1e5517fc60d6b90f8ad44b0899a2d4f71a64c9640b3142ce8b
         );
         vk.permutation_commitments[2] = PairingsBn254.new_g1(
-            0x1889e2c684caefde60471748f4259196ecf4209a735ccdf7b1816f05bafa50a,
-            0x92d287a080bfe2fd40ad392ff290e462cd0e347b8fd9d05b90af234ce77a11b
+            0x01889e2c684caefde60471748f4259196ecf4209a735ccdf7b1816f05bafa50a,
+            0x092d287a080bfe2fd40ad392ff290e462cd0e347b8fd9d05b90af234ce77a11b
         );
         vk.permutation_commitments[3] = PairingsBn254.new_g1(
             0x0dd98eeb5bc12c221da969398b67750a8774dbdd37a78da52367f9fc0e566d5c,
@@ -129,7 +129,7 @@ contract Verifier is Plonk4VerifierWithAccessToDNext {
         pure
         returns (Proof memory proof)
     {
-        // require(serialized_proof.length == 44); TODO
+        require(serialized_proof.length == 44);
         proof.input_values = new uint256[](public_inputs.length);
         for (uint256 i = 0; i < public_inputs.length; i = i.uncheckedInc()) {
             proof.input_values[i] = public_inputs[i];

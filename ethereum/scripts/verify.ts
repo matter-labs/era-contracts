@@ -32,6 +32,7 @@ async function main() {
         promises.push(promise);
     }
 
+    // TODO: Restore after switching to hardhat tasks (SMA-1711).
     // promises.push(verifyPromise(addresses.AllowList, [governor]));
 
     // // Proxy

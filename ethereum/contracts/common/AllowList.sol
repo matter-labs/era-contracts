@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
@@ -24,14 +24,11 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @dev caller => target => function signature => permission to call target function for the given caller address
     mapping(address => mapping(address => mapping(bytes4 => bool))) public hasSpecialAccessToCall;
 
-    /// @dev The mapping L1 token address => struct Withdrawal
-    mapping(address => Withdrawal) public tokenWithdrawal;
-
     /// @dev The mapping L1 token address => struct Deposit
     mapping(address => Deposit) public tokenDeposit;
 
-    constructor(address _owner) {
-        _transferOwnership(_owner);
+    constructor(address _initialOwner) {
+        _transferOwnership(_initialOwner);
     }
 
     /// @return Whether the caller can call the specific function on the target contract
@@ -129,26 +126,6 @@ contract AllowList is IAllowList, Ownable2Step {
             hasSpecialAccessToCall[_caller][_target][_functionSig] = _enable;
             emit UpdateCallPermission(_caller, _target, _functionSig, _enable);
         }
-    }
-
-    /// @dev Set withdrwal limit data for a token
-    /// @param _l1Token The address of L1 token
-    /// @param _withdrawalLimitation withdrawal limitation is active or not
-    /// @param _withdrawalFactor The percentage of allowed withdrawal. A withdrawalFactor of 10 means maximum %10 of bridge balance can be withdrawn
-    function setWithdrawalLimit(
-        address _l1Token,
-        bool _withdrawalLimitation,
-        uint256 _withdrawalFactor
-    ) external onlyOwner {
-        require(_withdrawalFactor <= 100, "wf");
-        tokenWithdrawal[_l1Token].withdrawalLimitation = _withdrawalLimitation;
-        tokenWithdrawal[_l1Token].withdrawalFactor = _withdrawalFactor;
-    }
-
-    /// @dev Get withdrawal limit data of a token
-    /// @param _l1Token The address of L1 token
-    function getTokenWithdrawalLimitData(address _l1Token) external view returns (Withdrawal memory) {
-        return tokenWithdrawal[_l1Token];
     }
 
     /// @dev Set deposit limit data for a token

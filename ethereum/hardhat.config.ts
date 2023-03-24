@@ -14,6 +14,7 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 const systemParams = require('../SystemConfig.json');
 
 const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
+const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT');
 
 const prodConfig = {
     UPGRADE_NOTICE_PERIOD: 0,
@@ -21,6 +22,7 @@ const prodConfig = {
     // NOTE: Should be greater than 0, otherwise zero approvals will be enough to make an instant upgrade!
     SECURITY_COUNCIL_APPROVALS_FOR_EMERGENCY_UPGRADE: 1,
     PRIORITY_TX_MAX_GAS_LIMIT,
+    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
     DUMMY_VERIFIER: false
 };
 const testnetConfig = {
@@ -29,6 +31,7 @@ const testnetConfig = {
     // NOTE: Should be greater than 0, otherwise zero approvals will be enough to make an instant upgrade!
     SECURITY_COUNCIL_APPROVALS_FOR_EMERGENCY_UPGRADE: 1,
     PRIORITY_TX_MAX_GAS_LIMIT,
+    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
     DUMMY_VERIFIER: true
 };
 const testConfig = {
@@ -36,6 +39,7 @@ const testConfig = {
     PRIORITY_EXPIRATION: 101,
     SECURITY_COUNCIL_APPROVALS_FOR_EMERGENCY_UPGRADE: 2,
     PRIORITY_TX_MAX_GAS_LIMIT,
+    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
     DUMMY_VERIFIER: true
 };
 const localConfig = {

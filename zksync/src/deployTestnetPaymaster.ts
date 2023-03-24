@@ -33,7 +33,8 @@ async function main() {
         const create2Salt = ethers.constants.HashZero;
         const paymasterAddress = computeL2Create2Address(deployWallet, testnetPaymasterBytecode, '0x', create2Salt);
 
-        await create2DeployFromL1(deployWallet, testnetPaymasterBytecode, create2Salt, priorityTxMaxGasLimit);
+        // TODO: request from API how many L2 gas needs for the transaction.
+        await create2DeployFromL1(deployWallet, testnetPaymasterBytecode, '0x', create2Salt, priorityTxMaxGasLimit);
 
         console.log(`CONTRACTS_L2_TESTNET_PAYMASTER_ADDR=${paymasterAddress}`);
     });

@@ -35,6 +35,7 @@ async function main() {
     }
 
     if (args.publish) {
+        // TODO: restore after testnet (SMA-388)
         // console.log('Publishing source code');
         // let verifiedOnce = false;
         // const networkTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.ETH_NETWORK}`);

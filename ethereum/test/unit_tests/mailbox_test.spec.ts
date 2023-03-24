@@ -1,8 +1,22 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
 import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
-import { MailboxFacet, MailboxFacetFactory, DiamondInitFactory, AllowListFactory, AllowList } from '../../typechain';
-import { DEFAULT_REVERT_REASON, getCallRevertReason, AccessMode, DEFAULT_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import {
+    MailboxFacet,
+    MailboxFacetFactory,
+    DiamondInitFactory,
+    AllowListFactory,
+    AllowList,
+    Forwarder,
+    ForwarderFactory
+} from '../../typechain';
+import {
+    DEFAULT_REVERT_REASON,
+    getCallRevertReason,
+    AccessMode,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    requestExecute
+} from './utils';
 import * as ethers from 'ethers';
 
 describe('Mailbox tests', function () {
@@ -13,6 +27,7 @@ describe('Mailbox tests', function () {
     let randomSigner: ethers.Signer;
     const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
     const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
+    let forwarder: Forwarder;
 
     before(async () => {
         [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -33,11 +48,10 @@ describe('Mailbox tests', function () {
 
         const dummyHash = new Uint8Array(32);
         dummyHash.set([1, 0, 0, 1]);
-        const dummyAddress = ethers.utils.hexlify(await ethers.utils.randomBytes(20));
+        const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
             dummyAddress,
             dummyAddress,
-            ethers.constants.AddressZero,
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,
@@ -63,16 +77,20 @@ describe('Mailbox tests', function () {
         await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
 
         mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
+
+        const forwarderFactory = await hardhat.ethers.getContractFactory('Forwarder');
+        const forwarderContract = await forwarderFactory.deploy();
+        forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
     });
 
     it('Should accept correctly formatted bytecode', async () => {
         const revertReason = await getCallRevertReason(
-            mailbox.requestL2Transaction(
+            requestExecute(
+                mailbox,
                 ethers.constants.AddressZero,
-                0,
+                ethers.BigNumber.from(0),
                 '0x',
-                1000000,
-                DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                ethers.BigNumber.from(1000000),
                 [new Uint8Array(32)],
                 ethers.constants.AddressZero
             )
@@ -83,12 +101,12 @@ describe('Mailbox tests', function () {
 
     it('Should not accept bytecode is not chunkable', async () => {
         const revertReason = await getCallRevertReason(
-            mailbox.requestL2Transaction(
+            requestExecute(
+                mailbox,
                 ethers.constants.AddressZero,
-                0,
+                ethers.BigNumber.from(0),
                 '0x',
-                100000,
-                DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                ethers.BigNumber.from(100000),
                 [new Uint8Array(63)],
                 ethers.constants.AddressZero
             )
@@ -99,12 +117,12 @@ describe('Mailbox tests', function () {
 
     it('Should not accept bytecode of even length in words', async () => {
         const revertReason = await getCallRevertReason(
-            mailbox.requestL2Transaction(
+            requestExecute(
+                mailbox,
                 ethers.constants.AddressZero,
-                0,
+                ethers.BigNumber.from(0),
                 '0x',
-                100000,
-                DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                ethers.BigNumber.from(100000),
                 [new Uint8Array(64)],
                 ethers.constants.AddressZero
             )
@@ -115,12 +133,12 @@ describe('Mailbox tests', function () {
 
     it('Should not accept bytecode that is too long', async () => {
         const revertReason = await getCallRevertReason(
-            mailbox.requestL2Transaction(
+            requestExecute(
+                mailbox,
                 ethers.constants.AddressZero,
-                0,
+                ethers.BigNumber.from(0),
                 '0x',
-                100000,
-                DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                ethers.BigNumber.from(100000),
                 [
                     // "+64" to keep the length in words odd and bytecode chunkable
                     new Uint8Array(MAX_CODE_LEN_BYTES + 64)
@@ -133,19 +151,22 @@ describe('Mailbox tests', function () {
     });
 
     describe('Deposit and Withdrawal limit functionality', function () {
-        it('Should not accept depositing more than the deposit limit', async () => {
-            await allowList.setDepositLimit(ethers.constants.AddressZero, true, ethers.utils.parseEther('10'));
+        const DEPOSIT_LIMIT = ethers.utils.parseEther('10');
 
+        before(async () => {
+            await allowList.setDepositLimit(ethers.constants.AddressZero, true, DEPOSIT_LIMIT);
+        });
+
+        it('Should not accept depositing more than the deposit limit', async () => {
             const revertReason = await getCallRevertReason(
-                mailbox.requestL2Transaction(
+                requestExecute(
+                    mailbox,
                     ethers.constants.AddressZero,
                     ethers.utils.parseEther('12'),
                     '0x',
-                    1000000,
-                    DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                    ethers.BigNumber.from(100000),
                     [new Uint8Array(32)],
-                    ethers.constants.AddressZero,
-                    { value: ethers.utils.parseEther('12') }
+                    ethers.constants.AddressZero
                 )
             );
 
@@ -153,16 +174,20 @@ describe('Mailbox tests', function () {
         });
 
         it('Should accept depositing less than or equal to the deposit limit', async () => {
+            const gasPrice = await mailbox.provider.getGasPrice();
+            const l2GasLimit = ethers.BigNumber.from(1000000);
+            const l2Cost = await mailbox.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+
             const revertReason = await getCallRevertReason(
-                mailbox.requestL2Transaction(
+                requestExecute(
+                    mailbox,
                     ethers.constants.AddressZero,
-                    ethers.utils.parseEther('10'),
+                    DEPOSIT_LIMIT.sub(l2Cost),
                     '0x',
-                    1000000,
-                    DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                    l2GasLimit,
                     [new Uint8Array(32)],
                     ethers.constants.AddressZero,
-                    { value: ethers.utils.parseEther('10') }
+                    { gasPrice }
                 )
             );
 
@@ -171,50 +196,40 @@ describe('Mailbox tests', function () {
 
         it('Should not accept depositing that the accumulation is more than the deposit limit', async () => {
             const revertReason = await getCallRevertReason(
-                mailbox.requestL2Transaction(
+                requestExecute(
+                    mailbox,
                     ethers.constants.AddressZero,
-                    1,
+                    ethers.BigNumber.from(1),
                     '0x',
-                    1000000,
-                    DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                    ethers.BigNumber.from(1000000),
                     [new Uint8Array(32)],
-                    ethers.constants.AddressZero,
-                    { value: 1 } // 1 wei
+                    ethers.constants.AddressZero
                 )
             );
 
             expect(revertReason).equal(`d2`);
         });
-
-        it(`Should not accept withdrawing more than withdrawal limit`, async () => {
-            await allowList.setWithdrawalLimit(ethers.constants.AddressZero, true, 10); // setting the withdrawal limit to %10 of ETH balance
-
-            let functionSignature = `0x6c0960f9`; //finalizeEthWithdrawal
-            let value = ethers.utils.hexZeroPad(ethers.utils.parseEther('2').toHexString(), 32); // withdrawing 2 ETH
-            let l1Receiver = ethers.utils.hexZeroPad('0x000000000000000000000000000000000000000a', 20);
-            let message = ethers.utils.hexConcat([functionSignature, l1Receiver, value]);
-
-            const revertReason = await getCallRevertReason(mailbox.finalizeEthWithdrawal(0, 0, 0, message, []));
-
-            expect(revertReason).equal(`w3`);
-        });
     });
 
     describe(`Access mode functionality`, function () {
+        before(async () => {
+            // We still need to set infinite amount of allowed deposit limit in order to ensure that every fee will be accepted
+            await allowList.setDepositLimit(ethers.constants.AddressZero, true, ethers.utils.parseEther('2000'));
+        });
+
         it(`Should not allow an un-whitelisted address to call`, async () => {
             await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Closed);
+
             const revertReason = await getCallRevertReason(
-                mailbox
-                    .connect(randomSigner)
-                    .requestL2Transaction(
-                        ethers.constants.AddressZero,
-                        0,
-                        '0x',
-                        1000000,
-                        DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
-                        [new Uint8Array(32)],
-                        ethers.constants.AddressZero
-                    )
+                requestExecute(
+                    mailbox.connect(randomSigner),
+                    ethers.constants.AddressZero,
+                    ethers.BigNumber.from(0),
+                    '0x',
+                    ethers.BigNumber.from(100000),
+                    [new Uint8Array(32)],
+                    ethers.constants.AddressZero
+                )
             );
             expect(revertReason).equal(`nr`);
         });
@@ -227,20 +242,99 @@ describe('Mailbox tests', function () {
                 `0xeb672419`,
                 true
             );
+
             const revertReason = await getCallRevertReason(
-                mailbox
-                    .connect(owner)
-                    .requestL2Transaction(
-                        ethers.constants.AddressZero,
-                        0,
-                        '0x',
-                        1000000,
-                        DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
-                        [new Uint8Array(32)],
-                        ethers.constants.AddressZero
-                    )
+                requestExecute(
+                    mailbox.connect(owner),
+                    ethers.constants.AddressZero,
+                    ethers.BigNumber.from(0),
+                    '0x',
+                    ethers.BigNumber.from(1000000),
+                    [new Uint8Array(32)],
+                    ethers.constants.AddressZero
+                )
             );
             expect(revertReason).equal(DEFAULT_REVERT_REASON);
         });
     });
+
+    it('Should propagate externally owned addresses as-is', async () => {
+        const tx = await requestExecute(
+            mailbox.connect(owner),
+            ethers.constants.AddressZero,
+            ethers.BigNumber.from(0),
+            '0x',
+            ethers.BigNumber.from(1000000),
+            [new Uint8Array(32)],
+            ethers.constants.AddressZero
+        );
+
+        const [event] = (await tx.wait()).events;
+        expect(event.event).to.equal('NewPriorityRequest');
+        expect(event.args.transaction.from).to.equal(await mailbox.signer.getAddress());
+    });
+
+    it('Should mask contract addresses', async () => {
+        const encodedRequest = mailbox.interface.encodeFunctionData('requestL2Transaction', [
+            ethers.constants.AddressZero,
+            0,
+            '0x',
+            10000000,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            [new Uint8Array(32)],
+            ethers.constants.AddressZero
+        ]);
+
+        let overrides: ethers.PayableOverrides = {};
+        overrides.gasPrice = await mailbox.provider.getGasPrice();
+        overrides.value = await mailbox.l2TransactionBaseCost(
+            overrides.gasPrice,
+            10000000,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+
+        const tx = await forwarder.forward(mailbox.address, encodedRequest, overrides);
+        const [event] = (await tx.wait()).events;
+        const parsedEvent = mailbox.interface.parseLog(event);
+
+        expect(parsedEvent.name).to.equal('NewPriorityRequest');
+        expect(parsedEvent.args.transaction.from).to.equal(aliasAddress(forwarder.address));
+    });
+
+    it('Should mask contract addresses when called from constructor', async () => {
+        const encodedRequest = mailbox.interface.encodeFunctionData('requestL2Transaction', [
+            ethers.constants.AddressZero,
+            0,
+            '0x',
+            1000000,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            [new Uint8Array(32)],
+            ethers.constants.AddressZero
+        ]);
+
+        let overrides: ethers.PayableOverrides = {};
+        overrides.gasPrice = await mailbox.provider.getGasPrice();
+        overrides.value = await mailbox.l2TransactionBaseCost(
+            overrides.gasPrice,
+            10000000,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+        overrides.gasLimit = 10000000;
+
+        const constructorForwarder = await (
+            await hardhat.ethers.getContractFactory('ConstructorForwarder')
+        ).deploy(mailbox.address, encodedRequest, overrides);
+
+        const [event] = (await constructorForwarder.deployTransaction.wait()).logs;
+        const parsedEvent = mailbox.interface.parseLog(event);
+
+        expect(parsedEvent.name).to.equal('NewPriorityRequest');
+        expect(parsedEvent.args.transaction.from).to.equal(aliasAddress(constructorForwarder.address));
+    });
 });
+
+function aliasAddress(address) {
+    return ethers.BigNumber.from(address)
+        .add('0x1111000000000000000000000000000000001111')
+        .mask(20 * 8);
+}

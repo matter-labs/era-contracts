@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../Storage.sol";
 import "../libraries/PriorityQueue.sol";
@@ -57,7 +57,9 @@ interface IGetters {
 
     function isApprovedBySecurityCouncil() external view returns (bool);
 
-    function getpriorityTxMaxGasLimit() external view returns (uint256);
+    function getPriorityTxMaxGasLimit() external view returns (uint256);
+
+    function getAllowList() external view returns (address);
 
     function isEthWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool);
 

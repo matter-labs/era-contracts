@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "./Base.sol";
 import "../Config.sol";
@@ -9,7 +9,8 @@ import "../libraries/PairingsBn254.sol";
 import "../libraries/PriorityQueue.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../../common/libraries/UnsafeBytes.sol";
-import "../../common/L2ContractHelper.sol";
+import "../../common/libraries/L2ContractHelper.sol";
+import "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
@@ -106,7 +107,7 @@ contract ExecutorFacet is Base, IExecutor {
             (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + 4);
 
             // show preimage for hashed message stored in log
-            if (logSender == L2_TO_L1_MESSENGER) {
+            if (logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 (bytes32 hashedMessage, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
                 require(keccak256(l2Messages[currentMessage]) == hashedMessage, "k2");
 
@@ -117,7 +118,7 @@ contract ExecutorFacet is Base, IExecutor {
 
                 // Overflow is not realistic
                 numberOfLayer1Txs = numberOfLayer1Txs.uncheckedInc();
-            } else if (logSender == L2_SYSTEM_CONTEXT_ADDRESS) {
+            } else if (logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
                 // Make sure that the system context log wasn't processed yet, to
                 // avoid accident double reading `blockTimestamp` and `previousBlockHash`
                 require(!isSystemContextLogProcessed, "fx");
@@ -125,7 +126,7 @@ contract ExecutorFacet is Base, IExecutor {
                 (previousBlockHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
                 // Mark system context log as processed
                 isSystemContextLogProcessed = true;
-            } else if (logSender == L2_KNOWN_CODE_STORAGE_ADDRESS) {
+            } else if (logSender == L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR) {
                 (bytes32 bytecodeHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 24);
                 require(bytecodeHash == L2ContractHelper.hashL2Bytecode(factoryDeps[currentBytecode]), "k3");
 

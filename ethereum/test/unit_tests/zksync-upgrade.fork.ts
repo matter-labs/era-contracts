@@ -16,6 +16,7 @@ import { IZkSyncFactory } from '../../typechain/IZkSyncFactory';
 import { IZkSync } from '../../typechain/IZkSync';
 import { ethers } from 'ethers';
 
+// TODO: change to the mainet config
 const DIAMOND_PROXY_ADDRESS = '0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319';
 
 describe('Diamond proxy upgrade fork test', function () {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
@@ -36,21 +36,6 @@ uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_ST
 
 // TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
-
-/// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-address constant L2_TO_L1_MESSENGER = address(0x8008);
-
-/// @dev The address of the bootloader start program
-address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
-
-/// @dev The address of the eth token system contract
-address constant L2_ETH_TOKEN_ADDRESS = address(0x800a);
-
-/// @dev The address of the known code storage system contract
-address constant L2_KNOWN_CODE_STORAGE_ADDRESS = address(0x8004);
-
-/// @dev The address of the context system contract
-address constant L2_SYSTEM_CONTEXT_ADDRESS = address(0x800b);
 
 /// @dev Denotes the first byte of the zkSync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
@@ -131,5 +116,5 @@ uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = $(L1_TX_DELTA_FACTORY_DEPS_P
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
 uint256 constant MAX_NEW_FACTORY_DEPS = $(MAX_NEW_FACTORY_DEPS);
 
-/// @dev The default L2 gasPricePerPubdata to be used in bridges.
-uint256 constant DEFAULT_L2_GAS_PRICE_PER_PUBDATA = $(DEFAULT_L2_GAS_PRICE_PER_PUBDATA);
+/// @dev The L2 gasPricePerPubdata required to be used in bridges.
+uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);

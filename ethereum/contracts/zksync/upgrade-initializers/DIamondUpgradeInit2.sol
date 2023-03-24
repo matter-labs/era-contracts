@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../Config.sol";
 import "../facets/Mailbox.sol";
 import "../libraries/Diamond.sol";
-import "../../common/L2ContractHelper.sol";
+import "../../common/libraries/L2ContractHelper.sol";
+import "../../common/L2ContractAddresses.sol";
 
 interface IOldContractDeployer {
     function forceDeployOnAddress(
@@ -24,12 +25,12 @@ contract DiamondUpgradeInit2 is MailboxFacet {
     ) external payable returns (bytes32) {
         // 1. Update bytecode for the deployer smart contract
         _requestL2Transaction(
-            FORCE_DEPLOYER,
-            DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+            L2_FORCE_DEPLOYER_ADDR,
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             _upgradeDeployerCalldata,
             $(PRIORITY_TX_MAX_GAS_LIMIT),
-            DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps,
             true,
             address(0)
@@ -37,12 +38,12 @@ contract DiamondUpgradeInit2 is MailboxFacet {
 
         // 2. Redeploy other contracts by one transaction
         _requestL2Transaction(
-            FORCE_DEPLOYER,
-            DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+            L2_FORCE_DEPLOYER_ADDR,
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             _upgradeSystemContractsCalldata,
             $(PRIORITY_TX_MAX_GAS_LIMIT),
-            DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps,
             true,
             address(0)

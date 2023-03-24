@@ -1,36 +1,101 @@
+import * as hardhat from 'hardhat';
+import { Interface } from 'ethers/lib/utils';
 import { Command } from 'commander';
-import { ethers } from 'hardhat';
-import { Deployer } from '../src.ts/deploy';
-import { web3Provider, print } from './utils';
-import { hexlify } from 'ethers/lib/utils';
+import { RermissionToCall, AccessMode, print } from './utils';
 
-const provider = web3Provider();
+// Get the interfaces for all needed contracts
+const allowList = new Interface(hardhat.artifacts.readArtifactSync('IAllowList').abi);
+const zkSync = new Interface(hardhat.artifacts.readArtifactSync('IZkSync').abi);
+const l1ERC20Bridge = new Interface(hardhat.artifacts.readArtifactSync('L1ERC20Bridge').abi);
 
-interface RermissionToCall {
-    caller: string;
-    target: string;
-    functionSig: string;
-    enable: boolean;
+const ZKSYNC_MAINNET_ADDRESS = '0x32400084c286cf3e17e7b677ea9583e60a000324';
+const L1_ERC20_BRIDGE_MAINNET_ADDRESS = '0x57891966931Eb4Bb6FB81430E6cE0A03AAbDe063';
+
+const ALPHA_MAINNET_ALLOW_LIST = [
+    {
+        target: ZKSYNC_MAINNET_ADDRESS,
+        functionName: 'requestL2Transaction'
+    },
+    {
+        target: L1_ERC20_BRIDGE_MAINNET_ADDRESS,
+        functionName: 'deposit'
+    },
+    {
+        target: L1_ERC20_BRIDGE_MAINNET_ADDRESS,
+        functionName: 'claimFailedDeposit'
+    },
+    {
+        target: L1_ERC20_BRIDGE_MAINNET_ADDRESS,
+        functionName: 'finalizeWithdrawal'
+    }
+];
+
+function functionSelector(functionName: string): string {
+    let selectors = new Array(0);
+
+    try {
+        selectors.push(zkSync.getSighash(zkSync.getFunction(functionName)));
+    } catch {}
+
+    try {
+        selectors.push(l1ERC20Bridge.getSighash(l1ERC20Bridge.getFunction(functionName)));
+    } catch {}
+
+    if (selectors.length == 0) {
+        throw `No selector found for the ${functionName} function`;
+    }
+
+    if (selectors.length > 1) {
+        throw `More than one selectors found for the ${functionName} function`;
+    }
+
+    return selectors[0];
 }
 
-interface PublicAccess {
-    target: string;
-    enable: boolean;
+function setBatchPermissionToCall(parameters: Array<RermissionToCall>) {
+    // Extend parameters with the function selector, to check it manually
+    const extendedParameters = parameters.map((param) =>
+        Object.assign(param, { functionSel: functionSelector(param.functionName) })
+    );
+    print('parameters', extendedParameters);
+
+    const callers = extendedParameters.map((permissionToCall) => permissionToCall.caller);
+    const targets = extendedParameters.map((permissionToCall) => permissionToCall.target);
+    const functionSelectors = extendedParameters.map((permissionToCall) => permissionToCall.functionSel);
+    const enables = extendedParameters.map((permissionToCall) => permissionToCall.enable);
+
+    const calldata = allowList.encodeFunctionData('setBatchPermissionToCall', [
+        callers,
+        targets,
+        functionSelectors,
+        enables
+    ]);
+    print('setBatchPermissionToCall', calldata);
 }
 
-// Get interface for the L1 allow list smart contract
-function getAllowListInterface() {
-    // Create the dummy wallet with provider to get contracts from `Deployer`
-    const dummyWallet = ethers.Wallet.createRandom().connect(provider);
-    const deployer = new Deployer({ deployWallet: dummyWallet });
+function setPermissionToCall(caller: string, target: string, functionName: string, enable: boolean) {
+    const functionSel = functionSelector(functionName);
+    print('parameters', { caller, target, functionName, functionSel, enable });
 
-    return deployer.l1AllowList(dummyWallet).interface;
+    const calldata = allowList.encodeFunctionData('setPermissionToCall', [caller, target, functionSel, enable]);
+    print('setPermissionToCall', calldata);
 }
 
-// Get the solidity 4 bytes function selector from the function signature
-// https://solidity-by-example.org/function-selector/
-function functionSelector(functionSignature: string) {
-    return hexlify(ethers.utils.solidityKeccak256(['string'], [functionSignature])).slice(0, 10);
+function setAccessMode(target: string, mode: number) {
+    print('parameters', { target, mode });
+
+    const calldata = allowList.encodeFunctionData('setAccessMode', [target, mode]);
+    print('setAccessMode', calldata);
+}
+
+function setBatchAccessMode(parameters: Array<AccessMode>) {
+    print('parameters', parameters);
+
+    const targets = parameters.map((publicAccess) => publicAccess.target);
+    const modes = parameters.map((publicAccess) => publicAccess.mode);
+
+    const calldata = allowList.encodeFunctionData('setBatchAccessMode', [targets, modes]);
+    print('setBatchAccessMode', calldata);
 }
 
 async function main() {
@@ -41,77 +106,59 @@ async function main() {
     const prepareCalldataProgram = program.command('prepare-calldata');
 
     prepareCalldataProgram
-        .command('set-batch-permission-to-call <permission-to-call>')
-        .action(async (permissionToCall: string) => {
-            const allowList = getAllowListInterface();
-
-            const parameters: Array<RermissionToCall> = JSON.parse(permissionToCall);
-            // Extend parameters with the function selector, to check it manually
-            const extendedParameters = parameters.map((param) =>
-                Object.assign(param, { functionSel: functionSelector(param.functionSig) })
-            );
-            print('parameters', extendedParameters);
-
-            const callers = extendedParameters.map((permissionToCall) => permissionToCall.caller);
-            const targets = extendedParameters.map((permissionToCall) => permissionToCall.target);
-            const functionSelectors = extendedParameters.map((permissionToCall) => permissionToCall.functionSel);
-            const enables = extendedParameters.map((permissionToCall) => permissionToCall.enable);
-
-            const calldata = allowList.encodeFunctionData('setBatchPermissionToCall', [
-                callers,
-                targets,
-                functionSelectors,
-                enables
-            ]);
-            print('setBatchPermissionToCall', calldata);
-        });
-
-    prepareCalldataProgram
         .command('set-permission-to-call')
         .requiredOption('--caller <caller-address>')
         .requiredOption('--target <target-address>')
-        .requiredOption('--function-sig <function-sig>')
+        .requiredOption('--function-name <function-name>')
         .requiredOption('--enable <enable>')
-        .action(async (cmd) => {
-            const allowList = getAllowListInterface();
-            const caller = cmd.caller;
-            const target = cmd.target;
-            const functionSig = cmd.functionSig;
-            const functionSel = functionSelector(functionSig);
-            const enable = cmd.enable;
-
-            print('parameters', { caller, target, functionSig, functionSel, enable });
-
-            const calldata = allowList.encodeFunctionData('setPermissionToCall', [caller, target, functionSel, enable]);
-            print('setPermissionToCall', calldata);
+        .action((cmd) => {
+            setPermissionToCall(cmd.caller, cmd.target, cmd.functionName, cmd.enable);
         });
 
     prepareCalldataProgram
-        .command('set-public-access')
-        .requiredOption('--target <target-address>')
-        .requiredOption('--enable <enable>')
-        .action(async (cmd) => {
-            const allowList = getAllowListInterface();
-            const target = cmd.target;
-            const enable = cmd.enable;
-
-            print('parameters', { target, enable });
-
-            const calldata = allowList.encodeFunctionData('setPublicAccess', [target, enable]);
-            print('setPublicAccess', calldata);
+        .command('set-batch-permission-to-call <permission-to-call>')
+        .action((permissionToCall: string) => {
+            const parameters: Array<RermissionToCall> = JSON.parse(permissionToCall);
+            setBatchPermissionToCall(parameters);
         });
 
-    prepareCalldataProgram.command('set-batch-public-access <public-access>').action(async (publicAccess: string) => {
-        const allowList = getAllowListInterface();
+    prepareCalldataProgram
+        .command('set-access-mode')
+        .requiredOption('--target <target-address>')
+        .requiredOption('--mode <mode>')
+        .action((cmd) => {
+            setAccessMode(cmd.target, cmd.mode);
+        });
 
-        const parameters: Array<PublicAccess> = JSON.parse(publicAccess);
-        print('parameters', parameters);
+    prepareCalldataProgram.command('set-batch-access-mode <public-access>').action((publicAccess: string) => {
+        const parameters = JSON.parse(publicAccess);
+        setBatchAccessMode(parameters);
+    });
 
-        const targets = parameters.map((publicAccess) => publicAccess.target);
-        const enables = parameters.map((publicAccess) => publicAccess.enable);
+    const alphaMainnet = program.command('alpha-mainnet');
 
-        const calldata = allowList.encodeFunctionData('setBatchPublicAccess', [targets, enables]);
-        print('setBatchPublicAccess', calldata);
+    alphaMainnet.command('add <addresses>').action(async (addresses: string) => {
+        const parsedAddresses = JSON.parse(addresses);
+        let parameters: Array<RermissionToCall> = new Array(0);
+        for (const caller of parsedAddresses) {
+            for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
+                parameters.push({ caller, enable: true, ...permission });
+            }
+        }
+
+        setBatchPermissionToCall(parameters);
+    });
+
+    alphaMainnet.command('remove <addresses>').action(async (addresses: string) => {
+        const parsedAddresses = JSON.parse(addresses);
+        let parameters: Array<RermissionToCall> = new Array(0);
+        for (const caller of parsedAddresses) {
+            for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
+                parameters.push({ caller, enable: false, ...permission });
+            }
+        }
+
+        setBatchPermissionToCall(parameters);
     });
 
     await program.parseAsync(process.argv);

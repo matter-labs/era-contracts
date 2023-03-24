@@ -10,7 +10,19 @@ const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
 export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
 
-export const DEFAULT_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').DEFAULT_L2_GAS_PRICE_PER_PUBDATA;
+export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+
+export interface RermissionToCall {
+    caller: string;
+    target: string;
+    functionName: string;
+    enable: boolean;
+}
+
+export interface AccessMode {
+    target: string;
+    mode: number;
+}
 
 export function web3Url() {
     return process.env.ETH_CLIENT_WEB3_URL.split(',')[0] as string;
@@ -59,8 +71,10 @@ export function getNumberFromEnv(envName: string): string {
     return number;
 }
 
+const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+
 export function applyL1ToL2Alias(address: string): string {
-    return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET));
+    return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
 }
 
 export function readBlockBootloaderBytecode() {

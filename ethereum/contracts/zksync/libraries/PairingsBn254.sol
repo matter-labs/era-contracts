@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 library PairingsBn254 {
     uint256 constant q_mod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
@@ -205,7 +205,6 @@ library PairingsBn254 {
     function point_mul(G1Point memory p, Fr memory s) internal view returns (G1Point memory r) {
         // https://eips.ethereum.org/EIPS/eip-197
         // Elliptic curve points are encoded as a Jacobian pair (X, Y) where the point at infinity is encoded as (0, 0)
-        // TODO
         if (p.X == 0 && p.Y == 1) {
             p.Y = 0;
         }

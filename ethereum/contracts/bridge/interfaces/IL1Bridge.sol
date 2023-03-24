@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
-
-import {IMailbox, L2Log, L2Message} from "../../zksync/interfaces/IZkSync.sol";
+pragma solidity ^0.8.13;
 
 /// @author Matter Labs
 interface IL1Bridge {
-    event DepositInitiated(address indexed from, address indexed to, address indexed l1Token, uint256 amount);
+    event DepositInitiated(
+        bytes32 indexed l2DepositTxHash,
+        address indexed from,
+        address indexed to,
+        address l1Token,
+        uint256 amount
+    );
 
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
 
@@ -19,7 +23,8 @@ interface IL1Bridge {
         address _l1Token,
         uint256 _amount,
         uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient
     ) external payable returns (bytes32 txHash);
 
     function claimFailedDeposit(

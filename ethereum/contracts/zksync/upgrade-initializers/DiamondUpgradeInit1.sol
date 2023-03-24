@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../facets/Mailbox.sol";
 import "../libraries/Diamond.sol";
-import "../../common/L2ContractHelper.sol";
+import "../../common/libraries/L2ContractHelper.sol";
+import "../../common/L2ContractAddresses.sol";
 import "../Config.sol";
 
 /// @author Matter Labs
@@ -17,12 +18,12 @@ contract DiamondUpgradeInit1 is MailboxFacet {
         uint256 _l2GasLimit
     ) external payable returns (bytes32) {
         _requestL2Transaction(
-            FORCE_DEPLOYER,
-            DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+            L2_FORCE_DEPLOYER_ADDR,
+            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             _forceDeployCalldata,
             _l2GasLimit,
-            DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps,
             true,
             address(0)

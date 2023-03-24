@@ -238,7 +238,9 @@ describe('Diamond proxy tests', function () {
         let proxy: DiamondProxy;
         let diamondInit: DiamondInit;
         let diamondCutFacet: DiamondCutFacet;
+        let proxyAsDiamondCut: DiamondCutFacet;
         let gettersFacet: GettersFacet;
+        let proxyAsGetters: GettersFacet;
         let governor, randomSigner: ethers.Signer;
         let governorAddress: string;
 
@@ -270,7 +272,6 @@ describe('Diamond proxy tests', function () {
             const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
                 '0x03752D8252d67f99888E741E3fB642803B29B155',
                 governorAddress,
-                '0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55',
                 '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
                 0,
                 '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -288,36 +289,33 @@ describe('Diamond proxy tests', function () {
             const chainId = hardhat.network.config.chainId;
             const proxyContract = await proxyFactory.deploy(chainId, diamondCutData);
             proxy = DiamondProxyFactory.connect(proxyContract.address, proxyContract.signer);
+
+            proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
+            proxyAsGetters = GettersFacetFactory.connect(proxy.address, governor);
         });
 
         it('should revert emergency freeze when unauthorized governor', async () => {
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, randomSigner);
-            const revertReason = await getCallRevertReason(proxyAsDiamondCut.freezeDiamond());
+            const proxyAsDiamondCutByRandomSigner = DiamondCutFacetFactory.connect(proxy.address, randomSigner);
+            const revertReason = await getCallRevertReason(proxyAsDiamondCutByRandomSigner.freezeDiamond());
             expect(revertReason).equal('1g');
         });
 
         it('should emergency freeze and unfreeze when authorized governor', async () => {
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
             await proxyAsDiamondCut.freezeDiamond();
             const doubleFreezeRevertReason = await getCallRevertReason(proxyAsDiamondCut.freezeDiamond());
             expect(doubleFreezeRevertReason).equal('a9');
             await proxyAsDiamondCut.unfreezeDiamond();
         });
 
+        it('should revert on unfreezing when it is not freezed', async () => {
+            const revertReason = await getCallRevertReason(proxyAsDiamondCut.unfreezeDiamond());
+            expect(revertReason).equal('a7');
+        });
+
         it('should revert on executing an unapproved proposal when diamondStorage is frozen', async () => {
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
             await proxyAsDiamondCut.freezeDiamond();
 
-            const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-            const gettersFacetContract = await gettersFacetFactory.deploy();
-            const gettersFacetToUpgrade = GettersFacetFactory.connect(
-                gettersFacetContract.address,
-                gettersFacetContract.signer
-            );
-
-            const facetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, true)
-            ];
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
 
             await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, 1);
@@ -330,18 +328,7 @@ describe('Diamond proxy tests', function () {
         });
 
         it('should revert on executing a proposal with different initAddress', async () => {
-            const proxyAsGetters = GettersFacetFactory.connect(proxy.address, governor);
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
-            const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-            const gettersFacetContract = await gettersFacetFactory.deploy();
-            const gettersFacetToUpgrade = GettersFacetFactory.connect(
-                gettersFacetContract.address,
-                gettersFacetContract.signer
-            );
-
-            const facetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, true)
-            ];
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
             const proposedDiamondCutData = diamondCut(facetCuts, '0x0000000000000000000000000000000000000000', '0x');
             const executedDiamondCutData = diamondCut(facetCuts, '0x0000000000000000000000000000000000000001', '0x');
 
@@ -357,87 +344,49 @@ describe('Diamond proxy tests', function () {
         });
 
         it('should revert on executing a proposal with different facetCut', async () => {
-            const proxyAsGettersFacet = GettersFacetFactory.connect(proxy.address, governor);
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
-            const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-            const gettersFacetContract = await gettersFacetFactory.deploy();
-            const gettersFacetToUpgrade = GettersFacetFactory.connect(
-                gettersFacetContract.address,
-                gettersFacetContract.signer
-            );
-
-            const facetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, true)
-            ];
-            const invalidFacetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, false)
-            ];
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const invalidFacetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
             const invalidDiamondCutData = diamondCut(invalidFacetCuts, ethers.constants.AddressZero, '0x');
 
-            const nextProposalId = (await proxyAsGettersFacet.getCurrentProposalId()).add(1);
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
             await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
             const invalidFacetCutRevertReason = await getCallRevertReason(
                 proxyAsDiamondCut.executeUpgrade(invalidDiamondCutData, ethers.constants.HashZero)
             );
 
             expect(invalidFacetCutRevertReason).equal('a4');
-            const proposalHash = await proxyAsGettersFacet.getProposedUpgradeHash();
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
             await proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
         });
 
         it('should revert when canceling empty proposal', async () => {
-            const proxyAsGettersFacet = GettersFacetFactory.connect(proxy.address, governor);
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
-            const proposalHash = await proxyAsGettersFacet.getProposedUpgradeHash();
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
             const revertReason = await getCallRevertReason(proxyAsDiamondCut.cancelUpgradeProposal(proposalHash));
             expect(revertReason).equal('a3');
         });
 
         it('should propose and execute diamond cut', async () => {
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
-            const proxyAsGettersFacet = GettersFacetFactory.connect(proxy.address, governor);
-
-            const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-            const gettersFacetContract = await gettersFacetFactory.deploy();
-            const gettersFacetToUpgrade = GettersFacetFactory.connect(
-                gettersFacetContract.address,
-                gettersFacetContract.signer
-            );
-
-            const facetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, true)
-            ];
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
 
-            const nextProposalId = (await proxyAsGettersFacet.getCurrentProposalId()).add(1);
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
             await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
             await proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
 
-            const gettersFacetToUpgradeSelectors = getAllSelectors(gettersFacetToUpgrade.interface);
+            const gettersFacetToUpgradeSelectors = getAllSelectors(gettersFacet.interface);
             for (const selector of gettersFacetToUpgradeSelectors) {
-                const addr = await proxyAsGettersFacet.facetAddress(selector);
-                const isFreezable = await proxyAsGettersFacet.isFunctionFreezable(selector);
-                expect(addr).equal(gettersFacetToUpgrade.address);
+                const addr = await proxyAsGetters.facetAddress(selector);
+                const isFreezable = await proxyAsGetters.isFunctionFreezable(selector);
+                expect(addr).equal(gettersFacet.address);
                 expect(isFreezable).equal(true);
             }
         });
 
         it('should revert on executing a proposal two times', async () => {
-            const proxyAsGettersFacet = GettersFacetFactory.connect(proxy.address, governor);
-            const proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
-            const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-            const gettersFacetContract = await gettersFacetFactory.deploy();
-            const gettersFacetToUpgrade = GettersFacetFactory.connect(
-                gettersFacetContract.address,
-                gettersFacetContract.signer
-            );
-
-            const facetCuts = [
-                facetCut(gettersFacetToUpgrade.address, gettersFacetToUpgrade.interface, Action.Replace, true)
-            ];
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const nextProposalId = (await proxyAsGettersFacet.getCurrentProposalId()).add(1);
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
             await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
             await proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
 
@@ -445,6 +394,97 @@ describe('Diamond proxy tests', function () {
                 proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero)
             );
             expect(secondFacetCutExecutionRevertReason).equal('ab');
+        });
+
+        it(`Should revert on proposing when an upgrade is already proposed`, async () => {
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+            await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
+
+            const reverReason = await getCallRevertReason(
+                proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId)
+            );
+            expect(reverReason).equal(`a8`);
+
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
+            await proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
+        });
+
+        it('should revert on executing unapproved shadow upgrade', async () => {
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+            const salt = ethers.utils.randomBytes(32);
+
+            const executingProposalHash = await proxyAsDiamondCut.upgradeProposalHash(
+                diamondCutData,
+                nextProposalId,
+                salt
+            );
+            await proxyAsDiamondCut.proposeShadowUpgrade(executingProposalHash, nextProposalId);
+
+            const revertReason = await getCallRevertReason(proxyAsDiamondCut.executeUpgrade(diamondCutData, salt));
+            expect(revertReason).equal('av');
+
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
+            await proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
+        });
+
+        it(`Should revert on proposing a shadow upgrade with zero proposal hash`, async () => {
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+            const revertReason = await getCallRevertReason(
+                proxyAsDiamondCut.proposeShadowUpgrade(ethers.constants.HashZero, nextProposalId)
+            );
+            expect(revertReason).equal('mi');
+        });
+
+        it(`Should revert on proposing a shadow upgrade with wrong proposal id`, async () => {
+            const currentProposalId = await proxyAsGetters.getCurrentProposalId();
+            const revertReason = await getCallRevertReason(
+                proxyAsDiamondCut.proposeShadowUpgrade(ethers.utils.randomBytes(32), currentProposalId)
+            );
+            expect(revertReason).equal('ya');
+        });
+
+        it(`Should revert on proposing a transparent upgrade with wrong proposal id`, async () => {
+            const currentProposalId = await proxyAsGetters.getCurrentProposalId();
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
+            const revertReason = await getCallRevertReason(
+                proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, currentProposalId)
+            );
+            expect(revertReason).equal('yb');
+        });
+
+        it(`Should revert on cancelling an upgrade proposal with wrong hash`, async () => {
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+            await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
+
+            const reverReason = await getCallRevertReason(
+                proxyAsDiamondCut.cancelUpgradeProposal(ethers.utils.randomBytes(32))
+            );
+            expect(reverReason).equal(`rx`);
+
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
+            await proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
+        });
+
+        it('should revert on executing a transparent upgrade with nonzero salt', async () => {
+            const facetCuts = [facetCut(gettersFacet.address, gettersFacet.interface, Action.Replace, true)];
+            const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
+            const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+            await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
+
+            const revertReason = await getCallRevertReason(
+                proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.utils.randomBytes(32))
+            );
+            expect(revertReason).equal('po');
+
+            const proposalHash = await proxyAsGetters.getProposedUpgradeHash();
+            await proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
         });
     });
 });

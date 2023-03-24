@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -11,7 +11,8 @@ import "../Storage.sol";
 import "../Config.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../../common/libraries/UnsafeBytes.sol";
-import "../../common/L2ContractHelper.sol";
+import "../../common/libraries/L2ContractHelper.sol";
+import "../../common/L2ContractAddresses.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "./Base.sol";
 
@@ -72,7 +73,7 @@ contract MailboxFacet is Base, IMailbox {
         // Thus, we can verify that the L1 -> L2 transaction was included in the L2 block with specified status.
         //
         // The semantics of such L2 -> L1 log is always:
-        // - sender = BOOTLOADER_ADDRESS
+        // - sender = L2_BOOTLOADER_ADDRESS
         // - key = hash(L1ToL2Transaction)
         // - value = status of the processing transaction (1 - success & 0 - fail)
         // - isService = true (just a conventional value)
@@ -82,7 +83,7 @@ contract MailboxFacet is Base, IMailbox {
             l2ShardId: 0,
             isService: true,
             txNumberInBlock: _l2TxNumberInBlock,
-            sender: BOOTLOADER_ADDRESS,
+            sender: L2_BOOTLOADER_ADDRESS,
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
@@ -132,7 +133,7 @@ contract MailboxFacet is Base, IMailbox {
                 l2ShardId: 0,
                 isService: true,
                 txNumberInBlock: _message.txNumberInBlock,
-                sender: L2_TO_L1_MESSENGER,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
                 key: bytes32(uint256(uint160(_message.sender))),
                 value: keccak256(_message.data)
             });
@@ -141,20 +142,12 @@ contract MailboxFacet is Base, IMailbox {
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
     /// @return The estimated L2 gas for the transaction to be paid
     function l2TransactionBaseCost(
-        uint256, // _gasPrice
-        uint256, // _l2GasLimit
-        uint256 // _l2GasPerPubdataByteLimit
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
     ) public pure returns (uint256) {
-        // TODO: for now, all the L1->L2 transaction are free.
-        // Below the return is the correct code for estimation of the base cost for
-        // the transaction.
-        return 0;
-
-        // uint256 l2GasPrice = _deriveL2GasPrice(
-        //     _gasPrice,
-        //      _l2GasPerPubdataByteLimit
-        // );
-        // return l2GasPrice * _l2GasLimit;
+        uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
+        return l2GasPrice * _l2GasLimit;
     }
 
     /// @notice Derives the price for L2 gas in ETH to be paid.
@@ -179,18 +172,16 @@ contract MailboxFacet is Base, IMailbox {
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override nonReentrant {
+    ) external override nonReentrant senderCanCallFunction(s.allowList) {
         require(!s.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBlock: _l2TxNumberInBlock,
-            sender: L2_ETH_TOKEN_ADDRESS,
+            sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
             data: _message
         });
 
         (address _l1WithdrawReceiver, uint256 _amount) = _parseL2WithdrawalMessage(_message);
-
-        _verifyWithdrawalLimit(_amount);
 
         bool proofValid = proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
         require(proofValid, "pi"); // Failed to verify that withdrawal was actually initialized on L2
@@ -201,30 +192,12 @@ contract MailboxFacet is Base, IMailbox {
         emit EthWithdrawalFinalized(_l1WithdrawReceiver, _amount);
     }
 
-    function _verifyWithdrawalLimit(uint256 _amount) internal {
-        IAllowList.Withdrawal memory limitData = IAllowList(s.allowList).getTokenWithdrawalLimitData(address(0)); // address(0) denotes the ETH
-        if (!limitData.withdrawalLimitation) return; // no withdrwawal limitation is placed for ETH
-        if (block.timestamp > s.lastWithdrawalLimitReset + 1 days) {
-            // The _amount should be <= %10 of balance
-            require(_amount <= (limitData.withdrawalFactor * address(this).balance) / 100, "w3");
-            s.withdrawnAmountInWindow = _amount; // reseting the withdrawn amount
-            s.lastWithdrawalLimitReset = block.timestamp;
-        } else {
-            // The _amount + withdrawn amount should be <= %10 of balance
-            require(
-                _amount + s.withdrawnAmountInWindow <= (limitData.withdrawalFactor * address(this).balance) / 100,
-                "w4"
-            );
-            s.withdrawnAmountInWindow += _amount; // accumulate the withdrawn amount for ETH
-        }
-    }
-
     /// @notice Request execution of L2 transaction from L1.
     /// @param _contractL2 The L2 receiver address
     /// @param _l2Value `msg.value` of L2 transaction
     /// @param _calldata The input of the L2 transaction
     /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
-    /// @param _l2GasPerPubdataByteLimit The maximum amount L2 gas that the operator may charge the user for.
+    /// @param _l2GasPerPubdataByteLimit The maximum amount L2 gas that the operator may charge the user for single byte of pubdata.
     /// @param _factoryDeps An array of L2 bytecodes that will be marked as known on L2
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction. If the transaction fails,
     /// it will also be the address to receive `_l2Value`.
@@ -244,6 +217,13 @@ contract MailboxFacet is Base, IMailbox {
         if (sender != tx.origin) {
             sender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
         }
+
+        // Enforcing that `_l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
+        // to ensure that users do not get used to using "exotic" numbers for _l2GasPerPubdataByteLimit, e.g. 1-2, etc.
+        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
+        // ability to provide `_l2GasPerPubdataByteLimit` for each independent transaction.
+        // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
+        require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
         // The L1 -> L2 transaction may be failed and funds will be sent to the `_refundRecipient`,
         // so we use `msg.value` instead of `_l2Value` as the bridged amount.
@@ -284,15 +264,24 @@ contract MailboxFacet is Base, IMailbox {
         uint64 expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
         uint256 txId = s.priorityQueue.getTotalPriorityTxs();
 
+        // Here we manually assign fields for the struct to prevent "stack too deep" error
+        WritePriorityOpParams memory params;
+
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
         {
-            uint256 baseCost = _isFree ? 0 : l2TransactionBaseCost(tx.gasprice, _l2GasLimit, _l2GasPerPubdataByteLimit);
-            require(msg.value >= baseCost + _l2Value);
+            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _l2GasPerPubdataByteLimit);
+            uint256 baseCost = params.l2GasPrice * _l2GasLimit;
+            require(msg.value >= baseCost + _l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
         }
 
-        // Here we manually assign fields for the struct to prevent "stack too deep" error
-        WritePriorityOpParams memory params;
+        // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
+        address refundRecipient = _refundRecipient == address(0) ? _sender : _refundRecipient;
+        // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+        if (refundRecipient.code.length > 0) {
+            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(refundRecipient);
+        }
+
         params.sender = _sender;
         params.txId = txId;
         params.l2Value = _l2Value;
@@ -301,7 +290,7 @@ contract MailboxFacet is Base, IMailbox {
         params.l2GasLimit = _l2GasLimit;
         params.l2GasPricePerPubdata = _l2GasPerPubdataByteLimit;
         params.valueToMint = msg.value;
-        params.refundRecipient = _refundRecipient == address(0) ? _sender : _refundRecipient;
+        params.refundRecipient = refundRecipient;
 
         canonicalTxHash = _writePriorityOp(params, _calldata, _factoryDeps);
     }
@@ -311,22 +300,25 @@ contract MailboxFacet is Base, IMailbox {
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps
     ) internal pure returns (L2CanonicalTransaction memory transaction) {
-        // Saving these two parameters in the local variables prevents
-        // "stack too deep error"
-        uint256 toMint = _priorityOpParams.valueToMint;
-        address refundRecipient = _priorityOpParams.refundRecipient;
-        transaction = serializeL2Transaction(
-            _priorityOpParams.txId,
-            _priorityOpParams.l2Value,
-            _priorityOpParams.sender,
-            _priorityOpParams.contractAddressL2,
-            _calldata,
-            _priorityOpParams.l2GasLimit,
-            _priorityOpParams.l2GasPricePerPubdata,
-            _factoryDeps,
-            toMint,
-            refundRecipient
-        );
+        transaction = L2CanonicalTransaction({
+            txType: PRIORITY_OPERATION_L2_TX_TYPE,
+            from: uint256(uint160(_priorityOpParams.sender)),
+            to: uint256(uint160(_priorityOpParams.contractAddressL2)),
+            gasLimit: _priorityOpParams.l2GasLimit,
+            gasPerPubdataByteLimit: _priorityOpParams.l2GasPricePerPubdata,
+            maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            nonce: uint256(_priorityOpParams.txId),
+            value: _priorityOpParams.l2Value,
+            reserved: [_priorityOpParams.valueToMint, uint256(uint160(_priorityOpParams.refundRecipient)), 0, 0],
+            data: _calldata,
+            signature: new bytes(0),
+            factoryDeps: _hashFactoryDeps(_factoryDeps),
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
     }
 
     /// @notice Stores a transaction record in storage & send event about that
@@ -381,6 +373,12 @@ contract MailboxFacet is Base, IMailbox {
         );
     }
 
+    /// @dev Calculates the approximate minimum gas limit required for executing a priority transaction.
+    /// @param _encodingLength The length of the priority transaction encoding in bytes.
+    /// @param _numberOfFactoryDependencies The number of new factory dependencies that will be added.
+    /// @param _l2GasPricePerPubdata The L2 gas price for publishing the priority transaction on L2.
+    /// @return The minimum gas limit required to execute the priority transaction.
+    /// Note: The calculation includes the main cost of the priority transaction, however, in reality, the operator can spend a little more gas on overheads.
     function _getMinimalPriorityTransactionGasLimit(
         uint256 _encodingLength,
         uint256 _numberOfFactoryDependencies,
@@ -388,12 +386,12 @@ contract MailboxFacet is Base, IMailbox {
     ) internal pure returns (uint256) {
         uint256 costForComputation;
         {
-            // Adding the intrinsic cost for the transaction, i.e. auxilary prices which can not be easily accounted for
+            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which can not be easily accounted for
             costForComputation = L1_TX_INTRINSIC_L2_GAS;
 
             // Taking into account the hashing costs that depend on the length of the transaction
-            // Note that, L1_TX_DELTA_544_ENCODING_BYTES is the delta in price for each 544 bytes of
-            // the transaction's encoding. It is taken as LCM between 136 and 32 (the length for each keccak round
+            // Note that L1_TX_DELTA_544_ENCODING_BYTES is the delta in the price for every 544 bytes of
+            // the transaction's encoding. It is taken as LCM between 136 and 32 (the length for each keccak256 round
             // and the size of each new encoding word).
             costForComputation += Math.ceilDiv(_encodingLength * L1_TX_DELTA_544_ENCODING_BYTES, 544);
 
@@ -414,54 +412,6 @@ contract MailboxFacet is Base, IMailbox {
         }
 
         return costForComputation + costForPubdata;
-    }
-
-    /// @dev Accepts the parameters of the l2 transaction and converts it to the canonical form.
-    /// @param _txId Priority operation ID, used as a unique identifier so that transactions always have a different hash
-    /// @param _l2Value `msg.value` of L2 transaction. Please note, this ether is not transferred with requesting priority op,
-    /// but will be taken from the balance in L2 during the execution
-    /// @param _sender The L2 address of the account that initiates the transaction
-    /// @param _contractAddressL2 The L2 receiver address
-    /// @param _calldata The input of the L2 transaction
-    /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
-    /// @param _l2GasPerPubdataByteLimit The maximum price in L2 gas per pubdata byte that the user can be charged by the operator in this transaction
-    /// @param _factoryDeps An array of L2 bytecodes that will be marked as known on L2
-    /// @param _toMint The amount of ether to be minted with this transaction
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction. If the transaction fails,
-    /// it will also be the address to receive `_l2Value`.
-    /// @return The canonical form of the l2 transaction parameters
-    function serializeL2Transaction(
-        uint256 _txId,
-        uint256 _l2Value,
-        address _sender,
-        address _contractAddressL2,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        uint256 _toMint,
-        address _refundRecipient
-    ) public pure returns (L2CanonicalTransaction memory) {
-        return
-            L2CanonicalTransaction({
-                txType: PRIORITY_OPERATION_L2_TX_TYPE,
-                from: uint256(uint160(_sender)),
-                to: uint256(uint160(_contractAddressL2)),
-                gasLimit: _l2GasLimit,
-                gasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
-                maxFeePerGas: uint256(0),
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-                nonce: uint256(_txId),
-                value: _l2Value,
-                reserved: [_toMint, uint256(uint160(_refundRecipient)), 0, 0],
-                data: _calldata,
-                signature: new bytes(0),
-                factoryDeps: _hashFactoryDeps(_factoryDeps),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
@@ -491,11 +441,39 @@ contract MailboxFacet is Base, IMailbox {
     /// and the L2 gas needed to process the transaction itself (i.e. the actual gasLimit that will be used for the transaction).
     function _getOverheadForTransaction(
         uint256 _totalGasLimit,
-        uint256, // _gasPricePerPubdata
-        uint256 // _encodingLength
+        uint256 _gasPricePerPubdata,
+        uint256 _encodingLength
     ) internal pure returns (uint256 blockOverheadForTransaction) {
-        // TODO: (SMA-1715) make users pay for overhead
-        return 0;
+        uint256 blockOverheadGas = BLOCK_OVERHEAD_L2_GAS + BLOCK_OVERHEAD_PUBDATA * _gasPricePerPubdata;
+
+        // The overhead from taking up the transaction's slot
+        uint256 txSlotOverhead = Math.ceilDiv(blockOverheadGas, MAX_TRANSACTIONS_IN_BLOCK);
+        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, txSlotOverhead);
+
+        // The overhead for occupying the bootloader memory can be derived from encoded_len
+        uint256 overheadForLength = Math.ceilDiv(_encodingLength * blockOverheadGas, BOOTLOADER_TX_ENCODING_SPACE);
+        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForLength);
+
+        // The overhead for possible published public data
+        // TODO: possibly charge a separate fee for possible pubdata spending
+        // uint256 overheadForPublicData;
+        // {
+        //     uint256 numerator = (blockOverheadGas * _totalGasLimit + _gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK);
+        //     uint256 denominator = (_gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK + blockOverheadGas);
+
+        //     overheadForPublicData = (numerator - 1) / denominator;
+        // }
+        // blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForPublicData);
+
+        // The overhead for ergs that could be used to use single-instance circuits
+        uint256 overheadForGas;
+        {
+            uint256 numerator = blockOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;
+            uint256 denominator = L2_TX_MAX_GAS_LIMIT + blockOverheadGas;
+
+            overheadForGas = (numerator - 1) / denominator;
+        }
+        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForGas);
     }
 
     /// @notice Based on the full L2 gas limit (that includes the block overhead) and other
@@ -511,9 +489,9 @@ contract MailboxFacet is Base, IMailbox {
     ) internal pure returns (uint256 txBodyGasLimit) {
         uint256 overhead = _getOverheadForTransaction(_totalGasLimit, _gasPricePerPubdata, _encodingLength);
 
+        require(_totalGasLimit >= overhead, "my"); // provided gas limit doesn't cover transaction overhead
         unchecked {
-            // The implementation of the `getOverheadForTransaction` function
-            // enforces the fact that _totalGasLimit >= overhead.
+            // We enforce the fact that `_totalGasLimit >= overhead` explicitly above.
             txBodyGasLimit = _totalGasLimit - overhead;
         }
     }

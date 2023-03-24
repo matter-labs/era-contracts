@@ -19,9 +19,9 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
 
-    /// @dev Contract that store the implementation address for token.
+    /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
-    UpgradeableBeacon public l2TokenFactory;
+    UpgradeableBeacon public l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 l2TokenProxyBytecodeHash;
@@ -48,14 +48,14 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-        l2TokenFactory = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-        l2TokenFactory.transferOwnership(_governor);
+        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+        l2TokenBeacon.transferOwnership(_governor);
     }
 
     /// @notice Finalize the deposit and mint funds
-    /// @param _l1Sender The account address that initiate the deposit on L1
+    /// @param _l1Sender The account address that initiated the deposit on L1
     /// @param _l2Receiver The account address that would receive minted ether
-    /// @param _l1Token The address of the token that was locked on the L1. Always should be equal to zero (conventional value)
+    /// @param _l1Token The address of the token that was locked on the L1
     /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
     function finalizeDeposit(
@@ -83,11 +83,11 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
     }
 
-    /// @dev Deploys and initialize the L2 token for the L1 counterpart
+    /// @dev Deploy and initialize the L2 token for the L1 counterpart
     function _deployL2Token(address _l1Token, bytes calldata _data) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_l1Token);
 
-        BeaconProxy l2Token = new BeaconProxy{salt: salt}(address(l2TokenFactory), "");
+        BeaconProxy l2Token = new BeaconProxy{salt: salt}(address(l2TokenBeacon), "");
         L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
 
         return address(l2Token);
@@ -125,7 +125,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
-        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenFactory), ""));
+        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         return

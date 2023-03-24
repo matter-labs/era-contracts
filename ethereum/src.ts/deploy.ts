@@ -6,6 +6,7 @@ import { Interface } from 'ethers/lib/utils';
 import { Action, facetCut, diamondCut } from './diamondCut';
 import { IZkSyncFactory } from '../typechain/IZkSyncFactory';
 import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
+import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
 import { AllowListFactory } from '../typechain';
 import { hexlify } from 'ethers/lib/utils';
@@ -38,6 +39,7 @@ export interface DeployedAddresses {
         ERC20BridgeProxy: string;
     };
     AllowList: string;
+    ValidatorTimeLock: string;
     Create2Factory: string;
 }
 
@@ -65,7 +67,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             ERC20BridgeProxy: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR')
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
-        Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR')
+        Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR'),
+        ValidatorTimeLock: getAddressFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_ADDR')
     };
 }
 
@@ -109,8 +112,7 @@ export class Deployer {
             facetCut(governance.address, governance.interface, Action.Add, true)
         ];
 
-        const validatorAddress = getAddressFromEnv('ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR');
-        const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT');
+        const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
         const verifierParams = {
@@ -124,7 +126,6 @@ export class Deployer {
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             this.addresses.ZkSync.Verifier,
             this.governorAddress,
-            validatorAddress,
             genesisBlockHash,
             genesisRollupLeafIndex,
             genesisBlockCommitment,
@@ -400,12 +401,34 @@ export class Deployer {
         await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     }
 
+    public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const executionDelay = getNumberFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY');
+        const validatorAddress = getAddressFromEnv('ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR');
+        const contractAddress = await this.deployViaCreate2(
+            'ValidatorTimelock',
+            [this.governorAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+            create2Salt,
+            ethTxOptions
+        );
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_VALIDATOR_TIMELOCK_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.ValidatorTimeLock = contractAddress;
+    }
+
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
         return SingletonFactoryFactory.connect(this.addresses.Create2Factory, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider) {
         return IZkSyncFactory.connect(this.addresses.ZkSync.DiamondProxy, signerOrProvider);
+    }
+
+    public validatorTimelock(signerOrProvider: Signer | providers.Provider) {
+        return ValidatorTimelockFactory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
     }
 
     public l1AllowList(signerOrProvider: Signer | providers.Provider) {

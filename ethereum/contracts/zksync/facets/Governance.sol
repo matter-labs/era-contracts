@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../interfaces/IGovernance.sol";
-import "../../common/L2ContractHelper.sol";
+import "../../common/libraries/L2ContractHelper.sol";
 import "./Base.sol";
 
 /// @title Governance Contract controls access rights for contract management.
@@ -106,6 +106,16 @@ contract GovernanceFacet is Base, IGovernance {
 
         s.verifierParams = _newVerifierParams;
         emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
+    }
+
+    /// @notice Change the address of the allow list smart contract
+    /// @param _newAllowList Allow list smart contract address
+    function setAllowList(IAllowList _newAllowList) external onlyGovernor {
+        IAllowList oldAllowList = s.allowList;
+        if (oldAllowList != _newAllowList) {
+            s.allowList = _newAllowList;
+            emit NewAllowList(address(oldAllowList), address(_newAllowList));
+        }
     }
 
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions

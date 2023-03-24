@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 interface IAllowList {
     /*//////////////////////////////////////////////////////////////
@@ -21,14 +21,6 @@ interface IAllowList {
         Closed,
         SpecialAccessOnly,
         Public
-    }
-
-    /// @dev A struct that contains withdrawal limit data of a token
-    /// @param withdrawalLimitation Whether any withdrawal limitation is placed or not
-    /// @param withdrawalFactor Percentage of allowed withdrawal. A withdrawalFactor of 10 means maximum %10 of bridge balance can be withdrawn
-    struct Withdrawal {
-        bool withdrawalLimitation;
-        uint256 withdrawalFactor;
     }
 
     /// @dev A struct that contains deposit limit data of a token
@@ -57,8 +49,6 @@ interface IAllowList {
         bytes4 _functionSig
     ) external view returns (bool);
 
-    function getTokenWithdrawalLimitData(address _l1Token) external view returns (Withdrawal memory);
-
     function getTokenDepositLimitData(address _l1Token) external view returns (Deposit memory);
 
     /*//////////////////////////////////////////////////////////////
@@ -81,16 +71,6 @@ interface IAllowList {
         address _target,
         bytes4 _functionSig,
         bool _enable
-    ) external;
-
-    /*//////////////////////////////////////////////////////////////
-                           WITHDRAWAL LIMIT LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function setWithdrawalLimit(
-        address _l1Token,
-        bool _withdrawalLimitation,
-        uint256 _withdrawalFactor
     ) external;
 
     /*//////////////////////////////////////////////////////////////

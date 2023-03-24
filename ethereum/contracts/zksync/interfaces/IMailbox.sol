@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import {L2Log, L2Message} from "../Storage.sol";
 
@@ -79,6 +79,7 @@ interface IMailbox {
         address contractAddressL2;
         uint64 expirationTimestamp;
         uint256 l2GasLimit;
+        uint256 l2GasPrice;
         uint256 l2GasPricePerPubdata;
         uint256 valueToMint;
         address refundRecipient;
@@ -106,19 +107,6 @@ interface IMailbox {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view returns (bool);
-
-    function serializeL2Transaction(
-        uint256 _txId,
-        uint256 _l2Value,
-        address _sender,
-        address _contractAddressL2,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        uint256 _toMint,
-        address _refundRecipient
-    ) external pure returns (L2CanonicalTransaction memory);
 
     function finalizeEthWithdrawal(
         uint256 _l2BlockNumber,

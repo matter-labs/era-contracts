@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 /// @notice The structure that contains meta information of the L2 transaction that was requested from L1
 /// @dev The weird size of fields was selected specifically to minimize the structure storage size

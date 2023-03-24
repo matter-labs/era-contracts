@@ -3,6 +3,8 @@
 pragma solidity ^0.8.0;
 
 interface IL2StandardToken {
+    event BridgeInitialize(address indexed l1Token, string name, string symbol, uint8 decimals);
+
     event BridgeMint(address indexed _account, uint256 _amount);
 
     event BridgeBurn(address indexed _account, uint256 _amount);

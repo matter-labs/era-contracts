@@ -185,38 +185,8 @@ describe('Allow list tests', function () {
             expect(revertReason).equal('yg');
         });
     });
-
-    describe('Withdrawal limit functionality', function () {
-        const l1Token = '0x0000000000000000000000000000000000000001';
-        it(`Non-owner fails to set withdrawal limit`, async () => {
-            const revertReason = await getCallRevertReason(
-                allowList.connect(randomSigner).setWithdrawalLimit(l1Token, true, 10)
-            );
-            expect(revertReason).equal('Ownable: caller is not the owner');
-        });
-
-        it(`Owner fails to set withdrawal limit more than 100 percent`, async () => {
-            const revertReason = await getCallRevertReason(allowList.setWithdrawalLimit(l1Token, true, 110));
-            expect(revertReason).equal(`wf`);
-        });
-
-        it(`Owner sets withdrawal limit`, async () => {
-            await allowList.setWithdrawalLimit(l1Token, true, 10);
-            let withdrawal = await allowList.getTokenWithdrawalLimitData(l1Token);
-            expect(withdrawal.withdrawalLimitation).equal(true);
-            expect(withdrawal.withdrawalFactor).equal(10);
-        });
-
-        it(`Unlimited-withdrawal token returns zero`, async () => {
-            let unlimitedToken = '0x000000000000000000000000000000000000000a';
-            let withdrawal = await allowList.getTokenWithdrawalLimitData(unlimitedToken);
-            expect(withdrawal.withdrawalLimitation).equal(false);
-            expect(withdrawal.withdrawalFactor).equal(0);
-        });
-    });
-
     describe('Deposit limit functionality', function () {
-        const l1Token = '0x0000000000000000000000000000000000000001';
+        const l1Token = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         it(`Non-owner fails to set deposit limit`, async () => {
             const revertReason = await getCallRevertReason(
                 allowList.connect(randomSigner).setDepositLimit(l1Token, true, 1000)
@@ -232,7 +202,7 @@ describe('Allow list tests', function () {
         });
 
         it(`Unlimited-deposit token returns zero`, async () => {
-            let unlimitedToken = '0x000000000000000000000000000000000000000a';
+            let unlimitedToken = ethers.utils.hexlify(ethers.utils.randomBytes(20));
             let deposit = await allowList.getTokenDepositLimitData(unlimitedToken);
             expect(deposit.depositLimitation).equal(false);
             expect(deposit.depositCap).equal(0);

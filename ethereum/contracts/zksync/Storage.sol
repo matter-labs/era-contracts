@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "./Verifier.sol";
 import "../common/interfaces/IAllowList.sol";
@@ -121,9 +121,9 @@ struct AppStorage {
     /// @dev Used to indicate that eth withdrawal was already processed
     mapping(uint256 => mapping(uint256 => bool)) isEthWithdrawalFinalized;
     /// @dev The most recent withdrawal time and amount reset
-    uint256 lastWithdrawalLimitReset;
+    uint256 __DEPRECATED_lastWithdrawalLimitReset;
     /// @dev The accumulated withdrawn amount during the withdrawal limit window
-    uint256 withdrawnAmountInWindow;
+    uint256 __DEPRECATED_withdrawnAmountInWindow;
     /// @dev A mapping user address => the total deposited amount by the user
     mapping(address => uint256) totalDepositedAmountPerUser;
 }

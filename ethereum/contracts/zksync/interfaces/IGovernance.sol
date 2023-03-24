@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
+import "../../common/interfaces/IAllowList.sol";
 import "../Verifier.sol";
 import "../Storage.sol";
 
@@ -21,6 +22,8 @@ interface IGovernance {
     function setVerifier(Verifier _newVerifier) external;
 
     function setVerifierParams(VerifierParams calldata _newVerifierParams) external;
+
+    function setAllowList(IAllowList _newAllowList) external;
 
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
@@ -48,6 +51,9 @@ interface IGovernance {
 
     /// @notice Verifier address changed
     event NewVerifierParams(VerifierParams oldVerifierParams, VerifierParams newVerifierParams);
+
+    /// @notice Allow list address changed
+    event NewAllowList(address indexed oldAllowList, address indexed newAllowList);
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

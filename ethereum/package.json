@@ -59,10 +59,12 @@
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-allow-list": "ts-node scripts/initialize-l1-allow-list.ts",
+    "initialize-validator": "ts-node scripts/initialize-validator.ts",
     "upgrade-1": "ts-node scripts/upgrades/upgrade-1.ts",
     "upgrade-2": "ts-node scripts/upgrades/upgrade-2.ts",
     "upgrade-3": "ts-node scripts/upgrades/upgrade-3.ts",
-    "upgrade-4": "ts-node scripts/upgrades/upgrade-4.ts"
+    "upgrade-4": "ts-node scripts/upgrades/upgrade-4.ts",
+    "upgrade-5": "ts-node scripts/upgrades/upgrade-5.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

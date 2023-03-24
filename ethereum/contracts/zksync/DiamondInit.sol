@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "../common/interfaces/IAllowList.sol";
 import "./interfaces/IExecutor.sol";
@@ -18,7 +18,6 @@ contract DiamondInit is Base {
     /// @notice zkSync contract initialization
     /// @param _verifier address of Verifier contract
     /// @param _governor address who can manage the contract
-    /// @param _validator address who can make blocks
     /// @param _genesisBlockHash Block hash of the genesis (initial) block
     /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis block
     /// @param _genesisBlockCommitment The zk-proof commitment for the genesis block
@@ -32,7 +31,6 @@ contract DiamondInit is Base {
     function initialize(
         Verifier _verifier,
         address _governor,
-        address _validator,
         bytes32 _genesisBlockHash,
         uint64 _genesisIndexRepeatedStorageChanges,
         bytes32 _genesisBlockCommitment,
@@ -48,7 +46,6 @@ contract DiamondInit is Base {
 
         s.verifier = _verifier;
         s.governor = _governor;
-        s.validators[_validator] = true;
 
         // We need to initialize the state hash because it is used in the commitment of the next block
         IExecutor.StoredBlockInfo memory storedBlockZero = IExecutor.StoredBlockInfo(

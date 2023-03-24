@@ -30,33 +30,41 @@ async function main() {
         .name('compile-and-deploy-libs')
         .description('Compile contracts & deploy libraries & recompile contracts');
 
-    program.option('--private-key <private-key>').action(async (cmd: Command) => {
-        const deployWallet = cmd.privateKey
-            ? new Wallet(cmd.privateKey, provider)
-            : Wallet.fromMnemonic(
-                  process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                  "m/44'/60'/0'/0/1"
-              ).connect(provider);
-        console.log(`Using deployer wallet: ${deployWallet.address}`);
+    program
+        .option('--no-deploy', 'Do not deploy the library')
+        .option('--private-key <private-key>')
+        .action(async (cmd: Command) => {
+            const deployWallet = cmd.privateKey
+                ? new Wallet(cmd.privateKey, provider)
+                : Wallet.fromMnemonic(
+                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                      "m/44'/60'/0'/0/1"
+                  ).connect(provider);
+            console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-        // Compile contract to get bytecode of the library.
-        await hre.run(TASK_COMPILE, { quiet: true });
+            // Compile contract to get bytecode of the library.
+            await hre.run(TASK_COMPILE, { quiet: true });
 
-        const libBytecode = hre.artifacts.readArtifactSync('ExternalDecoder').bytecode;
-        const create2Salt = ethers.constants.HashZero;
-        const externalDecoderLib = computeL2Create2Address(deployWallet, libBytecode, '0x', create2Salt);
+            const libBytecode = hre.artifacts.readArtifactSync('ExternalDecoder').bytecode;
+            const create2Salt = ethers.constants.HashZero;
+            const externalDecoderLib = computeL2Create2Address(deployWallet, libBytecode, '0x', create2Salt);
 
-        // Link smart contracts to the library.
-        hre.config.zksolc.settings.libraries = {
-            'cache-zk/solpp-generated-contracts/ExternalDecoder.sol': {
-                ExternalDecoder: externalDecoderLib
+            // Link smart contracts to the library.
+            // @ts-ignore
+            hre.config.zksolc.settings.libraries = {
+                'cache-zk/solpp-generated-contracts/ExternalDecoder.sol': {
+                    ExternalDecoder: externalDecoderLib
+                }
+            };
+
+            // Compile already contracts that were linked.
+            await hre.run(TASK_COMPILE, { force: true });
+
+            if (cmd.deploy) {
+                // TODO: request from API how many L2 gas is needed for the transaction.
+                await create2DeployFromL1(deployWallet, libBytecode, '0x', create2Salt, priorityTxMaxGasLimit);
             }
-        };
-
-        // Compile already contracts that were linked.
-        await hre.run(TASK_COMPILE, { force: true });
-        await create2DeployFromL1(deployWallet, libBytecode, create2Salt, priorityTxMaxGasLimit);
-    });
+        });
 
     await program.parseAsync(process.argv);
 }

@@ -5,7 +5,7 @@ import { Deployer } from '../../ethereum/src.ts/deploy';
 import * as path from 'path';
 import { getNumberFromEnv, web3Provider } from '../../ethereum/scripts/utils';
 import * as hre from 'hardhat';
-import { DEFAULT_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
 
 const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 const provider = web3Provider();
@@ -48,7 +48,7 @@ async function main() {
                 0,
                 '0x',
                 PRIORITY_TX_MAX_GAS_LIMIT,
-                DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 [getContractBytecode('L2ERC20Bridge')],
                 wallet.address,
                 { nonce, gasPrice }

@@ -6,7 +6,7 @@ import { Interface } from 'ethers/lib/utils';
 
 import { ethers, Wallet, BytesLike } from 'ethers';
 
-export const DEFAULT_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').DEFAULT_L2_GAS_PRICE_PER_PUBDATA;
+export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
@@ -63,6 +63,7 @@ export function computeL2Create2Address(
 export async function create2DeployFromL1(
     wallet: ethers.Wallet,
     bytecode: ethers.BytesLike,
+    constructor: ethers.BytesLike,
     create2Salt: ethers.BytesLike,
     l2GasLimit: ethers.BigNumberish
 ) {
@@ -70,17 +71,20 @@ export async function create2DeployFromL1(
     const zkSync = IZkSyncFactory.connect(zkSyncAddress, wallet);
 
     const deployerSystemContracts = new Interface(artifacts.readArtifactSync('IContractDeployer').abi);
-
     const bytecodeHash = hashL2Bytecode(bytecode);
-    const calldata = deployerSystemContracts.encodeFunctionData('create2', [create2Salt, bytecodeHash, '0x']);
+    const calldata = deployerSystemContracts.encodeFunctionData('create2', [create2Salt, bytecodeHash, constructor]);
+    const gasPrice = await zkSync.provider.getGasPrice();
+    const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+
     await zkSync.requestL2Transaction(
         DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
         0,
         calldata,
         l2GasLimit,
-        DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         [bytecode],
-        wallet.address
+        wallet.address,
+        { value: expectedCost, gasPrice }
     );
 }
 

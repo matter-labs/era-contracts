@@ -8,7 +8,7 @@ import {
     hashL2Bytecode,
     applyL1ToL2Alias,
     getNumberFromEnv,
-    DEFAULT_L2_GAS_PRICE_PER_PUBDATA
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
 } from './utils';
 
 import * as fs from 'fs';
@@ -49,6 +49,7 @@ const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = readBytecode(
     'UpgradeableBeacon'
 );
 const L2_ERC20_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2ERC20Bridge');
+const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT');
 
 async function main() {
     const program = new Command();
@@ -124,16 +125,29 @@ async function main() {
                 ethers.constants.HashZero
             );
 
+            // There will be two deployments done during the initial initialization
+            const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
+                gasPrice,
+                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            );
+
+            const requiredValueToPublishBytecodes = await zkSync.l2TransactionBaseCost(
+                gasPrice,
+                priorityTxMaxGasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            );
+
             const independentInitialization = [
                 zkSync.requestL2Transaction(
                     ethers.constants.AddressZero,
                     0,
                     '0x',
                     priorityTxMaxGasLimit,
-                    DEFAULT_L2_GAS_PRICE_PER_PUBDATA,
+                    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                     [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
                     deployWallet.address,
-                    { gasPrice, nonce }
+                    { gasPrice, nonce, value: requiredValueToPublishBytecodes }
                 ),
                 erc20Bridge.initialize(
                     [
@@ -143,9 +157,12 @@ async function main() {
                     ],
                     l2TokenFactoryAddr,
                     governorAddress,
+                    requiredValueToInitializeBridge,
+                    requiredValueToInitializeBridge,
                     {
                         gasPrice,
-                        nonce: nonce + 1
+                        nonce: nonce + 1,
+                        value: requiredValueToInitializeBridge.mul(2)
                     }
                 )
             ];

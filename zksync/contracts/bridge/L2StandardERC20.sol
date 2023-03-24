@@ -9,10 +9,8 @@ import "../ExternalDecoder.sol";
 /// @author Matter Labs
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
 contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
-    event BridgeInitialization(address indexed l1Token, string name, string symbol, uint8 decimals);
-
     /// @dev Describes whether there is a specific getter in the token.
-    /// @notice Used to explicitly separate which getters the token has and which do not.
+    /// @notice Used to explicitly separate which getters the token has and which it does not.
     /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
     /// @notice Our goal is to store all the getters that L1 token implements, and for others, we keep it as an unimplemented method.
     struct ERC20Getters {
@@ -35,13 +33,17 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     address public override l1Address;
 
     /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor() initializer {}
+    constructor() {
+        // Disable initialization to prevent Parity hack.
+        _disableInitializers();
+    }
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters that L1 token has.
+    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 token
+    /// @param _data The additional data that the L1 bridge provide for initialization.
+    /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
     function bridgeInitialize(address _l1Address, bytes memory _data) external initializer {
-        require(l1Address == address(0), "in5"); // Is already initialized
         require(_l1Address != address(0), "in6"); // Should be non-zero address
         l1Address = _l1Address;
 
@@ -81,6 +83,9 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(decodedName, decodedSymbol);
 
+        // Set the name for EIP-712 signature.
+        __ERC20Permit_init(decodedName);
+
         try ExternalDecoder.decodeUint8(decimalsBytes) returns (uint8 decimalsUint8) {
             // Set decoded value for decimals.
             decimals_ = decimalsUint8;
@@ -89,15 +94,17 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         }
 
         availableGetters = getters;
-        emit BridgeInitialization(_l1Address, decodedName, decodedSymbol, decimals_);
+        emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
     }
 
     modifier onlyBridge() {
-        require(msg.sender == l2Bridge);
+        require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
         _;
     }
 
     /// @dev Mint tokens to a given account.
+    /// @param _to The account that will receive the created tokens.
+    /// @param _amount The amount that will be created.
     /// @notice Should be called by bridge after depositing tokens from L1.
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         _mint(_to, _amount);
@@ -105,6 +112,8 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     }
 
     /// @dev Burn tokens from a given account.
+    /// @param _from The account from which tokens will be burned.
+    /// @param _amount The amount that will be burned.
     /// @notice Should be called by bridge before withdrawing tokens to L1.
     function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
         _burn(_from, _amount);
