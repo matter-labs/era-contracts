@@ -4,7 +4,7 @@ import { exec as _exec, spawn as _spawn } from 'child_process';
 
 import { getZksolcPath, getZksolcUrl, saltFromUrl } from '@matterlabs/hardhat-zksync-solc';
 
-const COMPILER_VERSION = '1.3.1';
+const COMPILER_VERSION = '1.3.7';
 const IS_COMPILER_PRE_RELEASE = false;
 
 async function compilerLocation(): Promise<string> {
@@ -37,13 +37,9 @@ export async function compileYul(path: string, files: string[], outputDirName: s
     }
     let paths = preparePaths(path, files, outputDirName);
 
-    // HACK: DON'T LET IT BE MERGED INTO PROD:
-    // What we are doing here is using the local compiler to compile the yul file. Here we simply
-    // rely on the coincidence in naming rather than the semantic meaning of the `paths` object.
-
     const zksolcLocation = await compilerLocation();
     await spawn(
-        `${zksolcLocation} ${paths.absolutePathSources}/${paths.outputDir} --system-mode --yul --optimize --bin --overwrite -o ${paths.absolutePathArtifacts}/${paths.outputDir}`
+        `${zksolcLocation} ${paths.absolutePathSources}/${paths.outputDir} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}/${paths.outputDir}`
     );
 }
 

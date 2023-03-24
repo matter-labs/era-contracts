@@ -58,18 +58,16 @@ BootloaderUtilities constant BOOTLOADER_UTILITIES = BootloaderUtilities(address(
 
 address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d);
 
-IBytecodeCompressor constant BYTECODE_COMPRESSOR_CONTRACT = IBytecodeCompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
-
-/// @dev The number of bytes that are published during the contract deployment
-/// in addition to the bytecode itself.
-uint256 constant BYTECODE_PUBLISHING_OVERHEAD = 100;
+IBytecodeCompressor constant BYTECODE_COMPRESSOR_CONTRACT = IBytecodeCompressor(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x0e)
+);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
 
 /// @dev The maximal msg.value that context can have
-uint256 constant MAX_MSG_VALUE = 2**128 - 1;
+uint256 constant MAX_MSG_VALUE = 2 ** 128 - 1;
 
 /// @dev Prefix used during derivation of account addresses using CREATE2
 /// @dev keccak256("zksyncCreate2")

@@ -90,7 +90,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             uint256 vInt = uint256(uint8(_transaction.signature[64]));
             require(vInt == 27 || vInt == 28, "Invalid v value");
 
-            // If the `chainId` is specified in the transaction, then the `v` value is encoded as 
+            // If the `chainId` is specified in the transaction, then the `v` value is encoded as
             // `35 + y + 2 * chainId == vInt + 8 + 2 * chainId`, where y - parity bit (see EIP-155).
             if (_transaction.reserved[0] != 0) {
                 vInt += 8 + block.chainid * 2;
@@ -112,7 +112,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
                 vEncoded.length;
 
             // Safe cast, because the length of the list can't be so large.
-            encodedListLength = RLPEncoder.encodeListLen(uint64(listLength)); 
+            encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));
         }
 
         return

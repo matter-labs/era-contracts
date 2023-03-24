@@ -34,11 +34,18 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function storeAccountConstructingCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
         require(Utils.isContractConstructing(_hash), "Code hash is not for a contract on constructor");
+        _storeCodeHash(_address, _hash);
+    }
 
-        uint256 addressAsKey = uint256(uint160(_address));
-        assembly {
-            sstore(addressAsKey, _hash)
-        }
+    /// @notice Stores the bytecodeHash of constructed contract.
+    /// @param _address The address of the account to set the codehash to.
+    /// @param _hash The new bytecode hash of the constructed account.
+    /// @dev This method trusts the ContractDeployer to make sure that the bytecode is known and well-formed,
+    /// but checks whether the bytecode hash corresponds to the constructed smart contract.
+    function storeAccountConstructedCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
+        // Check that code hash corresponds to the deploying smart contract
+        require(Utils.isContractConstructed(_hash), "Code hash is not for a contract on constructor");
+        _storeCodeHash(_address, _hash);
     }
 
     /// @notice Marks the account bytecodeHash as constructed.
@@ -46,14 +53,21 @@ contract AccountCodeStorage is IAccountCodeStorage {
     function markAccountCodeHashAsConstructed(address _address) external override onlyDeployer {
         bytes32 codeHash = getRawCodeHash(_address);
 
-        // Check that the code hash corresponds to the deploying smart contract
         require(Utils.isContractConstructing(codeHash), "Code hash is not for a contract on constructor");
+
         // Get the bytecode hash with "isConstructor" flag equal to false
         bytes32 constructedBytecodeHash = Utils.constructedBytecodeHash(codeHash);
 
+        _storeCodeHash(_address, constructedBytecodeHash);
+    }
+
+    /// @dev Store the codehash of the account without any checks.
+    /// @param _address The address of the account to set the codehash to.
+    /// @param _hash The new account bytecode hash.
+    function _storeCodeHash(address _address, bytes32 _hash) internal {
         uint256 addressAsKey = uint256(uint160(_address));
         assembly {
-            sstore(addressAsKey, constructedBytecodeHash)
+            sstore(addressAsKey, _hash)
         }
     }
 
@@ -107,13 +121,17 @@ contract AccountCodeStorage is IAccountCodeStorage {
 
         // If the contract is a default account or is on constructor the code size is zero,
         // otherwise extract the proper value for it from the bytecode hash.
-        // NOTE: zero address and precompiles are a special case, they are contracts, but we 
-        // want to preserve EVM invariants (see EIP-1052 specification). That's why we automatically 
+        // NOTE: zero address and precompiles are a special case, they are contracts, but we
+        // want to preserve EVM invariants (see EIP-1052 specification). That's why we automatically
         // return `0` length in the following cases:
         // - `codehash(0) == 0`
         // - `account` is a precompile.
         // - `account` is currently being constructed
-        if (uint160(account) > CURRENT_MAX_PRECOMPILE_ADDRESS && codeHash != 0x00 && !Utils.isContractConstructing(codeHash)) {
+        if (
+            uint160(account) > CURRENT_MAX_PRECOMPILE_ADDRESS &&
+            codeHash != 0x00 &&
+            !Utils.isContractConstructing(codeHash)
+        ) {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
     }

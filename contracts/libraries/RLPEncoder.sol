@@ -38,13 +38,13 @@ library RLPEncoder {
         }
     }
 
-	/// @notice Encodes the size of bytes in RLP format.
-	/// @param _len The length of the bytes to encode. It has a `uint64` type since as larger values are not supported.
-	/// NOTE: panics if the length is 1 since the length encoding is ambiguous in this case.
-	function encodeNonSingleBytesLen(uint64 _len) internal pure returns (bytes memory) {
-		assert(_len != 1);
-		return _encodeLength(_len, 0x80);
-	}
+    /// @notice Encodes the size of bytes in RLP format.
+    /// @param _len The length of the bytes to encode. It has a `uint64` type since as larger values are not supported.
+    /// NOTE: panics if the length is 1 since the length encoding is ambiguous in this case.
+    function encodeNonSingleBytesLen(uint64 _len) internal pure returns (bytes memory) {
+        assert(_len != 1);
+        return _encodeLength(_len, 0x80);
+    }
 
     /// @notice Encodes the size of list items in RLP format.
     /// @param _len The length of the bytes to encode. It has a `uint64` type since as larger values are not supported.

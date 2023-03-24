@@ -82,9 +82,9 @@ contract NonceHolder is INonceHolder, ISystemContract {
         IContractDeployer.AccountInfo memory accountInfo = DEPLOYER_SYSTEM_CONTRACT.getAccountInfo(msg.sender);
 
         require(_value != 0, "Nonce value can not be set to 0");
-        // If an account has sequential nonce ordering, we enforce that the previous 
+        // If an account has sequential nonce ordering, we enforce that the previous
         // nonce has already been used.
-        if(accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {
+        if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {
             require(isNonceUsed(msg.sender, _key - 1), "Previous nonce has not been used");
         }
 

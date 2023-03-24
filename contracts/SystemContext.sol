@@ -28,9 +28,8 @@ contract SystemContext is ISystemContext {
     /// @dev It is updated before each transaction by the bootloader
     uint256 public gasPrice;
 
-    /// @notice The current block's gasLimit (gasLimit in Ethereum terms).
-    /// @dev Currently set to some dummy value, it will be changed closer to mainnet.
-    uint256 public blockGasLimit = (1 << 30);
+    /// @notice The current block's gasLimit.
+    uint256 public blockGasLimit = type(uint32).max;
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will the bootloader formal address for now
@@ -61,7 +60,7 @@ contract SystemContext is ISystemContext {
         origin = _newOrigin;
     }
 
-    /// @notice Set the current tx origin.
+    /// @notice Set the the current gas price.
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyBootloader {
         gasPrice = _gasPrice;
@@ -113,7 +112,7 @@ contract SystemContext is ISystemContext {
         uint256 _baseFee
     ) external onlyBootloader {
         (uint256 currentBlockNumber, uint256 currentBlockTimestamp) = getBlockNumberAndTimestamp();
-        require(_newTimestamp >= currentBlockTimestamp, "Timestamps should be incremental");
+        require(_newTimestamp > currentBlockTimestamp, "Timestamps should be incremental");
         require(currentBlockNumber + 1 == _expectedNewNumber, "The provided block number is not correct");
 
         blockHash[currentBlockNumber] = _prevBlockHash;

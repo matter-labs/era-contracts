@@ -72,12 +72,7 @@ library SystemContractsCaller {
     /// @param data The calldata.
     /// @return success Whether the transaction has been successful.
     /// @dev Note, that the `isSystem` flag can only be set when calling system contracts.
-    function systemCall(
-        uint32 gasLimit,
-        address to,
-        uint256 value,
-        bytes memory data
-    ) internal returns (bool success) {
+    function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
         address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
         uint32 dataStart;
@@ -106,7 +101,7 @@ library SystemContractsCaller {
             }
         } else {
             address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
-            // We need to supply the mask to the MsgValueSimulator to denote 
+            // We need to supply the mask to the MsgValueSimulator to denote
             // that the call should be a system one.
             uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
 
@@ -139,7 +134,7 @@ library SystemContractsCaller {
 
         returnData = new bytes(size);
         assembly {
-            returndatacopy(add(returnData, 0x20), 0, size) 
+            returndatacopy(add(returnData, 0x20), 0, size)
         }
     }
 
@@ -148,7 +143,7 @@ library SystemContractsCaller {
     /// @param to The address to call.
     /// @param value The value to pass with the transaction.
     /// @param data The calldata.
-    /// @return returnData The returndata of the transaction. In case the transaction reverts, the error 
+    /// @return returnData The returndata of the transaction. In case the transaction reverts, the error
     /// bubbles up to the parent frame.
     /// @dev Note, that the `isSystem` flag can only be set when calling system contracts.
     function systemCallWithPropagatedRevert(
@@ -160,7 +155,7 @@ library SystemContractsCaller {
         bool success;
         (success, returnData) = systemCallWithReturndata(gasLimit, to, value, data);
 
-        if(!success) {
+        if (!success) {
             assembly {
                 let size := mload(returnData)
                 revert(add(returnData, 0x20), size)
@@ -239,7 +234,6 @@ library SystemContractsCaller {
         farCallAbi |= (uint256(memoryPage) << 32);
         farCallAbi |= (uint256(dataStart) << 64);
         farCallAbi |= (uint256(dataLength) << 96);
-        
     }
 
     /// @notice Calculates the packed representation of the FarCallABI with zero fat pointer fields.

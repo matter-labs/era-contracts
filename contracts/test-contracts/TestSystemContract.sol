@@ -1,6 +1,3 @@
-
-
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
@@ -29,7 +26,6 @@ contract TestSystemContract is ISystemContract {
             require(gasBefore - gasAfter < 10, "Spent too much gas");
         }
 
-        
         {
             uint256 gasBefore = gasleft();
             SystemContractHelper.precompileCall(0, 10000);
@@ -39,18 +35,13 @@ contract TestSystemContract is ISystemContract {
         }
     }
 
-    function testMimicCallAndValue(
-        address whoToMimic,
-        uint128 value
-    ) external {
+    function testMimicCallAndValue(address whoToMimic, uint128 value) external {
         // Note that we don't need to actually have the needed balance to set the `msg.value` for the next call
         SystemContractHelper.setValueForNextFarCall(value);
         this.performMimicCall(
             address(this),
             whoToMimic,
-            abi.encodeCall(
-                TestSystemContract.saveContext, ()
-            ),
+            abi.encodeCall(TestSystemContract.saveContext, ()),
             false,
             false
         );
@@ -73,20 +64,14 @@ contract TestSystemContract is ISystemContract {
 
     function testOnlySystemModifier() external {
         // Firstly, system contracts should be able to call it
-        (bool success, ) = address(this).call(
-            abi.encodeCall(
-                TestSystemContract.requireOnlySystem, ()
-            )
-        );
+        (bool success, ) = address(this).call(abi.encodeCall(TestSystemContract.requireOnlySystem, ()));
         require(success, "System contracts can call onlySystemCall methods");
 
         // Non-system contract accounts should not be able to call it.
         success = this.performRawMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
-            abi.encodeCall(
-                TestSystemContract.requireOnlySystem, ()
-            ),
+            abi.encodeCall(TestSystemContract.requireOnlySystem, ()),
             false,
             false
         );
@@ -95,9 +80,7 @@ contract TestSystemContract is ISystemContract {
         success = this.performRawMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
-            abi.encodeCall(
-                TestSystemContract.requireOnlySystem, ()
-            ),
+            abi.encodeCall(TestSystemContract.requireOnlySystem, ()),
             false,
             true
         );
@@ -110,9 +93,7 @@ contract TestSystemContract is ISystemContract {
         this.performSystemMimicCall(
             address(this),
             address(MAX_SYSTEM_CONTRACT_ADDRESS + 1),
-            abi.encodeCall(
-                TestSystemContract.saveContext, ()
-            ),
+            abi.encodeCall(TestSystemContract.saveContext, ()),
             false,
             100,
             120
@@ -128,15 +109,8 @@ contract TestSystemContract is ISystemContract {
         bytes calldata data,
         bool isConstructor,
         bool isSystem
-    ) external onlySelf returns(bytes memory) {
-        return EfficientCall.mimicCall(
-            uint32(gasleft()),
-            to,
-            data,
-            whoToMimic,
-            isConstructor,
-            isSystem
-        );
+    ) external onlySelf returns (bytes memory) {
+        return EfficientCall.mimicCall(uint32(gasleft()), to, data, whoToMimic, isConstructor, isSystem);
     }
 
     function performRawMimicCall(
@@ -145,15 +119,8 @@ contract TestSystemContract is ISystemContract {
         bytes calldata data,
         bool isConstructor,
         bool isSystem
-    ) external onlySelf returns(bool) {
-        return EfficientCall.rawMimicCall(
-            uint32(gasleft()),
-            to,
-            data,
-            whoToMimic,
-            isConstructor,
-            isSystem
-        );
+    ) external onlySelf returns (bool) {
+        return EfficientCall.rawMimicCall(uint32(gasleft()), to, data, whoToMimic, isConstructor, isSystem);
     }
 
     function performSystemMimicCall(
@@ -164,13 +131,6 @@ contract TestSystemContract is ISystemContract {
         uint256 extraAbiParam1,
         uint256 extraAbiParam2
     ) external onlySelf {
-        TestSystemContractHelper.systemMimicCall(
-            to,
-            whoToMimic,
-            data,
-            isConstructor,
-            extraAbiParam1,
-            extraAbiParam2
-        );
+        TestSystemContractHelper.systemMimicCall(to, whoToMimic, data, isConstructor, extraAbiParam1, extraAbiParam2);
     }
 }

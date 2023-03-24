@@ -64,6 +64,9 @@ let params = {
     PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector('L2EthToken', 'transferFromTo'),
     SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector('IAccount', 'validateTransaction'),
     SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector('IPaymaster', 'validateAndPayForPaymasterTransaction'),
+    PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector('BytecodeCompressor', 'publishCompressedBytecode'),
+    GET_MARKER_PADDED_SELECTOR: getPaddedSelector('KnownCodesStorage', 'getMarker'),
+    COMPRESSED_BYTECODES_SLOTS: 32768,
     ENSURE_RETURNED_MAGIC: 1,
     FORBID_ZERO_GAS_PER_PUBDATA: 1,
     ...SYSTEM_PARAMS

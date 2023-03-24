@@ -13,7 +13,7 @@ library Utils {
         0x00ff000000000000000000000000000000000000000000000000000000000000;
 
     /// @dev Bit mask to set the "isConstructor" marker in the bytecode hash
-    bytes32 constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK = 
+    bytes32 constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK =
         0x0001000000000000000000000000000000000000000000000000000000000000;
 
     function safeCastToU128(uint256 _x) internal pure returns (uint128) {
@@ -44,6 +44,11 @@ library Utils {
         unchecked {
             codeLengthInWords = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
         }
+    }
+
+    /// @notice Denotes whether bytecode hash corresponds to a contract that already constructed
+    function isContractConstructed(bytes32 _bytecodeHash) internal pure returns (bool) {
+        return _bytecodeHash[1] == 0x00;
     }
 
     /// @notice Denotes whether bytecode hash corresponds to a contract that is on constructor or has already been constructed
@@ -78,9 +83,11 @@ library Utils {
         require(_bytecode.length % 32 == 0, "po");
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2**16, "pp"); // bytecode length must be less than 2^16 words
+        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
         require(bytecodeLenInWords % 2 == 1, "pr"); // bytecode length in words must be odd
-        hashedBytecode = EfficientCall.sha(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+        hashedBytecode =
+            EfficientCall.sha(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length

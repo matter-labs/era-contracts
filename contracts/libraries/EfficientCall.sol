@@ -19,14 +19,14 @@ import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "../Constants.so
  * the contract may manipulate the already created fat pointers to forward a slice of the data, but not
  * to create new fat pointers!
  * @dev The allowed operation on fat pointers are:
-    * 1. `ptr.add` - Transforms `ptr.offset` into `ptr.offset + u32(_value)`. If overflow happens then it panics.
-    * 2. `ptr.sub` - Transforms `ptr.offset` into `ptr.offset - u32(_value)`. If underflow happens then it panics.
-    * 3. `ptr.pack` - Do the concatenation between the lowest 128 bits of the pointer itself and the highest 128 bits of `_value`. It is typically used to prepare the ABI for external calls.
-    * 4. `ptr.shrink` - Transforms `ptr.length` into `ptr.length - u32(_shrink)`. If underflow happens then it panics.
+ * 1. `ptr.add` - Transforms `ptr.offset` into `ptr.offset + u32(_value)`. If overflow happens then it panics.
+ * 2. `ptr.sub` - Transforms `ptr.offset` into `ptr.offset - u32(_value)`. If underflow happens then it panics.
+ * 3. `ptr.pack` - Do the concatenation between the lowest 128 bits of the pointer itself and the highest 128 bits of `_value`. It is typically used to prepare the ABI for external calls.
+ * 4. `ptr.shrink` - Transforms `ptr.length` into `ptr.length - u32(_shrink)`. If underflow happens then it panics.
  * @dev The call opcodes accept the fat pointer and change it to its canonical form before passing it to the child call
-    * 1. `ptr.start` is transformed into `ptr.offset + ptr.start`
-    * 2. `ptr.length` is transformed into `ptr.length - ptr.offset`
-    * 3. `ptr.offset` is transformed into `0`
+ * 1. `ptr.start` is transformed into `ptr.offset + ptr.start`
+ * 2. `ptr.length` is transformed into `ptr.length - ptr.offset`
+ * 3. `ptr.offset` is transformed into `0`
  */
 library EfficientCall {
     /// @notice Call the `keccak256` without copying calldata to memory.
@@ -52,12 +52,16 @@ library EfficientCall {
     /// @param _address The address to call.
     /// @param _value The `msg.value` to send.
     /// @param _data The calldata to use for the call.
+    /// @param _isSystem Whether the call should contain the `isSystem` flag.
     /// @return returnData The copied to memory return data.
-    function call(uint256 _gas, address _address, uint256 _value, bytes calldata _data)
-        internal
-        returns (bytes memory returnData)
-    {
-        bool success = rawCall(_gas, _address, _value, _data);
+    function call(
+        uint256 _gas,
+        address _address,
+        uint256 _value,
+        bytes calldata _data,
+        bool _isSystem
+    ) internal returns (bytes memory returnData) {
+        bool success = rawCall(_gas, _address, _value, _data, _isSystem);
         returnData = _verifyCallResult(success);
     }
 
@@ -66,11 +70,11 @@ library EfficientCall {
     /// @param _address The address to call.
     /// @param _data The calldata to use for the call.
     /// @return returnData The copied to memory return data.
-    function staticCall(uint256 _gas, address _address, bytes calldata _data)
-        internal
-        view
-        returns (bytes memory returnData)
-    {
+    function staticCall(
+        uint256 _gas,
+        address _address,
+        bytes calldata _data
+    ) internal view returns (bytes memory returnData) {
         bool success = rawStaticCall(_gas, _address, _data);
         returnData = _verifyCallResult(success);
     }
@@ -80,10 +84,11 @@ library EfficientCall {
     /// @param _address The address to call.
     /// @param _data The calldata to use for the call.
     /// @return returnData The copied to memory return data.
-    function delegateCall(uint256 _gas, address _address, bytes calldata _data)
-        internal
-        returns (bytes memory returnData)
-    {
+    function delegateCall(
+        uint256 _gas,
+        address _address,
+        bytes calldata _data
+    ) internal returns (bytes memory returnData) {
         bool success = rawDelegateCall(_gas, _address, _data);
         returnData = _verifyCallResult(success);
     }
@@ -113,25 +118,31 @@ library EfficientCall {
     /// @param _address The address to call.
     /// @param _value The `msg.value` to send.
     /// @param _data The calldata to use for the call.
+    /// @param _isSystem Whether the call should contain the `isSystem` flag.
     /// @return success whether the call was successful.
-    function rawCall(uint256 _gas, address _address, uint256 _value, bytes calldata _data)
-        internal
-        returns (bool success)
-    {
-        _loadFarCallABIIntoActivePtr(_gas, _data, false, false);
-
+    function rawCall(
+        uint256 _gas,
+        address _address,
+        uint256 _value,
+        bytes calldata _data,
+        bool _isSystem
+    ) internal returns (bool success) {
         if (_value == 0) {
+            _loadFarCallABIIntoActivePtr(_gas, _data, false, _isSystem);
+
             address callAddr = RAW_FAR_CALL_BY_REF_CALL_ADDRESS;
             assembly {
                 success := call(_address, callAddr, 0, 0, 0xFFFF, 0, 0)
             }
         } else {
+            _loadFarCallABIIntoActivePtr(_gas, _data, false, true);
+
             // If there is provided `msg.value` call the `MsgValueSimulator` to forward ether.
             address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
             address callAddr = SYSTEM_CALL_BY_REF_CALL_ADDRESS;
             // We need to supply the mask to the MsgValueSimulator to denote
             // that the call should be a system one.
-            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+            uint256 forwardMask = _isSystem ? MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT : 0;
 
             assembly {
                 success := call(msgValueSimulator, callAddr, _value, _address, 0xFFFF, forwardMask, 0)
@@ -230,10 +241,12 @@ library EfficientCall {
     /// @param _data The calldata to be passed to the call.
     /// @param _isConstructor Whether the call is a constructor call.
     /// @param _isSystem Whether the call is a system call.
-    function _loadFarCallABIIntoActivePtr(uint256 _gas, bytes calldata _data, bool _isConstructor, bool _isSystem)
-        private
-        view
-    {
+    function _loadFarCallABIIntoActivePtr(
+        uint256 _gas,
+        bytes calldata _data,
+        bool _isConstructor,
+        bool _isSystem
+    ) private view {
         SystemContractHelper.loadCalldataIntoActivePtr();
 
         // Currently, zkEVM considers the pointer valid if(ptr.offset < ptr.length || (ptr.length == 0 && ptr.offset == 0)), otherwise panics.

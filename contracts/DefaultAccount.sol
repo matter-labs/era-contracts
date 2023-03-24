@@ -16,24 +16,24 @@ import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM
  * @notice If it is delegate called always returns empty data, just like EOA does.
  */
 contract DefaultAccount is IAccount {
-	using TransactionHelper for *;
+    using TransactionHelper for *;
 
-	/**
-	 * @dev Simulate the behavior of the EOA if the caller is not the bootloader.
-	 * Essentially, for all non-bootloader callers halt the execution with empty return data.
-	 * If all functions will use this modifier AND the contract will implement an empty payable fallback()
-	 * then the contract will be indistinguishable from the EOA when called.
-	 */
-	modifier ignoreNonBootloader() {
-		if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
-			// If function was called outside of the bootloader, behave like an EOA.
-			assembly {
-				return(0, 0)
-			}
-		}
-		// Continue execution if called from the bootloader.
-		_;
-	}
+    /**
+     * @dev Simulate the behavior of the EOA if the caller is not the bootloader.
+     * Essentially, for all non-bootloader callers halt the execution with empty return data.
+     * If all functions will use this modifier AND the contract will implement an empty payable fallback()
+     * then the contract will be indistinguishable from the EOA when called.
+     */
+    modifier ignoreNonBootloader() {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS) {
+            // If function was called outside of the bootloader, behave like an EOA.
+            assembly {
+                return(0, 0)
+            }
+        }
+        // Continue execution if called from the bootloader.
+        _;
+    }
 
     /**
      * @dev Simulate the behavior of the EOA if it is called via `delegatecall`.
@@ -71,41 +71,40 @@ contract DefaultAccount is IAccount {
         magic = _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
-	/// @notice Inner method for validating transaction and increasing the nonce
-	/// @param _suggestedSignedHash The hash of the transaction signed by the EOA
-	/// @param _transaction The transaction.
-	function _validateTransaction(bytes32 _suggestedSignedHash, Transaction calldata _transaction) internal returns (bytes4 magic) {
-		// Note, that nonce holder can only be called with "isSystem" flag.
-		SystemContractsCaller.systemCallWithPropagatedRevert(
-			uint32(gasleft()),
-			address(NONCE_HOLDER_SYSTEM_CONTRACT),
-			0,
-			abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
-		);
+    /// @notice Inner method for validating transaction and increasing the nonce
+    /// @param _suggestedSignedHash The hash of the transaction signed by the EOA
+    /// @param _transaction The transaction.
+    function _validateTransaction(
+        bytes32 _suggestedSignedHash,
+        Transaction calldata _transaction
+    ) internal returns (bytes4 magic) {
+        // Note, that nonce holder can only be called with "isSystem" flag.
+        SystemContractsCaller.systemCallWithPropagatedRevert(
+            uint32(gasleft()),
+            address(NONCE_HOLDER_SYSTEM_CONTRACT),
+            0,
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
+        );
 
-		// Even though for the transaction types present in the system right now,
-		// we always provide the suggested signed hash, this should not be 
-		// always expected. In case the bootloader has no clue what the default hash 
-		// is, the bytes32(0) will be supplied.
+        // Even though for the transaction types present in the system right now,
+        // we always provide the suggested signed hash, this should not be
+        // always expected. In case the bootloader has no clue what the default hash
+        // is, the bytes32(0) will be supplied.
         bytes32 txHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
 
-        if (_transaction.to == uint256(uint160(address(DEPLOYER_SYSTEM_CONTRACT)))) {
-            require(_transaction.data.length >= 4, "Invalid call to ContractDeployer");
-        }
-
-		// The fact there is are enough balance for the account
-		// should be checked explicitly to prevent user paying for fee for a
-		// transaction that wouldn't be included on Ethereum.
-		uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-		require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
+        // The fact there is are enough balance for the account
+        // should be checked explicitly to prevent user paying for fee for a
+        // transaction that wouldn't be included on Ethereum.
+        uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
+        require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
 
         if (_isValidSignature(txHash, _transaction.signature)) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         } else {
             magic = bytes4(0);
         }
-	}
-	
+    }
+
     /// @notice Method called by the bootloader to execute the transaction.
     /// @param _transaction The transaction to execute.
     /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
@@ -119,17 +118,13 @@ contract DefaultAccount is IAccount {
         _execute(_transaction);
     }
 
-    /// @notice Method that should be used to initiate a transaction from this account
-    /// by an external call. This is not mandatory but should be implemented so that
-    /// it is always possible to execute transactions from L1 for this account.
-    /// @dev This method is basically validate + execute.
+    /// @notice Method that should be used to initiate a transaction from this account by an external call.
+    /// @dev The custom account is supposed to implement this method to initiate a transaction on behalf
+    /// of the account via L1 -> L2 communication. However, the default account can initiate a transaction
+    /// from L1, so we formally implement the interface method, but it doesn't execute any logic.
     /// @param _transaction The transaction to execute.
-    function executeTransactionFromOutside(
-        Transaction calldata _transaction
-    ) external payable override ignoreNonBootloader ignoreInDelegateCall {
-        // The account recalculate the hash on its own
-        _validateTransaction(bytes32(0), _transaction);
-        _execute(_transaction);
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
+        // Behave the same as for fallback/receive, just execute nothing, returns nothing
     }
 
     /// @notice Inner method for executing a transaction.
@@ -140,39 +135,45 @@ contract DefaultAccount is IAccount {
         bytes calldata data = _transaction.data;
         uint32 gas = Utils.safeCastToU32(gasleft());
 
-        if (to == address(DEPLOYER_SYSTEM_CONTRACT)) {
-            // Note, that the deployer contract can only be called
-            // with a "systemCall" flag.
-            SystemContractsCaller.systemCallWithPropagatedRevert(gas, to, value, data);
-        } else {
-            bool success = EfficientCall.rawCall(gas, to, value, data);
-            if(!success) {
-                EfficientCall.propagateRevert(); 
-            }  
+        // Note, that the deployment method from the deployer contract can only be called with a "systemCall" flag.
+        bool isSystemCall;
+        if (to == address(DEPLOYER_SYSTEM_CONTRACT) && data.length >= 4) {
+            bytes4 selector = bytes4(data[:4]);
+            // Check that called function is the deployment method,
+            // the others deployer method is not supposed to be called from the default account.
+            isSystemCall =
+                selector == DEPLOYER_SYSTEM_CONTRACT.create.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.create2.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector ||
+                selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
         }
-	}
+        bool success = EfficientCall.rawCall(gas, to, value, data, isSystemCall);
+        if (!success) {
+            EfficientCall.propagateRevert();
+        }
+    }
 
-	/// @notice Validation that the ECDSA signature of the transaction is correct.
-	/// @param _hash The hash of the transaction to be signed.
-	/// @param _signature The signature of the transaction.
-	/// @return EIP1271_SUCCESS_RETURN_VALUE if the signaure is correct. It reverts otherwise.
-	function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
-		require(_signature.length == 65, 'Signature length is incorrect');
-		uint8 v;
-		bytes32 r;
-		bytes32 s;
-		// Signature loading code
-		// we jump 32 (0x20) as the first slot of bytes contains the length
-		// we jump 65 (0x41) per signature
-		// for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
-		assembly {
-			r := mload(add(_signature, 0x20))
-			s := mload(add(_signature, 0x40))
-			v := and(mload(add(_signature, 0x41)), 0xff)
-		}
-		require(v == 27 || v == 28, "v is neither 27 nor 28");
+    /// @notice Validation that the ECDSA signature of the transaction is correct.
+    /// @param _hash The hash of the transaction to be signed.
+    /// @param _signature The signature of the transaction.
+    /// @return EIP1271_SUCCESS_RETURN_VALUE if the signaure is correct. It reverts otherwise.
+    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
+        require(_signature.length == 65, "Signature length is incorrect");
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        // Signature loading code
+        // we jump 32 (0x20) as the first slot of bytes contains the length
+        // we jump 65 (0x41) per signature
+        // for v we load 32 bytes ending with v (the first 31 come from s) then apply a mask
+        assembly {
+            r := mload(add(_signature, 0x20))
+            s := mload(add(_signature, 0x40))
+            v := and(mload(add(_signature, 0x41)), 0xff)
+        }
+        require(v == 27 || v == 28, "v is neither 27 nor 28");
 
-		// EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
         // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
         // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
         // signatures from current libraries generate a unique signature with an s-value in the lower half order.
@@ -183,10 +184,10 @@ contract DefaultAccount is IAccount {
         // these malleable signatures as well.
         require(uint256(s) <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0, "Invalid s");
 
-		address recoveredAddress = ecrecover(_hash, v, r, s);
+        address recoveredAddress = ecrecover(_hash, v, r, s);
 
         return recoveredAddress == address(this) && recoveredAddress != address(0);
-	}
+    }
 
     /// @notice Method for paying the bootloader for the transaction.
     /// @param _transaction The transaction for which the fee is paid.
@@ -217,7 +218,7 @@ contract DefaultAccount is IAccount {
         _transaction.processPaymasterInput();
     }
 
-    fallback() external {
+    fallback() external payable {
         // fallback of default account shouldn't be called by bootloader under no circumstances
         assert(msg.sender != BOOTLOADER_FORMAL_ADDRESS);
 

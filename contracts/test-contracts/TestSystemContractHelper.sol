@@ -8,7 +8,6 @@ import "../libraries/SystemContractsCaller.sol";
 import "../libraries/SystemContractHelper.sol";
 import "../libraries/Utils.sol";
 
-
 library TestSystemContractHelper {
     /// @notice Perform a `mimicCall` with `isSystem` flag, with the ability to pass extra abi data.
     /// @param to The address to call
@@ -27,20 +26,13 @@ library TestSystemContractHelper {
         uint256 extraAbiParam1,
         uint256 extraAbiParam2
     ) internal returns (bytes memory) {
-        bool success = rawSystemMimicCall(
-            to,
-            whoToMimic,
-            data,
-            isConstructor,
-            extraAbiParam1,
-            extraAbiParam2
-        );
+        bool success = rawSystemMimicCall(to, whoToMimic, data, isConstructor, extraAbiParam1, extraAbiParam2);
 
         uint256 size;
         assembly {
             size := returndatasize()
         }
-        if(!success) {
+        if (!success) {
             assembly {
                 returndatacopy(0, 0, size)
                 revert(0, size)
@@ -73,12 +65,12 @@ library TestSystemContractHelper {
         uint256 extraAbiParam2
     ) internal returns (bool success) {
         SystemContractHelper.loadCalldataIntoActivePtr();
-        
+
         // Currently, zkEVM considers the pointer valid if(ptr.offset < ptr.length || (ptr.length == 0 && ptr.offset == 0)), otherwise panics.
         // So, if the data is empty we need to make the `ptr.length = ptr.offset = 0`, otherwise follow standard logic.
         if (data.length == 0) {
             // Safe to cast, offset is never bigger than `type(uint32).max`
-            SystemContractHelper.ptrShrinkIntoActive(uint32(msg.data.length)); 
+            SystemContractHelper.ptrShrinkIntoActive(uint32(msg.data.length));
         } else {
             uint256 dataOffset;
             assembly {
@@ -86,7 +78,7 @@ library TestSystemContractHelper {
             }
 
             // Safe to cast, offset is never bigger than `type(uint32).max`
-            SystemContractHelper.ptrAddIntoActive(uint32(dataOffset)); 
+            SystemContractHelper.ptrAddIntoActive(uint32(dataOffset));
             // Safe to cast, `data.length` is never bigger than `type(uint32).max`
             uint32 shrinkTo = uint32(msg.data.length - (data.length + dataOffset));
             SystemContractHelper.ptrShrinkIntoActive(shrinkTo);

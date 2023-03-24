@@ -67,7 +67,7 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Provide a compiler hint, by placing calldata fat pointer into virtual `ACTIVE_PTR`, 
+    /// @notice Provide a compiler hint, by placing calldata fat pointer into virtual `ACTIVE_PTR`,
     /// that can be manipulated by `ptr.add`/`ptr.sub`/`ptr.pack`/`ptr.shrink` later.
     /// @dev This allows making a call by forwarding calldata pointer to the child call.
     /// It is a much more efficient way to forward calldata, than standard EVM bytes copying.
@@ -79,7 +79,7 @@ library SystemContractHelper {
     }
 
     /// @notice Compiler simulation of the `ptr.pack` opcode for the virtual `ACTIVE_PTR` pointer.
-    /// @dev Do the concatenation between lowest part of `ACTIVE_PTR` and highest part of `_farCallAbi` 
+    /// @dev Do the concatenation between lowest part of `ACTIVE_PTR` and highest part of `_farCallAbi`
     /// forming packed fat pointer for a far call or ret ABI when necessary.
     /// Note: Panics if the lowest 128 bits of `_farCallAbi` are not zeroes.
     function ptrPackIntoActivePtr(uint256 _farCallAbi) internal view {
@@ -88,8 +88,8 @@ library SystemContractHelper {
             pop(staticcall(_farCallAbi, callAddr, 0, 0xFFFF, 0, 0))
         }
     }
-    
-    /// @notice Compiler simulation of the `ptr.add` opcode for the virtual `ACTIVE_PTR` pointer. 
+
+    /// @notice Compiler simulation of the `ptr.add` opcode for the virtual `ACTIVE_PTR` pointer.
     /// @dev Transforms `ACTIVE_PTR.offset` into `ACTIVE_PTR.offset + u32(_value)`. If overflow happens then it panics.
     function ptrAddIntoActive(uint32 _value) internal view {
         address callAddr = PTR_ADD_INTO_ACTIVE_CALL_ADDRESS;

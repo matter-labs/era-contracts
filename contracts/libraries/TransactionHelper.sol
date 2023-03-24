@@ -78,8 +78,7 @@ library TransactionHelper {
     using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 constant EIP712_DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
+    bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
     bytes32 constant EIP712_TRANSACTION_TYPE_HASH =
         keccak256(
@@ -92,18 +91,12 @@ library TransactionHelper {
     /// @dev This method assumes that address is Ether either if the address is 0 (for convenience)
     /// or if the address is the address of the L2EthToken system contract.
     function isEthToken(uint256 _addr) internal pure returns (bool) {
-        return
-            _addr == uint256(uint160(address(ETH_TOKEN_SYSTEM_CONTRACT))) ||
-            _addr == 0;
+        return _addr == uint256(uint160(address(ETH_TOKEN_SYSTEM_CONTRACT))) || _addr == 0;
     }
 
     /// @notice Calculate the suggested signed hash of the transaction,
     /// i.e. the hash that is signed by EOAs and is recommended to be signed by other accounts.
-    function encodeHash(Transaction calldata _transaction)
-        internal
-        view
-        returns (bytes32 resultHash)
-    {
+    function encodeHash(Transaction calldata _transaction) internal view returns (bytes32 resultHash) {
         if (_transaction.txType == LEGACY_TX_TYPE) {
             resultHash = _encodeHashLegacyTransaction(_transaction);
         } else if (_transaction.txType == EIP_712_TX_TYPE) {
@@ -121,11 +114,7 @@ library TransactionHelper {
 
     /// @notice Encode hash of the zkSync native transaction type.
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
-    function _encodeHashEIP712Transaction(Transaction calldata _transaction)
-        private
-        view
-        returns (bytes32)
-    {
+    function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
                 EIP712_TRANSACTION_TYPE_HASH,
@@ -146,27 +135,15 @@ library TransactionHelper {
         );
 
         bytes32 domainSeparator = keccak256(
-            abi.encode(
-                EIP712_DOMAIN_TYPEHASH,
-                keccak256("zkSync"),
-                keccak256("2"),
-                block.chainid
-            )
+            abi.encode(EIP712_DOMAIN_TYPEHASH, keccak256("zkSync"), keccak256("2"), block.chainid)
         );
 
-        return
-            keccak256(
-                abi.encodePacked("\x19\x01", domainSeparator, structHash)
-            );
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
 
     /// @notice Encode hash of the legacy transaction type.
     /// @return keccak256 of the serialized RLP encoded representation of transaction
-    function _encodeHashLegacyTransaction(Transaction calldata _transaction)
-        private
-        view
-        returns (bytes32)
-    {
+    function _encodeHashLegacyTransaction(Transaction calldata _transaction) private view returns (bytes32) {
         // Hash of legacy transactions are encoded as one of the:
         // - RLP(nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0)
         // - RLP(nonce, gasPrice, gasLimit, to, value, data)
@@ -178,12 +155,8 @@ library TransactionHelper {
         // Encode `gasPrice` and `gasLimit` together to prevent "stack too deep error".
         bytes memory encodedGasParam;
         {
-            bytes memory encodedGasPrice = RLPEncoder.encodeUint256(
-                _transaction.maxFeePerGas
-            );
-            bytes memory encodedGasLimit = RLPEncoder.encodeUint256(
-                _transaction.gasLimit
-            );
+            bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
+            bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             encodedGasParam = bytes.concat(encodedGasPrice, encodedGasLimit);
         }
 
@@ -197,9 +170,7 @@ library TransactionHelper {
             uint64 txDataLen = uint64(_transaction.data.length);
             if (txDataLen != 1) {
                 // If the length is not equal to one, then only using the length can it be encoded definitely.
-                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(
-                    txDataLen
-                );
+                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(txDataLen);
             } else if (_transaction.data[0] >= 0x80) {
                 // If input is a byte in [0x80, 0xff] range, RLP encoding will concatenates 0x81 with the byte.
                 encodedDataLength = hex"81";
@@ -244,11 +215,7 @@ library TransactionHelper {
 
     /// @notice Encode hash of the EIP2930 transaction type.
     /// @return keccak256 of the serialized RLP encoded representation of transaction
-    function _encodeHashEIP2930Transaction(Transaction calldata _transaction)
-        private
-        view
-        returns (bytes32)
-    {
+    function _encodeHashEIP2930Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         // Hash of EIP2930 transactions is encoded the following way:
         // H(0x01 || RLP(chain_id, nonce, gas_price, gas_limit, destination, amount, data, access_list))
         //
@@ -281,9 +248,7 @@ library TransactionHelper {
             uint64 txDataLen = uint64(_transaction.data.length);
             if (txDataLen != 1) {
                 // If the length is not equal to one, then only using the length can it be encoded definitely.
-                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(
-                    txDataLen
-                );
+                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(txDataLen);
             } else if (_transaction.data[0] >= 0x80) {
                 // If input is a byte in [0x80, 0xff] range, RLP encoding will concatenates 0x81 with the byte.
                 encodedDataLength = hex"81";
@@ -320,11 +285,7 @@ library TransactionHelper {
 
     /// @notice Encode hash of the EIP1559 transaction type.
     /// @return keccak256 of the serialized RLP encoded representation of transaction
-    function _encodeHashEIP1559Transaction(Transaction calldata _transaction)
-        private
-        view
-        returns (bytes32)
-    {
+    function _encodeHashEIP1559Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         // Hash of EIP1559 transactions is encoded the following way:
         // H(0x02 || RLP(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list))
         //
@@ -359,9 +320,7 @@ library TransactionHelper {
             uint64 txDataLen = uint64(_transaction.data.length);
             if (txDataLen != 1) {
                 // If the length is not equal to one, then only using the length can it be encoded definitely.
-                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(
-                    txDataLen
-                );
+                encodedDataLength = RLPEncoder.encodeNonSingleBytesLen(txDataLen);
             } else if (_transaction.data[0] >= 0x80) {
                 // If input is a byte in [0x80, 0xff] range, RLP encoding will concatenates 0x81 with the byte.
                 encodedDataLength = hex"81";
@@ -400,14 +359,9 @@ library TransactionHelper {
     /// for tokens, etc. For more information on the expected behavior, check out
     /// the "Paymaster flows" section in the documentation.
     function processPaymasterInput(Transaction calldata _transaction) internal {
-        require(
-            _transaction.paymasterInput.length >= 4,
-            "The standard paymaster input must be at least 4 bytes long"
-        );
+        require(_transaction.paymasterInput.length >= 4, "The standard paymaster input must be at least 4 bytes long");
 
-        bytes4 paymasterInputSelector = bytes4(
-            _transaction.paymasterInput[0:4]
-        );
+        bytes4 paymasterInputSelector = bytes4(_transaction.paymasterInput[0:4]);
         if (paymasterInputSelector == IPaymasterFlow.approvalBased.selector) {
             require(
                 _transaction.paymasterInput.length >= 68,
@@ -416,16 +370,10 @@ library TransactionHelper {
 
             // While the actual data consists of address, uint256 and bytes data,
             // the data is needed only for the paymaster, so we ignore it here for the sake of optimization
-            (address token, uint256 minAllowance) = abi.decode(
-                _transaction.paymasterInput[4:68],
-                (address, uint256)
-            );
+            (address token, uint256 minAllowance) = abi.decode(_transaction.paymasterInput[4:68], (address, uint256));
             address paymaster = address(uint160(_transaction.paymaster));
 
-            uint256 currentAllowance = IERC20(token).allowance(
-                address(this),
-                paymaster
-            );
+            uint256 currentAllowance = IERC20(token).allowance(address(this), paymaster);
             if (currentAllowance < minAllowance) {
                 // Some tokens, e.g. USDT require that the allowance is firsty set to zero
                 // and only then updated to the new value.
@@ -443,10 +391,7 @@ library TransactionHelper {
     /// @notice Pays the required fee for the transaction to the bootloader.
     /// @dev Currently it pays the maximum amount "_transaction.maxFeePerGas * _transaction.gasLimit",
     /// it will change in the future.
-    function payToTheBootloader(Transaction calldata _transaction)
-        internal
-        returns (bool success)
-    {
+    function payToTheBootloader(Transaction calldata _transaction) internal returns (bool success) {
         address bootloaderAddr = BOOTLOADER_FORMAL_ADDRESS;
         uint256 amount = _transaction.maxFeePerGas * _transaction.gasLimit;
 
@@ -456,13 +401,13 @@ library TransactionHelper {
     }
 
     // Returns the balance required to process the transaction.
-	function totalRequiredBalance(Transaction calldata _transaction) internal pure returns (uint256 requiredBalance) {
-		if(address(uint160(_transaction.paymaster)) != address(0)) {
-			// Paymaster pays for the fee
-			requiredBalance = _transaction.value;
-		} else {
-			// The user should have enough balance for both the fee and the value of the transaction
-			requiredBalance =  _transaction.maxFeePerGas * _transaction.gasLimit + _transaction.value;
-		}
+    function totalRequiredBalance(Transaction calldata _transaction) internal pure returns (uint256 requiredBalance) {
+        if (address(uint160(_transaction.paymaster)) != address(0)) {
+            // Paymaster pays for the fee
+            requiredBalance = _transaction.value;
+        } else {
+            // The user should have enough balance for both the fee and the value of the transaction
+            requiredBalance = _transaction.maxFeePerGas * _transaction.gasLimit + _transaction.value;
+        }
     }
 }

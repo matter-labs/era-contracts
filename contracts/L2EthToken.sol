@@ -11,7 +11,7 @@ import {IMailbox} from "./interfaces/IMailbox.sol";
  * @author Matter Labs
  * @notice Native ETH contract.
  * @dev It does NOT provide interfaces for personal interaction with tokens like `transfer`, `approve`, and `transferFrom`.
- * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts 
+ * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
 contract L2EthToken is IEthToken {
@@ -21,11 +21,7 @@ contract L2EthToken is IEthToken {
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
 
-    /// NOTE: The deprecated from the previous upgrade storage variable.
-    // TODO: Remove this variable with the new upgrade.
-    address __DEPRECATED_l2Bridge = address(0);
-
-    modifier onlyBootloader {
+    modifier onlyBootloader() {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Callable only by the bootloader");
         _;
     }
@@ -52,7 +48,7 @@ contract L2EthToken is IEthToken {
             // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
             // decrementing then incrementing.
             balance[_to] += _amount;
-        }        
+        }
 
         emit Transfer(_from, _to, _amount);
     }
@@ -61,7 +57,7 @@ contract L2EthToken is IEthToken {
     /// @dev It takes `uint256` as an argument to be able to properly simulate the behaviour of the
     /// Ethereum's `BALANCE` opcode that accepts uint256 as an argument and truncates any upper bits
     /// @param _account The address of the account to return the balance of.
-    function balanceOf(uint256 _account) external override view returns (uint256) {
+    function balanceOf(uint256 _account) external view override returns (uint256) {
         return balance[address(uint160(_account))];
     }
 
@@ -77,11 +73,16 @@ contract L2EthToken is IEthToken {
 
     /// @notice Initiate the ETH withdrawal, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
+    /// @dev The function accepts the `msg.value`. Since this contract holds the mapping of all ether
+    /// balances of the system, the sent `msg.value` is added to the `this` balance before the call.
+    /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
     function withdraw(address _l1Receiver) external payable override {
         uint256 amount = msg.value;
 
         // Silent burning of the ether
         unchecked {
+            // This is safe, since this contract holds the ether balances, and if user
+            // send a `msg.value` it will be added to the contract (`this`) balance.
             balance[address(this)] -= amount;
             totalSupply -= amount;
         }

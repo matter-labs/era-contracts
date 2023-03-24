@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import "./libraries/Utils.sol";
 import "./libraries/EfficientCall.sol";
 import {SystemContractHelper, ISystemContract} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT, MAX_MSG_VALUE} from "./Constants.sol";
@@ -32,32 +33,24 @@ contract MsgValueSimulator is ISystemContract {
     fallback(bytes calldata _data) external payable onlySystemCall returns (bytes memory) {
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
+        // Prevent mimic call to the MsgValueSimulator to prevent an unexpected change of callee.
+        require(to != address(this), "MsgValueSimulator calls itself");
+
         if (value != 0) {
             (bool success, ) = address(ETH_TOKEN_SYSTEM_CONTRACT).call(
                 abi.encodeCall(ETH_TOKEN_SYSTEM_CONTRACT.transferFromTo, (msg.sender, to, value))
             );
 
             // If the transfer of ETH fails, we do the most Ethereum-like behaviour in such situation: revert(0,0)
-            if(!success) {
+            if (!success) {
                 assembly {
-                    revert(0,0)
+                    revert(0, 0)
                 }
             }
         }
 
-        if(value > MAX_MSG_VALUE) {
-            // The if above should never be true, since noone should be able to have 
-            // MAX_MSG_VALUE wei of ether. However, if it does happen for some reason,
-            // we will revert(0,0).
-            // Note, that we use raw revert here instead of `panic` to emulate behaviour close to 
-            // the EVM's one, i.e. returndata should be empty.
-            assembly {
-                return(0,0)
-            }
-        }
-
         // For the next call this `msg.value` will be used.
-        SystemContractHelper.setValueForNextFarCall(uint128(value));
+        SystemContractHelper.setValueForNextFarCall(Utils.safeCastToU128(value));
 
         return EfficientCall.mimicCall(gasleft(), to, _data, msg.sender, false, isSystemCall);
     }

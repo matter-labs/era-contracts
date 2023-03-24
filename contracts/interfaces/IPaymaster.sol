@@ -19,11 +19,11 @@ interface IPaymaster {
     /// @param _suggestedSignedHash The hash of the transaction that is signed by an EOA
     /// @param _transaction The transaction itself.
     /// @return magic The value that should be equal to the signature of the validateAndPayForPaymasterTransaction
-    /// if the paymaster agrees to pay for the transaction. 
-    /// @return context The "context" of the transaction: an array of bytes of length at most 1024 bytes, which will be 
+    /// if the paymaster agrees to pay for the transaction.
+    /// @return context The "context" of the transaction: an array of bytes of length at most 1024 bytes, which will be
     /// passed to the `postTransaction` method of the account.
     /// @dev The developer should strive to preserve as many steps as possible both for valid
-    /// and invalid transactions as this very method is also used during the gas fee estimation 
+    /// and invalid transactions as this very method is also used during the gas fee estimation
     /// (without some of the necessary data, e.g. signature).
     function validateAndPayForPaymasterTransaction(
         bytes32 _txHash,
