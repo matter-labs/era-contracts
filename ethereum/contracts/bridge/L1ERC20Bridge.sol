@@ -203,10 +203,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         address _refundRecipient
     ) public payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
-        uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "1T"); // The token has non-standard transfer logic
+        
         // verify the deposit amount is allowed
         _verifyDepositLimit(_l1Token, msg.sender, _amount, false);
+        uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
+        require(amount == _amount, "1T"); // The token has non-standard transfer logic
 
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
