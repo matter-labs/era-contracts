@@ -18,7 +18,8 @@ import "./BootloaderUtilities.sol";
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
 /// @dev All the system contracts must be located in the kernel space,
-/// i.e. their addresses must be below 2^16.
+/// i.e. their addresses must be below 2^16. The motivation behind this
+/// choice is EIP-1352: https://eips.ethereum.org/EIPS/eip-1352.
 uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
 
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
