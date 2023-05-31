@@ -143,30 +143,19 @@ library SystemContractHelper {
     /// @dev The list of currently available precompiles sha256, keccak256, ecrecover.
     /// NOTE: The precompile type depends on `this` which calls precompile, which means that only
     /// system contracts corresponding to the list of precompiles above can do `precompileCall`.
-    /// UNSAFE: This method should not be used in the context where it produces other work than gas burning, because
-    /// if the user does not have enough gas to burn, the VM will still be required to calculate the result of the precompile (e.g. sha256).
     /// @dev If used not in the `sha256`, `keccak256` or `ecrecover` contracts, it will just burn the gas provided.
-    function unsafePrecompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
+    function precompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
         address callAddr = PRECOMPILE_CALL_ADDRESS;
 
+        // After `precompileCall` gas will be burned down to 0 if there are not enough of them,
+        // thats why it should be checked before the call.
+        require(gasleft() >= _gasToBurn);
         uint256 cleanupMask = UINT32_MASK;
         assembly {
             // Clearing input params as they are not cleaned by Solidity by default
             _gasToBurn := and(_gasToBurn, cleanupMask)
             success := staticcall(_rawParams, callAddr, _gasToBurn, 0xFFFF, 0, 0)
         }
-    }
-
-
-    /// @notice The safe version of the precompileCall function above. It should be used in contexts where it produces
-    /// other work than gas burning, to prevent the operator from generating the result of the precompile.
-    /// @param _rawParams The packed precompile params. They can be retrieved by
-    /// the `packPrecompileParams` method.
-    /// @param _gasToBurn The number of gas to burn during this call.
-    /// @return success Whether the call was successful.
-    function precompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
-        require(gasleft() >= _gasToBurn);
-        success = unsafePrecompileCall(_rawParams, _gasToBurn);
     }
 
     /// @notice Set `msg.value` to next far call.
