@@ -1283,7 +1283,7 @@ object "Bootloader" {
                 }
 
                 // If marking of factory dependencies has been unsuccessful, 0 value is returned.
-                // Otherwise, all the previous dependencies have been successfuly published, so 
+                // Otherwise, all the previous dependencies have been successfully published, so
                 // we need to move the pointer.
                 if newCompressedFactoryDepsPointer {
                     mstore(COMPRESSED_BYTECODES_BEGIN_BYTE(), newCompressedFactoryDepsPointer)
@@ -1291,8 +1291,8 @@ object "Bootloader" {
 
                 switch gt(gasLeft, gasSpentOnFactoryDeps) 
                 case 0 {
-                    gasLeft := 0
                     gasSpentOnExecute := gasLeft
+                    gasLeft := 0
                 }
                 default {
                     // Note, that since gt(gasLeft, gasSpentOnFactoryDeps) = true

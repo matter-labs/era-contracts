@@ -111,7 +111,7 @@ contract KnownCodesStorage is IKnownCodesStorage {
     /// @notice Method used for burning a certain amount of gas
     /// @param _gasToPay The number of gas to burn.
     function _burnGas(uint32 _gasToPay) internal view {
-        bool precompileCallSuccess = SystemContractHelper.precompileCall(
+        bool precompileCallSuccess = SystemContractHelper.unsafePrecompileCall(
             0, // The precompile parameters are formal ones. We only need the precompile call to burn gas.
             _gasToPay
         );

@@ -39,9 +39,8 @@ contract L1Messenger is IL1Messenger {
         uint256 gasToPay = pubdataLen * gasPerPubdataBytes;
 
         // Call precompile to burn gas to cover the cost of publishing pubdata to L1.
-        uint256 precompileParams = SystemContractHelper.packPrecompileParams(0, 0, 0, 0, 0);
-        bool precompileCallSuccess = SystemContractHelper.precompileCall(
-            precompileParams,
+        bool precompileCallSuccess = SystemContractHelper.unsafePrecompileCall(
+            0,
             Utils.safeCastToU32(gasToPay)
         );
         require(precompileCallSuccess);
