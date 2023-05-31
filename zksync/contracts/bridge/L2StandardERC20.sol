@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "./interfaces/IL2StandardToken.sol";
-import "../ExternalDecoder.sol";
 
 /// @author Matter Labs
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
@@ -68,13 +67,13 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         // - Use the standard abi.decode method, but wrap it into an external call in which error can be handled.
         // We use the second option here.
 
-        try ExternalDecoder.decodeString(nameBytes) returns (string memory nameString) {
+        try this.decodeString(nameBytes) returns (string memory nameString) {
             decodedName = nameString;
         } catch {
             getters.ignoreName = true;
         }
 
-        try ExternalDecoder.decodeString(symbolBytes) returns (string memory symbolString) {
+        try this.decodeString(symbolBytes) returns (string memory symbolString) {
             decodedSymbol = symbolString;
         } catch {
             getters.ignoreSymbol = true;
@@ -86,7 +85,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         // Set the name for EIP-712 signature.
         __ERC20Permit_init(decodedName);
 
-        try ExternalDecoder.decodeUint8(decimalsBytes) returns (uint8 decimalsUint8) {
+        try this.decodeUint8(decimalsBytes) returns (uint8 decimalsUint8) {
             // Set decoded value for decimals.
             decimals_ = decimalsUint8;
         } catch {
@@ -136,5 +135,15 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         if (availableGetters.ignoreDecimals) revert();
         return decimals_;
+    }
+
+    /// @dev External function to decode a string from bytes.
+    function decodeString(bytes memory _input) external pure returns (string memory result) {
+        (result) = abi.decode(_input, (string));
+    }
+
+    /// @dev External function to decode a uint8 from bytes.
+    function decodeUint8(bytes memory _input) external pure returns (uint8 result) {
+        (result) = abi.decode(_input, (uint8));
     }
 }

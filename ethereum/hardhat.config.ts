@@ -4,6 +4,8 @@ import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
+import 'solidity-coverage';
+import 'hardhat-gas-reporter';
 import { getNumberFromEnv } from './scripts/utils';
 
 // If no network is specified, use the default config
@@ -63,7 +65,7 @@ export default {
         settings: {
             optimizer: {
                 enabled: true,
-                runs: 200
+                runs: 9999999
             },
             outputSelection: {
                 '*': {
@@ -73,7 +75,8 @@ export default {
         }
     },
     contractSizer: {
-        runOnCompile: false
+        runOnCompile: false,
+        except: ['dev-contracts', 'zksync/upgrade-initializers', 'zksync/libraries', 'common/libraries']
     },
     paths: {
         sources: './contracts'
@@ -102,5 +105,8 @@ export default {
     },
     etherscan: {
         apiKey: process.env.MISC_ETHERSCAN_API_KEY
+    },
+    gasReporter: {
+        enabled: true
     }
 };

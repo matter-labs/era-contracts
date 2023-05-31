@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "devDependencies": {
-    "@matterlabs/hardhat-zksync-solc": "^0.3.14-beta.3",
+    "@matterlabs/hardhat-zksync-solc": "^0.3.15",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-solpp": "^2.0.0",
     "@openzeppelin/contracts": "4.6.0",
@@ -29,10 +29,11 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
-    "compile-and-deploy-libs": "ts-node src/compileAndDeployLibs.ts",
     "deploy-testnet-paymaster": "hardhat run src/deployTestnetPaymaster.ts",
     "publish-bridge-preimages": "hardhat run src/publish-bridge-preimages.ts",
     "deploy-l2-weth": "ts-node src/deployL2Weth.ts"
   },
-  "dependencies": {}
+  "dependencies": {
+    "dotenv": "^16.0.3"
+  }
 }

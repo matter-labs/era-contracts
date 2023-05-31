@@ -12,16 +12,17 @@ deployment and interaction with Turing-complete smart contracts.
 All data that is needed to restore the L2 state are also pushed on-chain. There are two approaches, publishing inputs of
 L2 transactions on-chain and publishing the state transition diff. zkSync follows the second option.
 
-See the [documentation](https://v2-docs.zksync.io/dev/fundamentals/rollups.html) to read more!
+See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html) to read more!
 
 ## Glossary
 
-- **Governor** - privileged address that controls the upgradability of the network and sets other privileged addresses.
+- **Governor** - a privileged address that controls the upgradability of the network and sets other privileged
+  addresses.
+- **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
 - **Validator/Operator** - a privileged address that can commit/verify/execute L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
-- **Security council** - set of trusted addresses that can decrease upgrade timelock.
 - **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
-  zkSync v2 network.
+  zkSync Era network.
 
 ### L1 Smart contracts
 
@@ -31,7 +32,7 @@ Technically, this L1 smart contract acts as a connector between Ethereum (L1) an
 validity proof and data availability, handles L2 <-> L1 communication, finalizes L2 state transition, and more.
 
 There are also important contracts deployed on the L2 that can also execute logic called _system contracts_. Using L2
-<-> L1 communication, they can affect both the L1 and the L2.
+<-> L1 communication can affect both the L1 and the L2.
 
 #### DiamondProxy
 
@@ -93,7 +94,7 @@ _DiamondCutFacet_).
 #### MailboxFacet
 
 The facet that handles L2 <-> L1 communication, an overview for which can be found in
-[docs](https://v2-docs.zksync.io/dev/developer-guides/bridging/l1-l2-interop.html).
+[docs](https://era.zksync.io/docs/dev/developer-guides/bridging/l1-l2-interop.html).
 
 The Mailbox performs three functions:
 
@@ -127,6 +128,11 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
 }
 
 ```
+
+For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
+we simply reused the same L1 addresses as the L2 sender. In zkSync Era address derivation rule is different from the
+Ethereum, so cross-chain exploits are already impossible. However, zkSync Era may add full EVM support in the future, so
+applying address aliasing leave room for future EVM compatibility.
 
 The L1 -> L2 communication is also used for bridging ether. The user should include a `msg.value` when initiating a
 transaction request on the L1 contract. Before executing a transaction on L2, the specified address will be credited
@@ -176,7 +182,7 @@ When a block is committed, we process L2 -> L1 logs. Here are the invariants tha
   hash of processed L1 -> L2 transaction.
 - Several (of none) logs from the `L2_TO_L1_MESSENGER` with the `value == hashedMessage` where `hashedMessage` is a hash
   of an arbitrary-length message that is sent from L2
-- None logs from other addresses (may be changed in future).
+- None logs from other addresses (may be changed in the future).
 
 #### Bridges
 
@@ -189,14 +195,47 @@ L1 <-> L2 communication.
 
 ##### L1ERC20Bridge
 
+The "standard" implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+fee-on-transfer tokens or other custom logic for handling user balances.
+
 - `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
 ##### L2ERC20Bridge
 
+The L2 counterpart of the L1 ERC20 bridge.
+
 - `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
 - `finalizeDeposit` - finalize the deposit and mint funds on L2.
+
+##### L1WethBridge
+
+The custom bridge exclusively handles transfers of WETH tokens between the two domains. It is designed to streamline and
+enhance the user experience for bridging WETH tokens by minimizing the number of transactions required and reducing
+liquidity fragmentation thus improving efficiency and user experience.
+
+This contract accepts WETH deposits on L1, unwraps them to ETH, and sends the ETH to the L2 WETH bridge contract, where
+it is wrapped back into WETH and delivered to the L2 recipient.
+
+Thus, the deposit is made in one transaction, and the user receives L2 WETH that can be unwrapped to ETH.
+
+##### L2WethBridge
+
+The L2 counterpart of the L1 WETH bridge.
+
+For withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
+the L1 recipient.
+
+#### ValidatorTimelock
+
+An intermediate smart contract between the validator EOA account and the zkSync smart contract. Its primary purpose is
+to provide a trustless means of delaying block execution without modifying the main zkSync contract. zkSync actively
+monitors the chain activity and reacts to any suspicious activity by freezing the chain. This allows time for
+investigation and mitigation before resuming normal operations.
+
+It is a temporary solution to prevent any significant impact of the validator hot key leakage, while the network is in
+the Alpha stage.
 
 #### Allowlist
 
@@ -234,33 +273,13 @@ Thus:
 - Factory dependencies - list of bytecode hashes that can be deployed on L2
 - Address derivation for `create`/`create2` on L1 and L2 is different
 
-### Withdrawal/Deposit Limitation
+### Deposit Limitation
 
-It is decided to have a limit on the amount of fund being deposited and withdrawn from the protocol.
-
-#### Withdrawal Limitation
-
-In case a malicious user could mint illegally some tokens on L2, there should be limitation to not allow the malicious
-user withdrwing all the funds on L1. The current plan is to put withdrawal limitation on protocol level. In other words,
-it is not allowed to withdraw more than some percent of the protocol balance for the defined tokens every day. Through
-governance transaction, it is possible to add tokens to the list of withdrawal limitation, and also define the percent
-that is allowed to withdraw daily.
-
-```solidity
-struct Withdrawal {
-  bool withdrawalLimitation;
-  uint256 withdrawalFactor;
-}
-
-```
-
-#### Deposit Limitation
-
-To be on the safe side, the amount of deposit is also going to be limited. This limitation is applied on account level,
-and is not time-based. In other words, each account can not deposit more than the cap defined. The tokens and the cap
-can be set through governance transaction. Moreover, there is a whitelisting mechanism as well (only some whitelisted
-accounts can call some specific functions). So, the combination of deposit limiation and whitelisting lead to limiting
-deposit of whitelisted account to be less than the defined cap.
+The amount of deposit can be limited. This limitation is applied on an account level and is not time-based. In other
+words, each account can not deposit more than the cap defined. The tokens and the cap can be set through governance
+transactions. Moreover, there is an allow listing mechanism as well (only some allow listed accounts can call some
+specific functions). So, the combination of deposit limitation and allow listing leads to limiting the deposit of the
+allow listed account to be less than the defined cap.
 
 ```solidity
 struct Deposit {
@@ -270,5 +289,9 @@ struct Deposit {
 
 ```
 
-See the [documentation](https://v2-docs.zksync.io/dev/developer-guides/contracts/contracts.html#solidity-vyper-support)
+Currently, the limit is used only for blocking deposits of the specific token (turning on the limitation and setting the
+limit to zero). And on the near future, this functionality will be completely removed.
+
+See the
+[documentation](https://era.zksync.io/docs/dev/building-on-zksync/contracts/contract-development.html#solidity-vyper-support)
 to read more!

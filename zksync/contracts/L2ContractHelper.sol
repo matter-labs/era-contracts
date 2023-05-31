@@ -14,11 +14,19 @@ interface IContractDeployer {
     ) external;
 }
 
+interface IEthToken {
+    function withdraw(address _l1Receiver, bytes memory _additionalData) external payable;
+}
+
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
 address constant BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
+address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
+address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
+
+IEthToken constant L2_ETH_ADDRESS = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 library L2ContractHelper {
     bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");

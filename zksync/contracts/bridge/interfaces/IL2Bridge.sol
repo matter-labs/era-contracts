@@ -24,7 +24,7 @@ interface IL2Bridge {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external;
+    ) external payable;
 
     function withdraw(
         address _l1Receiver,

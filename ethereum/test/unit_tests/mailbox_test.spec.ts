@@ -258,78 +258,88 @@ describe('Mailbox tests', function () {
         });
     });
 
-    it('Should propagate externally owned addresses as-is', async () => {
-        const tx = await requestExecute(
-            mailbox.connect(owner),
-            ethers.constants.AddressZero,
-            ethers.BigNumber.from(0),
-            '0x',
-            ethers.BigNumber.from(1000000),
-            [new Uint8Array(32)],
-            ethers.constants.AddressZero
-        );
+    let callDirectly, callViaForwarder, callViaConstructorForwarder;
 
-        const [event] = (await tx.wait()).events;
-        expect(event.event).to.equal('NewPriorityRequest');
-        expect(event.args.transaction.from).to.equal(await mailbox.signer.getAddress());
-    });
+    before(async () => {
+        const l2GasLimit = ethers.BigNumber.from(10000000);
 
-    it('Should mask contract addresses', async () => {
-        const encodedRequest = mailbox.interface.encodeFunctionData('requestL2Transaction', [
-            ethers.constants.AddressZero,
-            0,
-            '0x',
-            10000000,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            [new Uint8Array(32)],
-            ethers.constants.AddressZero
-        ]);
+        callDirectly = async (refundRecipient) => {
+            return {
+                transaction: await requestExecute(
+                    mailbox.connect(owner),
+                    ethers.constants.AddressZero,
+                    ethers.BigNumber.from(0),
+                    '0x',
+                    l2GasLimit,
+                    [new Uint8Array(32)],
+                    refundRecipient
+                ),
+                expectedSender: await owner.getAddress()
+            };
+        };
 
-        let overrides: ethers.PayableOverrides = {};
-        overrides.gasPrice = await mailbox.provider.getGasPrice();
-        overrides.value = await mailbox.l2TransactionBaseCost(
-            overrides.gasPrice,
-            10000000,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
-
-        const tx = await forwarder.forward(mailbox.address, encodedRequest, overrides);
-        const [event] = (await tx.wait()).events;
-        const parsedEvent = mailbox.interface.parseLog(event);
-
-        expect(parsedEvent.name).to.equal('NewPriorityRequest');
-        expect(parsedEvent.args.transaction.from).to.equal(aliasAddress(forwarder.address));
-    });
-
-    it('Should mask contract addresses when called from constructor', async () => {
-        const encodedRequest = mailbox.interface.encodeFunctionData('requestL2Transaction', [
-            ethers.constants.AddressZero,
-            0,
-            '0x',
-            1000000,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            [new Uint8Array(32)],
-            ethers.constants.AddressZero
-        ]);
+        const encodeRequest = (refundRecipient) =>
+            mailbox.interface.encodeFunctionData('requestL2Transaction', [
+                ethers.constants.AddressZero,
+                0,
+                '0x',
+                l2GasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                [new Uint8Array(32)],
+                refundRecipient
+            ]);
 
         let overrides: ethers.PayableOverrides = {};
         overrides.gasPrice = await mailbox.provider.getGasPrice();
         overrides.value = await mailbox.l2TransactionBaseCost(
             overrides.gasPrice,
-            10000000,
+            l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
         );
         overrides.gasLimit = 10000000;
 
-        const constructorForwarder = await (
-            await hardhat.ethers.getContractFactory('ConstructorForwarder')
-        ).deploy(mailbox.address, encodedRequest, overrides);
+        callViaForwarder = async (refundRecipient) => {
+            return {
+                transaction: await forwarder.forward(mailbox.address, encodeRequest(refundRecipient), overrides),
+                expectedSender: aliasAddress(forwarder.address)
+            };
+        };
 
-        const [event] = (await constructorForwarder.deployTransaction.wait()).logs;
-        const parsedEvent = mailbox.interface.parseLog(event);
+        callViaConstructorForwarder = async (refundRecipient) => {
+            const constructorForwarder = await (
+                await hardhat.ethers.getContractFactory('ConstructorForwarder')
+            ).deploy(mailbox.address, encodeRequest(refundRecipient), overrides);
 
-        expect(parsedEvent.name).to.equal('NewPriorityRequest');
-        expect(parsedEvent.args.transaction.from).to.equal(aliasAddress(constructorForwarder.address));
+            return {
+                transaction: constructorForwarder.deployTransaction,
+                expectedSender: aliasAddress(constructorForwarder.address)
+            };
+        };
+    });
+
+    it('Should only alias externally-owned addresses', async () => {
+        const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
+        const refundRecipients = [
+            [mailbox.address, false],
+            [await mailbox.signer.getAddress(), true]
+        ];
+
+        for (const sendTransaction of indirections) {
+            for (const [refundRecipient, externallyOwned] of refundRecipients) {
+                const result = await sendTransaction(refundRecipient);
+
+                const [event] = (await result.transaction.wait()).logs;
+                const parsedEvent = mailbox.interface.parseLog(event);
+                expect(parsedEvent.name).to.equal('NewPriorityRequest');
+
+                const canonicalTransaction = parsedEvent.args.transaction;
+                expect(canonicalTransaction.from).to.equal(result.expectedSender);
+
+                expect(canonicalTransaction.reserved[1]).to.equal(
+                    externallyOwned ? refundRecipient : aliasAddress(refundRecipient)
+                );
+            }
+        }
     });
 });
 

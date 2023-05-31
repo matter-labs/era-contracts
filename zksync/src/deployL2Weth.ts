@@ -30,11 +30,11 @@ function readInterface(path: string, fileName: string) {
     return new ethers.utils.Interface(abi);
 }
 
-const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2WETH');
+const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
 
 const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
 
-const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WETH');
+const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2Weth');
 
 async function main() {
     const program = new Command();

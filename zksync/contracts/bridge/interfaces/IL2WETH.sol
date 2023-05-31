@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.0;
 
-interface IL2WETH {
+interface IL2Weth {
     event Initialize(string name, string symbol, uint8 decimals);
 
     function deposit() external payable;

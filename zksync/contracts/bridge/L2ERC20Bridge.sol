@@ -11,7 +11,8 @@ import "./interfaces/IL2StandardToken.sol";
 
 import "./L2StandardERC20.sol";
 import "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
+import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
 /// @notice The "default" bridge implementation for the ERC20 tokens.
@@ -64,9 +65,11 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external override {
+    ) external payable override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge, "mq");
+        // The passed value should be 0 for ERC20 bridge.
+        require(msg.value == 0, "Value should be 0 for ERC20 bridge");
 
         address expectedL2Token = l2TokenAddress(_l1Token);
         address currentL1Token = l1TokenAddress[expectedL2Token];
@@ -87,7 +90,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     function _deployL2Token(address _l1Token, bytes calldata _data) internal returns (address) {
         bytes32 salt = _getCreate2Salt(_l1Token);
 
-        BeaconProxy l2Token = new BeaconProxy{salt: salt}(address(l2TokenBeacon), "");
+        BeaconProxy l2Token = _deployBeaconProxy(salt);
         L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
 
         return address(l2Token);
@@ -135,5 +138,26 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev Convert the L1 token address to the create2 salt of deployed L2 token
     function _getCreate2Salt(address _l1Token) internal pure returns (bytes32 salt) {
         salt = bytes32(uint256(uint160(_l1Token)));
+    }
+
+    /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
+    /// for the code of the proxy.
+    function _deployBeaconProxy(bytes32 salt) internal returns (BeaconProxy proxy) {
+        (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
+            uint32(gasleft()),
+            DEPLOYER_SYSTEM_CONTRACT,
+            0,
+            abi.encodeWithSelector(
+                IContractDeployer.create2.selector,
+                salt,
+                l2TokenProxyBytecodeHash,
+                abi.encode(address(l2TokenBeacon), "")
+            )
+        );
+
+        // The deployment should be successful and return the address of the proxy
+        require(success, "mk");
+        proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
 }

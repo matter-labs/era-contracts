@@ -3,7 +3,8 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
-import "./interfaces/IL2WETH.sol";
+
+import "./interfaces/IL2Weth.sol";
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
@@ -16,7 +17,13 @@ import "./interfaces/IL2StandardToken.sol";
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
-contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
+contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
+    /// @dev Address of the L2 WETH Bridge.
+    address public override l2Bridge;
+
+    /// @dev Address of the L1 WETH token. It can be deposited to mint this L2 token.
+    address public override l1Address;
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -38,30 +45,42 @@ contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
         emit Initialize(name_, symbol_, 18);
     }
 
-    /// @notice Function for minting tokens on L2, is implemented †o be compatible with StandardToken interface.
-    /// @dev Should be never called because the WETH should be collateralized with Ether.
+    /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
+    /// @param _l2Bridge Address of the L2 bridge
+    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
+    function initializeV2(address _l2Bridge, address _l1Address) external reinitializer(2) {
+        require(_l2Bridge != address(0), "L2 bridge address can not be zero");
+        require(_l1Address != address(0), "L1 WETH token address can not be zero");
+        l2Bridge = _l2Bridge;
+        l1Address = _l1Address;
+    }
+
+    modifier onlyBridge() {
+        require(msg.sender == l2Bridge, "permission denied"); // Only L2 bridge can call this method
+        _;
+    }
+
+    /// @notice Function for minting tokens on L2, is implemented to be compatible with StandardToken interface.
     /// Note: Use `deposit`/`depositTo` methods instead.
     function bridgeMint(
         address, // _to
         uint256 // _amount
-    ) external override {
-        revert("bridgeMint is not implemented");
+    ) external view override {
+        revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
     }
 
     /// @dev Burn tokens from a given account and send the same amount of Ether to the bridge.
     /// @param _from The account from which tokens will be burned.
     /// @param _amount The amount that will be burned.
     /// @notice Should be called by the bridge before withdrawing tokens to L1.
-    function bridgeBurn(address _from, uint256 _amount) external override {
-        revert("bridgeBurn is not implemented yet");
-    }
+    function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
+        // burns tokens from "_from" WETH contract
+        _burn(_from, _amount);
+        // sends Ether to the bridge
+        (bool success, ) = msg.sender.call{value: _amount}("");
+        require(success, "Failed withdrawal");
 
-    function l2Bridge() external view returns (address) {
-        revert("l2Bridge is not implemented yet");
-    }
-
-    function l1Address() external view returns (address) {
-        revert("l1Address is not implemented yet");
+        emit BridgeBurn(_from, _amount);
     }
 
     /// @notice Deposit Ether to mint WETH.
@@ -80,9 +99,9 @@ contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
     }
 
     /// @notice Withdraw WETH to get Ether to a given account.
+    /// burns sender's tokens and sends Ether to the given account
     function withdrawTo(address _to, uint256 _amount) public override {
         _burn(msg.sender, _amount);
-
         (bool success, ) = _to.call{value: _amount}("");
         require(success, "Failed withdrawal");
     }

@@ -6,6 +6,7 @@ import { Interface } from 'ethers/lib/utils';
 import { Action, facetCut, diamondCut } from './diamondCut';
 import { IZkSyncFactory } from '../typechain/IZkSyncFactory';
 import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
+import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
 import { AllowListFactory } from '../typechain';
@@ -37,10 +38,13 @@ export interface DeployedAddresses {
     Bridges: {
         ERC20BridgeImplementation: string;
         ERC20BridgeProxy: string;
+        WethBridgeImplementation: string;
+        WethBridgeProxy: string;
     };
     AllowList: string;
     ValidatorTimeLock: string;
     Create2Factory: string;
+    WethToken: string;
 }
 
 export interface DeployerConfig {
@@ -64,10 +68,13 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         },
         Bridges: {
             ERC20BridgeImplementation: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR'),
-            ERC20BridgeProxy: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR')
+            ERC20BridgeProxy: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR'),
+            WethBridgeImplementation: getAddressFromEnv('CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR'),
+            WethBridgeProxy: getAddressFromEnv('CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR')
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
         Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR'),
+        WethToken: getAddressFromEnv('CONTRACTS_L1_WETH_TOKEN_ADDR'),
         ValidatorTimeLock: getAddressFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_ADDR')
     };
 }
@@ -325,6 +332,52 @@ export class Deployer {
         this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
     }
 
+    public async deployWethToken(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('WETH9', [], create2Salt, ethTxOptions);
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_L1_WETH_TOKEN_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.WethToken = contractAddress;
+    }
+
+    public async deployWethBridgeImplementation(
+        create2Salt: string,
+        ethTxOptions: ethers.providers.TransactionRequest
+    ) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2(
+            'L1WethBridge',
+            [this.addresses.WethToken, this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
+            create2Salt,
+            ethTxOptions
+        );
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.Bridges.WethBridgeImplementation = contractAddress;
+    }
+
+    public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2(
+            'TransparentUpgradeableProxy',
+            [this.addresses.Bridges.WethBridgeImplementation, this.governorAddress, '0x'],
+            create2Salt,
+            ethTxOptions
+        );
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.Bridges.WethBridgeProxy = contractAddress;
+    }
+
     public async deployDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2('DiamondInit', [], create2Salt, ethTxOptions);
@@ -401,6 +454,16 @@ export class Deployer {
         await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     }
 
+    public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+        nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+
+        if (process.env.CHAIN_ETH_NETWORK === 'localhost') {
+            await this.deployWethToken(create2Salt, { gasPrice, nonce: nonce++ });
+        }
+        await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
+        await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
+    }
+
     public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const executionDelay = getNumberFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY');
@@ -437,5 +500,9 @@ export class Deployer {
 
     public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {
         return L1ERC20BridgeFactory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
+    }
+
+    public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {
+        return L1WethBridgeFactory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
     }
 }

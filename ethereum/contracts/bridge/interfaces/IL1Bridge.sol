@@ -46,4 +46,6 @@ interface IL1Bridge {
     ) external;
 
     function l2TokenAddress(address _l1Token) external view returns (address);
+
+    function l2Bridge() external view returns (address);
 }

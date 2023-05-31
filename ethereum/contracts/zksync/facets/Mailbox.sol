@@ -502,12 +502,20 @@ contract MailboxFacet is Base, IMailbox {
         pure
         returns (address l1Receiver, uint256 amount)
     {
-        // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + uint256 = 4 + 20 + 32 = 56 (bytes).
-        require(_message.length == 56);
+        // We check that the message is long enough to read the data.
+        // Please note that there are two versions of the message:
+        // 1. The message that is sent by `withdraw(address _l1Receiver)`
+        // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
+        // 2. The message that is sent by `withdraw(address _l1Receiver, bytes calldata _additionalData)`
+        // It should be equal to the length of the following:
+        // bytes4 function signature + address l1Receiver + uint256 amount + address l2Sender + bytes _additionalData =
+        // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
+
+        // So the data is expected to be at least 56 bytes long.
+        require(_message.length >= 56, "pm");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(bytes4(functionSignature) == this.finalizeEthWithdrawal.selector);
+        require(bytes4(functionSignature) == this.finalizeEthWithdrawal.selector, "is");
 
         (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_message, offset);
