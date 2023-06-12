@@ -103,7 +103,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             // * The block wasn't committed at all, so execution will fail in the zkSync contract.
             // We allow executing such blocks.
 
-            require(block.timestamp > commitBlockTimestamp + executionDelay, "5c"); // The delay is not passed
+            require(block.timestamp >= commitBlockTimestamp + executionDelay, "5c"); // The delay is not passed
         }
 
         _propagateToZkSync();
