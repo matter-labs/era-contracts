@@ -157,8 +157,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         // Deposit WETH tokens from the depositor address to the smart contract address
         IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
-        // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
-        IWETH9(l1WethAddress).withdraw(_amount);
 
         // Request the finalization of the deposit on the L2 side
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, _amount);
@@ -243,8 +241,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
 
-        // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
-        IWETH9(l1WethAddress).deposit{value: amount}();
         // Transfer WETH tokens from the smart contract address to the withdrawal receiver
         IERC20(l1WethAddress).safeTransfer(l1WethWithdrawReceiver, amount);
 
