@@ -37,5 +37,9 @@ export function diamondCut(facetCuts: FacetCut[], initAddress: string, initCalld
 }
 
 export function getAllSelectors(contractInterface: Interface) {
-    return Object.keys(contractInterface.functions).map((signature) => contractInterface.getSighash(signature));
+    return Object.keys(contractInterface.functions)
+        .filter((signature) => {
+            return signature !== 'getName()';
+        })
+        .map((signature) => contractInterface.getSighash(signature));
 }

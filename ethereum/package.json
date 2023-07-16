@@ -4,7 +4,7 @@
   "license": "MIT",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
-    "@nomiclabs/hardhat-etherscan": "^2.1.0",
+    "@nomiclabs/hardhat-etherscan": "^3.1.0",
     "@nomiclabs/hardhat-solpp": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.0",
     "@openzeppelin/contracts": "4.8.0",
@@ -48,11 +48,12 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
-    "test": "CONTRACT_TESTS=1 yarn run hardhat test test/unit_tests/*.spec.ts --network hardhat",
+    "test": "CONTRACT_TESTS=1 yarn hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "deploy-no-build": "ts-node scripts/deploy.ts",
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
     "initialize-weth-bridges": "ts-node scripts/initialize-weth-bridges.ts",
+    "initialize-l2-weth-token": "ts-node scripts/initialize-l2-weth-token.ts",
     "allow-list-manager": "ts-node scripts/allow-list-manager.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",
@@ -68,9 +69,13 @@
     "upgrade-2": "ts-node scripts/upgrades/upgrade-2.ts",
     "upgrade-3": "ts-node scripts/upgrades/upgrade-3.ts",
     "upgrade-4": "ts-node scripts/upgrades/upgrade-4.ts",
-    "upgrade-5": "ts-node scripts/upgrades/upgrade-5.ts"
+    "upgrade-5": "ts-node scripts/upgrades/upgrade-5.ts",
+    "upgrade-6": "ts-node scripts/upgrades/upgrade-6.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"
+  },
+  "optionalDependencies": {
+    "zksync-web3": "^0.14.3"
   }
 }

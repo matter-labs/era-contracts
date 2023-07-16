@@ -493,7 +493,7 @@ describe(`Executor tests`, function () {
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
             );
-            expect(revertReason).equal(`po`);
+            expect(revertReason).equal('bl');
         });
 
         it(`Should revert on committing with wrong number of words in the bytecode`, async () => {

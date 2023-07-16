@@ -39,8 +39,12 @@ async function main() {
 
             const allowListContract = deployer.l1AllowList(wallet);
             await allowListContract.setBatchAccessMode(
-                [deployer.addresses.ZkSync.DiamondProxy, deployer.addresses.Bridges.ERC20BridgeProxy],
-                [AccessMode.Public, AccessMode.Public],
+                [
+                    deployer.addresses.ZkSync.DiamondProxy,
+                    deployer.addresses.Bridges.ERC20BridgeProxy,
+                    deployer.addresses.Bridges.WethBridgeProxy
+                ],
+                [AccessMode.Public, AccessMode.Public, AccessMode.Public],
                 { nonce }
             );
         });

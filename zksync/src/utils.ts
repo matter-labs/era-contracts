@@ -5,6 +5,8 @@ import { IZkSyncFactory } from '../../ethereum/typechain/IZkSyncFactory';
 import { Interface } from 'ethers/lib/utils';
 
 import { ethers, Wallet, BytesLike } from 'ethers';
+import { Provider } from 'zksync-web3';
+import { sleep } from 'zksync-web3/build/src/utils';
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
@@ -65,7 +67,8 @@ export async function create2DeployFromL1(
     bytecode: ethers.BytesLike,
     constructor: ethers.BytesLike,
     create2Salt: ethers.BytesLike,
-    l2GasLimit: ethers.BigNumberish
+    l2GasLimit: ethers.BigNumberish,
+    gasPrice?: ethers.BigNumberish
 ) {
     const zkSyncAddress = deployedAddressesFromEnv().ZkSync.DiamondProxy;
     const zkSync = IZkSyncFactory.connect(zkSyncAddress, wallet);
@@ -73,10 +76,10 @@ export async function create2DeployFromL1(
     const deployerSystemContracts = new Interface(artifacts.readArtifactSync('IContractDeployer').abi);
     const bytecodeHash = hashL2Bytecode(bytecode);
     const calldata = deployerSystemContracts.encodeFunctionData('create2', [create2Salt, bytecodeHash, constructor]);
-    const gasPrice = await zkSync.provider.getGasPrice();
+    gasPrice ??= await zkSync.provider.getGasPrice();
     const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
-    await zkSync.requestL2Transaction(
+    return await zkSync.requestL2Transaction(
         DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
         0,
         calldata,
@@ -94,4 +97,27 @@ export function getNumberFromEnv(envName: string): string {
         throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
     }
     return number;
+}
+
+export async function awaitPriorityOps(
+    zksProvider: Provider,
+    l1TxReceipt: ethers.providers.TransactionReceipt,
+    zksyncInterface: ethers.utils.Interface
+) {
+    const deployL2TxHashes = l1TxReceipt.logs
+        .map((log) => zksyncInterface.parseLog(log))
+        .filter((event) => event.name === 'NewPriorityRequest')
+        .map((event) => event.args[1]);
+    for (const txHash of deployL2TxHashes) {
+        console.log('Awaiting L2 transaction with hash: ', txHash);
+        let receipt = null;
+        while (receipt == null) {
+            receipt = await zksProvider.getTransactionReceipt(txHash);
+            await sleep(100);
+        }
+
+        if (receipt.status != 1) {
+            throw new Error('Failed to process L2 tx');
+        }
+    }
 }

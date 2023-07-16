@@ -5,8 +5,9 @@ pragma solidity ^0.8.13;
 import "../Storage.sol";
 import "../libraries/PriorityQueue.sol";
 import {VerifierParams} from "../Storage.sol";
+import "./IBase.sol";
 
-interface IGetters {
+interface IGetters is IBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/

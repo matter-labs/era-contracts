@@ -9,6 +9,8 @@ import "./Base.sol";
 /// @title Governance Contract controls access rights for contract management.
 /// @author Matter Labs
 contract GovernanceFacet is Base, IGovernance {
+    string public constant override getName = "GovernanceFacet";
+
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
     /// @notice New governor can accept governor rights by calling `acceptGovernor` function.
     /// @param _newPendingGovernor Address of the new governor

@@ -29,15 +29,20 @@ type TokenDescription = Token & {
 async function deployToken(token: TokenDescription): Promise<Token> {
     token.implementation = token.implementation || DEFAULT_ERC20;
     const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
-    const erc20 = await tokenFactory.deploy(token.name, token.symbol, token.decimals, { gasLimit: 5000000 });
+    const args = token.implementation !== 'WETH9' ? [token.name, token.symbol, token.decimals] : [];
+    const erc20 = await tokenFactory.deploy(...args, { gasLimit: 5000000 });
     await erc20.deployTransaction.wait();
 
-    await erc20.mint(wallet.address, parseEther('3000000000'));
+    if (token.implementation !== 'WETH9') {
+        await erc20.mint(wallet.address, parseEther('3000000000'));
+    }
     for (let i = 0; i < 10; ++i) {
         const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
             provider
         );
-        await erc20.mint(testWallet.address, parseEther('3000000000'));
+        if (token.implementation !== 'WETH9') {
+            await erc20.mint(testWallet.address, parseEther('3000000000'));
+        }
     }
     token.address = erc20.address;
 

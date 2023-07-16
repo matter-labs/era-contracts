@@ -5,8 +5,9 @@ pragma solidity ^0.8.13;
 import "../../common/interfaces/IAllowList.sol";
 import "../Verifier.sol";
 import "../Storage.sol";
+import "./IBase.sol";
 
-interface IGovernance {
+interface IGovernance is IBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
     function acceptGovernor() external;

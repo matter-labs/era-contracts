@@ -31,15 +31,13 @@ function readInterface(path: string, fileName: string) {
 }
 
 const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
-
-const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
-
 const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2Weth');
+const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
 
 async function main() {
     const program = new Command();
 
-    program.version('0.1.0').name('initialize-bridges');
+    program.version('0.1.0').name('deploy-l2-weth');
 
     program
         .option('--private-key <private-key>')
@@ -89,7 +87,7 @@ async function main() {
                     [l2WethImplAddr, governorAddress, proxyInitializationParams]
                 )
             );
-            const l2ERC20BridgeProxyAddr = computeL2Create2Address(
+            const l2WethProxyAddr = computeL2Create2Address(
                 deployWallet,
                 L2_WETH_PROXY_BYTECODE,
                 l2ERC20BridgeProxyConstructor,
@@ -112,8 +110,8 @@ async function main() {
                 priorityTxMaxGasLimit
             );
 
-            console.log(`CONTRACTS_L2_WETH_IMPLEMENTATION_ADDR=${l2WethImplAddr}`);
-            console.log(`CONTRACTS_L2_WETH_PROXY_ADDR=${l2ERC20BridgeProxyAddr}`);
+            console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddr}`);
+            console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddr}`);
         });
 
     await program.parseAsync(process.argv);

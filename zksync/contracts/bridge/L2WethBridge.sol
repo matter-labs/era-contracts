@@ -2,17 +2,14 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import "./interfaces/IL1Bridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IL2Weth.sol";
 import "./interfaces/IL2StandardToken.sol";
 
-import "../L2ContractHelper.sol";
+import {L2_ETH_ADDRESS} from "../L2ContractHelper.sol";
 import "../vendor/AddressAliasHelper.sol";
-import "./L2Weth.sol";
 
 /// @author Matter Labs
 /// @dev This contract works in conjunction with the L1WethBridge to streamline the process of bridging WETH tokens between L1 and L2.
@@ -22,7 +19,7 @@ import "./L2Weth.sol";
 /// eliminating the need for users to perform additional wrapping and unwrapping transactions on both L1 and L2 networks.
 contract L2WethBridge is IL2Bridge, Initializable {
     /// @dev Event emitted when ETH is received by the contract.
-    event EthReceived(address indexed sender, uint256 amount);
+    event EthReceived(uint256 amount);
 
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
@@ -39,14 +36,19 @@ contract L2WethBridge is IL2Bridge, Initializable {
         _disableInitializers();
     }
 
+    /// @notice Initializes the contract with parameters needed for its functionality.
+    /// @param _l1Bridge The address of the L1 Bridge contract.
+    /// @param _l1WethAddress The address of the L1 WETH token.
+    /// @param _l2WethAddress The address of the L2 WETH token.
+    /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,
         address _l2WethAddress
     ) external initializer {
-        require(_l1Bridge != address(0), "L1 WETH bridge address can not be zero");
-        require(_l1WethAddress != address(0), "L1 WETH token address can not be zero");
-        require(_l2WethAddress != address(0), "L2 WETH token address can not be zero");
+        require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
+        require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
+        require(_l2WethAddress != address(0), "L2 WETH token address cannot be zero");
 
         l1Bridge = _l1Bridge;
         l1WethAddress = _l1WethAddress;
@@ -63,7 +65,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
         uint256 _amount
     ) external override {
         require(_l2Token == l2WethAddress, "Only WETH can be withdrawn");
-        require(_amount > 0, "Amount can not be zero");
+        require(_amount > 0, "Amount cannot be zero");
 
         // Burn WETH on L2, receive ETH.
         IL2StandardToken(l2WethAddress).bridgeBurn(msg.sender, _amount);
@@ -72,7 +74,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
         bytes memory wethMessage = abi.encodePacked(_l1Receiver);
 
         // Withdraw ETH to L1 bridge.
-        L2_ETH_ADDRESS.withdraw{value: _amount}(l1Bridge, wethMessage);
+        L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
 
         emit WithdrawalInitiated(msg.sender, _l1Receiver, l2WethAddress, _amount);
     }
@@ -114,6 +116,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     }
 
     receive() external payable {
-        emit EthReceived(msg.sender, msg.value);
+        require(msg.sender == l2WethAddress, "pd");
+        emit EthReceived(msg.value);
     }
 }

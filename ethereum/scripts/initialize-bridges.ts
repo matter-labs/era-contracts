@@ -88,7 +88,12 @@ async function main() {
                 : deployer.defaultERC20Bridge(deployWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-            const governorAddress = await zkSync.getGovernor();
+            const l1GovernorAddress = await zkSync.getGovernor();
+            // Check whether governor is a smart contract on L1 to apply alias if needed.
+            const l1GovernorCodeSize = ethers.utils.hexDataLength(
+                await deployWallet.provider.getCode(l1GovernorAddress)
+            );
+            const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
             const abiCoder = new ethers.utils.AbiCoder();
 
             const l2ERC20BridgeImplAddr = computeL2Create2Address(
@@ -101,7 +106,7 @@ async function main() {
             const proxyInitializationParams = L2_ERC20_BRIDGE_INTERFACE.encodeFunctionData('initialize', [
                 erc20Bridge.address,
                 hashL2Bytecode(L2_STANDARD_ERC20_PROXY_BYTECODE),
-                governorAddress
+                l2GovernorAddress
             ]);
             const l2ERC20BridgeProxyAddr = computeL2Create2Address(
                 applyL1ToL2Alias(erc20Bridge.address),
@@ -109,7 +114,7 @@ async function main() {
                 ethers.utils.arrayify(
                     abiCoder.encode(
                         ['address', 'address', 'bytes'],
-                        [l2ERC20BridgeImplAddr, governorAddress, proxyInitializationParams]
+                        [l2ERC20BridgeImplAddr, l2GovernorAddress, proxyInitializationParams]
                     )
                 ),
                 ethers.constants.HashZero
@@ -159,7 +164,7 @@ async function main() {
                         L2_STANDARD_ERC20_PROXY_BYTECODE
                     ],
                     l2TokenFactoryAddr,
-                    governorAddress,
+                    l2GovernorAddress,
                     requiredValueToInitializeBridge,
                     requiredValueToInitializeBridge,
                     {

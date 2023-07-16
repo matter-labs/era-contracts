@@ -14,6 +14,8 @@ contract GettersFacet is Base, IGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
+    string public constant override getName = "GettersFacet";
+
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/

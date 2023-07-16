@@ -3,9 +3,6 @@ import * as chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SYSTEM_CONTRACTS_PATH = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts`);
-const BOOTLOADER_PATH = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
-
 const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
 export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
@@ -78,12 +75,14 @@ export function applyL1ToL2Alias(address: string): string {
 }
 
 export function readBlockBootloaderBytecode() {
-    return fs.readFileSync(`${BOOTLOADER_PATH}/build/artifacts/proved_block.yul/proved_block.yul.zbin`);
+    const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
+    return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_block.yul/proved_block.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
+    const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts`);
     const artifact = fs.readFileSync(
-        `${SYSTEM_CONTRACTS_PATH}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
+        `${systemContractsPath}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
     );
     return JSON.parse(artifact.toString()).bytecode;
 }

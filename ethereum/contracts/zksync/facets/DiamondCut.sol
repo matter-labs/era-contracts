@@ -13,6 +13,8 @@ import "./Base.sol";
 contract DiamondCutFacet is Base, IDiamondCut {
     using UncheckedMath for uint256;
 
+    string public constant override getName = "DiamondCutFacet";
+
     modifier upgradeProposed() {
         require(s.upgrades.state != UpgradeState.None, "a3"); // Proposal doesn't exist
         _;

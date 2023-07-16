@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import {L2Log, L2Message} from "../Storage.sol";
+import "./IBase.sol";
 
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
@@ -12,7 +13,7 @@ enum TxStatus {
     Success
 }
 
-interface IMailbox {
+interface IMailbox is IBase {
     /// @dev Structure that includes all fields of the L2 transaction
     /// @dev The hash of this structure is the "canonical L2 transaction hash" and can be used as a unique identifier of a tx
     /// @param txType The tx type number, depending on which the L2 transaction can be interpreted differently

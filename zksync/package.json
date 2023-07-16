@@ -31,7 +31,8 @@
     "clean": "hardhat clean",
     "deploy-testnet-paymaster": "hardhat run src/deployTestnetPaymaster.ts",
     "publish-bridge-preimages": "hardhat run src/publish-bridge-preimages.ts",
-    "deploy-l2-weth": "ts-node src/deployL2Weth.ts"
+    "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
+    "upgrade-l2-erc20-contract": "ts-node src/upgradeL2BridgeImpl.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

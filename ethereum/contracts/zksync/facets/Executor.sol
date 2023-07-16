@@ -10,13 +10,15 @@ import "../libraries/PriorityQueue.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../../common/libraries/UnsafeBytes.sol";
 import "../../common/libraries/L2ContractHelper.sol";
-import "../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 contract ExecutorFacet is Base, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+
+    string public constant override getName = "ExecutorFacet";
 
     /// @dev Process one block commit using the previous block StoredBlockInfo
     /// @dev returns new block StoredBlockInfo
