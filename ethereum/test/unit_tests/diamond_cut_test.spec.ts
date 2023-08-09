@@ -1,33 +1,33 @@
 import { expect } from 'chai';
+import * as ethers from 'ethers';
 import * as hardhat from 'hardhat';
-import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
+import { Action, diamondCut, facetCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
-    Mailbox as MailboxFacet,
-    MailboxFactory as MailboxFacetFactory,
-    DiamondCutTest,
-    DiamondCutTestFactory,
     DiamondCutFacet,
     DiamondCutFacetFactory,
+    DiamondCutTestContract,
+    DiamondCutTestContractFactory,
+    DiamondInit,
+    DiamondInitFactory,
+    DiamondProxy,
+    DiamondProxyFactory,
     ExecutorFacet,
     ExecutorFacetFactory,
     GettersFacet,
     GettersFacetFactory,
-    DiamondProxy,
-    DiamondInit,
-    DiamondInitFactory,
-    DiamondProxyFactory
+    Mailbox as MailboxFacet,
+    MailboxFactory as MailboxFacetFactory
 } from '../../typechain';
 import { getCallRevertReason } from './utils';
-import * as ethers from 'ethers';
 
 describe('Diamond cut tests', function () {
-    let diamondCutTest: DiamondCutTest;
+    let diamondCutTest: DiamondCutTestContract;
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory('DiamondCutTest');
+        const contractFactory = await hardhat.ethers.getContractFactory('DiamondCutTestContract');
         const contract = await contractFactory.deploy();
-        diamondCutTest = DiamondCutTestFactory.connect(contract.address, contract.signer);
+        diamondCutTest = DiamondCutTestContractFactory.connect(contract.address, contract.signer);
     });
 
     describe('facetCuts', function () {
