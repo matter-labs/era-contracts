@@ -1,32 +1,32 @@
 import { expect } from 'chai';
+import * as ethers from 'ethers';
 import * as hardhat from 'hardhat';
-import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
+import { Action, diamondCut, facetCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
-    MailboxFacet,
-    MailboxFacetFactory,
-    DiamondCutTest,
-    DiamondCutTestFactory,
     DiamondCutFacet,
     DiamondCutFacetFactory,
+    DiamondCutTestContract,
+    DiamondCutTestContractFactory,
+    DiamondInit,
+    DiamondInitFactory,
+    DiamondProxy,
+    DiamondProxyFactory,
     ExecutorFacet,
     ExecutorFacetFactory,
     GettersFacet,
     GettersFacetFactory,
-    DiamondProxy,
-    DiamondInit,
-    DiamondInitFactory,
-    DiamondProxyFactory
+    MailboxFacet,
+    MailboxFacetFactory
 } from '../../typechain';
 import { getCallRevertReason } from './utils';
-import * as ethers from 'ethers';
 
 describe('Diamond proxy tests', function () {
-    let diamondCutTest: DiamondCutTest;
+    let diamondCutTestContract: DiamondCutTestContract;
 
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory('DiamondCutTest');
+        const contractFactory = await hardhat.ethers.getContractFactory('DiamondCutTestContract');
         const contract = await contractFactory.deploy();
-        diamondCutTest = DiamondCutTestFactory.connect(contract.address, contract.signer);
+        diamondCutTestContract = DiamondCutTestContractFactory.connect(contract.address, contract.signer);
     });
 
     describe('facetCuts', function () {
@@ -59,9 +59,9 @@ describe('Diamond proxy tests', function () {
             ];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
 
-            const numberOfFacetsBeforeAdd = (await diamondCutTest.facetAddresses()).length;
-            await diamondCutTest.diamondCut(diamondCutData);
-            const numberOfFacetsAfterAdd = (await diamondCutTest.facetAddresses()).length;
+            const numberOfFacetsBeforeAdd = (await diamondCutTestContract.facetAddresses()).length;
+            await diamondCutTestContract.diamondCut(diamondCutData);
+            const numberOfFacetsAfterAdd = (await diamondCutTestContract.facetAddresses()).length;
 
             expect(numberOfFacetsAfterAdd).equal(numberOfFacetsBeforeAdd + facetCuts.length);
         });
@@ -69,14 +69,14 @@ describe('Diamond proxy tests', function () {
         it('should revert on add facet for occupied selector', async () => {
             const facetCuts = [facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('J');
         });
 
         it('should revert on add facet with zero address', async () => {
             const facetCuts = [facetCut(ethers.constants.AddressZero, mailboxFacet.interface, Action.Add, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('G');
         });
 
@@ -90,7 +90,7 @@ describe('Diamond proxy tests', function () {
                 }
             ];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('L');
         });
 
@@ -104,22 +104,22 @@ describe('Diamond proxy tests', function () {
                 }
             ];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('a1');
         });
 
         it('should replace facet for occupied selector', async () => {
             const facetCuts = [facetCut(executorFacet2.address, executorFacet2.interface, Action.Replace, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            await diamondCutTest.diamondCut(diamondCutData);
+            await diamondCutTestContract.diamondCut(diamondCutData);
         });
 
         it('should remove facet for occupied selector', async () => {
             const facetCuts = [facetCut(ethers.constants.AddressZero, executorFacet2.interface, Action.Remove, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const numberOfFacetsBeforeRemove = (await diamondCutTest.facetAddresses()).length;
-            await diamondCutTest.diamondCut(diamondCutData);
-            const numberOfFacetsAfterRemove = (await diamondCutTest.facetAddresses()).length;
+            const numberOfFacetsBeforeRemove = (await diamondCutTestContract.facetAddresses()).length;
+            await diamondCutTestContract.diamondCut(diamondCutData);
+            const numberOfFacetsAfterRemove = (await diamondCutTestContract.facetAddresses()).length;
 
             expect(numberOfFacetsAfterRemove).equal(numberOfFacetsBeforeRemove - facetCuts.length);
         });
@@ -127,9 +127,9 @@ describe('Diamond proxy tests', function () {
         it('should add facet after removing', async () => {
             const facetCuts = [facetCut(executorFacet2.address, executorFacet2.interface, Action.Add, false)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const numberOfFacetsBeforeAdd = (await diamondCutTest.facetAddresses()).length;
-            await diamondCutTest.diamondCut(diamondCutData);
-            const numberOfFacetsAfterAdd = (await diamondCutTest.facetAddresses()).length;
+            const numberOfFacetsBeforeAdd = (await diamondCutTestContract.facetAddresses()).length;
+            await diamondCutTestContract.diamondCut(diamondCutData);
+            const numberOfFacetsAfterAdd = (await diamondCutTestContract.facetAddresses()).length;
 
             expect(numberOfFacetsAfterAdd).equal(numberOfFacetsBeforeAdd + facetCuts.length);
         });
@@ -152,11 +152,11 @@ describe('Diamond proxy tests', function () {
                 }
             ];
             const diamondCutData1 = diamondCut(facetCuts1, ethers.constants.AddressZero, '0x');
-            await diamondCutTest.diamondCut(diamondCutData1);
-            const numberOfFacetsAfterAdd = (await diamondCutTest.facetAddresses()).length;
+            await diamondCutTestContract.diamondCut(diamondCutData1);
+            const numberOfFacetsAfterAdd = (await diamondCutTestContract.facetAddresses()).length;
             const diamondCutData2 = diamondCut(facetCuts2, ethers.constants.AddressZero, '0x');
-            await diamondCutTest.diamondCut(diamondCutData2);
-            const numberOfFacetsAfterReplace = (await diamondCutTest.facetAddresses()).length;
+            await diamondCutTestContract.diamondCut(diamondCutData2);
+            const numberOfFacetsAfterReplace = (await diamondCutTestContract.facetAddresses()).length;
             expect(numberOfFacetsAfterAdd).equal(numberOfFacetsAfterReplace);
         });
 
@@ -170,24 +170,24 @@ describe('Diamond proxy tests', function () {
                 }
             ];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('J1');
         });
 
         it('should revert on replacing a faucet with different freezability', async () => {
             const facetCuts = [facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Replace, true)];
             const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('J1');
         });
 
         it('should change the freezibility of a faucet', async () => {
             let facetCuts = [facetCut(ethers.constants.AddressZero, mailboxFacet.interface, Action.Remove, false)];
             let diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            await diamondCutTest.diamondCut(diamondCutData);
+            await diamondCutTestContract.diamondCut(diamondCutData);
             facetCuts = [facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)];
             diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
-            await diamondCutTest.diamondCut(diamondCutData);
+            await diamondCutTestContract.diamondCut(diamondCutData);
         });
     });
 
@@ -211,25 +211,25 @@ describe('Diamond proxy tests', function () {
 
         it('should revert on delegatecall to failed contract', async () => {
             const diamondCutData = diamondCut([], revertFallbackAddress, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('I');
         });
 
         it('should revert on delegatecall to EOA', async () => {
             const diamondCutData = diamondCut([], EOA_Address, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('lp');
         });
 
         it('should revert on initializing diamondCut with zero-address and nonzero-data', async () => {
             const diamondCutData = diamondCut([], ethers.constants.AddressZero, '0x11');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('H');
         });
 
         it('should revert on delegatecall to a contract with wrong return', async () => {
             const diamondCutData = diamondCut([], returnSomethingAddress, '0x');
-            const revertReason = await getCallRevertReason(diamondCutTest.diamondCut(diamondCutData));
+            const revertReason = await getCallRevertReason(diamondCutTestContract.diamondCut(diamondCutData));
             expect(revertReason).equal('lp1');
         });
     });
