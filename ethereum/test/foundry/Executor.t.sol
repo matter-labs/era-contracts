@@ -37,17 +37,12 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput proofInput;
 
     function getGovernanceSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = governance.setPendingGovernor.selector;
         selectors[1] = governance.acceptGovernor.selector;
         selectors[2] = governance.setValidator.selector;
-        selectors[3] = governance.setL2BootloaderBytecodeHash.selector;
-        selectors[4] = governance.setL2DefaultAccountBytecodeHash.selector;
-        selectors[5] = governance.setPorterAvailability.selector;
-        selectors[6] = governance.setVerifier.selector;
-        selectors[7] = governance.setVerifierParams.selector;
-        selectors[8] = governance.setAllowList.selector;
-        selectors[9] = governance.setPriorityTxMaxGasLimit.selector;
+        selectors[3] = governance.setPorterAvailability.selector;
+        selectors[4] = governance.setPriorityTxMaxGasLimit.selector;
         return selectors;
     }
 
@@ -478,7 +473,7 @@ contract CommittingFunctionalityTest is ExecutorTest {
     function test_revertWhen_committingWithoutProcessingSystemContextLog()
         public
     {
-        bytes memory wrongL2Logs = bytes.concat(bytes32(0x00000000));
+        bytes memory wrongL2Logs = abi.encodePacked(bytes4(0x00000000));
 
         IExecutor.CommitBlockInfo
             memory wrongNewCommitBlockInfo = newCommitBlockInfo;
@@ -527,6 +522,34 @@ contract CommittingFunctionalityTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("fx"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_reverWhen_unexpectedL1ToL2Log() public {
+        address unexpectedAddress = address(0);
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            unexpectedAddress,
+            uint256(currentTimestamp)
+        );
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("ne"));
         executor.commitBlocks(
             genesisStoredBlockInfo,
             wrongNewCommitBlockInfoArray
