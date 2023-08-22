@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../../ethereum/src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider } from '../../ethereum/scripts/utils';
+import { getTokens, web3Provider } from '../../ethereum/scripts/utils';
 
 import { getNumberFromEnv, create2DeployFromL1, computeL2Create2Address } from './utils';
 
@@ -33,6 +33,8 @@ function readInterface(path: string, fileName: string) {
 const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
 const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2Weth');
 const L2_WETH_PROXY_BYTECODE = readBytecode(openzeppelinTransparentProxyArtifactsPath, 'TransparentUpgradeableProxy');
+const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || 'localhost');
+const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == 'WETH')!.address;
 
 async function main() {
     const program = new Command();
@@ -44,6 +46,12 @@ async function main() {
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .action(async (cmd) => {
+            if (!l1WethToken) {
+                // Makes no sense to deploy the Rollup WETH if there is no base Layer WETH provided
+                console.log('Base Layer WETH address not provided so WETH deployment will be skipped.');
+                return;
+            }
+
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
@@ -56,7 +64,7 @@ async function main() {
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
             const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);
+            console.log(`Using initial nonce: ${nonce}`);
 
             const deployer = new Deployer({
                 deployWallet,
@@ -94,21 +102,31 @@ async function main() {
                 ethers.constants.HashZero
             );
 
-            await create2DeployFromL1(
+            const tx = await create2DeployFromL1(
                 deployWallet,
                 L2_WETH_IMPLEMENTATION_BYTECODE,
                 '0x',
                 ethers.constants.HashZero,
                 priorityTxMaxGasLimit
             );
+            console.log(
+                `WETH implementation transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`
+            );
 
-            await create2DeployFromL1(
+            await tx.wait();
+
+            const tx2 = await create2DeployFromL1(
                 deployWallet,
                 L2_WETH_PROXY_BYTECODE,
                 l2ERC20BridgeProxyConstructor,
                 ethers.constants.HashZero,
                 priorityTxMaxGasLimit
             );
+            console.log(
+                `WETH proxy transaction sent with hash ${tx2.hash} and nonce ${tx2.nonce}. Waiting for receipt...`
+            );
+
+            await tx2.wait();
 
             console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddr}`);
             console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddr}`);

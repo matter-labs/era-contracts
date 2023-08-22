@@ -37,8 +37,11 @@ uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_ST
 // TODO: change constant to the real root hash of empty Merkle tree (SMA-184)
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotes the first byte of the zkSync transaction that came from L1.
+/// @dev Denotes the type of the zkSync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
+
+/// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
+uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
 /// @dev The amount of time in seconds the validator has to process the priority transaction
 /// NOTE: The constant is set to zero for the Alpha release period

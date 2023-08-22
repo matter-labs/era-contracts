@@ -176,6 +176,9 @@ async function main() {
             ];
 
             const txs = await Promise.all(independentInitialization);
+            for (const tx of txs) {
+                console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+            }
             const receipts = await Promise.all(txs.map((tx) => tx.wait(2)));
 
             console.log(`ERC20 bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);

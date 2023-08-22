@@ -15,11 +15,13 @@ contract DiamondCutFacet is Base, IDiamondCut {
 
     string public constant override getName = "DiamondCutFacet";
 
+    /// @notice Ensures an upgrade proposal already exists.
     modifier upgradeProposed() {
         require(s.upgrades.state != UpgradeState.None, "a3"); // Proposal doesn't exist
         _;
     }
 
+    /// @notice Ensures no proposal has been made yet.
     modifier noUpgradeProposed() {
         require(s.upgrades.state == UpgradeState.None, "a8"); // Proposal already exists
         _;

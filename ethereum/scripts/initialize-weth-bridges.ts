@@ -90,6 +90,8 @@ async function main() {
                     value: requiredValueToInitializeBridge.mul(2)
                 }
             );
+            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+
             const receipt = await tx.wait();
 
             console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);

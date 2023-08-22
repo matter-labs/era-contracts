@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../interfaces/IMailbox.sol";
 import "../libraries/Merkle.sol";
 import "../libraries/PriorityQueue.sol";
+import "../libraries/TransactionValidator.sol";
 import "../Storage.sol";
 import "../Config.sol";
 import "../../common/libraries/UncheckedMath.sol";
@@ -345,27 +346,7 @@ contract MailboxFacet is Base, IMailbox {
 
         bytes memory transactionEncoding = abi.encode(transaction);
 
-        uint256 l2GasForTxBody = _getTransactionBodyGasLimit(
-            _priorityOpParams.l2GasLimit,
-            _priorityOpParams.l2GasPricePerPubdata,
-            transactionEncoding.length
-        );
-
-        // Ensuring that the transaction is provable
-        require(l2GasForTxBody <= s.priorityTxMaxGasLimit, "ui");
-        // Ensuring that the transaction cannot output more pubdata than is processable
-        require(l2GasForTxBody / _priorityOpParams.l2GasPricePerPubdata <= PRIORITY_TX_MAX_PUBDATA, "uk");
-
-        // Ensuring that the transaction covers the minimal costs for its processing:
-        // hashing its content, publishing the factory dependencies, etc.
-        require(
-            _getMinimalPriorityTransactionGasLimit(
-                transactionEncoding.length,
-                _factoryDeps.length,
-                _priorityOpParams.l2GasPricePerPubdata
-            ) <= _priorityOpParams.l2GasLimit,
-            "um"
-        );
+        TransactionValidator.validateL1ToL2Transaction(transaction, transactionEncoding, s.priorityTxMaxGasLimit);
 
         canonicalTxHash = keccak256(transactionEncoding);
 
@@ -387,47 +368,6 @@ contract MailboxFacet is Base, IMailbox {
         );
     }
 
-    /// @dev Calculates the approximate minimum gas limit required for executing a priority transaction.
-    /// @param _encodingLength The length of the priority transaction encoding in bytes.
-    /// @param _numberOfFactoryDependencies The number of new factory dependencies that will be added.
-    /// @param _l2GasPricePerPubdata The L2 gas price for publishing the priority transaction on L2.
-    /// @return The minimum gas limit required to execute the priority transaction.
-    /// Note: The calculation includes the main cost of the priority transaction, however, in reality, the operator can spend a little more gas on overheads.
-    function _getMinimalPriorityTransactionGasLimit(
-        uint256 _encodingLength,
-        uint256 _numberOfFactoryDependencies,
-        uint256 _l2GasPricePerPubdata
-    ) internal pure returns (uint256) {
-        uint256 costForComputation;
-        {
-            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
-            costForComputation = L1_TX_INTRINSIC_L2_GAS;
-
-            // Taking into account the hashing costs that depend on the length of the transaction
-            // Note that L1_TX_DELTA_544_ENCODING_BYTES is the delta in the price for every 544 bytes of
-            // the transaction's encoding. It is taken as LCM between 136 and 32 (the length for each keccak256 round
-            // and the size of each new encoding word).
-            costForComputation += Math.ceilDiv(_encodingLength * L1_TX_DELTA_544_ENCODING_BYTES, 544);
-
-            // Taking into the account the additional costs of providing new factory dependenies
-            costForComputation += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_L2_GAS;
-
-            // There is a minimal amount of computational L2 gas that the transaction should cover
-            costForComputation = Math.max(costForComputation, L1_TX_MIN_L2_GAS_BASE);
-        }
-
-        uint256 costForPubdata = 0;
-        {
-            // Adding the intrinsic cost for the transaction, i.e. auxilary prices which cannot be easily accounted for
-            costForPubdata = L1_TX_INTRINSIC_PUBDATA * _l2GasPricePerPubdata;
-
-            // Taking into the account the additional costs of providing new factory dependenies
-            costForPubdata += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_PUBDATA * _l2GasPricePerPubdata;
-        }
-
-        return costForComputation + costForPubdata;
-    }
-
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
     function _hashFactoryDeps(bytes[] calldata _factoryDeps)
         internal
@@ -443,72 +383,6 @@ contract MailboxFacet is Base, IMailbox {
             assembly {
                 mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
             }
-        }
-    }
-
-    /// @notice Based on the total L2 gas limit and several other parameters of the transaction
-    /// returns the part of the L2 gas that will be spent on the block's overhead.
-    /// @dev The details of how this function works can be checked in the documentation
-    /// of the fee model of zkSync. The appropriate comments are also present
-    /// in the Rust implementation description of function `get_maximal_allowed_overhead`.
-    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the block
-    /// and the L2 gas needed to process the transaction itself (i.e. the actual gasLimit that will be used for the transaction).
-    /// @param _gasPricePerPubdata The maximum amount of L2 gas that the operator may charge the user for a single byte of pubdata.
-    /// @param _encodingLength The length of the binary encoding of the transaction in bytes
-    function _getOverheadForTransaction(
-        uint256 _totalGasLimit,
-        uint256 _gasPricePerPubdata,
-        uint256 _encodingLength
-    ) internal pure returns (uint256 blockOverheadForTransaction) {
-        uint256 blockOverheadGas = BLOCK_OVERHEAD_L2_GAS + BLOCK_OVERHEAD_PUBDATA * _gasPricePerPubdata;
-
-        // The overhead from taking up the transaction's slot
-        uint256 txSlotOverhead = Math.ceilDiv(blockOverheadGas, MAX_TRANSACTIONS_IN_BLOCK);
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, txSlotOverhead);
-
-        // The overhead for occupying the bootloader memory can be derived from encoded_len
-        uint256 overheadForLength = Math.ceilDiv(_encodingLength * blockOverheadGas, BOOTLOADER_TX_ENCODING_SPACE);
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForLength);
-
-        // The overhead for possible published public data
-        // TODO: possibly charge a separate fee for possible pubdata spending
-        // uint256 overheadForPublicData;
-        // {
-        //     uint256 numerator = (blockOverheadGas * _totalGasLimit + _gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK);
-        //     uint256 denominator = (_gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK + blockOverheadGas);
-
-        //     overheadForPublicData = (numerator - 1) / denominator;
-        // }
-        // blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForPublicData);
-
-        // The overhead for ergs that could be used to use single-instance circuits
-        uint256 overheadForGas;
-        {
-            uint256 numerator = blockOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;
-            uint256 denominator = L2_TX_MAX_GAS_LIMIT + blockOverheadGas;
-
-            overheadForGas = (numerator - 1) / denominator;
-        }
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForGas);
-    }
-
-    /// @notice Based on the full L2 gas limit (that includes the block overhead) and other
-    /// properties of the transaction, returns the l2GasLimit for the body of the transaction (the actual execution).
-    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the block
-    /// and the L2 gas needed to process the transaction itself (i.e. the actual l2GasLimit that will be used for the transaction).
-    /// @param _gasPricePerPubdata The L2 gas price for each byte of pubdata.
-    /// @param _encodingLength The length of the ABI-encoding of the transaction.
-    function _getTransactionBodyGasLimit(
-        uint256 _totalGasLimit,
-        uint256 _gasPricePerPubdata,
-        uint256 _encodingLength
-    ) internal pure returns (uint256 txBodyGasLimit) {
-        uint256 overhead = _getOverheadForTransaction(_totalGasLimit, _gasPricePerPubdata, _encodingLength);
-
-        require(_totalGasLimit >= overhead, "my"); // provided gas limit doesn't cover transaction overhead
-        unchecked {
-            // We enforce the fact that `_totalGasLimit >= overhead` explicitly above.
-            txBodyGasLimit = _totalGasLimit - overhead;
         }
     }
 

@@ -67,7 +67,7 @@ async function getCalldata(
     const randomWallet = new Wallet(ethers.utils.randomBytes(32), zksProvider, provider);
     let governor = await (await randomWallet.getMainContract()).getGovernor();
     // Apply L1 to L2 mask if needed.
-    if (ethers.utils.hexDataLength(await zksProvider.getCode(governor)) != 0) {
+    if (ethers.utils.hexDataLength(await provider.getCode(governor)) != 0) {
         governor = applyL1ToL2Alias(governor);
     }
 

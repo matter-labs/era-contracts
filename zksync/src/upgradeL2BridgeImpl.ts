@@ -26,6 +26,7 @@ function checkSupportedContract(contract: any): contract is SupportedContracts {
 
 const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 const l2Erc20BridgeProxyAddress = getAddressFromEnv('CONTRACTS_L2_ERC20_BRIDGE_ADDR');
+const EIP1967_IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
@@ -38,6 +39,12 @@ async function getERC20BeaconAddress() {
     const contract = new ethers.Contract(bridge, artifact.abi, provider);
 
     return await contract.l2TokenBeacon();
+}
+
+async function getWETHAddress() {
+    const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+    const wethToken = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
+    return ethers.utils.hexStripZeros(await provider.getStorageAt(wethToken, EIP1967_IMPLEMENTATION_SLOT));
 }
 
 async function getTransparentProxyUpgradeCalldata(target: string) {
@@ -318,6 +325,10 @@ async function main() {
 
     program.command('get-l2-erc20-beacon-address').action(async () => {
         console.log(`L2 ERC20 beacon address: ${await getERC20BeaconAddress()}`);
+    });
+
+    program.command('get-weth-token-implementation').action(async () => {
+        console.log(`WETH token implementation address: ${await getWETHAddress()}`);
     });
 
     program

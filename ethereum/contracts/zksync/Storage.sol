@@ -70,9 +70,9 @@ struct VerifierParams {
 
 /// @dev storing all storage variables for zkSync facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
-/// NOTE: but NOT to modify already existing variables or change their order
-/// NOTE: DiamondCutStorage is unused, but it must remain a member of AppStorage to not have storage collision
-/// NOTE: instead UpgradeStorage is used that is appended to the end of the AppStorage struct
+/// but NOT to modify already existing variables or change their order.
+/// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
+/// Their presence is maintained for compatibility and to prevent storage collision.
 struct AppStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
@@ -126,4 +126,11 @@ struct AppStorage {
     uint256 __DEPRECATED_withdrawnAmountInWindow;
     /// @dev A mapping user address => the total deposited amount by the user
     mapping(address => uint256) totalDepositedAmountPerUser;
+    /// @dev Stores the protocol version. Note, that the protocol version may not only encompass changes to the
+    /// smart contracts, but also to the node behavior.
+    uint256 protocolVersion;
+    /// @dev Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
+    bytes32 l2SystemContractsUpgradeTxHash;
+    /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
+    uint256 l2SystemContractsUpgradeBlockNumber;
 }

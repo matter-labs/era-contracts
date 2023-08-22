@@ -129,6 +129,25 @@ contract GettersFacet is Base, IGetters {
         return s.upgrades.currentProposalId;
     }
 
+    /// @return The current protocol version
+    function getProtocolVersion() external view returns (uint256) {
+        return s.protocolVersion;
+    }
+
+    /// @return The upgrade system contract transaction hash, 0 if the upgrade is not initialized
+    function getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
+    }
+
+    /// @return The L2 block number in which the upgrade transaction was processed.
+    /// @dev It is equal to 0 in the following two cases:
+    /// - No upgrade transaction has ever been processed.
+    /// - The upgrade transaction has been processed and the block with such transaction has been
+    /// executed (i.e. finalized).
+    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBlockNumber;
+    }
+
     /// @return The number of received upgrade approvals from the security council
     function isApprovedBySecurityCouncil() external view returns (bool) {
         return s.upgrades.approvedBySecurityCouncil;

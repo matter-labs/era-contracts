@@ -140,3 +140,19 @@ export function computeL2Create2Address(
 export function print(name: string, data: any) {
     console.log(`${name}:\n`, JSON.stringify(data, null, 4), '\n');
 }
+
+export type L1Token = {
+    name: string;
+    symbol: string;
+    decimals: number;
+    address: string;
+};
+
+export function getTokens(network: string): L1Token[] {
+    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+    return JSON.parse(
+        fs.readFileSync(configPath, {
+            encoding: 'utf-8'
+        })
+    );
+}

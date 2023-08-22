@@ -42,6 +42,7 @@ async function main() {
             const zkSync = deployer.zkSyncContract(deployWallet);
             const validatorTimelock = deployer.validatorTimelock(deployWallet);
             const tx = await zkSync.setValidator(validatorTimelock.address, true);
+            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);
             const receipt = await tx.wait();
 
             console.log(`Validator is set, gasUsed: ${receipt.gasUsed.toString()}`);

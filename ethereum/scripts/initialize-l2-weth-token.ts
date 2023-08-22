@@ -2,8 +2,7 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
-import { getTokens } from 'reading-tool';
+import { web3Provider, getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -84,6 +83,11 @@ async function main() {
         .option('--private-key <private-key>')
         .option('--gas-price <gas-price>')
         .action(async (cmd) => {
+            if (!l1WethTokenAddress) {
+                console.log(`Base Layer WETH address not provided. Skipping.`);
+                return;
+            }
+
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
@@ -119,6 +123,11 @@ async function main() {
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .action(async (cmd) => {
+            if (!l1WethTokenAddress) {
+                console.log(`Base Layer WETH address not provided. Skipping.`);
+                return;
+            }
+
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
@@ -160,6 +169,9 @@ async function main() {
                     value: requiredValueToInitializeBridge
                 }
             );
+
+            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+
             const receipt = await tx.wait();
 
             console.log(`L2 WETH token initialized, gasUsed: ${receipt.gasUsed.toString()}`);

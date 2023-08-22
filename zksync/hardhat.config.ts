@@ -1,6 +1,7 @@
 import '@nomiclabs/hardhat-solpp';
 import '@matterlabs/hardhat-zksync-solc';
 import '@nomiclabs/hardhat-ethers';
+import '@matterlabs/hardhat-zksync-verify';
 import 'hardhat-typechain';
 
 // If no network is specified, use the default config
@@ -19,9 +20,24 @@ export default {
     solidity: {
         version: '0.8.19'
     },
+    defaultNetwork: 'hardhat',
     networks: {
         hardhat: {
             zksync: true
+        },
+        zkSyncTestnet: {
+            url: 'https://zksync2-testnet.zksync.dev',
+            ethNetwork: 'goerli',
+            zksync: true,
+            // contract verification endpoint
+            verifyURL: 'https://zksync2-testnet-explorer.zksync.dev/contract_verification'
+        },
+        zksyncMainnet: {
+            url: 'https://mainnet.era.zksync.io',
+            ethNetwork: 'mainnet',
+            zksync: true,
+            // contract verification endpoint
+            verifyURL: 'https://zksync2-mainnet-explorer.zksync.io/contract_verification'
         }
     }
 };

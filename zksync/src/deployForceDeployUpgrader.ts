@@ -12,13 +12,16 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
 const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 
-// Script to deploy the testnet paymaster and output its address.
+// Script to deploy the force deploy upgrader contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR
 // to running this script.
 async function main() {
     const program = new Command();
 
-    program.version('0.1.0').name('deploy-testnet-paymaster').description('Deploys the testnet paymaster to L2');
+    program
+        .version('0.1.0')
+        .name('deploy-force-deploy-upgrader')
+        .description('Deploys the force deploy upgrader contract to L2');
 
     program.option('--private-key <private-key>').action(async (cmd: Command) => {
         const deployWallet = cmd.privateKey
@@ -29,16 +32,19 @@ async function main() {
               ).connect(provider);
         console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-        const testnetPaymasterBytecode = hre.artifacts.readArtifactSync('TestnetPaymaster').bytecode;
+        const forceDeployUpgraderBytecode = hre.artifacts.readArtifactSync('ForceDeployUpgrader').bytecode;
         const create2Salt = ethers.constants.HashZero;
-        const paymasterAddress = computeL2Create2Address(deployWallet, testnetPaymasterBytecode, '0x', create2Salt);
+        const forceDeployUpgraderAddress = computeL2Create2Address(
+            deployWallet,
+            forceDeployUpgraderBytecode,
+            '0x',
+            create2Salt
+        );
 
         // TODO: request from API how many L2 gas needs for the transaction.
-        await (
-            await create2DeployFromL1(deployWallet, testnetPaymasterBytecode, '0x', create2Salt, priorityTxMaxGasLimit)
-        ).wait();
+        await create2DeployFromL1(deployWallet, forceDeployUpgraderBytecode, '0x', create2Salt, priorityTxMaxGasLimit);
 
-        console.log(`CONTRACTS_L2_TESTNET_PAYMASTER_ADDR=${paymasterAddress}`);
+        console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
     });
 
     await program.parseAsync(process.argv);

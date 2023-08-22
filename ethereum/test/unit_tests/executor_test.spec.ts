@@ -14,14 +14,17 @@ import {
     MailboxFacetFactory,
     GovernanceFacetFactory
 } from '../../typechain';
-import { AccessMode, getCallRevertReason, requestExecute } from './utils';
-
-const EMPTY_STRING_KECCAK = `0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`;
-const DEFAULT_L2_LOGS_TREE_ROOT_HASH = `0x0000000000000000000000000000000000000000000000000000000000000000`;
-const L2_SYSTEM_CONTEXT_ADDRESS = `0x000000000000000000000000000000000000800b`;
-const L2_BOOTLOADER_ADDRESS = `0x0000000000000000000000000000000000008001`;
-const L2_KNOWN_CODE_STORAGE_ADDRESS = `0x0000000000000000000000000000000000008004`;
-const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
+import {
+    AccessMode,
+    EMPTY_STRING_KECCAK,
+    L2_BOOTLOADER_ADDRESS,
+    L2_KNOWN_CODE_STORAGE_ADDRESS,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    L2_TO_L1_MESSENGER,
+    genesisStoredBlockInfo,
+    getCallRevertReason,
+    requestExecute
+} from './utils';
 
 describe(`Executor tests`, function () {
     let owner: ethers.Signer;
@@ -36,17 +39,6 @@ describe(`Executor tests`, function () {
     let currentTimestamp: number;
     let newCommitBlockInfo: any;
     let newStoredBlockInfo: any;
-
-    const genesisStoredBlockInfo = {
-        blockNumber: 0,
-        blockHash: ethers.constants.HashZero,
-        indexRepeatedStorageChanges: 0,
-        numberOfLayer1Txs: 0,
-        priorityOperationsHash: EMPTY_STRING_KECCAK,
-        l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-        timestamp: 0,
-        commitment: ethers.constants.HashZero
-    };
 
     const proofInput = {
         recursiveAggregationInput: [],
@@ -192,7 +184,7 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing with wrong last committed block data`, async () => {
-            const wrongGenesisStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo);
+            const wrongGenesisStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo());
             wrongGenesisStoredBlockInfo.timestamp = 1000; // wrong timestamp
 
             const revertReason = await getCallRevertReason(
@@ -206,7 +198,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.blockNumber = 2; //wrong block number
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`f`);
         });
@@ -225,7 +217,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`tb`);
         });
@@ -244,7 +236,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.timestamp = 0; // too small
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`h`);
         });
@@ -264,7 +256,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.timestamp = parseInt(wrongNewBlockTimestamp);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`h1`);
         });
@@ -283,7 +275,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`l`);
         });
@@ -295,7 +287,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`by`);
         });
@@ -317,9 +309,29 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`fx`);
+        });
+
+        it('Should revert on unexpected L2->L1 log', async () => {
+            // We do not expect to receive an L2->L1 log from zero address
+            const unexpectedAddress = ethers.constants.AddressZero;
+            const wrongL2Logs = ethers.utils.hexConcat([
+                `0x00000001`,
+                `0x00000000`,
+                unexpectedAddress,
+                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                ethers.constants.HashZero
+            ]);
+
+            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+            );
+            expect(revertReason).equal(`ne`);
         });
 
         it(`Should revert on committing with wrong canonical tx hash`, async () => {
@@ -339,7 +351,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`t`);
         });
@@ -368,7 +380,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.numberOfLayer1Txs = 2; // wrong number
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`ta`);
         });
@@ -390,7 +402,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(32)];
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`k3`);
         });
@@ -421,7 +433,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.factoryDeps = [arbitraryBytecode, arbitraryBytecode];
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`ym`);
         });
@@ -444,7 +456,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = [ethers.utils.randomBytes(32)];
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`k2`);
         });
@@ -469,7 +481,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = [arbitraryMessage, arbitraryMessage]; // wrong number
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`pl`);
         });
@@ -491,7 +503,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(20)];
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal('bl');
         });
@@ -513,7 +525,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(64)];
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`pr`);
         });
@@ -533,7 +545,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.initialStorageChanges = `0x00000001`;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`yq`);
         });
@@ -541,12 +553,7 @@ describe(`Executor tests`, function () {
         it(`Should revert on committing with too long L2 logs`, async () => {
             // uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
             const arr1 = Array(512)
-                .fill([
-                    `0x00000000`,
-                    ethers.constants.AddressZero,
-                    ethers.constants.HashZero,
-                    ethers.constants.HashZero
-                ])
+                .fill([`0x00000000`, L2_TO_L1_MESSENGER, ethers.constants.HashZero, ethers.utils.keccak256('0x')])
                 .flat();
 
             const arr2 = [
@@ -561,9 +568,10 @@ describe(`Executor tests`, function () {
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = Array(512).fill('0x');
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`pu`);
         });
@@ -587,7 +595,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.repeatedStorageChanges = wrongRepeatedStorageChanges; // too long repeated storage changes
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`py`);
         });
@@ -611,7 +619,7 @@ describe(`Executor tests`, function () {
             wrongNewCommitBlockInfo.initialStorageChanges = wrongInitialStorageChanges; // too long initial storage changes
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`pf`);
         });
@@ -630,7 +638,7 @@ describe(`Executor tests`, function () {
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo, [correctNewCommitBlockInfo]);
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
             const result = await commitTx.wait();
 
@@ -656,7 +664,7 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on proving with wrong previous block data`, async () => {
-            const wrongPreviousStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo);
+            const wrongPreviousStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo());
             wrongPreviousStoredBlockInfo.blockNumber = 10; // Correct is 0
 
             const revertReason = await getCallRevertReason(
@@ -670,7 +678,7 @@ describe(`Executor tests`, function () {
             wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).proveBlocks(genesisStoredBlockInfo, [wrongNewStoredBlockInfo], proofInput)
+                executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [wrongNewStoredBlockInfo], proofInput)
             );
             expect(revertReason).equal(`o1`);
         });
@@ -679,7 +687,7 @@ describe(`Executor tests`, function () {
             await executor.connect(validator).revertBlocks(0);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).proveBlocks(genesisStoredBlockInfo, [newStoredBlockInfo], proofInput)
+                executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput)
             );
             expect(revertReason).equal(`q`);
         });
@@ -696,9 +704,9 @@ describe(`Executor tests`, function () {
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
             correctNewCommitBlockInfo.l2Logs = correctL2Logs;
 
-            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [correctNewCommitBlockInfo]);
+            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
-            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo, [newStoredBlockInfo], proofInput);
+            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
             expect(await getters.getTotalBlocksVerified()).equal(1);
         });
     });
@@ -765,7 +773,7 @@ describe(`Executor tests`, function () {
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo, [correctNewCommitBlockInfo]);
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
             const result = await commitTx.wait();
 
@@ -777,7 +785,7 @@ describe(`Executor tests`, function () {
 
             await executor
                 .connect(validator)
-                .proveBlocks(genesisStoredBlockInfo, [correctNewStoredBlockInfo], proofInput);
+                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
@@ -812,7 +820,7 @@ describe(`Executor tests`, function () {
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo, [correctNewCommitBlockInfo]);
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
             const result = await commitTx.wait();
 
@@ -824,7 +832,7 @@ describe(`Executor tests`, function () {
 
             await executor
                 .connect(validator)
-                .proveBlocks(genesisStoredBlockInfo, [correctNewStoredBlockInfo], proofInput);
+                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
 
             await requestExecute(
                 mailbox,
@@ -844,6 +852,27 @@ describe(`Executor tests`, function () {
             await executor.connect(validator).revertBlocks(0);
         });
 
+        it(`Should fail to commit block with wrong previous blockhash`, async () => {
+            const correctL2Logs = ethers.utils.hexConcat([
+                `0x00000001`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                ethers.constants.HashZero
+            ]);
+
+            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+
+            const block = genesisStoredBlockInfo();
+            block.blockHash = '0x' + '1'.repeat(64);
+
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).commitBlocks(block, [correctNewCommitBlockInfo])
+            );
+            expect(revertReason).to.equal('i');
+        });
+
         it(`Should execute a block successfully`, async () => {
             const correctL2Logs = ethers.utils.hexConcat([
                 `0x00000001`,
@@ -856,8 +885,8 @@ describe(`Executor tests`, function () {
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
             correctNewCommitBlockInfo.l2Logs = correctL2Logs;
 
-            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo, [correctNewCommitBlockInfo]);
-            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo, [newStoredBlockInfo], proofInput);
+            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
             await executor.connect(validator).executeBlocks([newStoredBlockInfo]);
 
             expect(await getters.getTotalBlocksExecuted()).equal(1);

@@ -5,21 +5,45 @@ pragma solidity ^0.8.13;
 /**
  * @author Matter Labs
  * @notice Smart contract for sending arbitrary length messages to L1
- * @dev by default ZkSync can send fixed length messages on L1.
+ * @dev by default ZkSync can send fixed-length messages on L1.
  * A fixed length message has 4 parameters `senderAddress` `isService`, `key`, `value`,
  * the first one is taken from the context, the other three are chosen by the sender.
- * @dev To send a variable length message we use this trick:
- * - This system contract accepts a arbitrary length message and sends a fixed length message with
+ * @dev To send a variable-length message we use this trick:
+ * - This system contract accepts an arbitrary length message and sends a fixed length message with
  * parameters `senderAddress == this`, `marker == true`, `key == msg.sender`, `value == keccak256(message)`.
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
 interface IL2Messenger {
+    /// @notice Sends an arbitrary length message to L1.
+    /// @param _message The variable length message to be sent to L1.
+    /// @return Returns the keccak256 hashed value of the message.
     function sendToL1(bytes memory _message) external returns (bytes32);
 }
 
 interface IContractDeployer {
-    /// @notice Standard create2 function targeting L2.
+    /// @notice A struct that describes a forced deployment on an address.
+    /// @param bytecodeHash The bytecode hash to put on an address.
+    /// @param newAddress The address on which to deploy the bytecodehash to.
+    /// @param callConstructor Whether to run the constructor on the force deployment.
+    /// @param value The `msg.value` with which to initialize a contract.
+    /// @param input The constructor calldata.
+    struct ForceDeployment {
+        bytes32 bytecodeHash;
+        address newAddress;
+        bool callConstructor;
+        uint256 value;
+        bytes input;
+    }
+
+    /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
+    /// @param _deployParams A set of parameters describing force deployment.
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
+
+    /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
+    /// @param _salt a unique value to create the deterministic address of the new contract
+    /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
+    /// @param _input the calldata to be sent to the constructor of the new contract
     function create2(
         bytes32 _salt,
         bytes32 _bytecodeHash,
@@ -28,6 +52,9 @@ interface IContractDeployer {
 }
 
 interface IEthToken {
+    /// @notice Allows the withdrawal of ETH to a given L1 receiver along with an additional message.
+    /// @param _l1Receiver The address on L1 to receive the withdrawn ETH.
+    /// @param _additionalData Additional message or data to be sent alongside the withdrawal.
     function withdrawWithMessage(address _l1Receiver, bytes memory _additionalData) external payable;
 }
 
@@ -49,6 +76,9 @@ library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
     bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
+    /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
+    /// @param _message Data to be sent to L1.
+    /// @return keccak256 hash of the sent message.
     function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
         return L2_MESSENGER.sendToL1(_message);
     }
