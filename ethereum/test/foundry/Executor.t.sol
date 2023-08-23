@@ -1030,4 +1030,121 @@ contract CommittingFunctionalityTest is ExecutorTest {
             wrongNewCommitBlockInfoArray
         );
     }
+
+    // It costs too much gas to set up the array required for this test. TODO: fix this
+    // function test_revertWhen_committingWithTooLongRepeatedStorageChanges()
+    //     public
+    // {
+    //     bytes memory correctL2Logs = abi.encodePacked(
+    //         bytes4(0x00000001),
+    //         bytes4(0x00000000),
+    //         L2_SYSTEM_CONTEXT_ADDRESS,
+    //         uint256(currentTimestamp),
+    //         bytes32("")
+    //     );
+
+    //     // uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564;
+    //     bytes memory wrongRepeatedStorageChanges = abi.encodePacked(
+    //         bytes4(0x00000001)
+    //     );
+
+    //     for (uint i = 0; i < 7565; i++) {
+    //         wrongRepeatedStorageChanges = bytes.concat(
+    //             wrongRepeatedStorageChanges,
+    //             bytes.concat(
+    //                 bytes32("randomBytes32"),
+    //                 bytes4("rand"),
+    //                 bytes4("rand")
+    //             ) // 40 bytes
+    //         );
+    //     }
+
+    //     IExecutor.CommitBlockInfo
+    //         memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+    //     wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
+    //     wrongNewCommitBlockInfo
+    //         .repeatedStorageChanges = wrongRepeatedStorageChanges;
+
+    //     IExecutor.CommitBlockInfo[]
+    //         memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+    //             1
+    //         );
+    //     wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+    //     vm.prank(validator);
+
+    //     vm.expectRevert(bytes.concat("py"));
+    //     executor.commitBlocks(
+    //         genesisStoredBlockInfo,
+    //         wrongNewCommitBlockInfoArray
+    //     );
+    // }
+
+    // It costs too much gas to set up the array required for this test. TODO: fix this
+    // function test_revertWhen_committingWithTooLongInitialStorageChanges()
+    //     public
+    // {
+    //     bytes memory correctL2Logs = abi.encodePacked(
+    //         bytes4(0x00000001),
+    //         bytes4(0x00000000),
+    //         L2_SYSTEM_CONTEXT_ADDRESS,
+    //         uint256(currentTimestamp),
+    //         bytes32("")
+    //     );
+
+    //     // uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564;
+    //     bytes memory wrongInitialStorageChanges = abi.encodePacked(
+    //         bytes4(0x00000000)
+    //     );
+
+    //     for (uint i = 0; i < 4766; i++) {
+    //         wrongInitialStorageChanges = bytes.concat(
+    //             wrongInitialStorageChanges,
+    //             bytes.concat(bytes32("randomBytes32"), bytes32("randomBytes32")) // 64 bytes
+    //         );
+    //     }
+
+    //     IExecutor.CommitBlockInfo
+    //         memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+    //     wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
+    //     wrongNewCommitBlockInfo
+    //         .initialStorageChanges = wrongInitialStorageChanges;
+
+    //     IExecutor.CommitBlockInfo[]
+    //         memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+    //             1
+    //         );
+    //     wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+    //     vm.prank(validator);
+
+    //     vm.expectRevert(bytes.concat("pf"));
+    //     executor.commitBlocks(
+    //         genesisStoredBlockInfo,
+    //         wrongNewCommitBlockInfoArray
+    //     );
+    // }
+
+    function test_shouldCommitBlock() public {
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+
+        newCommitBlockInfo.l2Logs = correctL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        commitBlockInfoArray[0] = newCommitBlockInfo;
+
+        vm.prank(validator);
+
+        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+
+        uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
+        assertEq(totalBlocksCommitted, 1);
+    }
 }
