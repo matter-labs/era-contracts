@@ -296,7 +296,7 @@ contract CommittingFunctionalityTest is ExecutorTest {
             numberOfLayer1Txs: 0,
             l2LogsTreeRoot: 0,
             priorityOperationsHash: keccak256(""),
-            initialStorageChanges: bytes(""),
+            initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
             repeatedStorageChanges: bytes(""),
             l2Logs: bytes(""),
             l2ArbitraryLengthMessages: new bytes[](0),
@@ -794,6 +794,237 @@ contract CommittingFunctionalityTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes.concat("k2"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_revertWhen_committingWithWrongNumberOfMessages() public {
+        bytes memory arbitraryMessage = abi.encodePacked(uint8(0xaa));
+        bytes32 arbitraryHashedMessage = keccak256(arbitraryMessage);
+
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000002),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            bytes4(0x00010000),
+            L2_TO_L1_MESSENGER,
+            bytes32(""),
+            arbitraryHashedMessage
+        );
+
+        bytes[] memory l2ArbitraryLengthMessagesArray = new bytes[](2);
+        l2ArbitraryLengthMessagesArray[0] = arbitraryMessage;
+        l2ArbitraryLengthMessagesArray[1] = arbitraryMessage;
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo
+            .l2ArbitraryLengthMessages = l2ArbitraryLengthMessagesArray;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("pl"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_revertWhen_committingWithWrongBytecodeLength() public {
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000002),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            bytes4(0x00010000),
+            L2_KNOWN_CODE_STORAGE_ADDRESS,
+            keccak256(
+                bytes.concat(
+                    "randomBytes32",
+                    "test_revertWhen_committingWithWrongBytecodeLength()",
+                    "0"
+                )
+            )
+        );
+
+        bytes20 randomFactoryDeps1 = bytes20(
+            keccak256(
+                bytes.concat(
+                    "randomBytes20",
+                    "test_revertWhen_committingWithWrongBytecodeLength()",
+                    "0"
+                )
+            )
+        );
+        bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = bytes.concat(randomFactoryDeps1);
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo.factoryDeps = factoryDeps;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("bl"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_revertWhen_committingWithWrongNumberOfWordsInBytecode()
+        public
+    {
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000002),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            bytes4(0x00010000),
+            L2_KNOWN_CODE_STORAGE_ADDRESS,
+            keccak256(
+                bytes.concat(
+                    "randomBytes32",
+                    "test_revertWhen_committingWithWrongNumberOfWordsInBytecode()",
+                    "0"
+                )
+            )
+        );
+
+        bytes memory randomFactoryDeps1 = bytes.concat(
+            keccak256(
+                bytes.concat(
+                    "randomBytes32",
+                    "test_revertWhen_committingWithWrongNumberOfWordsInBytecode()",
+                    "0"
+                )
+            ),
+            keccak256(
+                bytes.concat(
+                    "randomBytes32",
+                    "test_revertWhen_committingWithWrongNumberOfWordsInBytecode()",
+                    "1"
+                )
+            )
+        );
+
+        bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = bytes.concat(randomFactoryDeps1);
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo.factoryDeps = factoryDeps;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("pr"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_revertWhen_committingWithWrongRepeatedStorageWrites() public {
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo.indexRepeatedStorageChanges = 0;
+        wrongNewCommitBlockInfo.initialStorageChanges = "0x00000001";
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("yq"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_revertWhen_committingWithTooLongL2Logs() public {
+        // uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
+        bytes memory arr1;
+
+        for (uint i = 0; i < 512; i++) {
+            arr1 = abi.encodePacked(
+                arr1,
+                bytes4(0x00000000),
+                L2_TO_L1_MESSENGER,
+                bytes32(""),
+                keccak256("")
+            );
+        }
+
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            arr1
+        );
+
+        bytes[] memory l2ArbitraryLengthMessages = new bytes[](512);
+
+        for (uint i = 0; i < l2ArbitraryLengthMessages.length; i++) {
+            l2ArbitraryLengthMessages[i] = bytes("");
+        }
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo
+            .l2ArbitraryLengthMessages = l2ArbitraryLengthMessages;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("pu"));
         executor.commitBlocks(
             genesisStoredBlockInfo,
             wrongNewCommitBlockInfoArray
