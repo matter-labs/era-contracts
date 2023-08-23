@@ -19,6 +19,9 @@ import "./libraries/EfficientCall.sol";
  * it requires that the preimage of `value` be provided.
  */
 contract L1Messenger is IL1Messenger {
+    /// @notice Sends an arbitrary length message to L1.
+    /// @param _message The variable length message to be sent to L1.
+    /// @return hash Returns the keccak256 hashed value of the message.
     function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         hash = EfficientCall.keccak(_message);
 
@@ -44,7 +47,7 @@ contract L1Messenger is IL1Messenger {
             precompileParams,
             Utils.safeCastToU32(gasToPay)
         );
-        require(precompileCallSuccess);
+        require(precompileCallSuccess, "Failed to burn gas");
 
         SystemContractHelper.toL1(true, bytes32(uint256(uint160(msg.sender))), hash);
 

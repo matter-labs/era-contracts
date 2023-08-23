@@ -73,19 +73,8 @@ contract L2EthToken is IEthToken {
 
     /// @notice Initiate the ETH withdrawal, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
-    /// @dev The function accepts the `msg.value`. Since this contract holds the mapping of all ether
-    /// balances of the system, the sent `msg.value` is added to the `this` balance before the call.
-    /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
     function withdraw(address _l1Receiver) external payable override {
-        uint256 amount = msg.value;
-
-        // Silent burning of the ether
-        unchecked {
-            // This is safe, since this contract holds the ether balances, and if user
-            // send a `msg.value` it will be added to the contract (`this`) balance.
-            balance[address(this)] -= amount;
-            totalSupply -= amount;
-        }
+        uint256 amount = _burnMsgValue();
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
@@ -94,9 +83,48 @@ contract L2EthToken is IEthToken {
         emit Withdrawal(msg.sender, _l1Receiver, amount);
     }
 
+    /// @notice Initiate the ETH withdrawal, with the sent message. The funds will be available to claim on L1 `finalizeEthWithdrawal` method.
+    /// @param _l1Receiver The address on L1 to receive the funds.
+    /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
+    function withdrawWithMessage(address _l1Receiver, bytes memory _additionalData) external payable override {
+        uint256 amount = _burnMsgValue();
+
+        // Send the L2 log, a user could use it as proof of the withdrawal
+        bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
+        L1_MESSENGER_CONTRACT.sendToL1(message);
+
+        emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);
+    }
+
+    /// @dev The function burn the sent `msg.value`.
+    /// NOTE: Since this contract holds the mapping of all ether balances of the system,
+    /// the sent `msg.value` is added to the `this` balance before the call.
+    /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
+    function _burnMsgValue() internal returns (uint256 amount) {
+        amount = msg.value;
+
+        // Silent burning of the ether
+        unchecked {
+            // This is safe, since this contract holds the ether balances, and if user
+            // send a `msg.value` it will be added to the contract (`this`) balance.
+            balance[address(this)] -= amount;
+            totalSupply -= amount;
+        }
+    }
+
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
         return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount);
+    }
+
+    /// @dev Get the message to be sent to L1 to initiate a withdrawal.
+    function _getExtendedWithdrawMessage(
+        address _to,
+        uint256 _amount,
+        address _sender,
+        bytes memory _additionalData
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 
     /// @dev This method has not been stabilized and might be

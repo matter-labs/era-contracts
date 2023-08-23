@@ -58,14 +58,14 @@ object "EventWriter" {
             /// @param initializer The event initializing value
             /// @param value1 The first topic or data chunk.
             function eventInitialize(initializer, value1) {
-                pop(verbatim_2i_0o("event_initialize", initializer, value1))
+                verbatim_2i_0o("event_initialize", initializer, value1)
             }
 
             /// @notice Continue writing the previously initialized event.
             /// @param value1 The first topic or data chunk.
             /// @param value2 The second topic or data chunk.
             function eventWrite(value1, value2) {
-                pop(verbatim_2i_0o("event_write", value1, value2))
+                verbatim_2i_0o("event_write", value1, value2)
             }
             
             // @dev Write 1-th topic and first data chunk

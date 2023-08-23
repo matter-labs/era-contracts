@@ -4,11 +4,12 @@ pragma solidity ^0.8.0;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 import "./libraries/Utils.sol";
 import "./libraries/EfficientCall.sol";
-import {SystemContractHelper, ISystemContract} from "./libraries/SystemContractHelper.sol";
+import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import "./interfaces/ISystemContract.sol";
 
 /**
  * @author Matter Labs
@@ -234,7 +235,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
-        require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER_CONTRACT");
+        require(
+            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT), 
+            "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
+        );
 
         uint256 deploymentsLength = _deployments.length;
         // We need to ensure that the `value` provided by the call is enough to provide `value`
@@ -256,7 +260,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         AccountAbstractionVersion _aaVersion,
         bytes calldata _input
     ) internal {
-        require(_bytecodeHash != bytes32(0x0), "BytecodeHash can not be zero");
+        require(_bytecodeHash != bytes32(0x0), "BytecodeHash cannot be zero");
         require(uint160(_newAddress) > MAX_SYSTEM_CONTRACT_ADDRESS, "Can not deploy contracts in kernel space");
 
         // We do not allow deploying twice on the same address.

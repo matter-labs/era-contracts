@@ -2,10 +2,9 @@
 
 pragma solidity ^0.8;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
+import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
 
 import "./SystemContractsCaller.sol";
-import "./Utils.sol";
 
 uint256 constant UINT32_MASK = 0xffffffff;
 uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
@@ -293,7 +292,7 @@ library SystemContractHelper {
 
     /// @notice Returns the current calldata pointer.
     /// @return ptr The current calldata pointer.
-    /// @dev NOTE: This file is just an integer and it can not be used
+    /// @dev NOTE: This file is just an integer and it cannot be used
     /// to forward the calldata to the next calls in any way.
     function getCalldataPtr() internal view returns (uint256 ptr) {
         address callAddr = PTR_CALLDATA_CALL_ADDRESS;
@@ -328,19 +327,5 @@ library SystemContractHelper {
     /// @return `true` or `false` based on whether the `_address` is a system contract.
     function isSystemContract(address _address) internal pure returns (bool) {
         return uint160(_address) <= uint160(MAX_SYSTEM_CONTRACT_ADDRESS);
-    }
-}
-
-/// @dev Solidity does not allow exporting modifiers via libraries, so
-/// the only way to do reuse modifiers is to have a base contract
-abstract contract ISystemContract {
-    /// @notice Modifier that makes sure that the method
-    /// can only be called via a system call.
-    modifier onlySystemCall() {
-        require(
-            SystemContractHelper.isSystemCall() || SystemContractHelper.isSystemContract(msg.sender),
-            "This method require system call flag"
-        );
-        _;
     }
 }

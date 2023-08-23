@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./interfaces/INonceHolder.sol";
 import "./interfaces/IContractDeployer.sol";
-import {ISystemContract} from "./libraries/SystemContractHelper.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
@@ -81,7 +81,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
     function setValueUnderNonce(uint256 _key, uint256 _value) public onlySystemCall {
         IContractDeployer.AccountInfo memory accountInfo = DEPLOYER_SYSTEM_CONTRACT.getAccountInfo(msg.sender);
 
-        require(_value != 0, "Nonce value can not be set to 0");
+        require(_value != 0, "Nonce value cannot be set to 0");
         // If an account has sequential nonce ordering, we enforce that the previous
         // nonce has already been used.
         if (accountInfo.nonceOrdering == IContractDeployer.AccountNonceOrdering.Sequential && _key != 0) {

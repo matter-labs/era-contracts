@@ -7,7 +7,8 @@ import "../Constants.sol";
 import "../DefaultAccount.sol";
 
 import "../libraries/EfficientCall.sol";
-import {SystemContractHelper, ISystemContract} from "../libraries/SystemContractHelper.sol";
+import "../interfaces/ISystemContract.sol";
+import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {TestSystemContractHelper} from "./TestSystemContractHelper.sol";
 
 /// @notice An example of a system contract that be used for local testing.
@@ -75,7 +76,7 @@ contract TestSystemContract is ISystemContract {
             false,
             false
         );
-        require(!success, "Normal acounts can not call onlySystemCall methods without proper flags");
+        require(!success, "Normal acounts cannot call onlySystemCall methods without proper flags");
 
         success = this.performRawMimicCall(
             address(this),
@@ -84,7 +85,7 @@ contract TestSystemContract is ISystemContract {
             false,
             true
         );
-        require(success, "Normal acounts can not call onlySystemCall methods without proper flags");
+        require(success, "Normal acounts cannot call onlySystemCall methods without proper flags");
     }
 
     function requireOnlySystem() external onlySystemCall {}

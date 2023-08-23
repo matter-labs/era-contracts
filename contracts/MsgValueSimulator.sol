@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 
 import "./libraries/Utils.sol";
 import "./libraries/EfficientCall.sol";
-import {SystemContractHelper, ISystemContract} from "./libraries/SystemContractHelper.sol";
-import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT, MAX_MSG_VALUE} from "./Constants.sol";
+import "./interfaces/ISystemContract.sol";
+import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -30,7 +31,7 @@ contract MsgValueSimulator is ISystemContract {
         to = address(uint160(addressAsUint));
     }
 
-    fallback(bytes calldata _data) external payable onlySystemCall returns (bytes memory) {
+    fallback(bytes calldata _data) external onlySystemCall returns (bytes memory) {
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
         // Prevent mimic call to the MsgValueSimulator to prevent an unexpected change of callee.

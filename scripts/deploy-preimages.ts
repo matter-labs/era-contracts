@@ -1,234 +1,168 @@
 import * as hre from 'hardhat';
 
 import { Command } from 'commander';
-import { Wallet } from 'zksync-web3';
+import {Provider, Wallet} from 'zksync-web3';
 import { Deployer } from '@matterlabs/hardhat-zksync-deploy';
 
 import * as path from 'path';
 import * as fs from 'fs';
 
-import { Language, SYSTEM_CONTRACTS, YulContractDescrption } from './constants';
-import { BytesLike, formatUnits, parseUnits } from 'ethers/lib/utils';
-import { BigNumber, BigNumberish, ethers } from 'ethers';
-import { hashBytecode } from 'zksync-web3/build/src/utils';
+import { Language, SYSTEM_CONTRACTS } from './constants';
+import { formatUnits, parseUnits } from 'ethers/lib/utils';
+import { BigNumber, ethers } from 'ethers';
+import {readYulBytecode, publishFactoryDeps, DeployedDependency, Dependency, filterDeployedFactoryDeps,} from './utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-// Script that publishes preimages for all the system contracts on zkSync
-// and outputs the JSON that can be used for performing the necessary upgrade
-const DEFAULT_L2_TX_GAS_LIMIT = 2097152;
-
-async function getMarkers(dependencies: BytesLike[], deployer: Deployer): Promise<[string, BigNumber][]> {
-    const contract = new ethers.Contract(
-        SYSTEM_CONTRACTS.knownCodesStorage.address,
-        (await deployer.loadArtifact('KnownCodesStorage')).abi,
-        deployer.zkWallet
-    );
-
-    const promises = dependencies.map(async (dep) => {
-        const hash = ethers.utils.hexlify(hashBytecode(dep));
-        const marker = BigNumber.from(await contract.getMarker(hash));
-
-        return [hash, marker] as [string, BigNumber];
-    });
-
-    return await Promise.all(promises);
-}
-
-// Checks whether the marker has been set correctly in the KnownCodesStorage
-// system contract
-async function checkMarker(dependencies: string[], deployer: Deployer) {
-    const markers = await getMarkers(dependencies, deployer);
-
-    for(const [bytecodeHash, marker] of markers) {
-        if(marker.eq(0)) {
-            throw new Error(`Failed to mark ${bytecodeHash}`);
-        }
-    }
-}
-
-function totalBytesLength(dependencies: string[]): number {
-    return dependencies.reduce((prev, curr) => prev + ethers.utils.arrayify(curr).length, 0);
-}
-
-async function publishFactoryDeps(
-    dependenciesNames: string[], 
-    dependencies: string[],
-    deployer: Deployer,
-    nonce: number,
-    gasPrice: BigNumber
-) {
-    if(dependencies.length == 0) {
-        return;
-    }
-    
-    const combinedLength = totalBytesLength(dependencies);
-
-    console.log(`\nPublishing dependencies for contracts ${dependenciesNames.join(', ')}`);
-    console.log(`Combined length ${combinedLength}`);
-
-    const txHandle = await deployer.zkWallet.requestExecute({
-        contractAddress: ethers.constants.AddressZero,
-        calldata: '0x',
-        l2GasLimit: DEFAULT_L2_TX_GAS_LIMIT,
-        factoryDeps: dependencies,
-        overrides: {
-            nonce,
-            gasPrice,
-            gasLimit: 3000000
-        }
-    })
-    console.log(`Transaction hash: ${txHandle.hash}`);
-
-    // Waiting for the transaction to be processed by the server
-    await txHandle.wait();
-
-    console.log('Transaction complete! Checking markers on L2...');
-
-    // Double checking that indeed the dependencies have been marked as known
-    await checkMarker(dependencies, deployer);
-}
-
-export interface ForceDeployment {
-    // The bytecode hash to put on an address
-    bytecodeHash: BytesLike;
-    // The address on which to deploy the bytecodehash to
-    newAddress: string;
-    // The value with which to initialize a contract
-    value: BigNumberish;
-    // The constructor calldata
-    input: BytesLike;
-    // Whether to call the constructor
-    callConstructor: boolean;
-}
-
-async function outputDeploymentParams(deployer: Deployer) {
-    const upgradeParamsPromises: Promise<ForceDeployment>[] = Object.values(SYSTEM_CONTRACTS).map(async (systemContractInfo) => {
-        let bytecode: string;
-
-        if (systemContractInfo.lang === Language.Yul) {
-            bytecode = readYulBytecode(systemContractInfo);
-        } else {
-            bytecode = (await deployer.loadArtifact(systemContractInfo.codeName)).bytecode;
-        }
-        const bytecodeHash = hashBytecode(bytecode);
-        
-        return {
-            bytecodeHash: ethers.utils.hexlify(bytecodeHash),
-            newAddress: systemContractInfo.address,
-            value: "0",
-            input: '0x',
-            callConstructor: false
-        }
-    });
-    const upgradeParams = await Promise.all(upgradeParamsPromises);
-
-    console.log(JSON.stringify(upgradeParams, null, 2));
-}
-
-// Returns an array of bytecodes that should be published along with 
-async function displayFactoryDeps(
-    contractName: string,
-    factoryDeps: string[],
-    deployer: Deployer
-): Promise<[string[], number]> {
-    console.log(`\nFactory dependencies for contract ${contractName}:`);
-    let currentLength = 0;  
-
-    let bytecodesToDeploy: string[] = [];
-
-    const hashesAndMarkers = await getMarkers(factoryDeps, deployer);
-
-    for(let i = 0; i < factoryDeps.length; i++) {
-        const depLength = ethers.utils.arrayify(factoryDeps[i]).length;
-        const [hash, marker] = hashesAndMarkers[i];
-        console.log(`${hash} (length: ${depLength} bytes) (deployed: ${marker})`);
-
-        if(marker.eq(0)) {
-            currentLength += depLength;
-            bytecodesToDeploy.push(factoryDeps[i]);
-        }
-    }
-
-    console.log(`Combined length to deploy: ${currentLength}`);
-
-    return [bytecodesToDeploy, currentLength];
-}
-
-async function publishBootloader(
-    deployer: Deployer,
-    nonce: number,
-    gasPrice: BigNumber
-) {
-    console.log('\nPublishing bootloader bytecode:');
-    const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_block.yul/proved_block.yul.zbin'));
-
-    const [deps, ] = await displayFactoryDeps('Bootloader', [bootloaderCode], deployer);
-
-    await publishFactoryDeps(
-        ['Bootloader'],
-        deps,
-        deployer,
-        nonce,
-        gasPrice
-    );
-}
-
-            
 // Maximum length of the combined length of dependencies
 const MAX_COMBINED_LENGTH = 90000;
 
-
-/// Publishes the contract with the given name, along with its dependencies. 
-/// It modifies currentToPublishNames and currentToPublish, in place.
-/// Returns the new nonce.
-async function publishContract(
-    contractName: string,
-    factoryDeps: string[],
-    currentToPublishNames: string[],
-    currentToPublish: string[],
-    currentNonce: number,
-    gasPrice: BigNumber,
-    deployer: Deployer
-): Promise<number> {
-    let [bytecodesToDeploy, currentLength] = await displayFactoryDeps(contractName, factoryDeps, deployer);
-
-    if(currentLength > MAX_COMBINED_LENGTH) {
-        throw new Error(`Can not publish dependencies of contract ${contractName}`);
+class ZkSyncDeployer {
+    deployer: Deployer;
+    gasPrice: BigNumber;
+    nonce: number;
+    deployedDependencies: DeployedDependency[];
+    defaultAA?: DeployedDependency;
+    bootloader?: DeployedDependency;
+    constructor(deployer: Deployer, gasPrice: BigNumber, nonce: number) {
+        this.deployer = deployer;
+        this.gasPrice = gasPrice;
+        this.nonce = nonce;
+        this.deployedDependencies = [];
     }
 
-    const currentCombinedLength = currentToPublish.reduce((prev, dep) => prev + ethers.utils.arrayify(dep).length, 0);
-
-    if(currentLength + currentCombinedLength > MAX_COMBINED_LENGTH) {
-        await publishFactoryDeps(
-            currentToPublishNames,
-            currentToPublish,
-            deployer,
-            currentNonce,
-            gasPrice
+    async publishFactoryDeps(
+        dependencies: Dependency[],
+    ): Promise<DeployedDependency[]> {
+        let deployedDependencies = await publishFactoryDeps(
+            dependencies,
+            this.deployer,
+            this.nonce,
+            this.gasPrice
         );
+        this.nonce += 1;
 
-        currentToPublishNames.splice(0);
-        currentToPublish.splice(0);
-
-        currentNonce += 1;
+        return deployedDependencies;
     }
 
-    currentToPublishNames.push(contractName);
-    currentToPublish.push(
-        ...bytecodesToDeploy
-    );
+    async publishDefaultAA() {
+        const [defaultAccountBytecodes, ] = await filterDeployedFactoryDeps('DefaultAccount', [(await this.deployer.loadArtifact('DefaultAccount')).bytecode], this.deployer);
+        
+        if (defaultAccountBytecodes.length == 0) {
+            console.log('Default account bytecode is already published, skipping');
+            return;
+        }
 
-    return currentNonce;
+        let deployedDependencies = await this.publishFactoryDeps(
+            [{
+                name: 'DefaultAccount',
+                bytecodes: defaultAccountBytecodes,
+            }],
+        );
+        this.nonce += 1;
+        this.defaultAA = deployedDependencies[0];
+    }
+
+    async publishBootloader() {
+        console.log('\nPublishing bootloader bytecode:');
+        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_block.yul/proved_block.yul.zbin'));
+
+        const [deps, ] = await filterDeployedFactoryDeps('Bootloader', [bootloaderCode], this.deployer);
+
+        if (deps.length == 0) {
+            console.log('Default bootloader bytecode is already published, skipping');
+            return;
+        }
+
+        const deployedDependencies = await this.publishFactoryDeps(
+            [{
+                name: 'Bootloader',
+                bytecodes: deps,
+            }],
+        );
+        this.bootloader = deployedDependencies[0];
+    }
+
+    async prepareContractsForPublishing(): Promise<Dependency[]> {
+        const dependenciesToDeploy: Dependency[] = [];
+        for(const contract of Object.values(SYSTEM_CONTRACTS)) {
+            let contractName = contract.codeName;
+            let factoryDeps: string[] = [];
+            if (contract.lang == Language.Solidity) {
+                const artifact = await this.deployer.loadArtifact(contractName);
+                factoryDeps = [
+                    ...await this.deployer.extractFactoryDeps(artifact),
+                    artifact.bytecode
+                ];
+            } else {
+                // Yul files have only one dependency
+                factoryDeps = [
+                    readYulBytecode(contract)
+                ];
+            }
+
+            let [bytecodesToDeploy, currentLength] = await filterDeployedFactoryDeps(contractName, factoryDeps, this.deployer);
+            if (bytecodesToDeploy.length == 0) {
+                console.log(`All bytecodes for ${contractName} are already published, skipping`);
+                continue;
+            }
+            if(currentLength > MAX_COMBINED_LENGTH) {
+                throw new Error(`Can not publish dependencies of contract ${contractName}`);
+            }
+
+            dependenciesToDeploy.push({
+                name: contractName,
+                bytecodes: bytecodesToDeploy,
+                address: contract.address
+            });
+        }
+
+        return dependenciesToDeploy;
+    }
+
+    async publishDependencies(dependenciesToDeploy: Dependency[]) {
+        let currentLength = 0;
+        let currentDependencies: Dependency[] = [];
+        // We iterate over dependencies and try to batch the publishing of those in order to save up on gas as well as time.
+        for (let dependency of dependenciesToDeploy) {
+            const dependencyLength = dependency.bytecodes.reduce((prev, dep) => prev + ethers.utils.arrayify(dep).length, 0);
+            if (currentLength + dependencyLength > MAX_COMBINED_LENGTH) {
+                const deployedDependencies =  await this.publishFactoryDeps(
+                    currentDependencies,
+                );
+                currentLength = dependencyLength;
+                currentDependencies = [dependency];
+                this.deployedDependencies.push(...deployedDependencies);
+            } else {
+                currentLength += dependencyLength;
+                currentDependencies.push(dependency);
+            }
+        }
+        if (currentDependencies.length > 0) {
+            const deployedDependencies = await this.publishFactoryDeps(
+                currentDependencies,
+            );
+            this.deployedDependencies.push(...deployedDependencies);    
+        }
+    }
+
+    returnResult() {
+        return {
+            systemContracts: this.deployedDependencies,
+            defaultAA: this.defaultAA,
+            bootloader: this.bootloader,
+        }
+    }
 }
 
-function readYulBytecode(description: YulContractDescrption) {
-    const contractName = description.codeName;
-    const path = `contracts/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
-    const dependency = ethers.utils.hexlify(fs.readFileSync(path));
 
-    return dependency;
+export function l1RpcUrl() {
+    return process.env.ETH_CLIENT_WEB3_URL as string;
+}
+
+export function l2RpcUrl() {
+    return process.env.API_WEB3_JSON_RPC_HTTP_URL as string;
 }
 
 async function main() {
@@ -240,91 +174,60 @@ async function main() {
         .option('--private-key <private-key>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
+        .option('--l1Rpc <l1Rpc>')
+        .option('--l2Rpc <l2Rpc>')
+        .option('--bootloader')
+        .option('--default-aa')
+        .option('--system-contracts')
+        .option('--file <file>')
         .action(async (cmd) => {
-            const noproviderWallet = cmd.privateKey
+            const l1Rpc = cmd.l1Rpc ? cmd.l1Rpc : l1RpcUrl();
+            const l2Rpc = cmd.l2Rpc ? cmd.l2Rpc : l2RpcUrl();
+            const providerL1 = new ethers.providers.JsonRpcProvider(l1Rpc);
+            const providerL2 = new Provider(l2Rpc);
+            const wallet= cmd.privateKey
             ? new Wallet(cmd.privateKey)
                 : Wallet.fromMnemonic(
                     process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
                     "m/44'/60'/0'/0/1"
                 );
+            wallet.connect(providerL2);
+            wallet.connectToL1(providerL1);
 
-
-            const deployer = new Deployer(hre, noproviderWallet);
+            const deployer = new Deployer(hre, wallet);
+            deployer.zkWallet = deployer.zkWallet.connect(providerL2).connectToL1(providerL1);
+            deployer.ethWallet = deployer.ethWallet.connect(providerL1);
             const ethWallet = deployer.ethWallet;
-            const l1Provider = deployer.ethWallet.provider;
-                
+
             console.log(`Using deployer wallet: ${ethWallet.address}`);
 
-            const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await l1Provider.getGasPrice();
+            const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await providerL1.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
             let nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);            
-            
-            let currentToPublishNames: string[] = [];
-            let currentToPublish: string[] = [];
-            for(const contract of Object.values(SYSTEM_CONTRACTS)) {
-                let contractName = contract.codeName;
+            console.log(`Using nonce: ${nonce}`);
 
-                let factoryDeps: string[] = [];
-                if (contract.lang == Language.Solidity) {
-                    const artifact = await deployer.loadArtifact(contractName);
-                    factoryDeps = [
-                        ...await deployer.extractFactoryDeps(artifact),
-                        artifact.bytecode
-                    ];
-                } else {
-                    // Yul files have only one dependency
-                    factoryDeps = [
-                        readYulBytecode(contract)
-                    ];
-                }
-
-                nonce = await publishContract(
-                    contractName,
-                    factoryDeps,
-                    currentToPublishNames,
-                    currentToPublish,
-                    nonce,
-                    gasPrice,
-                    deployer
-                );
-            }
-            
-            // Publish the remaining dependencies
-            if(currentToPublish.length > 0) {
-                await publishFactoryDeps(
-                    currentToPublishNames,
-                    currentToPublish,
-                    deployer,
-                    nonce,
-                    gasPrice
-                );
-                nonce += 1;
+            const zkSyncDeployer = new ZkSyncDeployer(deployer, gasPrice, nonce);
+            if (cmd.bootloader) {
+                await zkSyncDeployer.publishBootloader();
             }
 
-            // Publish the DefaultAccount as it is not included in the SYSTEM_CONTRACTS, since
-            // it has no address.
-            const [defaultAccountBytecodes, ] = await displayFactoryDeps('DefaultAccount', [(await deployer.loadArtifact('DefaultAccount')).bytecode], deployer);
-            await publishFactoryDeps(
-                ['DefaultAccount'],
-                defaultAccountBytecodes,
-                deployer,
-                nonce,
-                gasPrice
-            );
-            nonce += 1;
+            if (cmd.defaultAa) {
+                await zkSyncDeployer.publishDefaultAA();
+            }
 
-            // Publish the bootloader
-            await publishBootloader(
-                deployer,
-                nonce,
-                gasPrice
-            );
+            if (cmd.systemContracts) {
+                const dependencies = await zkSyncDeployer.prepareContractsForPublishing();
+                await zkSyncDeployer.publishDependencies(dependencies);
+            }
 
+            const result = zkSyncDeployer.returnResult();
+            console.log(JSON.stringify(result));
+            if (cmd.file) {
+                fs.writeFileSync(cmd.file, JSON.stringify(result));
+            }
             console.log('\nPublishing factory dependencies complete!');
 
-            await outputDeploymentParams(deployer);
         });
 
     await program.parseAsync(process.argv);

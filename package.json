@@ -4,7 +4,7 @@
   "repository": "git@github.com:matter-labs/system-contracts.git",
   "license": "MIT",
   "dependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "^0.5.2",
+    "@matterlabs/hardhat-zksync-deploy": "^0.6.3",
     "@nomiclabs/hardhat-solpp": "^2.0.1",
     "commander": "^9.4.1",
     "ethers": "^5.7.0",
@@ -45,6 +45,7 @@
     "clean": "hardhat clean",
     "fmt": "prettier --config prettier.js --write contracts/*.sol contracts/**/*.sol",
     "preprocess": "rm -rf ./bootloader/build && yarn ts-node scripts/process.ts",
-    "deploy-preimages": "ts-node scripts/deploy-preimages.ts"
+    "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
+    "compile-yul": "ts-node scripts/compile-yul.ts"
   }
 }

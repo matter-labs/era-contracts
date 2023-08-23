@@ -112,6 +112,11 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
         codeName: 'BytecodeCompressor',
         lang: Language.Solidity,
     },
+    complexUpgrader: {
+        address: '0x000000000000000000000000000000000000800f',
+        codeName: 'ComplexUpgrader',
+        lang: Language.Solidity,
+    },
     keccak256: {
         address: '0x0000000000000000000000000000000000008010',
         codeName: 'Keccak256',

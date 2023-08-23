@@ -11,6 +11,7 @@ import "./interfaces/IEthToken.sol";
 import "./interfaces/IL1Messenger.sol";
 import "./interfaces/ISystemContext.sol";
 import "./interfaces/IBytecodeCompressor.sol";
+import "./interfaces/IComplexUpgrader.sol";
 import "./BootloaderUtilities.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
@@ -60,6 +61,10 @@ address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d)
 
 IBytecodeCompressor constant BYTECODE_COMPRESSOR_CONTRACT = IBytecodeCompressor(
     address(SYSTEM_CONTRACTS_OFFSET + 0x0e)
+);
+
+IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x0f)
 );
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR

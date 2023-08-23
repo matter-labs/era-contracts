@@ -7,7 +7,7 @@ const systemConfig = require('./SystemConfig.json');
 
 export default {
     zksolc: {
-        version: '1.3.7',
+        version: '1.3.11',
         compilerSource: 'binary',
         settings: {
             isSystem: true

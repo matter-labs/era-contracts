@@ -68,7 +68,7 @@ object "Bootloader" {
                 <!-- @endif -->
             }
 
-            // While we definitely can not control the gas price on L1, 
+            // While we definitely cannot control the gas price on L1,
             // we need to check the operator does not provide any absurd numbers there
             function MAX_ALLOWED_GAS_PRICE() -> ret {
                 // 10k gwei
@@ -486,11 +486,17 @@ object "Bootloader" {
             /// @dev Whether the bootloader should enforce that accounts have returned the correct
             /// magic value for signature. This value is enforced to be "true" on the main proved block, but 
             /// we need the ability to ignore invalid signature results during fee estimation,
-            /// where the signature for the transaction is usually not known beforehand
+            /// where the signature for the transaction is usually not known beforehand.
             function SHOULD_ENSURE_CORRECT_RETURNED_MAGIC() -> ret {
                 ret := {{ENSURE_RETURNED_MAGIC}}
             }
 
+            /// @notice The type of the transaction used for system upgrades.
+            function UPGRADE_TRANSACTION_TX_TYPE() -> ret {
+                ret := 254
+            }
+
+            /// @notice The type of every non-upgrade transaction that comes from L1.
             function L1_TX_TYPE() -> ret {
                 ret := 255
             }
@@ -643,13 +649,22 @@ object "Bootloader" {
 
                 debugLog("gasPerPubdata:", gasPerPubdata)
 
-                switch isTxFromL1(innerTxDataOffset) 
-                    case 1 {
-                        // For L1->L2 transactions we always use the pubdata price provided by the transaction. 
-                        // This is needed to ensure DDoS protection. All the excess expenditure 
-                        // will be refunded to the user.
-                        setPricePerPubdataByte(userProvidedPubdataPrice)
+                switch getTxType(innerTxDataOffset) 
+                    case 254 {
+                        // This is an upgrade transaction.
+                        // Protocol upgrade transactions are processed totally in the same manner as the normal L1->L2 transactions,
+                        // the only differences are:
+                        // - They must be the first one in the block
+                        // - They have a different type to prevent tx hash collisions and preserve the expectation that the 
+                        // L1->L2 transactions have priorityTxId inside them.
+                        if transactionIndex {    
+                            assertionError("Protocol upgrade tx not first")
+                        }
 
+                        processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice)
+                    }
+                    case 255 {
+                        // This is an L1->L2 transaction.
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice)
                     }
                     default {
@@ -863,7 +878,7 @@ object "Bootloader" {
                 let returnedContextOffset := mload(0)
 
                 // Ensuring that the returned offset is not greater than the returndata length
-                // Note, that we can not use addition here to prevent an overflow
+                // Note, that we cannot use addition here to prevent an overflow
                 if gt(returnedContextOffset, returnlen) {
                     revertWithReason(
                         PAYMASTER_RETURNED_INVALID_CONTEXT(),
@@ -871,7 +886,7 @@ object "Bootloader" {
                     )
                 }
 
-                // Can not read the returned length. 
+                // Can not read the returned length.
                 // It is safe to add here due to the previous check.
                 if gt(add(returnedContextOffset, 32), returnlen) {
                     revertWithReason(
@@ -923,8 +938,13 @@ object "Bootloader" {
                 txDataOffset,
                 resultPtr,
                 transactionIndex,
-                gasPerPubdata
+                gasPerPubdata,
             ) {
+                // For L1->L2 transactions we always use the pubdata price provided by the transaction. 
+                // This is needed to ensure DDoS protection. All the excess expenditure 
+                // will be refunded to the user.
+                setPricePerPubdataByte(gasPerPubdata)
+
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 0x20) 
 
@@ -1159,8 +1179,8 @@ object "Bootloader" {
             /// @param intrinsicGas The intrinsic number of L2 gas required for transaction processing.
             /// @param intrinsicPubdata The intrinsic number of pubdata bytes required for transaction processing.
             /// @return gasLimitForTx The maximum number of L2 gas that can be spent on a transaction.
-            /// @return reservedGas The number of L2 gas that is beyond the `MAX_GAS_PER_TRANSACTION` and beyond the operator's trust limit, i.e. 
-            /// this is the amount of gas which we can not allow the transaction to use, but we will refund it later.
+            /// @return reservedGas The number of L2 gas that is beyond the `MAX_GAS_PER_TRANSACTION` and beyond the operator's trust limit,
+            /// i.e. gas which we cannot allow the transaction to use and will refund.
             function getGasLimitForTx(
                 innerTxDataOffset,
                 transactionIndex,
@@ -1490,7 +1510,7 @@ object "Bootloader" {
                 // the bootloader, we will use the one calculated by the bootloader.
                 let refundInGas := max(operatorProvidedRefund, add(reservedGas, gasLeft))
 
-                // The operator can not refund more than the gasLimit for the transaction
+                // The operator cannot refund more than the gasLimit for the transaction
                 if gt(refundInGas, getGasLimit(innerTxDataOffset)) {
                     assertionError("refundInGas > gasLimit")
                 }
@@ -1568,7 +1588,7 @@ object "Bootloader" {
             /// @dev It is expected that the pointer at the COMPRESSED_BYTECODES_BEGIN_BYTE()
             /// stores the position of the current bytecodeHash 
             function sendCompressedBytecode(dataInfoPtr, bytecodeHash) -> ret {
-                // Storing the right selector, ensuring that the operator can not manipulate it
+                // Storing the right selector, ensuring that the operator cannot manipulate it
                 mstore(add(dataInfoPtr, 32), {{PUBLISH_COMPRESSED_BYTECODE_SELECTOR}})
 
                 let calldataPtr := add(dataInfoPtr, 60)
@@ -2750,6 +2770,9 @@ object "Bootloader" {
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                     }
+                    case 254 {
+                        // Upgrade transaction, no need to validate as it is validated on L1.
+                    }
                     case 255 {
                         // L1 transaction, no need to validate as it is validated on L1. 
                     }
@@ -2868,10 +2891,6 @@ object "Bootloader" {
             function getReservedDynamicBytesLength(innerTxDataOffset) -> ret {
                 let ptr := getReservedDynamicPtr(innerTxDataOffset)
                 ret := lengthRoundedByWords(mload(ptr))
-            }
-
-            function isTxFromL1(innerTxDataOffset) -> ret {
-                ret := eq(getTxType(innerTxDataOffset), L1_TX_TYPE())
             }
     
             /// This method checks that the transaction's structure is correct
