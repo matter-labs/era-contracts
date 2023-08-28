@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.15.1'
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: cd ethereum && yarn install
+
+      - name: Run tests
+        working-directory: ethereum
+        run: yarn test
