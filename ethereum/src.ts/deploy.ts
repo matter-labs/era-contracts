@@ -3,7 +3,7 @@ import '@nomiclabs/hardhat-ethers';
 
 import { BigNumberish, ethers, providers, Signer, Wallet } from 'ethers';
 import { Interface } from 'ethers/lib/utils';
-import { Action, facetCut, diamondCut } from './diamondCut';
+import { diamondCut, getCurrentFacetCutsForAdd } from './diamondCut';
 import { IZkSyncFactory } from '../typechain/IZkSyncFactory';
 import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
 import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
@@ -17,8 +17,10 @@ import {
     getAddressFromEnv,
     getHashFromEnv,
     getNumberFromEnv,
-    readBlockBootloaderBytecode
+    readBlockBootloaderBytecode,
+    getTokens
 } from '../scripts/utils';
+import { deployViaCreate2 } from './deploy-utils';
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
@@ -33,6 +35,7 @@ export interface DeployedAddresses {
         Verifier: string;
         DiamondInit: string;
         DiamondUpgradeInit: string;
+        DefaultUpgrade: string;
         DiamondProxy: string;
     };
     Bridges: {
@@ -44,7 +47,6 @@ export interface DeployedAddresses {
     AllowList: string;
     ValidatorTimeLock: string;
     Create2Factory: string;
-    WethToken: string;
 }
 
 export interface DeployerConfig {
@@ -63,6 +65,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             GettersFacet: getAddressFromEnv('CONTRACTS_GETTERS_FACET_ADDR'),
             DiamondInit: getAddressFromEnv('CONTRACTS_DIAMOND_INIT_ADDR'),
             DiamondUpgradeInit: getAddressFromEnv('CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR'),
+            DefaultUpgrade: getAddressFromEnv('CONTRACTS_DEFAULT_UPGRADE_ADDR'),
             DiamondProxy: getAddressFromEnv('CONTRACTS_DIAMOND_PROXY_ADDR'),
             Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR')
         },
@@ -74,7 +77,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
         Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR'),
-        WethToken: getAddressFromEnv('CONTRACTS_L1_WETH_TOKEN_ADDR'),
         ValidatorTimeLock: getAddressFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_ADDR')
     };
 }
@@ -93,39 +95,22 @@ export class Deployer {
     }
 
     public async initialProxyDiamondCut() {
-        const getters = await hardhat.ethers.getContractAt('GettersFacet', this.addresses.ZkSync.GettersFacet);
-        const diamondCutFacet = await hardhat.ethers.getContractAt(
-            'DiamondCutFacet',
-            this.addresses.ZkSync.DiamondCutFacet
+        const facetCuts = Object.values(
+            await getCurrentFacetCutsForAdd(
+                this.addresses.ZkSync.DiamondCutFacet,
+                this.addresses.ZkSync.GettersFacet,
+                this.addresses.ZkSync.MailboxFacet,
+                this.addresses.ZkSync.ExecutorFacet,
+                this.addresses.ZkSync.GovernanceFacet
+            )
         );
-        const executor = await hardhat.ethers.getContractAt('ExecutorFacet', this.addresses.ZkSync.ExecutorFacet);
-        const governance = await hardhat.ethers.getContractAt('GovernanceFacet', this.addresses.ZkSync.GovernanceFacet);
-        const mailbox = await hardhat.ethers.getContractAt('MailboxFacet', this.addresses.ZkSync.MailboxFacet);
-
-        // Facet cuts data are formed by contract address and the all implemented functions inside it (contract interface).
-        // In addition to that, facet cut has associated boolean flag that indicates that function can be paused by governor or not.
-        // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
-        // And for some facets there are should be possibility to freeze them by the governor if we found a bug inside.
-        const facetCuts = [
-            // Should be unfreezable. The function to unfreeze contract is located on the diamond cut facet.
-            // That means if the diamond cut will be freezable, the proxy can NEVER be unfrozen.
-            facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
-            // Should be unfreezable. There are getters, that users can expect to be available.
-            facetCut(getters.address, getters.interface, Action.Add, false),
-
-            // These contracts implement the logic without which we can get out of the freeze.
-            facetCut(mailbox.address, mailbox.interface, Action.Add, true),
-            facetCut(executor.address, executor.interface, Action.Add, true),
-            facetCut(governance.address, governance.interface, Action.Add, true)
-        ];
-
         const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
         const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_NODE'),
-            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_LEAF'),
-            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_BASIC_CIRCUITS')
+            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
         };
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
@@ -144,6 +129,7 @@ export class Deployer {
             priorityTxMaxGasLimit
         ]);
 
+        // @ts-ignore
         return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
     }
 
@@ -174,45 +160,17 @@ export class Deployer {
         ethTxOptions: ethers.providers.TransactionRequest,
         libraries?: any
     ) {
-        if (this.verbose) {
-            console.log(`Deploying ${contractName}`);
-        }
-
-        const create2Factory = this.create2FactoryContract(this.deployWallet);
-        const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
-            signer: this.deployWallet,
-            libraries
-        });
-        const bytecode = contractFactory.getDeployTransaction(...[...args, ethTxOptions]).data;
-        const expectedAddress = ethers.utils.getCreate2Address(
-            create2Factory.address,
+        let result = await deployViaCreate2(
+            this.deployWallet,
+            contractName,
+            args,
             create2Salt,
-            ethers.utils.keccak256(bytecode)
+            ethTxOptions,
+            this.addresses.Create2Factory,
+            this.verbose,
+            libraries
         );
-
-        const deployedBytecodeBefore = await this.deployWallet.provider.getCode(expectedAddress);
-        if (ethers.utils.hexDataLength(deployedBytecodeBefore) > 0) {
-            if (this.verbose) {
-                console.log(`Contract ${contractName} aleady deployed1`);
-            }
-            return;
-        }
-
-        const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
-        const receipt = await tx.wait();
-
-        if (this.verbose) {
-            const gasUsed = receipt.gasUsed;
-
-            console.log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
-        }
-
-        const deployedBytecodeAfter = await this.deployWallet.provider.getCode(expectedAddress);
-        if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
-            throw new Error('Failed to deploy bytecode via create2 factory');
-        }
-
-        return expectedAddress;
+        return result[0];
     }
 
     public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -339,18 +297,19 @@ export class Deployer {
         if (this.verbose) {
             console.log(`CONTRACTS_L1_WETH_TOKEN_ADDR=${contractAddress}`);
         }
-
-        this.addresses.WethToken = contractAddress;
     }
 
     public async deployWethBridgeImplementation(
         create2Salt: string,
         ethTxOptions: ethers.providers.TransactionRequest
     ) {
+        const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || 'localhost');
+        const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == 'WETH')!.address;
+
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'L1WethBridge',
-            [this.addresses.WethToken, this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
+            [l1WethToken, this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
             create2Salt,
             ethTxOptions
         );
@@ -409,6 +368,17 @@ export class Deployer {
         this.addresses.ZkSync.DiamondUpgradeInit = contractAddress;
     }
 
+    public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('DefaultUpgrade', [], create2Salt, ethTxOptions);
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.ZkSync.DefaultUpgrade = contractAddress;
+    }
+
     public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
 
@@ -438,11 +408,10 @@ export class Deployer {
             this.deployDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
             this.deployGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
             this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 4 }),
-            this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 5 }),
-            this.deployDiamondInit(create2Salt, { gasPrice, nonce: nonce + 6 })
+            this.deployDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 })
         ];
         await Promise.all(independentZkSyncDeployPromises);
-        nonce += 7;
+        nonce += 6;
 
         await this.deployDiamondProxy(create2Salt, { gasPrice, nonce });
     }
@@ -457,9 +426,6 @@ export class Deployer {
     public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        if (process.env.CHAIN_ETH_NETWORK === 'localhost') {
-            await this.deployWethToken(create2Salt, { gasPrice, nonce: nonce++ });
-        }
         await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
         await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
     }
@@ -480,6 +446,15 @@ export class Deployer {
         }
 
         this.addresses.ValidatorTimeLock = contractAddress;
+    }
+
+    public async deployMulticall3(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('Multicall3', [], create2Salt, ethTxOptions);
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_L1_MULTICALL3_ADDR=${contractAddress}`);
+        }
     }
 
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

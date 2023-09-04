@@ -19,7 +19,7 @@ library L2ContractHelper {
     /// - Bytecode words length is not odd
     function hashL2Bytecode(bytes memory _bytecode) internal pure returns (bytes32 hashedBytecode) {
         // Note that the length of the bytecode must be provided in 32-byte words.
-        require(_bytecode.length % 32 == 0, "po");
+        require(_bytecode.length % 32 == 0, "bl");
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
         require(bytecodeLenInWords < 2**16, "pp"); // bytecode length must be less than 2^16 words

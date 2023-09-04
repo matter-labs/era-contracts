@@ -13,27 +13,25 @@ import "./interfaces/IL2ERC20Bridge.sol";
 import "./libraries/BridgeInitializationHelper.sol";
 
 import "../zksync/interfaces/IZkSync.sol";
-import "../common/interfaces/IL2ContractDeployer.sol";
 import "../common/interfaces/IAllowList.sol";
 import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/libraries/L2ContractHelper.sol";
-import "../common/L2ContractAddresses.sol";
 import "../common/ReentrancyGuard.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync v2.0
+/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
 contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The smart contract that manages the list with permission to call contract functions
-    IAllowList immutable allowList;
+    IAllowList internal immutable allowList;
 
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IZkSync immutable zkSync;
+    IZkSync internal immutable zkSync;
 
     /// @dev A mapping L2 block number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
@@ -41,12 +39,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(address => mapping(address => mapping(bytes32 => uint256))) depositAmount;
+    mapping(address => mapping(address => mapping(bytes32 => uint256))) internal depositAmount;
 
     /// @dev The address of deployed L2 bridge counterpart
     address public l2Bridge;
 
-    /// @dev The address of the factory that deploys proxy for L2 tokens
+    /// @dev The address that acts as a beacon for L2 tokens
     address public l2TokenBeacon;
 
     /// @dev The bytecode hash of the L2 token contract
@@ -78,6 +76,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @notice At the time of the function call, it is not yet deployed in L2, but knowledge of its address
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _governor Address which can change L2 token implementation and upgrade the bridge
+    /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge implementation
+    /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function initialize(
         bytes[] calldata _factoryDeps,
         address _l2TokenBeacon,
@@ -136,7 +136,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return l2TxHash The L2 transaction hash of deposit finalization
-    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner method do.
+    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner method does.
     function deposit(
         address _l2Receiver,
         address _l1Token,
@@ -154,8 +154,16 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _amount The total amount of tokens to be bridged
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction. If the transaction fails,
-    /// it will also be the address to receive `_l2Value`. If zero, the refund will be sent to the sender of the transaction.
+    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
+    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
+    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
+    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will be sent to the `msg.sender` address.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be sent to the aliased `msg.sender` address.
+    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds are controllable through the Mailbox,
+    /// since the Mailbox applies address aliasing to the from address for the L2 tx if the L1 msg.sender is a contract.
+    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx requests
+    /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return l2TxHash The L2 transaction hash of deposit finalization
     function deposit(
         address _l2Receiver,
@@ -174,7 +182,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
         // Otherwise, the refund will be sent to the specified address.
-        // Please note, if the recipient is a contract (the only exception is a contracting contract, but it is shooting in the leg).
+        // If the recipient is a contract on L1, the address alias will be applied.
         address refundRecipient = _refundRecipient;
         if (_refundRecipient == address(0)) {
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;

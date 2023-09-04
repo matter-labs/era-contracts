@@ -113,7 +113,7 @@ contract Plonk4VerifierWithAccessToDNext {
         PairingsBn254.Fr memory omega_power = omega.pow(poly_num);
         res = at.pow(domain_size);
         res.sub_assign(one);
-        require(res.value != 0); // Vanishing polynomial can not be zero at point `at`
+        require(res.value != 0); // Vanishing polynomial cannot be zero at point `at`
         res.mul_assign(omega_power);
 
         PairingsBn254.Fr memory den = PairingsBn254.copy(at);

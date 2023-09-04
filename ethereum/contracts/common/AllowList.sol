@@ -11,7 +11,7 @@ import "./libraries/UncheckedMath.sol";
 /// @notice The smart contract that stores the permissions to call the function on different contracts.
 /// @dev The contract is fully controlled by the owner, that can grant and revoke any permissions at any time.
 /// @dev The permission list has three different modes:
-/// - Closed. The contract can NOT be called by anyone.
+/// - Closed. The contract cannot be called by anyone.
 /// - SpecialAccessOnly. Only some contract functions can be called by specifically granted addresses.
 /// - Public. Access list to call any function from the target contract by any caller
 contract AllowList is IAllowList, Ownable2Step {

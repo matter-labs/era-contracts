@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request
+
+env:
+  ALLOWED_LICENSES: >
+    MIT;
+    BSD;
+    ISC;
+    Apache-2.0;
+    MPL-2.0;
+    LGPL-3.0;
+    LGPL-3.0-or-later;
+    CC0-1.0;
+    CC-BY-3.0;
+    CC-BY-4.0;
+    Python-2.0;
+    PSF;
+    Public Domain;
+    WTFPL;
+    Unlicense;
+  # It has to be one line, there must be no space between packages.
+  EXCLUDE_PACKAGES: testrpc@0.0.1;uuid@2.0.1;
+
+jobs:
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest code
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.15.1'
+
+      - name: Install yarn
+        run: npm install -g yarn license-checker
+
+      - name: Install dependencies in ethereum
+        run: cd ethereum && yarn install
+
+      - name: Check licenses in ethereum
+        working-directory: ethereum
+        run: npx license-checker --json --onlyAllow="$ALLOWED_LICENSES" --excludePackages "$EXCLUDE_PACKAGES"
+
+      - name: Install dependencies in zksync
+        run: cd zksync && yarn install
+
+      - name: Check licenses in zksync
+        working-directory: zksync
+        run: npx license-checker --json --onlyAllow="$ALLOWED_LICENSES" --excludePackages "$EXCLUDE_PACKAGES"
+

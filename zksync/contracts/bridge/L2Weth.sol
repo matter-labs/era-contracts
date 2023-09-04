@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 
@@ -31,7 +31,7 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     }
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
-    /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters.
+    /// @dev Sets up `name`/`symbol`/`decimals` getters.
     /// @param name_ The name of the token.
     /// @param symbol_ The symbol of the token.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
@@ -49,8 +49,8 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     function initializeV2(address _l2Bridge, address _l1Address) external reinitializer(2) {
-        require(_l2Bridge != address(0), "L2 bridge address can not be zero");
-        require(_l1Address != address(0), "L1 WETH token address can not be zero");
+        require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
+        require(_l1Address != address(0), "L1 WETH token address cannot be zero");
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
     }
@@ -60,10 +60,11 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
         _;
     }
 
-    /// @notice Function for minting tokens on L2, is implemented to be compatible with StandardToken interface.
+    /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
+    /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     function bridgeMint(
-        address, // _to
+        address, // _account
         uint256 // _amount
     ) external view override {
         revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
@@ -74,7 +75,6 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @param _amount The amount that will be burned.
     /// @notice Should be called by the bridge before withdrawing tokens to L1.
     function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
-        // burns tokens from "_from" WETH contract
         _burn(_from, _amount);
         // sends Ether to the bridge
         (bool success, ) = msg.sender.call{value: _amount}("");

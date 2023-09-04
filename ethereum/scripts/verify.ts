@@ -15,6 +15,10 @@ async function main() {
         console.log('Skip contract verification on localhost');
         return;
     }
+    if (!process.env.MISC_ETHERSCAN_API_KEY) {
+        console.log('Skip contract verification given etherscan api key is missing');
+        return;
+    }
     const addresses = deployedAddressesFromEnv();
     const promises = [];
 

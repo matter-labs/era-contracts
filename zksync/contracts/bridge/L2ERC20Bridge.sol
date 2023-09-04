@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -25,7 +25,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     UpgradeableBeacon public l2TokenBeacon;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 l2TokenProxyBytecodeHash;
+    bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
     mapping(address => address) public override l1TokenAddress;
@@ -148,11 +148,9 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
             uint32(gasleft()),
             DEPLOYER_SYSTEM_CONTRACT,
             0,
-            abi.encodeWithSelector(
-                IContractDeployer.create2.selector,
-                salt,
-                l2TokenProxyBytecodeHash,
-                abi.encode(address(l2TokenBeacon), "")
+            abi.encodeCall(
+                IContractDeployer.create2,
+                (salt, l2TokenProxyBytecodeHash, abi.encode(address(l2TokenBeacon), ""))
             )
         );
 

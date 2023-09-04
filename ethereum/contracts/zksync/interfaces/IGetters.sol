@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.13;
 
-import "../Storage.sol";
 import "../libraries/PriorityQueue.sol";
-import {VerifierParams} from "../Storage.sol";
+import {VerifierParams, UpgradeState} from "../Storage.sol";
+import "./IBase.sol";
 
-interface IGetters {
+interface IGetters is IBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -54,6 +54,12 @@ interface IGetters {
     function getProposedUpgradeTimestamp() external view returns (uint256);
 
     function getCurrentProposalId() external view returns (uint256);
+
+    function getProtocolVersion() external view returns (uint256);
+
+    function getL2SystemContractsUpgradeTxHash() external view returns (bytes32);
+
+    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256);
 
     function isApprovedBySecurityCouncil() external view returns (bool);
 

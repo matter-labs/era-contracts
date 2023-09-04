@@ -50,6 +50,7 @@ const localConfig = {
 };
 
 const contractDefs = {
+    sepolia: testnetConfig,
     rinkeby: testnetConfig,
     ropsten: testnetConfig,
     goerli: testnetConfig,

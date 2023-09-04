@@ -15,6 +15,9 @@ import "./interfaces/IExecutor.sol";
 /// timestamp is stored for it. Later, when the owner calls the block execution, the contract checks that block
 /// was committed not earlier than X time ago.
 contract ValidatorTimelock is IExecutor, Ownable2Step {
+    /// @dev Part of the IBase interface. Not used in this contract.
+    string public constant override getName = "ValidatorTimelock";
+
     /// @notice The delay between committing and executing blocks is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
