@@ -27,11 +27,11 @@ contract ExecutorTest is Test {
     ExecutorFacet executor;
     GettersFacet getters;
     MailboxFacet mailbox;
-    bytes32 newCommitedBlockBlockHash;
-    bytes32 newCommitedBlockCommitment;
-    uint256 timestamp;
+    bytes32 newCommittedBlockBlockHash;
+    bytes32 newCommittedBlockCommitment;
+    uint256 currentTimestamp;
     IExecutor.CommitBlockInfo newCommitBlockInfo;
-    bytes32 newStoredBlockInfo;
+    IExecutor.StoredBlockInfo newStoredBlockInfo;
 
     IExecutor.StoredBlockInfo genesisStoredBlockInfo;
     IExecutor.ProofInput proofInput;
@@ -279,8 +279,6 @@ contract AuthorizationTest is ExecutorTest {
 }
 
 contract CommittingFunctionalityTest is ExecutorTest {
-    uint256 currentTimestamp;
-
     function setUp() public {
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER
@@ -1031,100 +1029,6 @@ contract CommittingFunctionalityTest is ExecutorTest {
         );
     }
 
-    // It costs too much gas to set up the array required for this test. TODO: fix this
-    // function test_revertWhen_committingWithTooLongRepeatedStorageChanges()
-    //     public
-    // {
-    //     bytes memory correctL2Logs = abi.encodePacked(
-    //         bytes4(0x00000001),
-    //         bytes4(0x00000000),
-    //         L2_SYSTEM_CONTEXT_ADDRESS,
-    //         uint256(currentTimestamp),
-    //         bytes32("")
-    //     );
-
-    //     // uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564;
-    //     bytes memory wrongRepeatedStorageChanges = abi.encodePacked(
-    //         bytes4(0x00000001)
-    //     );
-
-    //     for (uint i = 0; i < 7565; i++) {
-    //         wrongRepeatedStorageChanges = bytes.concat(
-    //             wrongRepeatedStorageChanges,
-    //             bytes.concat(
-    //                 bytes32("randomBytes32"),
-    //                 bytes4("rand"),
-    //                 bytes4("rand")
-    //             ) // 40 bytes
-    //         );
-    //     }
-
-    //     IExecutor.CommitBlockInfo
-    //         memory wrongNewCommitBlockInfo = newCommitBlockInfo;
-    //     wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
-    //     wrongNewCommitBlockInfo
-    //         .repeatedStorageChanges = wrongRepeatedStorageChanges;
-
-    //     IExecutor.CommitBlockInfo[]
-    //         memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-    //             1
-    //         );
-    //     wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
-
-    //     vm.prank(validator);
-
-    //     vm.expectRevert(bytes.concat("py"));
-    //     executor.commitBlocks(
-    //         genesisStoredBlockInfo,
-    //         wrongNewCommitBlockInfoArray
-    //     );
-    // }
-
-    // It costs too much gas to set up the array required for this test. TODO: fix this
-    // function test_revertWhen_committingWithTooLongInitialStorageChanges()
-    //     public
-    // {
-    //     bytes memory correctL2Logs = abi.encodePacked(
-    //         bytes4(0x00000001),
-    //         bytes4(0x00000000),
-    //         L2_SYSTEM_CONTEXT_ADDRESS,
-    //         uint256(currentTimestamp),
-    //         bytes32("")
-    //     );
-
-    //     // uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564;
-    //     bytes memory wrongInitialStorageChanges = abi.encodePacked(
-    //         bytes4(0x00000000)
-    //     );
-
-    //     for (uint i = 0; i < 4766; i++) {
-    //         wrongInitialStorageChanges = bytes.concat(
-    //             wrongInitialStorageChanges,
-    //             bytes.concat(bytes32("randomBytes32"), bytes32("randomBytes32")) // 64 bytes
-    //         );
-    //     }
-
-    //     IExecutor.CommitBlockInfo
-    //         memory wrongNewCommitBlockInfo = newCommitBlockInfo;
-    //     wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
-    //     wrongNewCommitBlockInfo
-    //         .initialStorageChanges = wrongInitialStorageChanges;
-
-    //     IExecutor.CommitBlockInfo[]
-    //         memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-    //             1
-    //         );
-    //     wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
-
-    //     vm.prank(validator);
-
-    //     vm.expectRevert(bytes.concat("pf"));
-    //     executor.commitBlocks(
-    //         genesisStoredBlockInfo,
-    //         wrongNewCommitBlockInfoArray
-    //     );
-    // }
-
     function test_shouldCommitBlock() public {
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
@@ -1142,9 +1046,588 @@ contract CommittingFunctionalityTest is ExecutorTest {
 
         vm.prank(validator);
 
+        vm.recordLogs();
+
         executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        assertEq(entries.length, 1);
+        assertEq(
+            entries[0].topics[0],
+            keccak256("BlockCommit(uint256,bytes32,bytes32)")
+        );
+        assertEq(entries[0].topics[1], bytes32(uint256(1))); // blockNumber
+        assertEq(
+            entries[0].topics[2],
+            bytes32(
+                0x5391aedfa307cfbb5523d0ba566759d1b5c0901dcb5868a195addafd5e9dd563
+            )
+        ); // blockHash
+        assertEq(
+            entries[0].topics[3],
+            bytes32(
+                0x00cc2f6937a02033a72880ac0f2a2a7caeb8795676538437e1277d2b6e6c6fb5
+            )
+        ); // commitment
 
         uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
         assertEq(totalBlocksCommitted, 1);
+    }
+}
+
+contract ProvingTest is ExecutorTest {
+    function setUp() public {
+        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        currentTimestamp = block.timestamp;
+        IExecutor.CommitBlockInfo memory commitBlockInfo = IExecutor
+            .CommitBlockInfo({
+                blockNumber: 1,
+                timestamp: uint64(currentTimestamp),
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: keccak256(
+                    bytes.concat("randomBytes32", "setUp()", "0")
+                ),
+                numberOfLayer1Txs: 0,
+                l2LogsTreeRoot: 0,
+                priorityOperationsHash: keccak256(""),
+                initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
+                repeatedStorageChanges: bytes(""),
+                l2Logs: bytes(""),
+                l2ArbitraryLengthMessages: new bytes[](0),
+                factoryDeps: new bytes[](0)
+            });
+
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+
+        commitBlockInfo.l2Logs = correctL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        commitBlockInfoArray[0] = commitBlockInfo;
+
+        vm.prank(validator);
+        vm.recordLogs();
+        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        newStoredBlockInfo = IExecutor.StoredBlockInfo({
+            blockNumber: 1,
+            blockHash: entries[0].topics[2],
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            l2LogsTreeRoot: 0,
+            timestamp: currentTimestamp,
+            commitment: entries[0].topics[3]
+        });
+    }
+
+    function test_revertWhen_provingWithWrongPreviousBlockData() public {
+        IExecutor.StoredBlockInfo
+            memory wrongPreviousStoredBlockInfo = genesisStoredBlockInfo;
+        wrongPreviousStoredBlockInfo.blockNumber = 10; // Correct is 0
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("t1"));
+        executor.proveBlocks(
+            wrongPreviousStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+    }
+
+    function test_revertWhen_provingWithWrongCommittedBlock() public {
+        IExecutor.StoredBlockInfo
+            memory wrongNewStoredBlockInfo = newStoredBlockInfo;
+        wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("o1"));
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+    }
+
+    function test_revertWhen_provingRevertedBlockWithoutCommittingAgain()
+        public
+    {
+        vm.prank(validator);
+        executor.revertBlocks(0);
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("q"));
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+    }
+
+    function test_successfulProve() public {
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+
+        uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
+        assertEq(totalBlocksVerified, 1);
+    }
+}
+
+contract RevertingTest is ExecutorTest {
+    function setUp() public {
+        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        currentTimestamp = block.timestamp;
+        IExecutor.CommitBlockInfo memory commitBlockInfo = IExecutor
+            .CommitBlockInfo({
+                blockNumber: 1,
+                timestamp: uint64(currentTimestamp),
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: keccak256(
+                    bytes.concat("randomBytes32", "setUp()", "0")
+                ),
+                numberOfLayer1Txs: 0,
+                l2LogsTreeRoot: 0,
+                priorityOperationsHash: keccak256(""),
+                initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
+                repeatedStorageChanges: bytes(""),
+                l2Logs: bytes(""),
+                l2ArbitraryLengthMessages: new bytes[](0),
+                factoryDeps: new bytes[](0)
+            });
+
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+
+        commitBlockInfo.l2Logs = correctL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        commitBlockInfoArray[0] = commitBlockInfo;
+
+        vm.prank(validator);
+        vm.recordLogs();
+        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        newStoredBlockInfo = IExecutor.StoredBlockInfo({
+            blockNumber: 1,
+            blockHash: entries[0].topics[2],
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            l2LogsTreeRoot: 0,
+            timestamp: currentTimestamp,
+            commitment: entries[0].topics[3]
+        });
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+    }
+
+    function test_revertWhen_revertingMoreBlocksThanAlreadyCommitted() public {
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("v1"));
+        executor.revertBlocks(10);
+    }
+
+    function test_successfulRevert() public {
+        uint256 totalBlocksCommittedBefore = getters.getTotalBlocksCommitted();
+        assertEq(totalBlocksCommittedBefore, 1, "totalBlocksCommittedBefore");
+
+        uint256 totalBlocksVerifiedBefore = getters.getTotalBlocksVerified();
+        assertEq(totalBlocksVerifiedBefore, 1, "totalBlocksVerifiedBefore");
+
+        vm.prank(validator);
+        executor.revertBlocks(0);
+
+        uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
+        assertEq(totalBlocksCommitted, 0, "totalBlocksCommitted");
+
+        uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
+        assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
+    }
+}
+
+contract ExecutingTest is ExecutorTest {
+    function setUp() public {
+        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        currentTimestamp = block.timestamp;
+        newCommitBlockInfo = IExecutor.CommitBlockInfo({
+            blockNumber: 1,
+            timestamp: uint64(currentTimestamp),
+            indexRepeatedStorageChanges: 0,
+            newStateRoot: keccak256(
+                bytes.concat("randomBytes32", "setUp()", "0")
+            ),
+            numberOfLayer1Txs: 0,
+            l2LogsTreeRoot: 0,
+            priorityOperationsHash: keccak256(""),
+            initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
+            repeatedStorageChanges: bytes(""),
+            l2Logs: bytes(""),
+            l2ArbitraryLengthMessages: new bytes[](0),
+            factoryDeps: new bytes[](0)
+        });
+
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+        newCommitBlockInfo.l2Logs = correctL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        commitBlockInfoArray[0] = newCommitBlockInfo;
+
+        vm.prank(validator);
+        vm.recordLogs();
+        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        newStoredBlockInfo = IExecutor.StoredBlockInfo({
+            blockNumber: 1,
+            blockHash: entries[0].topics[2],
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            l2LogsTreeRoot: 0,
+            timestamp: currentTimestamp,
+            commitment: entries[0].topics[3]
+        });
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            storedBlockInfoArray,
+            proofInput
+        );
+    }
+
+    function test_revertWhen_executingBlockWithWrongBlockNumber() public {
+        IExecutor.StoredBlockInfo
+            memory wrongNewStoredBlockInfo = newStoredBlockInfo;
+        wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("k"));
+        executor.executeBlocks(storedBlockInfoArray);
+    }
+
+    function test_revertWhen_executingBlockWithWrongData() public {
+        IExecutor.StoredBlockInfo
+            memory wrongNewStoredBlockInfo = newStoredBlockInfo;
+        wrongNewStoredBlockInfo.timestamp = 0; // incorrect timestamp
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("exe10"));
+        executor.executeBlocks(storedBlockInfoArray);
+    }
+
+    function test_revertWhen_executingRevertedBlockWithoutCommittingAndProvingAgain()
+        public
+    {
+        vm.prank(validator);
+        executor.revertBlocks(0);
+
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("n"));
+        executor.executeBlocks(storedBlockInfoArray);
+    }
+
+    function test_revertWhen_executingUnavailablePriorityOperationHash()
+        public
+    {
+        vm.prank(validator);
+        executor.revertBlocks(0);
+
+        bytes32 arbitraryCanonicalTxHash = keccak256(
+            bytes.concat(
+                "randomBytes32",
+                "test_revertWhen_executingUnavailablePriorityOperationHash()",
+                "0"
+            )
+        );
+        bytes32 chainedPriorityTxHash = keccak256(
+            bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
+        );
+
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000002),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            bytes4(0x00010000),
+            L2_BOOTLOADER_ADDRESS,
+            arbitraryCanonicalTxHash,
+            uint256(1)
+        );
+
+        IExecutor.CommitBlockInfo
+            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+        correctNewCommitBlockInfo
+            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+
+        IExecutor.CommitBlockInfo[]
+            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+
+        vm.prank(validator);
+        vm.recordLogs();
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            correctNewCommitBlockInfoArray
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        IExecutor.StoredBlockInfo
+            memory correctNewStoredBlockInfo = newStoredBlockInfo;
+        correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
+        correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
+        correctNewStoredBlockInfo
+            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBlockInfo.commitment = entries[0].topics[3];
+
+        IExecutor.StoredBlockInfo[]
+            memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](
+                1
+            );
+        correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
+
+        vm.prank(validator);
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            correctNewStoredBlockInfoArray,
+            proofInput
+        );
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("s"));
+        executor.executeBlocks(correctNewStoredBlockInfoArray);
+    }
+
+    function test_revertWhen_executingWithUnmatchedPriorityOperationHash()
+        public
+    {
+        vm.prank(validator);
+        executor.revertBlocks(0);
+
+        bytes32 arbitraryCanonicalTxHash = keccak256(
+            bytes.concat(
+                "randomBytes32",
+                "test_revertWhen_executingWithUnmatchedPriorityOperationHash()",
+                "0"
+            )
+        );
+        bytes32 chainedPriorityTxHash = keccak256(
+            bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
+        );
+
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000002),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32(""),
+            bytes4(0x00010000),
+            L2_BOOTLOADER_ADDRESS,
+            arbitraryCanonicalTxHash,
+            uint256(1)
+        );
+
+        IExecutor.CommitBlockInfo
+            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+        correctNewCommitBlockInfo
+            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+
+        IExecutor.CommitBlockInfo[]
+            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+
+        vm.prank(validator);
+        vm.recordLogs();
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            correctNewCommitBlockInfoArray
+        );
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        IExecutor.StoredBlockInfo
+            memory correctNewStoredBlockInfo = newStoredBlockInfo;
+        correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
+        correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
+        correctNewStoredBlockInfo
+            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBlockInfo.commitment = entries[0].topics[3];
+
+        IExecutor.StoredBlockInfo[]
+            memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](
+                1
+            );
+        correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
+
+        vm.prank(validator);
+        executor.proveBlocks(
+            genesisStoredBlockInfo,
+            correctNewStoredBlockInfoArray,
+            proofInput
+        );
+
+        bytes32 randomFactoryDeps0 = keccak256(
+            bytes.concat(
+                "randomBytes32",
+                "test_revertWhen_executingWithUnmatchedPriorityOperationHash()",
+                "1"
+            )
+        );
+
+        bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = bytes.concat(randomFactoryDeps0);
+
+        uint256 gasPrice = 1000000000;
+        uint256 l2GasLimit = 1000000;
+        uint256 baseCost = mailbox.l2TransactionBaseCost(
+            gasPrice,
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+        uint256 l2Value = 10 ether;
+        uint256 totalCost = baseCost + l2Value;
+
+        mailbox.requestL2Transaction{value: totalCost}(
+            address(0),
+            l2Value,
+            bytes(""),
+            l2GasLimit,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps,
+            address(0)
+        );
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("x"));
+        executor.executeBlocks(correctNewStoredBlockInfoArray);
+    }
+
+    function test_revertWhen_committingBlockWithWrongPreviousBlockHash()
+        public
+    {
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(currentTimestamp),
+            bytes32("")
+        );
+
+        IExecutor.CommitBlockInfo
+            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+
+        IExecutor.CommitBlockInfo[]
+            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+
+        bytes32 wrongPreviousBlockHash = keccak256(
+            bytes.concat(
+                "randomBytes32",
+                "test_revertWhen_committingBlockWithWrongPreviousBlockHash()",
+                "0"
+            )
+        );
+
+        IExecutor.StoredBlockInfo memory genesisBlock = genesisStoredBlockInfo;
+        genesisBlock.blockHash = wrongPreviousBlockHash;
+
+        vm.prank(validator);
+        vm.expectRevert(bytes.concat("i"));
+        executor.commitBlocks(genesisBlock, correctNewCommitBlockInfoArray);
+    }
+
+    function test_shouldExecuteBlockSuccessfully() public {
+        IExecutor.StoredBlockInfo[]
+            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        storedBlockInfoArray[0] = newStoredBlockInfo;
+
+        vm.prank(validator);
+        executor.executeBlocks(storedBlockInfoArray);
+
+        uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
+        assertEq(totalBlocksExecuted, 1);
     }
 }
