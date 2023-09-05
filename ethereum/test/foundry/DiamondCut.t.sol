@@ -87,7 +87,7 @@ contract FacetCutTest is DiamondProxyTest {
         executorFacet2 = new ExecutorFacet();
     }
 
-    function test_addingFacetsToFreeSelectors() public {
+    function test_AddingFacetsToFreeSelectors() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -131,7 +131,7 @@ contract FacetCutTest is DiamondProxyTest {
         );
     }
 
-    function test_revertWhen_addingFacetToOccupiedSelector() public {
+    function test_RevertWhen_AddingFacetToOccupiedSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -152,7 +152,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_addingFacetWithZeroAddress() public {
+    function test_RevertWhen_AddingFacetWithZeroAddress() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(0),
@@ -171,7 +171,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_replacingFacetFromFreeSelector() public {
+    function test_RevertWhen_ReplacingFacetFromFreeSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -190,7 +190,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_removingFacetFromFreeSelector() public {
+    function test_RevertWhen_RemovingFacetFromFreeSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -209,7 +209,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_replaceFacetForOccupiedSelector() public {
+    function test_ReplaceFacetForOccupiedSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(executorFacet1),
@@ -233,7 +233,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_removingFacetFromOccupiedSelector() public {
+    function test_RemovingFacetFromOccupiedSelector() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -257,7 +257,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_addingFacetAfterRemoving() public {
+    function test_AddingFacetAfterRemoving() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -287,7 +287,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_replacingASelectorFacetWithItself() public {
+    function test_ReplacingASelectorFacetWithItself() public {
         bytes4[] memory selectors = new bytes4[](1);
         selectors[0] = 0x00000005;
 
@@ -334,7 +334,7 @@ contract FacetCutTest is DiamondProxyTest {
         assertEq(numOfFacetsAfterAdd, numOfFacetsAfterReplace);
     }
 
-    function test_revertWhen_addingFacetWithDifferentFreezabilityThanExistingFacets()
+    function test_RevertWhen_AddingFacetWithDifferentFreezabilityThanExistingFacets()
         public
     {
         bytes4[] memory selectors1 = new bytes4[](1);
@@ -367,7 +367,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_replacingFacetWithDifferentFreezabilityThanExistingFacets()
+    function test_RevertWhen_ReplacingFacetWithDifferentFreezabilityThanExistingFacets()
         public
     {
         bytes4[] memory selectors1 = new bytes4[](1);
@@ -405,7 +405,7 @@ contract FacetCutTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_changingFacetFreezability() public {
+    function test_ChangingFacetFreezability() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(mailboxFacet),
@@ -448,7 +448,7 @@ contract InitializationTest is DiamondProxyTest {
         returnSomethingAddress = address(new ReturnSomething());
     }
 
-    function test_revertWhen_delegateCallToFailedContract() public {
+    function test_RevertWhen_DelegateCallToFailedContract() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -461,7 +461,7 @@ contract InitializationTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_reverWhen_delegateCallToEOA() public {
+    function test_ReverWhen_DelegateCallToEOA() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -474,7 +474,7 @@ contract InitializationTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_initializingDiamondCutWithZeroAddressAndNonZeroData()
+    function test_RevertWhen_InitializingDiamondCutWithZeroAddressAndNonZeroData()
         public
     {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
@@ -489,7 +489,7 @@ contract InitializationTest is DiamondProxyTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_revertWhen_delegateCallToAContractWithWrongReturn() public {
+    function test_RevertWhen_DelegateCallToAContractWithWrongReturn() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -580,14 +580,14 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsGetters = GettersFacet(address(diamondProxy));
     }
 
-    function test_revertWhen_emergencyFreezeWhenUnauthurizedGovernor() public {
+    function test_RevertWhen_EmergencyFreezeWhenUnauthurizedGovernor() public {
         vm.startPrank(randomSigner);
 
         vm.expectRevert(abi.encodePacked("1g"));
         proxyAsDiamondCut.freezeDiamond();
     }
 
-    function test_revertWhen_doubleFreezingByGovernor() public {
+    function test_RevertWhen_DoubleFreezingByGovernor() public {
         vm.startPrank(governor);
 
         proxyAsDiamondCut.freezeDiamond();
@@ -596,14 +596,14 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.freezeDiamond();
     }
 
-    function test_revertWhen_unfreezingWhenNotFrozen() public {
+    function test_RevertWhen_UnfreezingWhenNotFrozen() public {
         vm.startPrank(governor);
 
         vm.expectRevert(abi.encodePacked("a7"));
         proxyAsDiamondCut.unfreezeDiamond();
     }
 
-    function test_revertWhen_executingUnapprovedProposalWHenDiamondStorageIsFrozen()
+    function test_RevertWhen_ExecutingUnapprovedProposalWHenDiamondStorageIsFrozen()
         public
     {
         vm.startPrank(governor);
@@ -630,7 +630,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
     }
 
-    function test_revertWhen_executingProposalWithDifferentInitAddress()
+    function test_RevertWhen_ExecutingProposalWithDifferentInitAddress()
         public
     {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
@@ -670,7 +670,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.executeUpgrade(executedDiamondCutData, 0);
     }
 
-    function test_revertWhen_executingProposalWithDifferentFacetCut() public {
+    function test_RevertWhen_ExecutingProposalWithDifferentFacetCut() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -714,7 +714,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.executeUpgrade(invalidDiamondCutData, 0);
     }
 
-    function test_revertWhen_cancelingEmptyProposal() public {
+    function test_RevertWhen_CancelingEmptyProposal() public {
         bytes32 proposalHash = proxyAsGetters.getProposedUpgradeHash();
 
         vm.startPrank(governor);
@@ -723,7 +723,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
     }
 
-    function test_proposeAndExecuteDiamondCut() public {
+    function test_ProposeAndExecuteDiamondCut() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -763,7 +763,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         }
     }
 
-    function test_revertWhen_executingSameProposalTwoTimes() public {
+    function test_RevertWhen_ExecutingSameProposalTwoTimes() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -795,7 +795,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
     }
 
-    function test_revertWhen_proposingAnAlreadyPropsedUpgrade() public {
+    function test_RevertWhen_ProposingAnAlreadyPropsedUpgrade() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -828,7 +828,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         );
     }
 
-    function test_revertWhen_executingUnapprovedShadowUpgrade() public {
+    function test_RevertWhen_ExecutingUnapprovedShadowUpgrade() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -864,7 +864,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
     }
 
-    function test_revertWhen_proposingShadowUpgradeWithWrongProposalId()
+    function test_RevertWhen_ProposingShadowUpgradeWithWrongProposalId()
         public
     {
         uint40 nextProposalId = uint40(
@@ -880,7 +880,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         );
     }
 
-    function test_revertWhen_proposingTransparentUpgradeWithWrongProposalId()
+    function test_RevertWhen_ProposingTransparentUpgradeWithWrongProposalId()
         public
     {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
@@ -910,7 +910,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         );
     }
 
-    function test_revertWhen_cancellingUpgradeProposalWithWrongHash() public {
+    function test_RevertWhen_CancellingUpgradeProposalWithWrongHash() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -940,7 +940,7 @@ contract UpgradeLogicTest is DiamondProxyTest {
         proxyAsDiamondCut.cancelUpgradeProposal(bytes32("randomBytes32"));
     }
 
-    function test_revertWhen_executingTransparentUpgradeWithNonZeroSalt()
+    function test_RevertWhen_ExecutingTransparentUpgradeWithNonZeroSalt()
         public
     {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);

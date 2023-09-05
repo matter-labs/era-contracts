@@ -22,18 +22,18 @@ contract PermissionTest is AllowListTest {
 }
 
 contract SetPermissionToCallTest is PermissionTest {
-    function test_revertWhen_nonOwner() public {
+    function test_RevertWhen_NonOwner() public {
         vm.expectRevert(abi.encodePacked("Ownable: caller is not the owner"));
         vm.prank(randomSigner);
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
     }
 
-    function test_owner() public {
+    function test_Owner() public {
         vm.prank(owner);
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
     }
 
-    function test_owner_twice() public {
+    function test_OwnerTwice() public {
         vm.prank(owner);
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
 
@@ -41,7 +41,7 @@ contract SetPermissionToCallTest is PermissionTest {
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
     }
 
-    function test_permissionBefore() public {
+    function test_PermissionBefore() public {
         bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
             randomSigner,
             target,
@@ -61,7 +61,7 @@ contract SetPermissionToCallTest is PermissionTest {
         assertEq(canCall, false, "canCall should be false");
     }
 
-    function test_permissionAfter() public {
+    function test_PermissionAfter() public {
         vm.prank(owner);
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
         bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
@@ -83,7 +83,7 @@ contract SetPermissionToCallTest is PermissionTest {
         assertEq(canCall, false, "canCall should be false");
     }
 
-    function test_removePermission() public {
+    function test_RemovePermission() public {
         vm.prank(owner);
         allowList.setPermissionToCall(randomSigner, target, functionSig, true);
         bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
@@ -110,7 +110,7 @@ contract SetPermissionToCallTest is PermissionTest {
 }
 
 contract SetBatchPermissionToCall is PermissionTest {
-    function test_revertWhen_nonOwner() public {
+    function test_RevertWhen_NonOwner() public {
         address[] memory callers = new address[](2);
         callers[0] = owner;
         callers[1] = owner;
@@ -137,7 +137,7 @@ contract SetBatchPermissionToCall is PermissionTest {
         );
     }
 
-    function test_owner() public {
+    function test_Owner() public {
         address[] memory callers = new address[](2);
         callers[0] = owner;
         callers[1] = owner;
@@ -163,7 +163,7 @@ contract SetBatchPermissionToCall is PermissionTest {
         );
     }
 
-    function test_revertWhen_arrayLengthNotEqual() public {
+    function test_RevertWhen_ArrayLengthNotEqual() public {
         address[] memory callers = new address[](1);
         callers[0] = owner;
 
@@ -196,18 +196,18 @@ contract AccessModeTest is AllowListTest {
 }
 
 contract SetAccessModeTest is AccessModeTest {
-    function test_revertWhen_nonOwner() public {
+    function test_RevertWhen_NonOwner() public {
         vm.expectRevert(abi.encodePacked("Ownable: caller is not the owner"));
         vm.prank(randomSigner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
     }
 
-    function test_owner() public {
+    function test_Owner() public {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
     }
 
-    function test_owner_twice() public {
+    function test_OwnerTwice() public {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
 
@@ -215,7 +215,7 @@ contract SetAccessModeTest is AccessModeTest {
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
     }
 
-    function test_accessModeBefore() public {
+    function test_AccessModeBefore() public {
         bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
             owner,
             target,
@@ -235,7 +235,7 @@ contract SetAccessModeTest is AccessModeTest {
         assertEq(canCall, false, "canCall should be false");
     }
 
-    function test_accessModeAfter() public {
+    function test_AccessModeAfter() public {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
 
@@ -258,7 +258,7 @@ contract SetAccessModeTest is AccessModeTest {
         assertEq(canCall, true, "canCall should be true");
     }
 
-    function test_removePermission() public {
+    function test_RemovePermission() public {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Closed);
 
@@ -286,7 +286,7 @@ contract SetAccessModeTest is AccessModeTest {
 }
 
 contract SetBatchAccessModeTest is AccessModeTest {
-    function test_revertWhen_nonOwner() public {
+    function test_RevertWhen_NonOwner() public {
         address[] memory targets = new address[](2);
         targets[0] = target;
         targets[1] = target;
@@ -301,7 +301,7 @@ contract SetBatchAccessModeTest is AccessModeTest {
         allowList.setBatchAccessMode(targets, accessModes);
     }
 
-    function test_owner() public {
+    function test_Owner() public {
         address[] memory targets = new address[](2);
         targets[0] = target;
         targets[1] = target;
@@ -315,7 +315,7 @@ contract SetBatchAccessModeTest is AccessModeTest {
         allowList.setBatchAccessMode(targets, accessModes);
     }
 
-    function test_revertWhen_arrayLengthNotEqual() public {
+    function test_RevertWhen_ArrayLengthNotEqual() public {
         address[] memory targets = new address[](1);
         targets[0] = target;
 
@@ -333,13 +333,13 @@ contract SetBatchAccessModeTest is AccessModeTest {
 contract DepositLimitTest is AllowListTest {
     address l1token = makeAddr("l1token");
 
-    function test_revertWhen_nonOwner() public {
+    function test_RevertWhen_NonOwner() public {
         vm.expectRevert(abi.encodePacked("Ownable: caller is not the owner"));
         vm.prank(randomSigner);
         allowList.setDepositLimit(l1token, true, 1000);
     }
 
-    function test_owner() public {
+    function test_Owner() public {
         vm.prank(owner);
         allowList.setDepositLimit(l1token, true, 1000);
 
@@ -354,7 +354,7 @@ contract DepositLimitTest is AllowListTest {
         assertEq(deposit.depositCap, 1000, "depositCap should be 1000");
     }
 
-    function test_unlimited_token() public {
+    function test_UnlimitedToken() public {
         address unlimitedToken = makeAddr("unlimitedToken");
 
         IAllowList.Deposit memory deposit = allowList.getTokenDepositLimitData(
