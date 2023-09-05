@@ -76,7 +76,7 @@ export function applyL1ToL2Alias(address: string): string {
 
 export function readBlockBootloaderBytecode() {
     const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
-    return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_block.yul/proved_block.yul.zbin`);
+    return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
