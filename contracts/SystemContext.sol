@@ -269,8 +269,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated {
         virtualBlockInfo.number += _maxVirtualBlocksToCreate;
         virtualBlockInfo.timestamp = _newTimestamp;
 
-        currentVirtualL2BlockInfo = virtualBlockInfo;
-
         // The virtual block number must never exceed the L2 block number.
         // We do not use a `require` here, since the virtual blocks are a temporary solution to let the Solidity's `block.number`
         // catch up with the L2 block number and so the situation where virtualBlockInfo.number starts getting larger 
@@ -279,6 +277,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated {
             virtualBlockUpgradeInfo.virtualBlockFinishL2Block = _l2BlockNumber;
             virtualBlockInfo.number = _l2BlockNumber;
         }
+        
+        currentVirtualL2BlockInfo = virtualBlockInfo;
     }
 
     /// @notice Sets the current block number and timestamp of the L2 block.
