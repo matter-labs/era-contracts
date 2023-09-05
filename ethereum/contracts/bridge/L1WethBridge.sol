@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./interfaces/IL1Bridge.sol";
+import "./interfaces/IL1WethBridge.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
@@ -33,7 +33,7 @@ import "../vendor/AddressAliasHelper.sol";
 /// @dev For withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into
 /// WETH, and sends the WETH to the L1 recipient.
 /// @dev The `L1WethBridge` contract works in conjunction with its L2 counterpart, `L2WethBridge`.
-contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
+contract L1WethBridge is IL1WethBridge, AllowListed, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Event emitted when ETH is received by the contract.
@@ -161,6 +161,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
         require(_l1Token == l1WethAddress, "Invalid L1 token address");
         require(_amount != 0, "Amount cannot be zero");
+        //require(zkSync.baseTokenAddress() == address(0), "Base token has to be ETH");
 
         // Deposit WETH tokens from the depositor address to the smart contract address
         IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
@@ -178,13 +179,11 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
         txHash = zkSync.requestL2Transaction{value: _amount + msg.value}(
-            l2Bridge,
-            _amount,
+            L2Transaction(l2Bridge, 0, _l2TxGasLimit, _l2TxGasPerPubdataByte),
             l2TxCalldata,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
             new bytes[](0),
-            refundRecipient
+            refundRecipient,
+            0
         );
 
         emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);

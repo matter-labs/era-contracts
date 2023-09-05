@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import {L2Log, L2Message} from "../Storage.sol";
+import {L2Transaction} from "../libraries/L2Transaction.sol";
 import "./IBase.sol";
 
 /// @dev The enum that represents the transaction execution status
@@ -118,13 +119,11 @@ interface IMailbox is IBase {
     ) external;
 
     function requestL2Transaction(
-        address _contractL2,
-        uint256 _l2Value,
+        L2Transaction memory _l2tx,
         bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        address _refundRecipient,
+        uint256 _baseAmount
     ) external payable returns (bytes32 canonicalTxHash);
 
     function l2TransactionBaseCost(
@@ -132,6 +131,9 @@ interface IMailbox is IBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
+
+    function baseTokenAddress(
+    ) external view returns (address);
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

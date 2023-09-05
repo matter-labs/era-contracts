@@ -37,15 +37,24 @@ library BridgeInitializationHelper {
             IL2ContractDeployer.create2,
             (bytes32(0), _bytecodeHash, _constructorData)
         );
-        _zkSync.requestL2Transaction{value: _deployTransactionFee}(
-            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            0,
-            deployCalldata,
-            DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps,
-            msg.sender
-        );
+
+        if (_zkSync.baseTokenAddress() == address(0)) {
+            _zkSync.requestL2Transaction{value: _deployTransactionFee}(
+                L2Transaction(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, 0, DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,REQUIRED_L2_GAS_PRICE_PER_PUBDATA ),
+                deployCalldata,
+                _factoryDeps,
+                msg.sender,
+                0
+            );
+        } else {
+            _zkSync.requestL2Transaction{value: 0}(
+                L2Transaction(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, 0, DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,REQUIRED_L2_GAS_PRICE_PER_PUBDATA ),
+                deployCalldata,
+                _factoryDeps,
+                msg.sender,
+                _deployTransactionFee
+            );
+        }
 
         deployedAddress = L2ContractHelper.computeCreate2Address(
             // Apply the alias to the address of the bridge contract, to get the `msg.sender` in L2.

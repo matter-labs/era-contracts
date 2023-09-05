@@ -144,7 +144,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0),0);
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -155,6 +155,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
+    /// @param _baseAmount The amount of base token to be transferred from L1 to L2, it should be enough to cover the gas cost of the L2 transaction.
     /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
     /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
     /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
@@ -171,7 +172,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
+        address _refundRecipient,
+        uint256 _baseAmount
     ) public payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
         uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
@@ -188,13 +190,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
         l2TxHash = zkSync.requestL2Transaction{value: msg.value}(
-            l2Bridge,
-            0, // L2 msg.value
+            L2Transaction(l2Bridge, 0, _l2TxGasLimit, _l2TxGasPerPubdataByte),
             l2TxCalldata,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
             new bytes[](0),
-            refundRecipient
+            refundRecipient,
+            _baseAmount
         );
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 /// @author Matter Labs
-interface IL1Bridge {
+interface IL1WethBridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
         address indexed from,
@@ -24,8 +24,7 @@ interface IL1Bridge {
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient,
-        uint256 _baseAmount
+        address _refundRecipient
     ) external payable returns (bytes32 txHash);
 
     function claimFailedDeposit(

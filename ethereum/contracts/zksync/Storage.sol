@@ -133,4 +133,6 @@ struct AppStorage {
     bytes32 l2SystemContractsUpgradeTxHash;
     /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
     uint256 l2SystemContractsUpgradeBlockNumber;
+    /// @dev base token address on l1, if 0 then eth is used as base token.
+    address baseTokenAddress;
 }

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/IMailbox.sol";
 import "../libraries/Merkle.sol";
@@ -22,6 +23,7 @@ import "./Base.sol";
 contract MailboxFacet is Base, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+    using SafeERC20 for IERC20;
 
     string public constant override getName = "MailboxFacet";
 
@@ -97,11 +99,16 @@ contract MailboxFacet is Base, IMailbox {
     /// @dev Reverts only if the transfer call failed
     function _withdrawFunds(address _to, uint256 _amount) internal {
         bool callSuccess;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
+
+        if (s.baseTokenAddress == address(0)) {
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "pz");
+        } else {
+            IERC20(s.baseTokenAddress).safeTransfer(_to, _amount);
         }
-        require(callSuccess, "pz");
     }
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 block number
@@ -156,6 +163,12 @@ contract MailboxFacet is Base, IMailbox {
         return l2GasPrice * _l2GasLimit;
     }
 
+    /// @notice Return the address of the base token contract on L1. If 0 then it uses ETH.
+    function baseTokenAddress(
+    ) public view returns (address) {
+        return s.baseTokenAddress;
+    }
+
     /// @notice Derives the price for L2 gas in ETH to be paid.
     /// @param _l1GasPrice The gas price on L1.
     /// @param _gasPricePerPubdata The price for each pubdata byte in L2 gas
@@ -200,13 +213,11 @@ contract MailboxFacet is Base, IMailbox {
     }
 
     /// @notice Request execution of L2 transaction from L1.
-    /// @param _contractL2 The L2 receiver address
-    /// @param _l2Value `msg.value` of L2 transaction
+    /// @param _l2tx The L2 transaction parameters
     /// @param _calldata The input of the L2 transaction
-    /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
-    /// @param _l2GasPerPubdataByteLimit The maximum amount L2 gas that the operator may charge the user for single byte of pubdata.
     /// @param _factoryDeps An array of L2 bytecodes that will be marked as known on L2
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
+    /// @param _baseAmount The base token amount to bridge along with with this transaction
     /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
     /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
     /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
@@ -218,13 +229,11 @@ contract MailboxFacet is Base, IMailbox {
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return canonicalTxHash The hash of the requested L2 transaction. This hash can be used to follow the transaction status
     function requestL2Transaction(
-        address _contractL2,
-        uint256 _l2Value,
+        L2Transaction memory _l2tx,
         bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        address _refundRecipient,
+        uint256 _baseAmount
     ) external payable nonReentrant senderCanCallFunction(s.allowList) returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
@@ -233,31 +242,44 @@ contract MailboxFacet is Base, IMailbox {
             sender = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
         }
 
+        if (s.baseTokenAddress != address(0)) {
+            // prevent stack too deep error
+            {
+                IERC20(s.baseTokenAddress).safeTransferFrom(tx.origin, address(this), _baseAmount);
+            }
+        }
+
         // Enforcing that `_l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _l2GasPerPubdataByteLimit, e.g. 1-2, etc.
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
         // ability to provide `_l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
-        require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+        require(_l2tx.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+
+        uint256 valueToMint;
+        if (s.baseTokenAddress == address(0)) {
+            valueToMint = msg.value;
+        } else {
+            valueToMint = _baseAmount;
+        }
 
         // The L1 -> L2 transaction may be failed and funds will be sent to the `_refundRecipient`,
-        // so we use `msg.value` instead of `_l2Value` as the bridged amount.
-        _verifyDepositLimit(msg.sender, msg.value);
+        // so we use `valueToMint` instead of `_l2Value` as the bridged amount.
+        _verifyDepositLimit(msg.sender, valueToMint);
+
         canonicalTxHash = _requestL2Transaction(
             sender,
-            _contractL2,
-            _l2Value,
+            _l2tx,
             _calldata,
-            _l2GasLimit,
-            _l2GasPerPubdataByteLimit,
             _factoryDeps,
             false,
-            _refundRecipient
+            _refundRecipient,
+            valueToMint
         );
     }
 
     function _verifyDepositLimit(address _depositor, uint256 _amount) internal {
-        IAllowList.Deposit memory limitData = IAllowList(s.allowList).getTokenDepositLimitData(address(0)); // address(0) denotes the ETH
+        IAllowList.Deposit memory limitData = IAllowList(s.allowList).getTokenDepositLimitData(s.baseTokenAddress); // address(0) denotes the ETH
         if (!limitData.depositLimitation) return; // no deposit limitation is placed for ETH
 
         require(s.totalDepositedAmountPerUser[_depositor] + _amount <= limitData.depositCap, "d2");
@@ -266,14 +288,12 @@ contract MailboxFacet is Base, IMailbox {
 
     function _requestL2Transaction(
         address _sender,
-        address _contractAddressL2,
-        uint256 _l2Value,
+        L2Transaction memory _l2tx,
         bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         bool _isFree,
-        address _refundRecipient
+        address _refundRecipient,
+        uint256 _valueToMint
     ) internal returns (bytes32 canonicalTxHash) {
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
         uint64 expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
@@ -285,9 +305,9 @@ contract MailboxFacet is Base, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
         {
-            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _l2GasPerPubdataByteLimit);
-            uint256 baseCost = params.l2GasPrice * _l2GasLimit;
-            require(msg.value >= baseCost + _l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _l2tx.l2GasPerPubdataByteLimit);
+            uint256 baseCost = params.l2GasPrice * _l2tx.l2GasLimit;
+            require(_valueToMint >= baseCost + _l2tx.l2Value, "mv"); // The base amount doesn't cover the transaction cost
         }
 
         // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
@@ -299,13 +319,13 @@ contract MailboxFacet is Base, IMailbox {
 
         params.sender = _sender;
         params.txId = txId;
-        params.l2Value = _l2Value;
-        params.contractAddressL2 = _contractAddressL2;
+        params.l2Value = _l2tx.l2Value;
+        params.contractAddressL2 = _l2tx.l2Contract;
         params.expirationTimestamp = expirationTimestamp;
-        params.l2GasLimit = _l2GasLimit;
-        params.l2GasPricePerPubdata = _l2GasPerPubdataByteLimit;
-        params.valueToMint = msg.value;
+        params.l2GasLimit = _l2tx.l2GasLimit;
+        params.l2GasPricePerPubdata = _l2tx.l2GasPerPubdataByteLimit;
         params.refundRecipient = refundRecipient;
+        params.valueToMint = _valueToMint;
 
         canonicalTxHash = _writePriorityOp(params, _calldata, _factoryDeps);
     }
