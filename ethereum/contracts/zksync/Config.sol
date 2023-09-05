@@ -121,3 +121,7 @@ uint256 constant MAX_NEW_FACTORY_DEPS = $(MAX_NEW_FACTORY_DEPS);
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+
+/// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
+/// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
+uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
