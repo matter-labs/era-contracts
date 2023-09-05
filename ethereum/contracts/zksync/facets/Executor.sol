@@ -2,14 +2,15 @@
 
 pragma solidity ^0.8.13;
 
-import "./Base.sol";
-import "../Config.sol";
-import "../interfaces/IExecutor.sol";
-import "../libraries/PairingsBn254.sol";
-import "../libraries/PriorityQueue.sol";
-import "../../common/libraries/UncheckedMath.sol";
-import "../../common/libraries/UnsafeBytes.sol";
-import "../../common/libraries/L2ContractHelper.sol";
+import {Base} from "./Base.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, INPUT_MASK, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK} from "../Config.sol";
+import {IExecutor} from "../interfaces/IExecutor.sol";
+import {PairingsBn254} from "../libraries/PairingsBn254.sol";
+import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
+import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
+import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
+import {VerifierParams} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
@@ -36,7 +37,7 @@ contract ExecutorFacet is Base, IExecutor {
             uint256 expectedNumberOfLayer1Txs,
             bytes32 expectedPriorityOperationsHash,
             bytes32 previousBlockHash,
-            uint256 l2BlockTimestamp
+            uint256 packedBatchAndL2BlockTimestamp
         ) = _processL2Logs(_newBlock, _expectedSystemContractUpgradeTxHash);
 
         require(_previousBlock.blockHash == previousBlockHash, "l");
@@ -44,17 +45,12 @@ contract ExecutorFacet is Base, IExecutor {
         require(expectedPriorityOperationsHash == _newBlock.priorityOperationsHash, "t");
         // Check that the number of processed priority operations is as expected
         require(expectedNumberOfLayer1Txs == _newBlock.numberOfLayer1Txs, "ta");
-        // Check that the timestamp that came from the Bootloader is expected
-        require(l2BlockTimestamp == _newBlock.timestamp, "tb");
+
+        // Check the timestamp of the new block
+        _verifyBlockTimestamp(packedBatchAndL2BlockTimestamp, _newBlock.timestamp, _previousBlock.timestamp);
 
         // Preventing "stack too deep error"
         {
-            // Check the timestamp of the new block
-            bool timestampNotTooSmall = block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= l2BlockTimestamp;
-            bool timestampNotTooBig = l2BlockTimestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA;
-            require(timestampNotTooSmall, "h"); // New block timestamp is too small
-            require(timestampNotTooBig, "h1"); // New block timestamp is too big
-
             // Check the index of repeated storage writes
             uint256 newStorageChangesIndexes = uint256(uint32(bytes4(_newBlock.initialStorageChanges[:4])));
             require(
@@ -62,8 +58,6 @@ contract ExecutorFacet is Base, IExecutor {
                     _newBlock.indexRepeatedStorageChanges,
                 "yq"
             );
-
-            // NOTE: We don't check that _newBlock.timestamp > _previousBlock.timestamp, it is checked inside the L2
         }
 
         // Create block commitment for the proof verification
@@ -82,6 +76,33 @@ contract ExecutorFacet is Base, IExecutor {
             );
     }
 
+    /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
+    /// @param _packedBatchAndL2BlockTimestamp - packed batch and L2 block timestamp in a foramt of batchTimestamp * 2**128 + l2BlockTimestamp
+    /// @param _expectedBatchTimestamp - expected batch timestamp
+    /// @param _previousBatchTimestamp - the timestamp of the previous batch
+    function _verifyBlockTimestamp(
+        uint256 _packedBatchAndL2BlockTimestamp,
+        uint256 _expectedBatchTimestamp,
+        uint256 _previousBatchTimestamp
+    ) internal view {
+        // Check that the timestamp that came from the system context is expected
+        uint256 batchTimestamp = _packedBatchAndL2BlockTimestamp >> 128;
+        require(batchTimestamp == _expectedBatchTimestamp, "tb");
+
+        // While the fact that _previousBatchTimestamp < batchTimestamp is already checked on L2,
+        // we double check it here for clarity
+        require(_previousBatchTimestamp < batchTimestamp, "h");
+
+        uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
+
+        // On L2, all blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
+        // So here we need to only double check that:
+        // - The timestamp of the batch is not too small.
+        // - The timestamp of the last L2 block is not too big.
+        require(block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= batchTimestamp, "h1"); // New batch timestamp is too small
+        require(lastL2BlockTimestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA, "h2"); // The last L2 block timestamp is too big
+    }
+
     /// @dev Check that L2 logs are proper and block contain all meta information for them
     function _processL2Logs(CommitBlockInfo calldata _newBlock, bytes32 _expectedSystemContractUpgradeTxHash)
         internal
@@ -90,7 +111,7 @@ contract ExecutorFacet is Base, IExecutor {
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
             bytes32 previousBlockHash,
-            uint256 blockTimestamp
+            uint256 packedBatchAndL2BlockTimestamp
         )
     {
         // Copy L2 to L1 logs into memory.
@@ -128,7 +149,7 @@ contract ExecutorFacet is Base, IExecutor {
                 // Make sure that the system context log wasn't processed yet, to
                 // avoid accident double reading `blockTimestamp` and `previousBlockHash`
                 require(!isSystemContextLogProcessed, "fx");
-                (blockTimestamp, ) = UnsafeBytes.readUint256(emittedL2Logs, i + 24);
+                (packedBatchAndL2BlockTimestamp, ) = UnsafeBytes.readUint256(emittedL2Logs, i + 24);
                 (previousBlockHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
                 // Mark system context log as processed
                 isSystemContextLogProcessed = true;

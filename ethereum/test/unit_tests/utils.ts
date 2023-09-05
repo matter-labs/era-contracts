@@ -87,6 +87,13 @@ export function genesisStoredBlockInfo(): StoredBlockInfo {
     };
 }
 
+// Packs the batch timestamp and block timestamp and returns the 32-byte hex string
+// which should be used for the "key" field of the L2->L1 system context log.
+export function packBatchTimestampAndBlockTimestamp(batchTimestamp: number, blockTimestamp: number): string {
+    const packedNum = BigNumber.from(batchTimestamp).shl(128).or(BigNumber.from(blockTimestamp));
+    return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
+}
+
 export interface StoredBlockInfo {
     blockNumber: BigNumberish;
     blockHash: BytesLike;
@@ -100,7 +107,7 @@ export interface StoredBlockInfo {
 
 export interface CommitBlockInfo {
     blockNumber: BigNumberish;
-    timestamp: BigNumberish;
+    timestamp: number;
     indexRepeatedStorageChanges: BigNumberish;
     newStateRoot: BytesLike;
     numberOfLayer1Txs: BigNumberish;

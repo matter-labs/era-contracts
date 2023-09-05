@@ -23,6 +23,7 @@ import {
     L2_TO_L1_MESSENGER,
     genesisStoredBlockInfo,
     getCallRevertReason,
+    packBatchTimestampAndBlockTimestamp,
     requestExecute
 } from './utils';
 
@@ -166,7 +167,7 @@ describe(`Executor tests`, function () {
 
     describe(`Commiting functionality`, async function () {
         before(async () => {
-            currentTimestamp = (await ethers.providers.getDefaultProvider().getBlock(`latest`)).timestamp;
+            currentTimestamp = (await hardhat.ethers.providers.getDefaultProvider().getBlock(`latest`)).timestamp;
             newCommitBlockInfo = {
                 blockNumber: 1,
                 timestamp: currentTimestamp,
@@ -227,38 +228,38 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.constants.HashZero,
+                packBatchTimestampAndBlockTimestamp(1, 1),
                 ethers.constants.HashZero
             ]);
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
             wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.timestamp = 0; // too small
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`h`);
-        });
-
-        it(`Should revert on committing with too big new block timestamp`, async () => {
-            const wrongNewBlockTimestamp = `0xffffffff`; // too big
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(wrongNewBlockTimestamp, 32),
-                ethers.constants.HashZero
-            ]);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.timestamp = parseInt(wrongNewBlockTimestamp);
+            wrongNewCommitBlockInfo.timestamp = 1; // too small
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
             expect(revertReason).equal(`h1`);
+        });
+
+        it(`Should revert on committing with too big last L2 block timestamp`, async () => {
+            const wrongL2BlockTimestamp = parseInt('0xffffffff');
+            const wrongL2Logs = ethers.utils.hexConcat([
+                `0x00000001`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                packBatchTimestampAndBlockTimestamp(wrongL2BlockTimestamp, wrongL2BlockTimestamp),
+                ethers.constants.HashZero
+            ]);
+
+            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.timestamp = wrongL2BlockTimestamp;
+
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+            );
+            expect(revertReason).equal(`h2`);
         });
 
         it(`Should revert on committing with wrong previous blockhash`, async () => {
@@ -535,7 +536,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
@@ -560,7 +561,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ].concat(arr1);
 
@@ -581,7 +582,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
@@ -605,7 +606,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
@@ -629,7 +630,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
@@ -697,7 +698,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
@@ -758,7 +759,7 @@ describe(`Executor tests`, function () {
                 `0x00000002`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero,
                 `0x00010000`,
                 L2_BOOTLOADER_ADDRESS,
@@ -805,7 +806,7 @@ describe(`Executor tests`, function () {
                 `0x00000002`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero,
                 `0x00010000`,
                 L2_BOOTLOADER_ADDRESS,
@@ -878,7 +879,7 @@ describe(`Executor tests`, function () {
                 `0x00000001`,
                 `0x00000000`,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
                 ethers.constants.HashZero
             ]);
 
