@@ -10,7 +10,8 @@ import * as fs from 'fs';
 import { Language, SYSTEM_CONTRACTS } from './constants';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import { BigNumber, ethers } from 'ethers';
-import {readYulBytecode, publishFactoryDeps, DeployedDependency, Dependency, filterDeployedFactoryDeps,} from './utils';
+import {readYulBytecode, publishFactoryDeps, DeployedDependency, Dependency, filterPublishedFactoryDeps } from './utils';
+import { hashBytecode } from 'zksync-web3/build/src/utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
@@ -18,74 +19,141 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 // Maximum length of the combined length of dependencies
 const MAX_COMBINED_LENGTH = 90000;
 
+const DEFAULT_ACCOUNT_CONTRACT_NAME = 'DefaultAccount';
+const BOOTLOADER_CONTRACT_NAME = 'Bootloader';
+
 class ZkSyncDeployer {
     deployer: Deployer;
     gasPrice: BigNumber;
     nonce: number;
-    deployedDependencies: DeployedDependency[];
-    defaultAA?: DeployedDependency;
-    bootloader?: DeployedDependency;
+    dependenciesToUpgrade: DeployedDependency[];
+    defaultAccountToUpgrade?: DeployedDependency;
+    bootloaderToUpgrade?: DeployedDependency;
     constructor(deployer: Deployer, gasPrice: BigNumber, nonce: number) {
         this.deployer = deployer;
         this.gasPrice = gasPrice;
         this.nonce = nonce;
-        this.deployedDependencies = [];
+        this.dependenciesToUpgrade = [];
     }
 
     async publishFactoryDeps(
         dependencies: Dependency[],
-    ): Promise<DeployedDependency[]> {
-        let deployedDependencies = await publishFactoryDeps(
+    ) {
+        await publishFactoryDeps(
             dependencies,
             this.deployer,
             this.nonce,
             this.gasPrice
         );
         this.nonce += 1;
-
-        return deployedDependencies;
     }
 
-    async publishDefaultAA() {
-        const [defaultAccountBytecodes, ] = await filterDeployedFactoryDeps('DefaultAccount', [(await this.deployer.loadArtifact('DefaultAccount')).bytecode], this.deployer);
+    // Returns the current default account bytecode on zkSync
+    async currentDefaultAccountBytecode(): Promise<string> {
+        const zkSync = await this.deployer.zkWallet.getMainContract();
+        return await zkSync.getL2DefaultAccountBytecodeHash()
+    }
+
+    // If needed, appends the default account bytecode to the upgrade
+    async checkShouldUpgradeDefaultAA(defaultAccountBytecode: string) {
+        const bytecodeHash = ethers.utils.hexlify(hashBytecode(defaultAccountBytecode));
+        const currentDefaultAccountBytecode = ethers.utils.hexlify(await this.currentDefaultAccountBytecode());
+
+        // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+        if (bytecodeHash.toLowerCase() !== currentDefaultAccountBytecode) {
+            this.defaultAccountToUpgrade = {
+                name: DEFAULT_ACCOUNT_CONTRACT_NAME,
+                bytecodeHashes: [bytecodeHash]
+            }
+        }
+    }
+    
+    // Publish default account bytecode
+    async publishDefaultAA(defaultAccountBytecode: string) {
+        const [defaultAccountBytecodes, ] = await filterPublishedFactoryDeps(DEFAULT_ACCOUNT_CONTRACT_NAME, [defaultAccountBytecode], this.deployer);
         
         if (defaultAccountBytecodes.length == 0) {
             console.log('Default account bytecode is already published, skipping');
             return;
         }
 
-        let deployedDependencies = await this.publishFactoryDeps(
+        await this.publishFactoryDeps(
             [{
-                name: 'DefaultAccount',
+                name: DEFAULT_ACCOUNT_CONTRACT_NAME,
                 bytecodes: defaultAccountBytecodes,
             }],
         );
         this.nonce += 1;
-        this.defaultAA = deployedDependencies[0];
     }
 
-    async publishBootloader() {
-        console.log('\nPublishing bootloader bytecode:');
-        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_block.yul/proved_block.yul.zbin'));
+    // Publishes the bytecode of default AA and appends it to the deployed bytecodes if needed.
+    async processDefaultAA() {
+        const defaultAccountBytecode = (await this.deployer.loadArtifact(DEFAULT_ACCOUNT_CONTRACT_NAME)).bytecode;
 
-        const [deps, ] = await filterDeployedFactoryDeps('Bootloader', [bootloaderCode], this.deployer);
+        await this.publishDefaultAA(defaultAccountBytecode);
+        await this.checkShouldUpgradeDefaultAA(defaultAccountBytecode);
+    }
+
+    async currentBootloaderBytecode(): Promise<string> {
+        const zkSync = await this.deployer.zkWallet.getMainContract();
+        return await zkSync.getL2BootloaderBytecodeHash();
+    }
+
+    async checkShouldUpgradeBootloader(bootloaderCode: string) {
+        const bytecodeHash = ethers.utils.hexlify(hashBytecode(bootloaderCode));
+        const currentBootloaderBytecode = ethers.utils.hexlify(await this.currentBootloaderBytecode());
+
+        // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
+        if (bytecodeHash.toLowerCase() !== currentBootloaderBytecode) {
+            this.bootloaderToUpgrade = {
+                name: BOOTLOADER_CONTRACT_NAME,
+                bytecodeHashes: [bytecodeHash]
+            }
+        }
+    }
+
+    async publishBootloader(bootloaderCode: string) {
+        console.log('\nPublishing bootloader bytecode:');
+
+        const [deps, ] = await filterPublishedFactoryDeps(BOOTLOADER_CONTRACT_NAME, [bootloaderCode], this.deployer);
 
         if (deps.length == 0) {
             console.log('Default bootloader bytecode is already published, skipping');
             return;
         }
 
-        const deployedDependencies = await this.publishFactoryDeps(
+        await this.publishFactoryDeps(
             [{
-                name: 'Bootloader',
+                name: BOOTLOADER_CONTRACT_NAME,
                 bytecodes: deps,
             }],
         );
-        this.bootloader = deployedDependencies[0];
     }
 
+    async processBootloader() {
+        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_block.yul/proved_block.yul.zbin'));
+
+        await this.publishBootloader(bootloaderCode);
+        await this.checkShouldUpgradeBootloader(bootloaderCode);
+    }
+
+    async shouldUpgradeSystemContract(
+        contractAddress: string,
+        expectedBytecodeHash: string
+    ): Promise<boolean> {
+        // We could have also used the `getCode` method of the JSON-RPC, but in the context
+        // of system upgrades looking into account code storage is more robust
+        const currentBytecodeHash = await this.deployer.zkWallet.provider.getStorageAt(
+            SYSTEM_CONTRACTS.accountCodeStorage.address,
+            contractAddress
+        );
+
+        return expectedBytecodeHash.toLowerCase() !== currentBytecodeHash.toLowerCase();
+    }
+
+    // Returns the contracts to be published.
     async prepareContractsForPublishing(): Promise<Dependency[]> {
-        const dependenciesToDeploy: Dependency[] = [];
+        const dependenciesToPublish: Dependency[] = [];
         for(const contract of Object.values(SYSTEM_CONTRACTS)) {
             let contractName = contract.codeName;
             let factoryDeps: string[] = [];
@@ -102,8 +170,17 @@ class ZkSyncDeployer {
                 ];
             }
 
-            let [bytecodesToDeploy, currentLength] = await filterDeployedFactoryDeps(contractName, factoryDeps, this.deployer);
-            if (bytecodesToDeploy.length == 0) {
+            const contractBytecodeHash = ethers.utils.hexlify(hashBytecode(factoryDeps[factoryDeps.length - 1]));
+            if (await this.shouldUpgradeSystemContract(contract.address, contractBytecodeHash)) {
+                this.dependenciesToUpgrade.push({
+                    name: contractName,
+                    bytecodeHashes: [contractBytecodeHash],
+                    address: contract.address
+                })
+            }
+            
+            let [bytecodesToPublish, currentLength] = await filterPublishedFactoryDeps(contractName, factoryDeps, this.deployer);
+            if (bytecodesToPublish.length == 0) {
                 console.log(`All bytecodes for ${contractName} are already published, skipping`);
                 continue;
             }
@@ -111,47 +188,45 @@ class ZkSyncDeployer {
                 throw new Error(`Can not publish dependencies of contract ${contractName}`);
             }
 
-            dependenciesToDeploy.push({
+            dependenciesToPublish.push({
                 name: contractName,
-                bytecodes: bytecodesToDeploy,
+                bytecodes: bytecodesToPublish,
                 address: contract.address
             });
         }
 
-        return dependenciesToDeploy;
+        return dependenciesToPublish;
     }
 
-    async publishDependencies(dependenciesToDeploy: Dependency[]) {
+    async publishDependencies(dependenciesToPublish: Dependency[]) {
         let currentLength = 0;
         let currentDependencies: Dependency[] = [];
         // We iterate over dependencies and try to batch the publishing of those in order to save up on gas as well as time.
-        for (let dependency of dependenciesToDeploy) {
+        for (let dependency of dependenciesToPublish) {
             const dependencyLength = dependency.bytecodes.reduce((prev, dep) => prev + ethers.utils.arrayify(dep).length, 0);
             if (currentLength + dependencyLength > MAX_COMBINED_LENGTH) {
-                const deployedDependencies =  await this.publishFactoryDeps(
+                await this.publishFactoryDeps(
                     currentDependencies,
                 );
                 currentLength = dependencyLength;
                 currentDependencies = [dependency];
-                this.deployedDependencies.push(...deployedDependencies);
             } else {
                 currentLength += dependencyLength;
                 currentDependencies.push(dependency);
             }
         }
         if (currentDependencies.length > 0) {
-            const deployedDependencies = await this.publishFactoryDeps(
+            await this.publishFactoryDeps(
                 currentDependencies,
             );
-            this.deployedDependencies.push(...deployedDependencies);    
         }
     }
 
     returnResult() {
         return {
-            systemContracts: this.deployedDependencies,
-            defaultAA: this.defaultAA,
-            bootloader: this.bootloader,
+            systemContracts: this.dependenciesToUpgrade,
+            defaultAA: this.defaultAccountToUpgrade,
+            bootloader: this.bootloaderToUpgrade,
         }
     }
 }
@@ -209,22 +284,22 @@ async function main() {
 
             const zkSyncDeployer = new ZkSyncDeployer(deployer, gasPrice, nonce);
             if (cmd.bootloader) {
-                await zkSyncDeployer.publishBootloader();
+                await zkSyncDeployer.processBootloader();
             }
 
             if (cmd.defaultAa) {
-                await zkSyncDeployer.publishDefaultAA();
+                await zkSyncDeployer.processDefaultAA();
             }
 
             if (cmd.systemContracts) {
-                const dependencies = await zkSyncDeployer.prepareContractsForPublishing();
-                await zkSyncDeployer.publishDependencies(dependencies);
+                const dependenciesToPublish = await zkSyncDeployer.prepareContractsForPublishing();
+                await zkSyncDeployer.publishDependencies(dependenciesToPublish);
             }
 
             const result = zkSyncDeployer.returnResult();
-            console.log(JSON.stringify(result));
+            console.log(JSON.stringify(result, null, 2));
             if (cmd.file) {
-                fs.writeFileSync(cmd.file, JSON.stringify(result));
+                fs.writeFileSync(cmd.file, JSON.stringify(result, null, 2));
             }
             console.log('\nPublishing factory dependencies complete!');
 

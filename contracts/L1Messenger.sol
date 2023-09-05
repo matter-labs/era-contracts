@@ -21,7 +21,7 @@ import "./libraries/EfficientCall.sol";
 contract L1Messenger is IL1Messenger {
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
-    /// @return hash Returns the keccak256 hashed value of the message.
+    /// @return hash The keccak256 hashed value of the message.
     function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         hash = EfficientCall.keccak(_message);
 

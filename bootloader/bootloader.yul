@@ -8,17 +8,17 @@ object "Bootloader" {
 
             let GAS_PRICE_PER_PUBDATA := 0
 
-            // Initializing block params
+            // Initializing batch params
             {
-                /// @notice The hash of the previous block
-                let PREV_BLOCK_HASH := mload(32)
-                /// @notice The timestamp of the block being processed
-                let NEW_BLOCK_TIMESTAMP := mload(64)
-                /// @notice The number of the new block being processed.
-                /// While this number is deterministic for each block, we
+                /// @notice The hash of the previous batch
+                let PREV_BATCH_HASH := mload(32)
+                /// @notice The timestamp of the batch being processed
+                let NEW_BATCH_TIMESTAMP := mload(64)
+                /// @notice The number of the new batch being processed.
+                /// While this number is deterministic for each batch, we
                 /// still provide it here to ensure consistency between the state
                 /// of the VM and the state of the operator.
-                let NEW_BLOCK_NUMBER := mload(96)
+                let NEW_BATCH_NUMBER := mload(96)
 
                 /// @notice The gas price on L1 for ETH. In the future, a trustless value will be enforced.
                 /// For now, this value is trusted to be fairly provided by the operator.
@@ -29,40 +29,47 @@ object "Bootloader" {
                 let FAIR_L2_GAS_PRICE := mload(160)
 
                 /// @notice The expected base fee by the operator.
-                /// Just like the block number, while calculated on the bootloader side,
+                /// Just like the batch number, while calculated on the bootloader side,
                 /// the operator still provides it to make sure that its data is in sync. 
                 let EXPECTED_BASE_FEE := mload(192)
 
                 validateOperatorProvidedPrices(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
 
-                <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                // This implementation of the bootloader relies on the correct version of the SystemContext
+                // and it can not be upgraded via a standard upgrade transaction, but needs to ensure 
+                // correctness itself before any transaction is executed. 
+                upgradeSystemContextIfNeeded()
+                
+                let baseFee := 0
 
-                // Only for the proved block we enforce that the baseFee proposed 
-                // by the operator is equal to the expected one. For the playground block, we allow
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
+                // Only for the proved batch we enforce that the baseFee proposed 
+                // by the operator is equal to the expected one. For the playground batch, we allow
                 // the operator to provide any baseFee the operator wants.
-                let baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
+                baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
                 if iszero(eq(baseFee, EXPECTED_BASE_FEE)) {
                     debugLog("baseFee", baseFee)
                     debugLog("EXPECTED_BASE_FEE", EXPECTED_BASE_FEE)
                     assertionError("baseFee inconsistent")
                 }
 
-                setNewBlock(PREV_BLOCK_HASH, NEW_BLOCK_TIMESTAMP, NEW_BLOCK_NUMBER, EXPECTED_BASE_FEE)
+                setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
 
                 <!-- @endif -->
 
-                <!-- @if BOOTLOADER_TYPE=='playground_block' -->
+                <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
 
-                let _, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
+                baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
 
-                let SHOULD_SET_NEW_BLOCK := mload(224)
+                let SHOULD_SET_NEW_BATCH := mload(224)
 
-                switch SHOULD_SET_NEW_BLOCK 
+                switch SHOULD_SET_NEW_BATCH 
                 case 0 {    
-                    unsafeOverrideBlock(NEW_BLOCK_TIMESTAMP, NEW_BLOCK_NUMBER, EXPECTED_BASE_FEE)
+                    unsafeOverrideBatch(NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
                 default {
-                    setNewBlock(PREV_BLOCK_HASH, NEW_BLOCK_TIMESTAMP, NEW_BLOCK_NUMBER, EXPECTED_BASE_FEE)
+                    setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
 
                 <!-- @endif -->
@@ -87,7 +94,7 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Returns the baseFee for this block based on the
+            /// @dev Returns the baseFee for this batch based on the
             /// L1 gas price and the fair L2 gas price.
             function getBaseFee(l1GasPrice, fairL2GasPrice) -> baseFee, gasPricePerPubdata {
                 // By default, we want to provide the fair L2 gas price.
@@ -116,19 +123,19 @@ object "Bootloader" {
                 ret := div(MAX_GAS_PER_TRANSACTION(), GUARANTEED_PUBDATA_PER_TX())
             }
 
-            /// @dev The computational overhead for a block.
+            /// @dev The computational overhead for a batch.
             /// It includes the combined price for 1 instance of all the circuits 
             /// (since they might be partially filled), the price for running
             /// the common parts of the bootloader as well as general maintainance of the system.
-            function BLOCK_OVERHEAD_L2_GAS() -> ret {
-                ret := {{BLOCK_OVERHEAD_L2_GAS}}
+            function BATCH_OVERHEAD_L2_GAS() -> ret {
+                ret := {{BATCH_OVERHEAD_L2_GAS}}
             }
 
             /// @dev The overhead for the interaction with L1.
             /// It should cover proof verification as well as other minor 
-            /// overheads for committing/executing a transaction in a block.
-            function BLOCK_OVERHEAD_L1_GAS() -> ret {
-                ret := {{BLOCK_OVERHEAD_L1_GAS}}
+            /// overheads for committing/executing a transaction in a batch.
+            function BATCH_OVERHEAD_L1_GAS() -> ret {
+                ret := {{BATCH_OVERHEAD_L1_GAS}}
             }
 
             /// @dev The maximal number of gas available to the transaction
@@ -138,8 +145,8 @@ object "Bootloader" {
 
             /// @dev The maximum number of pubdata bytes that can be published with one
             /// L1 batch
-            function MAX_PUBDATA_PER_BLOCK() -> ret {
-                ret := {{MAX_PUBDATA_PER_BLOCK}}
+            function MAX_PUBDATA_PER_BATCH() -> ret {
+                ret := {{MAX_PUBDATA_PER_BATCH}}
             }
 
             /// @dev The number of L1 gas needed to be spent for
@@ -156,15 +163,15 @@ object "Bootloader" {
                 ret := {{BOOTLOADER_MEMORY_FOR_TXS}}
             }
 
-            /// @dev Whether the block is allowed to accept transactions with
+            /// @dev Whether the batch is allowed to accept transactions with
             /// gasPerPubdataByteLimit = 0. On mainnet, this is forbidden for safety reasons.
             function FORBID_ZERO_GAS_PER_PUBDATA() -> ret {
                 ret := {{FORBID_ZERO_GAS_PER_PUBDATA}}
             }
             
             /// @dev The maximum number of transactions per L1 batch.
-            function MAX_TRANSACTIONS_IN_BLOCK() -> ret {
-                ret := {{MAX_TRANSACTIONS_IN_BLOCK}}
+            function MAX_TRANSACTIONS_IN_BATCH() -> ret {
+                ret := {{MAX_TRANSACTIONS_IN_BATCH}}
             }
 
             /// @dev The slot from which the scratch space starts.
@@ -270,9 +277,9 @@ object "Bootloader" {
             }
 
             /// @dev The number of slots dedicated for the refunds for the transactions.
-            /// It is equal to the number of transactions in the block.
+            /// It is equal to the number of transactions in the batch.
             function TX_OPERATOR_REFUNDS_SLOTS() -> ret {
-                ret := MAX_TRANSACTIONS_IN_BLOCK()
+                ret := MAX_TRANSACTIONS_IN_BATCH()
             }
 
             /// @dev The slot starting from which the overheads proposed by the operator will be stored
@@ -286,9 +293,9 @@ object "Bootloader" {
             }
 
             /// @dev The number of slots dedicated for the overheads for the transactions.
-            /// It is equal to the number of transactions in the block.
+            /// It is equal to the number of transactions in the batch.
             function TX_SUGGESTED_OVERHEAD_SLOTS() -> ret {
-                ret := MAX_TRANSACTIONS_IN_BLOCK()
+                ret := MAX_TRANSACTIONS_IN_BATCH()
             }
 
             /// @dev The slot starting from which the maximum number of gas that the operator "trusts"
@@ -305,9 +312,41 @@ object "Bootloader" {
             }
 
             /// @dev The number of slots dedicated for the trusted gas limits for the transactions.
-            /// It is equal to the number of transactions in the block.
+            /// It is equal to the number of transactions in the batch.
             function TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS() -> ret {
-                ret := MAX_TRANSACTIONS_IN_BLOCK()
+                ret := MAX_TRANSACTIONS_IN_BATCH()
+            }
+
+            /// @dev The slot starting from the L2 block information for transactions is stored.
+            function TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT() -> ret {
+                ret := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS())
+            }
+
+            /// @dev The byte starting from which the L2 block information for transactions is stored.
+            function TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE() -> ret {
+                ret := mul(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), 32)
+            }
+
+            /// @dev The size of each of the L2 block information. Each L2 block information contains four fields:
+            /// - number of the block
+            /// - timestamp of the block
+            /// - hash of the previous block
+            /// - the maximal number of virtual blocks to create
+            function TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE() -> ret {
+                ret := 4
+            }
+
+            /// @dev The size of each of the L2 block information in bytes.
+            function TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES() -> ret {
+                ret := mul(TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE(), 32)
+            }
+
+            /// @dev The number of slots dedicated for the L2 block information for the transactions.
+            /// Note, that an additional slot is required for the fictive L2 block at the end of the batch. 
+            /// For technical reasons inside the sequencer implementation, 
+            /// each batch ends with a fictive block with no transactions.
+            function TX_OPERATOR_L2_BLOCK_INFO_SLOTS() -> ret {
+                ret := mul(add(MAX_TRANSACTIONS_IN_BATCH(), 1), TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE())
             }
 
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -321,7 +360,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to 
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS())
+                ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -362,12 +401,12 @@ object "Bootloader" {
             // }
             //
             // `txMeta` contains flags to manipulate the transaction execution flow.
-            // For playground blocks:
+            // For playground batches:
             //      It can have the following information (0 byte is LSB and 31 byte is MSB):
             //      0 byte: `execute`, bool. Denotes whether transaction should be executed by the bootloader.
             //      31 byte: server-side tx execution mode
-            // For proved blocks:
-            //      It can simply denotes whether to execute the transaction (0 to stop executing the block, 1 to continue) 
+            // For proved batches:
+            //      It can simply denotes whether to execute the transaction (0 to stop executing the batch, 1 to continue) 
             //
             // Each such encoded struct consumes 2 words
             function TX_DESCRIPTION_SIZE() -> ret {
@@ -375,8 +414,8 @@ object "Bootloader" {
             }
 
             /// @dev The byte right after the basic description of bootloader transactions
-            function TXS_IN_BLOCK_LAST_PTR() -> ret {
-                ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BLOCK(), TX_DESCRIPTION_SIZE()))
+            function TXS_IN_BATCH_LAST_PTR() -> ret {
+                ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
             /// @dev The memory page consists of 2^19 VM words.
@@ -405,7 +444,7 @@ object "Bootloader" {
 
             /// @dev The byte from which the pointers on the result of transactions are stored
             function RESULT_START_PTR() -> ret {
-                ret := sub(MAX_MEM_SIZE(), mul(MAX_TRANSACTIONS_IN_BLOCK(), 32))
+                ret := sub(MAX_MEM_SIZE(), mul(MAX_TRANSACTIONS_IN_BATCH(), 32))
             }
 
             /// @dev The pointer writing to which invokes the VM hooks
@@ -442,6 +481,10 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000008002
             }
 
+            function NONCE_HOLDER_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008003
+            }
+
             function KNOWN_CODES_CONTRACT_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008004
             }
@@ -449,21 +492,21 @@ object "Bootloader" {
             function CONTRACT_DEPLOYER_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008006
             }
+            
+            function FORCE_DEPLOYER() -> ret {
+                ret := 0x0000000000000000000000000000000000008007
+            }
 
             function MSG_VALUE_SIMULATOR_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008009
             }
 
-            function SYSTEM_CONTEXT_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000000800b
-            }
-
-            function NONCE_HOLDER_ADDR() -> ret {
-                ret := 0x0000000000000000000000000000000000008003
-            }
-
             function ETH_L2_TOKEN_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000800a
+            }
+
+            function SYSTEM_CONTEXT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000800b
             }
 
             function BOOTLOADER_UTILITIES() -> ret {
@@ -484,7 +527,7 @@ object "Bootloader" {
             }
 
             /// @dev Whether the bootloader should enforce that accounts have returned the correct
-            /// magic value for signature. This value is enforced to be "true" on the main proved block, but 
+            /// magic value for signature. This value is enforced to be "true" on the main proved batch, but 
             /// we need the ability to ignore invalid signature results during fee estimation,
             /// where the signature for the transaction is usually not known beforehand.
             function SHOULD_ENSURE_CORRECT_RETURNED_MAGIC() -> ret {
@@ -513,7 +556,7 @@ object "Bootloader" {
             // `true` or `false` based on whether the tx execution was successful,
 
             // The position at which the tx offset of the transaction should be placed
-            let currentExpectedTxOffset := add(TXS_IN_BLOCK_LAST_PTR(), mul(MAX_POSTOP_SLOTS(), 32))
+            let currentExpectedTxOffset := add(TXS_IN_BATCH_LAST_PTR(), mul(MAX_POSTOP_SLOTS(), 32))
 
             let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
 
@@ -522,10 +565,10 @@ object "Bootloader" {
             mstore(COMPRESSED_BYTECODES_BEGIN_BYTE(), add(COMPRESSED_BYTECODES_BEGIN_BYTE(), 0x20))
 
             // Iterating through transaction descriptions
+            let transactionIndex := 0 
             for { 
                 let resultPtr := RESULT_START_PTR()
-                let transactionIndex := 0 
-            } lt(txPtr, TXS_IN_BLOCK_LAST_PTR()) { 
+            } lt(txPtr, TXS_IN_BATCH_LAST_PTR()) { 
                 txPtr := add(txPtr, TX_DESCRIPTION_SIZE())
                 resultPtr := add(resultPtr, 32)
                 transactionIndex := add(transactionIndex, 1)
@@ -564,13 +607,13 @@ object "Bootloader" {
 
                 validateTypedTxStructure(add(txDataOffset, 0x20))
     
-                <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                 {
                     debugLog("ethCall", 0)
                     processTx(txDataOffset, resultPtr, transactionIndex, 0, GAS_PRICE_PER_PUBDATA)
                 }
                 <!-- @endif -->
-                <!-- @if BOOTLOADER_TYPE=='playground_block' -->
+                <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                 {
                     let txMeta := mload(txPtr)
                     let processFlags := getWordByte(txMeta, 31)
@@ -592,7 +635,7 @@ object "Bootloader" {
                 // Increment tx index within the system.
                 considerNewTx()
             }
-            
+
             // The bootloader doesn't have to pay anything
             setPricePerPubdataByte(0)
 
@@ -601,11 +644,28 @@ object "Bootloader" {
             setTxOrigin(0)
             setGasPrice(0)
 
-            // Transfering all the ETH received in the block to the operator
+            // Transferring all the ETH received in the batch to the operator
             directETHTransfer(
                 selfbalance(),
                 OPERATOR_ADDRESS
             )
+
+            // Hook that notifies that the operator should provide final information for the batch
+            setHook(VM_HOOK_FINAL_L2_STATE_INFO())
+
+            // Each batch typically ends with a special block which contains no transactions. 
+            // So we need to have this method to reflect it in the system contracts too.
+            //
+            // The reason is that as of now our node requires that each storage write (event, etc) belongs to a particular
+            // L2 block. In case a batch is sealed by timeout (i.e. the resources of the batch have not been exhaused, but we need
+            // to seal it to assure timely finality), we need to process sending funds to the operator *after* the last
+            // non-empty L2 block has been already sealed. We can not override old L2 blocks, so we need to create a new empty "fictive" block for it.
+            //
+            // The other reason why we need to set this block is so that in case of empty batch (i.e. the one which has no transactions), 
+            // the virtual block number as well as miniblock number are incremented.
+            setL2Block(transactionIndex)
+
+            publishBatchDataToL1()
 
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
@@ -628,10 +688,10 @@ object "Bootloader" {
             /// @dev Function responsible for processing the transaction
             /// @param txDataOffset The offset to the ABI-encoding of the structure
             /// @param resultPtr The pointer at which the result of the transaction's execution should be stored
-            /// @param transactionIndex The index of the transaction in the block
+            /// @param transactionIndex The index of the transaction in the batch
             /// @param isETHCall Whether the call is an ethCall. 
             /// @param gasPerPubdata The number of L2 gas to charge users for each byte of pubdata 
-            /// On proved block this value should always be zero
+            /// On proved batch this value should always be zero
             function processTx(
                 txDataOffset, 
                 resultPtr,
@@ -639,6 +699,9 @@ object "Bootloader" {
                 isETHCall,
                 gasPerPubdata
             ) {
+                // We set the L2 block info for this particular transaction
+                setL2Block(transactionIndex)
+
                 let innerTxDataOffset := add(txDataOffset, 0x20)
 
                 // By default we assume that the transaction has failed.
@@ -653,8 +716,8 @@ object "Bootloader" {
                     case 254 {
                         // This is an upgrade transaction.
                         // Protocol upgrade transactions are processed totally in the same manner as the normal L1->L2 transactions,
-                        // the only differences are:
-                        // - They must be the first one in the block
+                        // the only difference are:
+                        // - They must be the first one in the batch
                         // - They have a different type to prevent tx hash collisions and preserve the expectation that the 
                         // L1->L2 transactions have priorityTxId inside them.
                         if transactionIndex {    
@@ -675,11 +738,11 @@ object "Bootloader" {
                         
                         setPricePerPubdataByte(gasPerPubdata)
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
                         <!-- @endif -->
 
-                        <!-- @if BOOTLOADER_TYPE=='playground_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                         switch isETHCall 
                             case 1 {
                                 let gasLimit := getGasLimit(innerTxDataOffset)
@@ -707,6 +770,36 @@ object "Bootloader" {
                     }
             }
 
+            /// @dev Checks whether the code hash of the system context contract is correct and updates it if needed.
+            /// @dev The bootloader implementation strictly relies of the ability of the system context contract to work with the 
+            /// L2 blocks. However, the old system context did not support the correspodning interface at all. Usually we upgrade system context
+            /// via an upgrade transaction, but in this case the transaction won't be even processed, because of failure to create an L2 block.
+            function upgradeSystemContextIfNeeded() {
+                let expectedCodeHash := {{SYSTEM_CONTEXT_EXPECTED_CODE_HASH}}
+                
+                let actualCodeHash := extcodehash(SYSTEM_CONTEXT_ADDR())
+                if iszero(eq(expectedCodeHash, actualCodeHash)) {
+                    // Preparing the calldata to upgrade the SystemContext contract
+                    {{UPGRADE_SYSTEM_CONTEXT_CALLDATA}}
+                    
+                    // We'll use a mimicCall to simulate the correct sender.
+                    let success := mimicCallOnlyResult(
+                        CONTRACT_DEPLOYER_ADDR(),
+                        FORCE_DEPLOYER(), 
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    )
+
+                    if iszero(success) {
+                        assertionError("system context upgrade fail")
+                    }
+                }
+            }
+
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
             /// sent to L1 as a message to the L1 contract that a certain operation has been processed.
             function getCanonicalL1TxHash(txDataOffset) -> ret {
@@ -727,7 +820,7 @@ object "Bootloader" {
             /// @dev The purpose of this function is to make sure that the operator
             /// gets paid for the transaction. Note, that the beneficiary of the payment is 
             /// bootloader.
-            /// The operator will be paid at the end of the block.
+            /// The operator will be paid at the end of the batch.
             function ensurePayment(txDataOffset, gasPrice) {
                 // Skipping the first 0x20 byte in the encoding of the transaction.
                 let innerTxDataOffset := add(txDataOffset, 0x20)
@@ -1024,7 +1117,11 @@ object "Bootloader" {
                 }
 
                 if gt(toRefundRecipient, 0) {
-                    mintEther(getReserved1(innerTxDataOffset), toRefundRecipient, false)
+                    let refundRecipient := getReserved1(innerTxDataOffset)
+                    // Zero out the first 12 bytes to be sure that refundRecipient is address.
+                    // In case of an issue in L1 contracts, we still will be able to process tx.
+                    refundRecipient := and(refundRecipient, sub(shl(160, 1), 1))
+                    mintEther(refundRecipient, toRefundRecipient, false)
                 } 
 
                 mstore(resultPtr, success)
@@ -1072,6 +1169,9 @@ object "Bootloader" {
                 // we should still be able to do it even if this protection layer fails.
                 canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
                 debugLog("l1 hash", canonicalL1TxHash)
+
+                // Appending the transaction's hash to the current L2 block
+                appendTransactionHash(canonicalL1TxHash, true)
 
                 markFactoryDepsForTx(innerTxDataOffset, true)
 
@@ -1174,7 +1274,7 @@ object "Bootloader" {
 
             /// @dev Calculates the L2 gas limit for the transaction's body, i.e. without intrinsic costs and overhead.
             /// @param innerTxDataOffset The offset for the ABI-encoded Transaction struct fields.
-            /// @param transactionIndex The index of the transaction within the block.
+            /// @param transactionIndex The index of the transaction within the batch.
             /// @param gasPerPubdata The price for a pubdata byte in L2 gas.
             /// @param intrinsicGas The intrinsic number of L2 gas required for transaction processing.
             /// @param intrinsicPubdata The intrinsic number of pubdata bytes required for transaction processing.
@@ -1248,7 +1348,9 @@ object "Bootloader" {
                 // Saving the tx hash and the suggested signed tx hash to memory
                 saveTxHashes(txDataOffset)
 
-                
+                // Appending the transaction's hash to the current L2 block
+                appendTransactionHash(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), false)
+
                 checkEnoughGas(gasLimitForTx)
 
                 // Note, that it is assumed that `ZKSYNC_NEAR_CALL_validateTx` will always return true
@@ -1562,8 +1664,8 @@ object "Bootloader" {
 
             /// @dev Return the operator suggested transaction overhead cost.
             function getOperatorOverheadForTx(transactionIndex) -> ret {
-                let txBlockOverheadPtr := add(TX_SUGGESTED_OVERHEAD_BEGIN_BYTE(), mul(transactionIndex, 32))
-                ret := mload(txBlockOverheadPtr)
+                let txBatchOverheadPtr := add(TX_SUGGESTED_OVERHEAD_BEGIN_BYTE(), mul(transactionIndex, 32))
+                ret := mload(txBatchOverheadPtr)
             }
 
             /// @dev Return the operator's "trusted" transaction gas limit
@@ -1637,7 +1739,7 @@ object "Bootloader" {
 
                 // If the bytecode hash calculated on the bytecode compressor's side
                 // is not equal to the one provided by the operator means that the operator is 
-                // malicious and we should revert the block altogether
+                // malicious and we should revert the batch altogether
                 if iszero(eq(returnedBytecodeHash, bytecodeHash)) {
                     assertionError("bytecodeHash incorrect")
                 }
@@ -1755,7 +1857,7 @@ object "Bootloader" {
             }
 
 
-            <!-- @if BOOTLOADER_TYPE=='playground_block' -->
+            <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
             function ZKSYNC_NEAR_CALL_ethCall(
                 abi,
                 txDataOffset,
@@ -1844,14 +1946,14 @@ object "Bootloader" {
                 }
             }
 
-            /// Returns the block overhead to be paid, assuming a certain value of gasPerPubdata
-            function getBlockOverheadGas(gasPerPubdata) -> ret {
-                let computationOverhead := BLOCK_OVERHEAD_L2_GAS()
-                let l1GasOverhead := BLOCK_OVERHEAD_L1_GAS()
+            /// Returns the batch overhead to be paid, assuming a certain value of gasPerPubdata
+            function getBatchOverheadGas(gasPerPubdata) -> ret {
+                let computationOverhead := BATCH_OVERHEAD_L2_GAS()
+                let l1GasOverhead := BATCH_OVERHEAD_L1_GAS()
                 let l1GasPerPubdata := L1_GAS_PER_PUBDATA_BYTE()
 
                 // Since the user specifies the amount of gas he is willing to pay for a *byte of pubdata*,
-                // we need to convert the number of L1 gas needed to process the block into the equivalent number of 
+                // we need to convert the number of L1 gas needed to process the batch into the equivalent number of 
                 // pubdata to pay for.
                 // The difference between ceil and floor division here is negligible,
                 // so we prefer doing the cheaper operation for the end user
@@ -1866,33 +1968,31 @@ object "Bootloader" {
 
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
             /// The goal of this overhead is to cover the possibility that this transaction may use up a certain
-            /// limited resource per block: a single-instance circuit, runs out of pubdata available for block, etc.
-            /// The transaction needs to be able to pay the same % of the costs for publishing & proving the block
-            /// as the % of the block's limited resources that it can consume.
+            /// limited resource per batch: a single-instance circuit, etc.
+            /// The transaction needs to be able to pay the same % of the costs for publishing & proving the batch
+            /// as the % of the batch's limited resources that it can consume.
             /// @param txGasLimit The gasLimit for the transaction (note, that this limit should not include the overhead).
             /// @param gasPerPubdataByte The price for pubdata byte in gas.
             /// @param txEncodeLen The length of the ABI-encoding of the transaction
-            /// @dev The % following 4 resources is taken into account when calculating the % of the block's overhead to pay.
+            /// @dev The % following 3 resources is taken into account when calculating the % of the batch's overhead to pay.
             /// 1. The % of the maximal gas per transaction. It is assumed that `MAX_GAS_PER_TRANSACTION` gas is enough to consume all
             /// the single-instance circuits. Meaning that the transaction should pay at least txGasLimit/MAX_GAS_PER_TRANSACTION part 
             /// of the overhead.
             /// 2. Overhead for taking up the bootloader memory. The bootloader memory has a cap on its length, mainly enforced to keep the RAM requirements
             /// for the node smaller. That is, the user needs to pay a share proportional to the length of the ABI encoding of the transaction.
-            /// 3. Overhead for taking up a slot for the transaction. Since each block has the limited number of transactions in it, the user must pay 
+            /// 3. Overhead for taking up a slot for the transaction. Since each batch has the limited number of transactions in it, the user must pay 
             /// at least 1/MAX_TRANSACTIONS_IN_BLOCK part of the overhead.
-            /// 4. Overhead for the pubdata. It is proportional to the maximal number of pubdata the transaction could use compared to the maximal number of
-            /// public data available in L1 batch. 
             function getTransactionUpfrontOverhead(
                 txGasLimit,
                 gasPerPubdataByte,
                 txEncodeLen
             ) -> ret {
                 ret := 0
-                let totalBlockOverhead := getBlockOverheadGas(gasPerPubdataByte)
-                debugLog("totalBlockOverhead", totalBlockOverhead)
+                let totalBatchOverhead := getBatchOverheadGas(gasPerPubdataByte)
+                debugLog("totalBatchOverhead", totalBatchOverhead)
 
                 let overheadForCircuits := ceilDiv(
-                    safeMul(totalBlockOverhead, txGasLimit, "ac"),
+                    safeMul(totalBatchOverhead, txGasLimit, "ac"),
                     MAX_GAS_PER_TRANSACTION()
                 )
                 ret := max(ret, overheadForCircuits)
@@ -1900,7 +2000,7 @@ object "Bootloader" {
 
                 
                 let overheadForLength := ceilDiv(
-                    safeMul(txEncodeLen, totalBlockOverhead, "ad"),
+                    safeMul(txEncodeLen, totalBatchOverhead, "ad"),
                     BOOTLOADER_MEMORY_FOR_TXS()
                 )
                 ret := max(ret, overheadForLength)
@@ -1908,30 +2008,20 @@ object "Bootloader" {
 
                 
                 let overheadForSlot := ceilDiv(
-                    totalBlockOverhead,
-                    MAX_TRANSACTIONS_IN_BLOCK()
+                    totalBatchOverhead,
+                    MAX_TRANSACTIONS_IN_BATCH()
                 )
                 ret := max(ret, overheadForSlot)
                 debugLog("overheadForSlot", overheadForSlot)
             
-                // In the proved block we ensure that the gasPerPubdataByte is not zero
+                // In the proved batch we ensure that the gasPerPubdataByte is not zero
                 // to avoid the potential edge case of division by zero. In Yul, division by 
                 // zero does not panic, but returns zero.
-                <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                 if and(iszero(gasPerPubdataByte), FORBID_ZERO_GAS_PER_PUBDATA()) {
                     assertionError("zero gasPerPubdataByte")
                 }
                 <!-- @endif --> 
-
-                // We use "ceil" here for formal reasons to allow easier approach for calculating the overhead in O(1) for L1
-                // calculation.
-                // TODO: possibly pay for pubdata overhead
-                // let maxPubdataInTx := ceilDiv(txGasLimit, gasPerPubdataByte)
-                // let overheadForPubdata := ceilDiv(
-                //     safeMul(maxPubdataInTx, totalBlockOverhead),
-                //     MAX_PUBDATA_PER_BLOCK()
-                // )
-                // ret := max(ret, overheadForPubdata)
             }
 
             /// @dev A method where all panics in the nearCalls get to.
@@ -2478,7 +2568,7 @@ object "Bootloader" {
                 ret := verbatim_7i_1o("system_mimic_call", to, whoToMimic, farCallAbi, extraAbi1, extraAbi2, extraAbi3, 0) 
             }
             
-            <!-- @if BOOTLOADER_TYPE=='playground_block' -->
+            <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
             // Extracts the required byte from the 32-byte word.
             // 31 would mean the MSB, 0 would mean LSB.
             function getWordByte(word, byteIdx) -> ret {
@@ -2498,7 +2588,7 @@ object "Bootloader" {
                 verbatim_3i_0o("to_l1", isService, key, value)
             } 
             
-            /// @dev Increment the number of txs in the block
+            /// @dev Increment the number of txs in the batch
             function considerNewTx() {
                 verbatim_0i_0o("increment_tx_counter")
             }
@@ -2528,14 +2618,14 @@ object "Bootloader" {
                 }
             }
 
-            /// @notice Sets the context information for the current block.
+            /// @notice Sets the context information for the current batch.
             /// @dev The SystemContext.sol system contract is responsible for validating
-            /// the validity of the new block's data.
-            function setNewBlock(prevBlockHash, newTimestamp, newBlockNumber, baseFee) {
-                mstore(0, {{RIGHT_PADDED_SET_NEW_BLOCK_SELECTOR}})
-                mstore(4, prevBlockHash)
+            /// the validity of the new batch's data.
+            function setNewBatch(prevBatchHash, newTimestamp, newBatchNumber, baseFee) {
+                mstore(0, {{RIGHT_PADDED_SET_NEW_BATCH_SELECTOR}})
+                mstore(4, prevBatchHash)
                 mstore(36, newTimestamp)
-                mstore(68, newBlockNumber)
+                mstore(68, newBatchNumber)
                 mstore(100, baseFee)
 
                 let success := call(
@@ -2549,20 +2639,125 @@ object "Bootloader" {
                 )
 
                 if iszero(success) {
-                    debugLog("Failed to set new block: ", prevBlockHash)
-                    debugLog("Failed to set new block: ", newTimestamp)
+                    debugLog("Failed to set new batch: ", prevBatchHash)
+                    debugLog("Failed to set new batch: ", newTimestamp)
 
-                    revertWithReason(FAILED_TO_SET_NEW_BLOCK_ERR_CODE(), 1)
+                    revertWithReason(FAILED_TO_SET_NEW_BATCH_ERR_CODE(), 1)
                 }
             }
 
-            <!-- @if BOOTLOADER_TYPE=='playground_block' -->
-            /// @notice Arbitrarily overrides the current block information.
-            /// @dev It should NOT be available in the proved block. 
-            function unsafeOverrideBlock(newTimestamp, newBlockNumber, baseFee) {
-                mstore(0, {{RIGHT_PADDED_OVERRIDE_BLOCK_SELECTOR}})
+            /// @notice Sets the context information for the current L2 block.
+            /// @param txId The index of the transaction in the batch for which to get the L2 block information.
+            function setL2Block(txId) {
+                let txL2BlockPosition := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE(), mul(TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES(), txId))
+
+                let currentL2BlockNumber := mload(txL2BlockPosition)
+                let currentL2BlockTimestamp := mload(add(txL2BlockPosition, 32))
+                let previousL2BlockHash := mload(add(txL2BlockPosition, 64))
+                let virtualBlocksToCreate := mload(add(txL2BlockPosition, 96))
+
+                let isFirstInBatch := iszero(txId)
+
+                debugLog("Setting new L2 block: ", currentL2BlockNumber)
+                debugLog("Setting new L2 block: ", currentL2BlockTimestamp)
+                debugLog("Setting new L2 block: ", previousL2BlockHash)
+                debugLog("Setting new L2 block: ", virtualBlocksToCreate)
+
+                mstore(0, {{RIGHT_PADDED_SET_L2_BLOCK_SELECTOR}})
+                mstore(4, currentL2BlockNumber)
+                mstore(36, currentL2BlockTimestamp)
+                mstore(68, previousL2BlockHash)
+                mstore(100, isFirstInBatch)
+                mstore(132, virtualBlocksToCreate)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    164,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set new L2 block: ", currentL2BlockNumber)
+                    debugLog("Failed to set new L2 block: ", currentL2BlockTimestamp)
+                    debugLog("Failed to set new L2 block: ", previousL2BlockHash)
+                    debugLog("Failed to set new L2 block: ", isFirstInBatch)
+
+                    revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
+                }
+            }
+
+            /// @notice Appends the transaction hash to the current L2 block. 
+            /// @param txHash The hash of the transaction to append.
+            /// @param isL1Tx Whether the transaction is an L1 transaction. If it is an L1 transaction,
+            /// and this method fails, then the bootloader execution will be explicitly reverted. 
+            /// Otherwise, the nearCallPanic will be used to implicitly fail the validation of the transaction.
+            function appendTransactionHash(
+                txHash,
+                isL1Tx
+            ) {
+                debugLog("Appending tx to L2 block", txHash)
+
+                mstore(0, {{RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR}})
+                mstore(4, txHash)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugReturndata()
+                    switch isL1Tx
+                    case 1 {
+                        revertWithReason(
+                            FAILED_TO_APPEND_TRANSACTION_TO_L2_BLOCK(),
+                            1
+                        )
+                    }
+                    default {
+                        // For L2 transactions, we use near call panic, it will triger the validation 
+                        // step of the transaction to fail, returning a consistent error message. 
+                        nearCallPanic()
+                    }
+                }
+            } 
+
+            function publishBatchDataToL1() {
+                debugLog("Publishing batch data to L1", 0)
+
+                mstore(0, {{RIGHT_PADDED_PUBLISH_BATCH_DATA_TO_L1_SELECTOR}})
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    4,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed publish batch data to L1", 0)
+                    revertWithReason(FAILED_TO_PUBLISH_BATCH_DATA_TO_L1(), 1)
+                }
+            }
+
+            <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
+            /// @notice Arbitrarily overrides the current batch information.
+            /// @dev It should NOT be available in the proved batch. 
+            function unsafeOverrideBatch(newTimestamp, newBatchNumber, baseFee) {
+                mstore(0, {{RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR}})
                 mstore(4, newTimestamp)
-                mstore(36, newBlockNumber)
+                mstore(36, newBatchNumber)
                 mstore(68, baseFee)
 
                 let success := call(
@@ -2576,10 +2771,10 @@ object "Bootloader" {
                 )
 
                 if iszero(success) {
-                    debugLog("Failed to override block: ", newTimestamp)
-                    debugLog("Failed to override block: ", newBlockNumber)
+                    debugLog("Failed to override batch: ", newTimestamp)
+                    debugLog("Failed to override batch: ", newBatchNumber)
 
-                    revertWithReason(FAILED_TO_SET_NEW_BLOCK_ERR_CODE(), 1)
+                    revertWithReason(FAILED_TO_SET_NEW_BATCH_ERR_CODE(), 1)
                 }
             }
             <!-- @endif -->
@@ -2715,7 +2910,7 @@ object "Bootloader" {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         
@@ -2733,7 +2928,7 @@ object "Bootloader" {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         
@@ -2748,7 +2943,7 @@ object "Bootloader" {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         
@@ -2762,7 +2957,7 @@ object "Bootloader" {
                     case 113 {                        
                         let paymaster := getPaymaster(innerTxDataOffset)
                         assertEq(or(gt(paymaster, MAX_SYSTEM_CONTRACT_ADDR()), iszero(paymaster)), 1, "paymaster in kernel space")
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3150,7 +3345,7 @@ object "Bootloader" {
             /// the operator with the leftover gas found by the bootloader. 
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
-            /// bring us to closing the block as well as how much the transaction 
+            /// bring us to closing the batch as well as how much the transaction 
             /// should've spent on the pubdata/computation/etc.
             /// After it is run, the operator should put the expected refund
             /// into the memory slot (in the out of circuit execution).
@@ -3189,7 +3384,7 @@ object "Bootloader" {
                 ret := 5
             }
 
-            function FAILED_TO_SET_NEW_BLOCK_ERR_CODE() -> ret {
+            function FAILED_TO_SET_NEW_BATCH_ERR_CODE() -> ret {
                 ret := 6
             }
 
@@ -3261,6 +3456,18 @@ object "Bootloader" {
                 ret := 23
             }
 
+            function FAILED_TO_APPEND_TRANSACTION_TO_L2_BLOCK() -> ret {
+                ret := 24
+            }
+
+            function FAILED_TO_SET_L2_BLOCK() -> ret {
+                ret := 25
+            }
+
+            function FAILED_TO_PUBLISH_BATCH_DATA_TO_L1() -> ret {
+                ret := 26
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -3325,38 +3532,73 @@ object "Bootloader" {
                 revert(0, returndataLen)
             }
 
+            /// @notice The id of the VM hook that notifies the operator that the transaction 
+            /// validation rules should start applying (i.e. the user should not be allowed to access 
+            /// other users' storage, etc).
             function VM_HOOK_ACCOUNT_VALIDATION_ENTERED() -> ret {
                 ret := 0
             }
+
+            /// @notice The id of the VM hook that notifies the operator that the transaction
+            /// paymaster validation has started.
             function VM_HOOK_PAYMASTER_VALIDATION_ENTERED() -> ret {
                 ret := 1
             }
+
+            /// @notice The id of the VM hook that notifies the operator that the transaction's validation 
+            /// restrictions should no longer apply. Note, that this is different from the validation ending, 
+            /// since for instance the bootloader needs to do some actions during validation which are forbidden for users.
+            /// So this hook is used to notify the operator that the restrictions should be temporarily lifted.
             function VM_HOOK_NO_VALIDATION_ENTERED() -> ret {
                 ret := 2
             }
+            
+            /// @notice The id of the VM hook that notifies the operator that the transaction's validation has ended.
             function VM_HOOK_VALIDATION_STEP_ENDED() -> ret {
                 ret := 3
             }
+
+            /// @notice The id of the VM hook that notifies the operator that the transaction's execution has started.
             function VM_HOOK_TX_HAS_ENDED() -> ret {
                 ret := 4
             }
+
+            /// @notice The id of the VM hook that is used to emit debugging logs consisting of pair <msg, data>.
             function VM_HOOK_DEBUG_LOG() -> ret {
                 ret := 5
             }
+
+            /// @notice The id of the VM hook that is used to emit debugging logs with the returndata of the latest transaction.
             function VM_HOOK_DEBUG_RETURNDATA() -> ret {
                 ret := 6
             }
+
+            /// @notice The id of the VM hook that is used to notify the operator about the entry into the
+            /// `ZKSYNC_CATCH_NEAR_CALL` function.
             function VM_HOOK_CATCH_NEAR_CALL() -> ret {
                 ret := 7
             }
+            
+            /// @notice The id of the VM hook that is used to notify the operator about the need to put the refund for 
+            /// the current transaction into the bootloader's memory.
             function VM_HOOK_ASK_OPERATOR_FOR_REFUND() -> ret {
                 ret := 8
             }
+
+            /// @notice The id of the VM hook that is used to notify the operator about the refund given to the user by the bootloader.
             function VM_NOTIFY_OPERATOR_ABOUT_FINAL_REFUND() -> ret {
                 ret := 9
             }
+
+            /// @notice The id of the VM hook that is used to notify the operator about the execution result of the transaction.
             function VM_HOOK_EXECUTION_RESULT() -> ret {
                 ret := 10
+            }
+
+            /// @notice The id of the VM hook that is used to notify the operator that it needs to insert the information about the last
+            /// fictive miniblock.
+            function VM_HOOK_FINAL_L2_STATE_INFO() -> ret {
+                ret := 11
             }
 
             // Need to prevent the compiler from optimizing out similar operations, 

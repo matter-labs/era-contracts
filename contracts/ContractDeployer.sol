@@ -22,7 +22,7 @@ import "./interfaces/ISystemContract.sol";
 contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
-    mapping(address => AccountInfo) internal _accountInfo;
+    mapping(address => AccountInfo) internal accountInfo;
 
     modifier onlySelf() {
         require(msg.sender == address(this), "Callable only by self");
@@ -31,13 +31,13 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     /// @notice Returns information about a certain account.
     function getAccountInfo(address _address) external view returns (AccountInfo memory info) {
-        return _accountInfo[_address];
+        return accountInfo[_address];
     }
 
     /// @notice Returns the account abstraction version if `_address` is a deployed contract.
     /// Returns the latest supported account abstraction version if `_address` is an EOA.
     function extendedAccountVersion(address _address) public view returns (AccountAbstractionVersion) {
-        AccountInfo memory info = _accountInfo[_address];
+        AccountInfo memory info = accountInfo[_address];
         if (info.supportedAAVersion != AccountAbstractionVersion.None) {
             return info.supportedAAVersion;
         }
@@ -52,14 +52,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     /// @notice Stores the new account information
     function _storeAccountInfo(address _address, AccountInfo memory _newInfo) internal {
-        _accountInfo[_address] = _newInfo;
+        accountInfo[_address] = _newInfo;
     }
 
     /// @notice Update the used version of the account.
     /// @param _version The new version of the AA protocol to use.
     /// @dev Note that it allows changes from account to non-account and vice versa.
     function updateAccountVersion(AccountAbstractionVersion _version) external onlySystemCall {
-        _accountInfo[msg.sender].supportedAAVersion = _version;
+        accountInfo[msg.sender].supportedAAVersion = _version;
 
         emit AccountVersionUpdated(msg.sender, _version);
     }
@@ -68,7 +68,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// it only allows changes from sequential to arbitrary ordering.
     /// @param _nonceOrdering The new nonce ordering to use.
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external onlySystemCall {
-        AccountInfo memory currentInfo = _accountInfo[msg.sender];
+        AccountInfo memory currentInfo = accountInfo[msg.sender];
 
         require(
             _nonceOrdering == AccountNonceOrdering.Arbitrary &&

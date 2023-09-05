@@ -61,8 +61,6 @@ export async function outputSystemContracts(): Promise<ForceDeployment[]> {
     return await Promise.all(upgradeParamsPromises);
 }
 
-
-
 // Script that publishes preimages for all the system contracts on zkSync
 // and outputs the JSON that can be used for performing the necessary upgrade
 const DEFAULT_L2_TX_GAS_LIMIT = 2097152;
@@ -104,8 +102,6 @@ export function totalBytesLength(dependencies: BytesLike[]): number {
     return dependencies.reduce((prev, curr) => prev + ethers.utils.arrayify(curr).length, 0);
 }
 
-
-
 export function getBytecodes(dependencies: Dependency[]): BytesLike[] {
     return dependencies.map((dep) => dep.bytecodes).flat();
 }
@@ -115,7 +111,7 @@ export async function publishFactoryDeps(
     deployer: Deployer,
     nonce: number,
     gasPrice: BigNumber,
-): Promise<DeployedDependency[]>{
+) {
     if(dependencies.length == 0) {
         return [];
     }
@@ -145,15 +141,10 @@ export async function publishFactoryDeps(
 
     // Double checking that indeed the dependencies have been marked as known
     await checkMarkers(bytecodes, deployer);
-    return dependencies.map((dep) =>{return {
-        name: dep.name,
-        bytecodeHashes: dep.bytecodes.map((bytecode) =>  ethers.utils.hexlify(hashBytecode(bytecode))),
-        address: dep.address
-    }});
 }
 
 // Returns an array of bytecodes that should be published along with their total length in bytes
-export async function filterDeployedFactoryDeps(
+export async function filterPublishedFactoryDeps(
     contractName: string,
     factoryDeps: string[],
     deployer: Deployer,
@@ -180,6 +171,3 @@ export async function filterDeployedFactoryDeps(
 
     return [bytecodesToDeploy, currentLength];
 }
-
-
-
