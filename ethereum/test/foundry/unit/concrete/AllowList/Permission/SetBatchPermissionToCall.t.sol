@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./_PermissionTest_Shared.t.sol";
+import "./_Permission_Shared.t.sol";
 
 contract SetBatchPermissionToCall is PermissionTest {
     function test_RevertWhen_NonOwner() public {
