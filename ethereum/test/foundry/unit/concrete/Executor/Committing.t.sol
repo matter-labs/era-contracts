@@ -668,6 +668,122 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
+    function test_RevertWhen_CommittingTooLongRepeatedStorageChanges() public {
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
+            bytes32("")
+        );
+
+        // 7565 * 40 bytes = 302600 bytes long repeatedStorageChanges
+        // which is longer than 302564 (MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES =
+        // 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564)
+        uint256 wrongRepeatedStorageChangesLen = 7565 * 40;
+        bytes memory wrongRepeatedStorageChanges = new bytes(
+            wrongRepeatedStorageChangesLen
+        );
+
+        assembly {
+            let ptr := add(wrongRepeatedStorageChanges, 32)
+            let end := add(ptr, wrongRepeatedStorageChangesLen)
+
+            for {
+
+            } lt(ptr, end) {
+
+            } {
+                mstore(
+                    ptr,
+                    0x0000000000000000000000000000000000000000000000000000000000000000
+                )
+                ptr := add(ptr, 40)
+            }
+        }
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
+        wrongNewCommitBlockInfo
+            .repeatedStorageChanges = wrongRepeatedStorageChanges;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("py"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
+    function test_RevertWhen_CommittingTooLongInitialStorageChanges() public {
+        bytes memory correctL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
+            bytes32("")
+        );
+
+        // 4766 * 64 bytes = 305024 bytes long initialStorageChangesLen
+        // which is longer than 304964 (MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES =
+        // 4 + INITIAL_STORAGE_CHANGE_SERIALIZE_SIZE * 4765)
+        uint256 wrongInitialStorageChangesLen = 4766 * 64;
+        bytes memory wrongInitialStorageChanges = new bytes(
+            wrongInitialStorageChangesLen
+        );
+
+        assembly {
+            let ptr := add(wrongInitialStorageChanges, 32)
+            let end := add(ptr, wrongInitialStorageChangesLen)
+
+            for {
+
+            } lt(ptr, end) {
+
+            } {
+                mstore(
+                    ptr,
+                    0x0000000000000000000000000000000000000000000000000000000000000000
+                )
+                ptr := add(ptr, 64)
+            }
+        }
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
+        wrongNewCommitBlockInfo
+            .initialStorageChanges = wrongInitialStorageChanges;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("pf"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
     function test_SuccessfullyCommitBlock() public {
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
