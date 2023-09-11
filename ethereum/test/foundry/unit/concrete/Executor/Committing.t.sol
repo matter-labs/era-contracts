@@ -4,27 +4,6 @@ pragma solidity ^0.8.13;
 import "./_Executor_Shared.t.sol";
 
 contract CommittingTest is ExecutorTest {
-    function setUp() public {
-        // foundry's default value is 1 for the block's timestamp, it is expected
-        // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
-        currentTimestamp = block.timestamp;
-        newCommitBlockInfo = IExecutor.CommitBlockInfo({
-            blockNumber: 1,
-            timestamp: uint64(currentTimestamp),
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: Utils.randomBytes32("newStateRoot"),
-            numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: 0,
-            priorityOperationsHash: keccak256(""),
-            initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
-            repeatedStorageChanges: bytes(""),
-            l2Logs: bytes(""),
-            l2ArbitraryLengthMessages: new bytes[](0),
-            factoryDeps: new bytes[](0)
-        });
-    }
-
     function test_RevertWhen_ComittingWithWrongLastCommittedBlockData() public {
         IExecutor.CommitBlockInfo[]
             memory newCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);

@@ -7,21 +7,6 @@ contract RevertingTest is ExecutorTest {
     function setUp() public {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
-        IExecutor.CommitBlockInfo memory commitBlockInfo = IExecutor
-            .CommitBlockInfo({
-                blockNumber: 1,
-                timestamp: uint64(currentTimestamp),
-                indexRepeatedStorageChanges: 0,
-                newStateRoot: Utils.randomBytes32("newStateRoot"),
-                numberOfLayer1Txs: 0,
-                l2LogsTreeRoot: 0,
-                priorityOperationsHash: keccak256(""),
-                initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
-                repeatedStorageChanges: bytes(""),
-                l2Logs: bytes(""),
-                l2ArbitraryLengthMessages: new bytes[](0),
-                factoryDeps: new bytes[](0)
-            });
 
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
@@ -34,11 +19,12 @@ contract RevertingTest is ExecutorTest {
             bytes32("")
         );
 
-        commitBlockInfo.l2Logs = correctL2Logs;
+        newCommitBlockInfo.timestamp = uint64(currentTimestamp);
+        newCommitBlockInfo.l2Logs = correctL2Logs;
 
         IExecutor.CommitBlockInfo[]
             memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        commitBlockInfoArray[0] = commitBlockInfo;
+        commitBlockInfoArray[0] = newCommitBlockInfo;
 
         vm.prank(validator);
         vm.recordLogs();
