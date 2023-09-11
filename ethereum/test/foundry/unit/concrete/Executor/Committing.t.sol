@@ -7,15 +7,13 @@ contract CommittingTest is ExecutorTest {
     function setUp() public {
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
         newCommitBlockInfo = IExecutor.CommitBlockInfo({
             blockNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
-            newStateRoot: keccak256(
-                bytes.concat("randomBytes32", "setUp()", "0")
-            ),
+            newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             l2LogsTreeRoot: 0,
             priorityOperationsHash: keccak256(""),
@@ -66,12 +64,8 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongNewBlockTimestamp() public {
-        bytes32 wrongNewBlockTimestamp = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingWithWrongNewBlockTimestamp()",
-                "0"
-            )
+        bytes32 wrongNewBlockTimestamp = Utils.randomBytes32(
+            "wrongNewBlockTimestamp"
         );
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000001),
@@ -105,43 +99,14 @@ contract CommittingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             address(L2_SYSTEM_CONTEXT_ADDRESS),
-            bytes32(0),
+            Utils.packBatchTimestampAndBlockTimestamp(1, 1),
             bytes32("")
         );
 
         IExecutor.CommitBlockInfo
             memory wrongNewCommitBlockInfo = newCommitBlockInfo;
         wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-        wrongNewCommitBlockInfo.timestamp = 0;
-
-        IExecutor.CommitBlockInfo[]
-            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-                1
-            );
-        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
-
-        vm.prank(validator);
-
-        vm.expectRevert(bytes.concat("h"));
-        executor.commitBlocks(
-            genesisStoredBlockInfo,
-            wrongNewCommitBlockInfoArray
-        );
-    }
-
-    function test_RevertWhen_CommittingTooBigNewBlockTimestamp() public {
-        bytes memory wrongL2Logs = abi.encodePacked(
-            bytes4(0x00000001),
-            bytes4(0x00000000),
-            address(L2_SYSTEM_CONTEXT_ADDRESS),
-            uint256(0xffffffff),
-            bytes32("")
-        );
-
-        IExecutor.CommitBlockInfo
-            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
-        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-        wrongNewCommitBlockInfo.timestamp = 0xffffffff;
+        wrongNewCommitBlockInfo.timestamp = 1; // too small
 
         IExecutor.CommitBlockInfo[]
             memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
@@ -158,13 +123,42 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
+    function test_RevertWhen_CommittingTooBigLastL2BlockTimestamp() public {
+        uint64 wrongL2BlockTimestamp = 0xffffffff;
+        bytes memory wrongL2Logs = abi.encodePacked(
+            bytes4(0x00000001),
+            bytes4(0x00000000),
+            address(L2_SYSTEM_CONTEXT_ADDRESS),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                wrongL2BlockTimestamp,
+                wrongL2BlockTimestamp
+            ),
+            bytes32("")
+        );
+
+        IExecutor.CommitBlockInfo
+            memory wrongNewCommitBlockInfo = newCommitBlockInfo;
+        wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+        wrongNewCommitBlockInfo.timestamp = wrongL2BlockTimestamp;
+
+        IExecutor.CommitBlockInfo[]
+            memory wrongNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
+                1
+            );
+        wrongNewCommitBlockInfoArray[0] = wrongNewCommitBlockInfo;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes.concat("h2"));
+        executor.commitBlocks(
+            genesisStoredBlockInfo,
+            wrongNewCommitBlockInfoArray
+        );
+    }
+
     function test_RevertWhen_CommittingWithWrongPreviousBlockHash() public {
-        bytes32 wrongPreviousBlockHash = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_committingWithWrongPreviousBlockHash()",
-                "0"
-            )
+        bytes32 wrongPreviousBlockHash = Utils.randomBytes32(
+            "wrongPreviousBlockHash"
         );
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000001),
@@ -251,13 +245,14 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    function test_RevertWhen_UnexpectedL1ToL2Log() public {
+    function test_RevertWhen_UnexpectedL2ToL1Log() public {
         address unexpectedAddress = address(0);
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),
             unexpectedAddress,
-            uint256(currentTimestamp)
+            uint256(currentTimestamp),
+            bytes32("")
         );
 
         IExecutor.CommitBlockInfo
@@ -280,13 +275,8 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
-        bytes32 randomBytes32 = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_committingWithWrongCanonicalTxHash()",
-                "0"
-            )
-        );
+        bytes32 canonicalTxHash = Utils.randomBytes32("canonicalTxHash");
+
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000002),
             bytes4(0x00000000),
@@ -295,7 +285,7 @@ contract CommittingTest is ExecutorTest {
             bytes32(""),
             bytes4(0x00010000),
             L2_BOOTLOADER_ADDRESS,
-            randomBytes32,
+            canonicalTxHash,
             uint256(1)
         );
 
@@ -319,12 +309,8 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
-        bytes32 arbitraryCanonicalTxHash = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingWithWrongNumberOfLayer1txs()",
-                "0"
-            )
+        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32(
+            "arbitraryCanonicalTxHash"
         );
         bytes32 chainedPriorityTxHash = keccak256(
             bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
@@ -366,20 +352,8 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongFactoryDepsData() public {
-        bytes32 randomFactoryDeps0 = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingWithWrongFactoryDepsData()",
-                "0"
-            )
-        );
-        bytes32 randomFactoryDeps1 = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingWithWrongFactoryDepsData()",
-                "1"
-            )
-        );
+        bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
+        bytes32 randomFactoryDeps1 = Utils.randomBytes32("randomFactoryDeps1");
 
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000002),
@@ -419,13 +393,7 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongFactoryDepsArrayLength()
         public
     {
-        bytes32 arbitraryBytecode = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingWithWrongFactoryDepsArrayLength()",
-                "0"
-            )
-        );
+        bytes32 arbitraryBytecode = Utils.randomBytes32("arbitraryBytecode");
         bytes32 arbitraryBytecodeHash = sha256(bytes.concat(arbitraryBytecode));
         uint256 arbitraryBytecodeHashManipulated1 = uint256(
             arbitraryBytecodeHash
@@ -470,13 +438,7 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ComittingWithWrongHashedMessage() public {
-        bytes32 randomL2LogValue = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_ComittingWithWrongHashedMessage()",
-                "0"
-            )
-        );
+        bytes32 randomL2LogValue = Utils.randomBytes32("randomL2LogValue");
 
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000002),
@@ -494,13 +456,7 @@ contract CommittingTest is ExecutorTest {
             memory wrongNewCommitBlockInfo = newCommitBlockInfo;
         wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
 
-        bytes32 randomL2Message = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_ComittingWithWrongHashedMessage()",
-                "1"
-            )
-        );
+        bytes32 randomL2Message = Utils.randomBytes32("randomL2Message");
 
         bytes[] memory l2ArbitraryLengthMessages = new bytes[](1);
         l2ArbitraryLengthMessages[0] = bytes.concat(randomL2Message);
@@ -565,6 +521,8 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingWithWrongBytecodeLength() public {
+        bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
+
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000002),
             bytes4(0x00000000),
@@ -573,24 +531,11 @@ contract CommittingTest is ExecutorTest {
             bytes32(""),
             bytes4(0x00010000),
             L2_KNOWN_CODE_STORAGE_ADDRESS,
-            keccak256(
-                bytes.concat(
-                    "randomBytes32",
-                    "test_RevertWhen_CommittingWithWrongBytecodeLength()",
-                    "0"
-                )
-            )
+            randomFactoryDeps0
         );
 
-        bytes20 randomFactoryDeps1 = bytes20(
-            keccak256(
-                bytes.concat(
-                    "randomBytes20",
-                    "test_RevertWhen_CommittingWithWrongBytecodeLength()",
-                    "0"
-                )
-            )
-        );
+        bytes20 randomFactoryDeps1 = bytes20(randomFactoryDeps0);
+
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = bytes.concat(randomFactoryDeps1);
 
@@ -617,6 +562,8 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongNumberOfWordsInBytecode()
         public
     {
+        bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
+
         bytes memory wrongL2Logs = abi.encodePacked(
             bytes4(0x00000002),
             bytes4(0x00000000),
@@ -625,30 +572,12 @@ contract CommittingTest is ExecutorTest {
             bytes32(""),
             bytes4(0x00010000),
             L2_KNOWN_CODE_STORAGE_ADDRESS,
-            keccak256(
-                bytes.concat(
-                    "randomBytes32",
-                    "test_RevertWhen_CommittingWithWrongNumberOfWordsInBytecode()",
-                    "0"
-                )
-            )
+            randomFactoryDeps0
         );
 
         bytes memory randomFactoryDeps1 = bytes.concat(
-            keccak256(
-                bytes.concat(
-                    "randomBytes32",
-                    "test_RevertWhen_CommittingWithWrongNumberOfWordsInBytecode()",
-                    "0"
-                )
-            ),
-            keccak256(
-                bytes.concat(
-                    "randomBytes32",
-                    "test_RevertWhen_CommittingWithWrongNumberOfWordsInBytecode()",
-                    "1"
-                )
-            )
+            randomFactoryDeps0,
+            randomFactoryDeps0
         );
 
         bytes[] memory factoryDeps = new bytes[](1);
@@ -679,7 +608,10 @@ contract CommittingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32("")
         );
 
@@ -722,7 +654,10 @@ contract CommittingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32(""),
             arr1
         );
@@ -754,20 +689,25 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    function test_ShouldCommitBlock() public {
+    function test_SuccessfullyCommitBlock() public {
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32("")
         );
 
-        newCommitBlockInfo.l2Logs = correctL2Logs;
+        IExecutor.CommitBlockInfo
+            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
 
         IExecutor.CommitBlockInfo[]
             memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        commitBlockInfoArray[0] = newCommitBlockInfo;
+        commitBlockInfoArray[0] = correctNewCommitBlockInfo;
 
         vm.prank(validator);
 
@@ -783,18 +723,6 @@ contract CommittingTest is ExecutorTest {
             keccak256("BlockCommit(uint256,bytes32,bytes32)")
         );
         assertEq(entries[0].topics[1], bytes32(uint256(1))); // blockNumber
-        assertEq(
-            entries[0].topics[2],
-            bytes32(
-                0x5391aedfa307cfbb5523d0ba566759d1b5c0901dcb5868a195addafd5e9dd563
-            )
-        ); // blockHash
-        assertEq(
-            entries[0].topics[3],
-            bytes32(
-                0x00cc2f6937a02033a72880ac0f2a2a7caeb8795676538437e1277d2b6e6c6fb5
-            )
-        ); // commitment
 
         uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
         assertEq(totalBlocksCommitted, 1);

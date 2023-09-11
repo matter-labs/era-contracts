@@ -10,28 +10,22 @@ contract AuthorizationTest is ExecutorTest {
     function setUp() public {
         storedBlockInfo = IExecutor.StoredBlockInfo({
             blockNumber: 1,
-            blockHash: keccak256(bytes.concat("randomBytes32", "setUp()", "0")),
+            blockHash: Utils.randomBytes32("blockHash"),
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
-            l2LogsTreeRoot: keccak256(
-                bytes.concat("randomBytes32", "setUp()", "1")
-            ),
+            l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             timestamp: 0,
-            commitment: keccak256(bytes.concat("randomBytes32", "setUp()", "2"))
+            commitment: Utils.randomBytes32("commitment")
         });
 
         commitBlockInfo = IExecutor.CommitBlockInfo({
             blockNumber: 0,
             timestamp: 0,
             indexRepeatedStorageChanges: 0,
-            newStateRoot: keccak256(
-                bytes.concat("randomBytes32", "setUp()", "3")
-            ),
+            newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: keccak256(
-                bytes.concat("randomBytes32", "setUp()", "4")
-            ),
+            l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             priorityOperationsHash: keccak256(""),
             initialStorageChanges: bytes(""),
             repeatedStorageChanges: bytes(""),

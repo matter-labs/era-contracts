@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
+import "../Utils/Utils.sol";
 import "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
 import "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
@@ -12,6 +13,8 @@ import "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 
 contract ExecutorTest is Test {
+    using Utils for *;
+
     address constant L2_SYSTEM_CONTEXT_ADDRESS =
         0x000000000000000000000000000000000000800B;
     address constant L2_KNOWN_CODE_STORAGE_ADDRESS =

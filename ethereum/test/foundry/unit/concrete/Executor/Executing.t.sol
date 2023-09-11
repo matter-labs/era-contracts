@@ -11,9 +11,7 @@ contract ExecutingTest is ExecutorTest {
             blockNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
-            newStateRoot: keccak256(
-                bytes.concat("randomBytes32", "setUp()", "0")
-            ),
+            newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             l2LogsTreeRoot: 0,
             priorityOperationsHash: keccak256(""),
@@ -28,7 +26,10 @@ contract ExecutingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32("")
         );
         newCommitBlockInfo.l2Logs = correctL2Logs;
@@ -114,12 +115,8 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         executor.revertBlocks(0);
 
-        bytes32 arbitraryCanonicalTxHash = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_ExecutingUnavailablePriorityOperationHash()",
-                "0"
-            )
+        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32(
+            "arbitraryCanonicalTxHash"
         );
         bytes32 chainedPriorityTxHash = keccak256(
             bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
@@ -129,7 +126,10 @@ contract ExecutingTest is ExecutorTest {
             bytes4(0x00000002),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32(""),
             bytes4(0x00010000),
             L2_BOOTLOADER_ADDRESS,
@@ -190,12 +190,8 @@ contract ExecutingTest is ExecutorTest {
         vm.prank(validator);
         executor.revertBlocks(0);
 
-        bytes32 arbitraryCanonicalTxHash = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash()",
-                "0"
-            )
+        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32(
+            "arbitraryCanonicalTxHash"
         );
         bytes32 chainedPriorityTxHash = keccak256(
             bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
@@ -205,7 +201,10 @@ contract ExecutingTest is ExecutorTest {
             bytes4(0x00000002),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32(""),
             bytes4(0x00010000),
             L2_BOOTLOADER_ADDRESS,
@@ -255,13 +254,7 @@ contract ExecutingTest is ExecutorTest {
             proofInput
         );
 
-        bytes32 randomFactoryDeps0 = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash()",
-                "1"
-            )
-        );
+        bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
 
         bytes[] memory factoryDeps = new bytes[](1);
         factoryDeps[0] = bytes.concat(randomFactoryDeps0);
@@ -298,7 +291,10 @@ contract ExecutingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32("")
         );
 
@@ -312,12 +308,8 @@ contract ExecutingTest is ExecutorTest {
             );
         correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
 
-        bytes32 wrongPreviousBlockHash = keccak256(
-            bytes.concat(
-                "randomBytes32",
-                "test_RevertWhen_CommittingBlockWithWrongPreviousBlockHash()",
-                "0"
-            )
+        bytes32 wrongPreviousBlockHash = Utils.randomBytes32(
+            "wrongPreviousBlockHash"
         );
 
         IExecutor.StoredBlockInfo memory genesisBlock = genesisStoredBlockInfo;

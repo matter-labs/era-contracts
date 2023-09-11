@@ -12,9 +12,7 @@ contract ProvingTest is ExecutorTest {
                 blockNumber: 1,
                 timestamp: uint64(currentTimestamp),
                 indexRepeatedStorageChanges: 0,
-                newStateRoot: keccak256(
-                    bytes.concat("randomBytes32", "setUp()", "0")
-                ),
+                newStateRoot: Utils.randomBytes32("newStateRoot"),
                 numberOfLayer1Txs: 0,
                 l2LogsTreeRoot: 0,
                 priorityOperationsHash: keccak256(""),
@@ -29,7 +27,10 @@ contract ProvingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(currentTimestamp),
+            Utils.packBatchTimestampAndBlockTimestamp(
+                currentTimestamp,
+                currentTimestamp
+            ),
             bytes32("")
         );
 

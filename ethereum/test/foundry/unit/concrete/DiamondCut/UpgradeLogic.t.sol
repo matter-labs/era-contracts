@@ -376,9 +376,11 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         vm.startPrank(governor);
 
+        bytes32 porposalHash = Utils.randomBytes32("porposalHash");
+
         vm.expectRevert(abi.encodePacked("ya"));
         proxyAsDiamondCut.proposeShadowUpgrade(
-            bytes32("randomBytes32"),
+            porposalHash,
             nextProposalId + 1
         );
     }
@@ -439,8 +441,12 @@ contract UpgradeLogicTest is DiamondCutTest {
             nextProposalId
         );
 
+        bytes32 proposedUpgradeHash = Utils.randomBytes32(
+            "proposedUpgradeHash"
+        );
+
         vm.expectRevert(abi.encodePacked("rx"));
-        proxyAsDiamondCut.cancelUpgradeProposal(bytes32("randomBytes32"));
+        proxyAsDiamondCut.cancelUpgradeProposal(proposedUpgradeHash);
     }
 
     function test_RevertWhen_ExecutingTransparentUpgradeWithNonZeroSalt()
@@ -471,10 +477,9 @@ contract UpgradeLogicTest is DiamondCutTest {
             nextProposalId
         );
 
+        bytes32 proposalSalt = Utils.randomBytes32("proposalSalt");
+
         vm.expectRevert(abi.encodePacked("po"));
-        proxyAsDiamondCut.executeUpgrade(
-            diamondCutData,
-            bytes32("randomBytes32")
-        );
+        proxyAsDiamondCut.executeUpgrade(diamondCutData, proposalSalt);
     }
 }

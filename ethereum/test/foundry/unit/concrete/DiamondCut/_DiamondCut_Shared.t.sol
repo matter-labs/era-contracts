@@ -2,9 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
+import "../Utils/Utils.sol";
 import "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
 
 contract DiamondCutTest is Test {
+    using Utils for *;
+
     DiamondCutTestContract diamondCutTestContract;
     GettersFacet gettersFacet;
 
