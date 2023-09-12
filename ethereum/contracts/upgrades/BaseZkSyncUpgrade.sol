@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "../zksync/facets/Base.sol";
 import "../zksync/interfaces/IMailbox.sol";
-import "../zksync/Verifier.sol";
+import "../verifier/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../zksync/libraries/TransactionValidator.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS} from "../zksync/Config.sol";
@@ -103,16 +103,16 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(Verifier _newVerifier) private {
+    function _setVerifier(IVerifier _newVerifier) private {
         // An upgrade to the verifier must be done carefully to ensure there aren't blocks in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed blocks.
         // Blocks committed expecting the old verifier will fail. Ensure all commited blocks are finalized before the
         // verifier is upgraded.
-        if (_newVerifier == Verifier(address(0))) {
+        if (_newVerifier == IVerifier(address(0))) {
             return;
         }
 
-        Verifier oldVerifier = s.verifier;
+        IVerifier oldVerifier = s.verifier;
         s.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
@@ -137,7 +137,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If either of the fields is 0, the params will not be updated.
     function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
-        _setVerifier(Verifier(_newVerifier));
+        _setVerifier(IVerifier(_newVerifier));
         _setVerifierParams(_verifierParams);
     }
 

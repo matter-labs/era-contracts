@@ -43,7 +43,7 @@ contract DiamondUpgradeInit3 is Base {
     function upgrade(
         uint256 _priorityTxMaxGasLimit,
         IAllowList _allowList,
-        Verifier _verifier
+        IVerifier _verifier
     ) external payable returns (bytes32) {
         // Zero out the deprecated storage slots
         delete s.__DEPRECATED_diamondCutStorage;
