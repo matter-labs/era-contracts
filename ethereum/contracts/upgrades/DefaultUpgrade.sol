@@ -2,10 +2,10 @@
 
 pragma solidity ^0.8.13;
 
-import "../zksync/libraries/Diamond.sol";
+import "../common/libraries/Diamond.sol";
 import "./BaseZkSyncUpgrade.sol";
 
-contract DefaultUpgrade is BaseZkSyncUpgrade {
+contract ProofDefaultUpgrade is BaseZkSyncUpgrade {
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each upgrade.
@@ -18,16 +18,17 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
 
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
-        super.upgrade(_proposedUpgrade);
+    function upgrade(uint256 _chainId, ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+        super.upgrade(_chainId, _proposedUpgrade);
 
-        _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
+        _setNewProtocolVersion(_chainId, _proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
+        _setBaseSystemContracts(_chainId, _proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
         bytes32 txHash;
         txHash = _setL2SystemContractUpgrade(
+            _chainId,
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
             _proposedUpgrade.newProtocolVersion

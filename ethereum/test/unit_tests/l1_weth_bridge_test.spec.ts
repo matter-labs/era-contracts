@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { ethers } from 'ethers';
 import * as hardhat from 'hardhat';
-import { IZkSync } from '../../typechain/IZkSync';
+import { IFactory as IZkSync } from '../../typechain/IFactory';
 import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
     AllowList,
@@ -25,6 +25,7 @@ const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').
 
 export async function create2DeployFromL1(
     zkSync: IZkSync,
+    chainId: ethers.BigNumberish,
     walletAddress: Address,
     bytecode: ethers.BytesLike,
     constructor: ethers.BytesLike,
@@ -38,6 +39,7 @@ export async function create2DeployFromL1(
     const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
     await zkSync.requestL2Transaction(
+        chainId,
         DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
         0,
         calldata,
@@ -80,19 +82,19 @@ describe('WETH Bridge tests', () => {
 
         const dummyHash = new Uint8Array(32);
         dummyHash.set([1, 0, 0, 1]);
-        const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+        // const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            dummyAddress,
+            // dummyAddress,
             await owner.getAddress(),
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,
             allowList.address,
-            {
-                recursionCircuitsSetVksHash: ethers.constants.HashZero,
-                recursionLeafLevelVkHash: ethers.constants.HashZero,
-                recursionNodeLevelVkHash: ethers.constants.HashZero
-            },
+            // {
+            //     recursionCircuitsSetVksHash: ethers.constants.HashZero,
+            //     recursionLeafLevelVkHash: ethers.constants.HashZero,
+            //     recursionNodeLevelVkHash: ethers.constants.HashZero
+            // },
             false,
             dummyHash,
             dummyHash,
@@ -146,6 +148,7 @@ describe('WETH Bridge tests', () => {
             bridgeProxy
                 .connect(randomSigner)
                 .deposit(
+                    chainId,
                     await randomSigner.getAddress(),
                     ethers.constants.AddressZero,
                     0,
@@ -166,6 +169,7 @@ describe('WETH Bridge tests', () => {
             bridgeProxy
                 .connect(randomSigner)
                 .deposit(
+                    chainId,
                     await randomSigner.getAddress(),
                     await bridgeProxy.l1WethAddress(),
                     0,
@@ -184,6 +188,7 @@ describe('WETH Bridge tests', () => {
         await bridgeProxy
             .connect(randomSigner)
             .deposit(
+                chainId,
                 await randomSigner.getAddress(),
                 l1Weth.address,
                 100,
@@ -196,14 +201,14 @@ describe('WETH Bridge tests', () => {
 
     it('Should revert on finalizing a withdrawal with wrong message length', async () => {
         const revertReason = await getCallRevertReason(
-            bridgeProxy.connect(randomSigner).finalizeWithdrawal(0, 0, 0, '0x', [])
+            bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, '0x', [])
         );
         expect(revertReason).equal('Incorrect ETH message with additional data length');
     });
 
     it('Should revert on finalizing a withdrawal with wrong function selector', async () => {
         const revertReason = await getCallRevertReason(
-            bridgeProxy.connect(randomSigner).finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(96), [])
+            bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
         );
         expect(revertReason).equal('Incorrect ETH message function selector');
     });
@@ -213,6 +218,7 @@ describe('WETH Bridge tests', () => {
             bridgeProxy
                 .connect(randomSigner)
                 .finalizeWithdrawal(
+                    chainId,
                     0,
                     0,
                     0,
@@ -228,6 +234,7 @@ describe('WETH Bridge tests', () => {
             bridgeProxy
                 .connect(randomSigner)
                 .finalizeWithdrawal(
+                    chainId,
                     0,
                     0,
                     0,

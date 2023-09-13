@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../zksync/libraries/Merkle.sol";
+import "../../bridgehead/libraries/Merkle.sol";
 
 contract MerkleTest {
     function calculateRoot(

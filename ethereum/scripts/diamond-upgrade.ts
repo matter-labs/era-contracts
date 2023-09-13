@@ -9,13 +9,29 @@ import { FacetCut, getAllSelectors } from '../src.ts/diamondCut';
 const provider = web3Provider();
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 
-function getZkSyncContract() {
+function getFactoryContract() {
     // Create the dummy wallet with provider to get contracts from `Deployer`
     const dummyWallet = ethers.Wallet.createRandom().connect(provider);
     const deployer = new Deployer({ deployWallet: dummyWallet });
 
-    return deployer.zkSyncContract(dummyWallet);
+    return deployer.bridgeheadContract(dummyWallet);
 }
+
+// function getProofSystemContract() {
+//     // Create the dummy wallet with provider to get contracts from `Deployer`
+//     const dummyWallet = ethers.Wallet.createRandom().connect(provider);
+//     const deployer = new Deployer({ deployWallet: dummyWallet });
+
+//     return deployer.proofSystemContract(dummyWallet);
+// }
+
+// function getEraContract() {
+//     // Create the dummy wallet with provider to get contracts from `Deployer`
+//     const dummyWallet = ethers.Wallet.createRandom().connect(provider);
+//     const deployer = new Deployer({ deployWallet: dummyWallet });
+
+//     return deployer.eraContract(dummyWallet);
+// }
 
 async function main() {
     const program = new Command();
@@ -30,7 +46,7 @@ async function main() {
     });
 
     program.command('diamond-loupe-view').action(async () => {
-        const facets = await getZkSyncContract().facets();
+        const facets = await getFactoryContract().facets();
 
         print('Facets', facets);
     });
@@ -81,7 +97,7 @@ async function main() {
             const initData = cmd.initData ? cmd.initData : '0x';
             const proposalId = cmd.proposalId
                 ? cmd.proposalId
-                : (await getZkSyncContract().getCurrentProposalId()).add(1);
+                : (await getFactoryContract().getCurrentProposalId()).add(1);
 
             const upgradeParam = diamondCut(facetCuts, initAddress, initData);
             print('DiamondCut', upgradeParam);

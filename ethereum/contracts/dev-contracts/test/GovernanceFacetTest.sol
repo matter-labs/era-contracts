@@ -2,22 +2,18 @@
 
 pragma solidity ^0.8.13;
 
-import "../../zksync/facets/Governance.sol";
+import "../../proof-system/chain-deps/facets/ProofChainGovernance.sol";
 
-contract GovernanceFacetTest is GovernanceFacet {
+contract GovernanceFacetTest is ProofGovernanceFacet {
     constructor() {
-        s.governor = msg.sender;
-    }
-
-    function isValidator(address _validator) external view returns (bool) {
-        return s.validators[_validator];
+        chainStorage.governor = msg.sender;
     }
 
     function getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+        return chainStorage.pendingGovernor;
     }
 
     function getGovernor() external view returns (address) {
-        return s.governor;
+        return chainStorage.governor;
     }
 }

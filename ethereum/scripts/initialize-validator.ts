@@ -16,6 +16,7 @@ async function main() {
 
     program
         .option('--private-key <private-key>')
+        .option('--chain-id <chain-id>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .action(async (cmd) => {
@@ -39,7 +40,7 @@ async function main() {
                 verbose: true
             });
 
-            const zkSync = deployer.zkSyncContract(deployWallet);
+            const zkSync = deployer.proofChainContract(deployWallet);
             const validatorTimelock = deployer.validatorTimelock(deployWallet);
             const tx = await zkSync.setValidator(validatorTimelock.address, true);
             console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);

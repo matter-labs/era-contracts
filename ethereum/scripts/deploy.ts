@@ -17,6 +17,7 @@ async function main() {
 
     program
         .option('--private-key <private-key>')
+        .option('--chain-id <chain-id>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .option('--governor-address <governor-address>')
@@ -64,26 +65,26 @@ async function main() {
             }
 
             // Deploy diamond upgrade init contract if needed
-            const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
-            if (diamondUpgradeContractVersion) {
-                await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
-                    gasPrice,
-                    nonce
-                });
-                nonce++;
-            }
+            // const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
+            // if (diamondUpgradeContractVersion) {
+            //     await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
+            //         gasPrice,
+            //         nonce
+            //     });
+            //     nonce++;
+            // }
 
-            await deployer.deployDefaultUpgrade(create2Salt, {
-                gasPrice,
-                nonce
-            });
-            nonce++;
+            // await deployer.deployDefaultUpgrade(create2Salt, {
+            //     gasPrice,
+            //     nonce
+            // });
+            // nonce++;
 
             await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-            await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);
-            await deployer.deployBridgeContracts(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying zkSync contracts
+            await deployer.deployBridgeheadContract(create2Salt, gasPrice, nonce + 1);
+            await deployer.deployProofSystemContract(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying factory contracts
+            await deployer.deployBridgeContracts(create2Salt, gasPrice);
             await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-            await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
         });
 
     await program.parseAsync(process.argv);

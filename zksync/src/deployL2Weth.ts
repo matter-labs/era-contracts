@@ -43,9 +43,11 @@ async function main() {
 
     program
         .option('--private-key <private-key>')
+        .option('--chain-id <chain-id>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .action(async (cmd) => {
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             if (!l1WethToken) {
                 // Makes no sense to deploy the Rollup WETH if there is no base Layer WETH provided
                 console.log('Base Layer WETH address not provided so WETH deployment will be skipped.');
@@ -72,7 +74,7 @@ async function main() {
                 verbose: true
             });
 
-            const zkSync = deployer.zkSyncContract(deployWallet);
+            const zkSync = deployer.bridgeheadContract(deployWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
             const governorAddress = await zkSync.getGovernor();
@@ -103,6 +105,7 @@ async function main() {
             );
 
             const tx = await create2DeployFromL1(
+                chainId,
                 deployWallet,
                 L2_WETH_IMPLEMENTATION_BYTECODE,
                 '0x',
@@ -116,6 +119,7 @@ async function main() {
             await tx.wait();
 
             const tx2 = await create2DeployFromL1(
+                chainId,
                 deployWallet,
                 L2_WETH_PROXY_BYTECODE,
                 l2ERC20BridgeProxyConstructor,

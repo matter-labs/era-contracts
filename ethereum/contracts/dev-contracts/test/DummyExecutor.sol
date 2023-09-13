@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.13;
 
-import "../../zksync/interfaces/IExecutor.sol";
+import "../../proof-system/chain-interfaces/IProofChainExecutor.sol";
 
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
-contract DummyExecutor is IExecutor {
+contract DummyExecutor is IProofExecutor {
     address owner;
 
     // Flags to control if the contract should revert during commit, prove, and execute blocks operations
@@ -18,7 +18,7 @@ contract DummyExecutor is IExecutor {
     uint256 public getTotalBlocksCommitted;
     uint256 public getTotalBlocksVerified;
     uint256 public getTotalBlocksExecuted;
-    string public constant override getName = "DummyExecutor";
+    string public constant getName = "DummyExecutor";
 
     /// @notice Constructor sets the contract owner to the message sender
     constructor() {
@@ -29,6 +29,12 @@ contract DummyExecutor is IExecutor {
     modifier onlyOwner() {
         require(msg.sender == owner);
         _;
+    }
+
+    /// @notice Removing txs from the priority queue
+    function removePriorityQueueFront(uint256 _index) external {
+        // KL todo
+        // s.priorityQueue.removeFront(_index);
     }
 
     /// @notice Allows the owner to set whether the contract should revert during commit blocks operation

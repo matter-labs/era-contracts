@@ -20,6 +20,7 @@ import {
 import * as ethers from 'ethers';
 
 describe('Mailbox tests', function () {
+    const chainId = ethers.BigNumber.from(9);
     let mailbox: MailboxFacet;
     let allowList: AllowList;
     let diamondProxyContract: ethers.Contract;
@@ -50,17 +51,17 @@ describe('Mailbox tests', function () {
         dummyHash.set([1, 0, 0, 1]);
         const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            dummyAddress,
+            // dummyAddress,
             dummyAddress,
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,
             allowList.address,
-            {
-                recursionCircuitsSetVksHash: ethers.constants.HashZero,
-                recursionLeafLevelVkHash: ethers.constants.HashZero,
-                recursionNodeLevelVkHash: ethers.constants.HashZero
-            },
+            // {
+            //     recursionCircuitsSetVksHash: ethers.constants.HashZero,
+            //     recursionLeafLevelVkHash: ethers.constants.HashZero,
+            //     recursionNodeLevelVkHash: ethers.constants.HashZero
+            // },
             false,
             dummyHash,
             dummyHash,
@@ -86,6 +87,7 @@ describe('Mailbox tests', function () {
     it('Should accept correctly formatted bytecode', async () => {
         const revertReason = await getCallRevertReason(
             requestExecute(
+                chainId,
                 mailbox,
                 ethers.constants.AddressZero,
                 ethers.BigNumber.from(0),
@@ -102,6 +104,7 @@ describe('Mailbox tests', function () {
     it('Should not accept bytecode is not chunkable', async () => {
         const revertReason = await getCallRevertReason(
             requestExecute(
+                chainId,
                 mailbox,
                 ethers.constants.AddressZero,
                 ethers.BigNumber.from(0),
@@ -118,6 +121,7 @@ describe('Mailbox tests', function () {
     it('Should not accept bytecode of even length in words', async () => {
         const revertReason = await getCallRevertReason(
             requestExecute(
+                chainId,
                 mailbox,
                 ethers.constants.AddressZero,
                 ethers.BigNumber.from(0),
@@ -134,6 +138,7 @@ describe('Mailbox tests', function () {
     it('Should not accept bytecode that is too long', async () => {
         const revertReason = await getCallRevertReason(
             requestExecute(
+                chainId,
                 mailbox,
                 ethers.constants.AddressZero,
                 ethers.BigNumber.from(0),
@@ -160,6 +165,7 @@ describe('Mailbox tests', function () {
         it('Should not accept depositing more than the deposit limit', async () => {
             const revertReason = await getCallRevertReason(
                 requestExecute(
+                    chainId,
                     mailbox,
                     ethers.constants.AddressZero,
                     ethers.utils.parseEther('12'),
@@ -180,6 +186,7 @@ describe('Mailbox tests', function () {
 
             const revertReason = await getCallRevertReason(
                 requestExecute(
+                    chainId,
                     mailbox,
                     ethers.constants.AddressZero,
                     DEPOSIT_LIMIT.sub(l2Cost),
@@ -197,6 +204,7 @@ describe('Mailbox tests', function () {
         it('Should not accept depositing that the accumulation is more than the deposit limit', async () => {
             const revertReason = await getCallRevertReason(
                 requestExecute(
+                    chainId,
                     mailbox,
                     ethers.constants.AddressZero,
                     ethers.BigNumber.from(1),
@@ -222,6 +230,7 @@ describe('Mailbox tests', function () {
 
             const revertReason = await getCallRevertReason(
                 requestExecute(
+                    chainId,
                     mailbox.connect(randomSigner),
                     ethers.constants.AddressZero,
                     ethers.BigNumber.from(0),
@@ -245,6 +254,7 @@ describe('Mailbox tests', function () {
 
             const revertReason = await getCallRevertReason(
                 requestExecute(
+                    chainId,
                     mailbox.connect(owner),
                     ethers.constants.AddressZero,
                     ethers.BigNumber.from(0),
@@ -266,6 +276,7 @@ describe('Mailbox tests', function () {
         callDirectly = async (refundRecipient) => {
             return {
                 transaction: await requestExecute(
+                    chainId,
                     mailbox.connect(owner),
                     ethers.constants.AddressZero,
                     ethers.BigNumber.from(0),
@@ -280,6 +291,7 @@ describe('Mailbox tests', function () {
 
         const encodeRequest = (refundRecipient) =>
             mailbox.interface.encodeFunctionData('requestL2Transaction', [
+                chainId,
                 ethers.constants.AddressZero,
                 0,
                 '0x',

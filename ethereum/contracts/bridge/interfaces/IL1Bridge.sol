@@ -16,9 +16,14 @@ interface IL1Bridge {
 
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
-    function isWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool);
+    function isWithdrawalFinalized(
+        uint256 chainId,
+        uint256 _l2BlockNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool);
 
     function deposit(
+        uint256 _chainId,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -28,6 +33,7 @@ interface IL1Bridge {
     ) external payable returns (bytes32 txHash);
 
     function claimFailedDeposit(
+        uint256 _chainId,
         address _depositSender,
         address _l1Token,
         bytes32 _l2TxHash,
@@ -38,6 +44,7 @@ interface IL1Bridge {
     ) external;
 
     function finalizeWithdrawal(
+        uint256 _chainId,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBlock,

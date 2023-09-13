@@ -63,13 +63,15 @@ async function getBeaconProxyUpgradeCalldata(target: string) {
 
 async function getL1TxInfo(
     deployer: Deployer,
+    chainId: string,
     to: string,
     l2Calldata: string,
     refundRecipient: string,
     gasPrice: BigNumber
 ) {
-    const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+    const zksync = deployer.bridgeheadContract(ethers.Wallet.createRandom().connect(provider));
     const l1Calldata = zksync.interface.encodeFunctionData('requestL2Transaction', [
+        chainId,
         to,
         0,
         l2Calldata,
@@ -80,6 +82,7 @@ async function getL1TxInfo(
     ]);
 
     const neededValue = await zksync.l2TransactionBaseCost(
+        chainId,
         gasPrice,
         priorityTxMaxGasLimit,
         REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
@@ -95,17 +98,19 @@ async function getL1TxInfo(
 
 async function getBridgeUpgradeTxInfo(
     deployer: Deployer,
+    chainId: string,
     target: string,
     refundRecipient: string,
     gasPrice: BigNumber
 ) {
     const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
 
-    return await getL1TxInfo(deployer, l2Erc20BridgeProxyAddress, l2Calldata, refundRecipient, gasPrice);
+    return await getL1TxInfo(deployer, chainId, l2Erc20BridgeProxyAddress, l2Calldata, refundRecipient, gasPrice);
 }
 
 async function getTokenBeaconUpgradeTxInfo(
     deployer: Deployer,
+    chainId: string,
     target: string,
     refundRecipient: string,
     gasPrice: BigNumber,
@@ -113,11 +118,12 @@ async function getTokenBeaconUpgradeTxInfo(
 ) {
     const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
 
-    return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice);
+    return await getL1TxInfo(deployer, chainId, proxy, l2Calldata, refundRecipient, gasPrice);
 }
 
 async function getTxInfo(
     deployer: Deployer,
+    chainId: string,
     target: string,
     refundRecipient: string,
     gasPrice: BigNumber,
@@ -125,7 +131,7 @@ async function getTxInfo(
     l2ProxyAddress?: string
 ) {
     if (contract === 'L2ERC20Bridge') {
-        return getBridgeUpgradeTxInfo(deployer, target, refundRecipient, gasPrice);
+        return getBridgeUpgradeTxInfo(deployer, chainId, target, refundRecipient, gasPrice);
     } else if (contract == 'L2StandardERC20') {
         if (!l2ProxyAddress) {
             console.log('Explicit beacon address is not supplied, requesting the one from L2 node');
@@ -133,7 +139,7 @@ async function getTxInfo(
         }
         console.log(`Using beacon address: ${l2ProxyAddress}`);
 
-        return getTokenBeaconUpgradeTxInfo(deployer, target, refundRecipient, gasPrice, l2ProxyAddress);
+        return getTokenBeaconUpgradeTxInfo(deployer, chainId, target, refundRecipient, gasPrice, l2ProxyAddress);
     } else {
         throw new Error(`Unsupported contract: ${contract}`);
     }
@@ -153,6 +159,7 @@ async function main() {
         .option('--no-l2-double-check')
         .action(async (cmd) => {
             // We deploy the target contract through L1 to ensure security
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
@@ -189,6 +196,7 @@ async function main() {
             }
 
             const tx = await create2DeployFromL1(
+                chainId,
                 deployWallet,
                 bridgeImplBytecode,
                 '0x',
@@ -209,7 +217,7 @@ async function main() {
             if (cmd.l2DoubleCheck !== false) {
                 console.log('Waiting for the L2 transaction to be committed...');
                 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-                await awaitPriorityOps(zksProvider, receipt, deployer.zkSyncContract(deployWallet).interface);
+                await awaitPriorityOps(zksProvider, receipt, deployer.bridgeheadContract(deployWallet).interface);
 
                 // Double checking that the bridge implementation has been deployed
                 const deployedBytecode = await zksProvider.getCode(l2ERC20BridgeImplAddr);
@@ -235,6 +243,7 @@ async function main() {
         .option('--deployer-private-key <deployer-private-key>')
         .option('--refund-recipient <refund-recipient>')
         .action(async (cmd) => {
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
             const deployWallet = cmd.deployerPrivateKey
                 ? new Wallet(cmd.deployerPrivateKey, provider)
@@ -255,6 +264,7 @@ async function main() {
             console.log('Refund recipient: ', refundRecipient);
             const txInfo = await getTxInfo(
                 deployer,
+                chainId,
                 target,
                 refundRecipient,
                 gasPrice,
@@ -276,6 +286,7 @@ async function main() {
         .option('--refund-recipient <refund-recipient>')
         .option('--no-l2-double-check')
         .action(async (cmd) => {
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
             const deployWallet = cmd.governorPrivateKey
                 ? new Wallet(cmd.governorPrivateKey, provider)
@@ -298,6 +309,7 @@ async function main() {
 
             const txInfo = await getTxInfo(
                 deployer,
+                chainId,
                 target,
                 refundRecipient,
                 gasPrice,
@@ -317,7 +329,7 @@ async function main() {
             // Note that it requires working L2 node.
             if (cmd.l2DoubleCheck !== false) {
                 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-                await awaitPriorityOps(zksProvider, receipt, deployer.zkSyncContract(deployWallet).interface);
+                await awaitPriorityOps(zksProvider, receipt, deployer.bridgeheadContract(deployWallet).interface);
 
                 console.log('The L2 transaction has been successfully committed');
             }
@@ -335,6 +347,7 @@ async function main() {
         .command('get-base-cost-for-max-op')
         .option('--gas-price <gas-price>')
         .action(async (cmd) => {
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             if (!cmd.gasPrice) {
                 throw new Error('Gas price is not provided');
             }
@@ -342,9 +355,10 @@ async function main() {
             const gasPrice = BigNumber.from(cmd.gasPrice);
 
             const deployer = new Deployer({ deployWallet: Wallet.createRandom().connect(provider) });
-            const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+            const zksync = deployer.bridgeheadContract(ethers.Wallet.createRandom().connect(provider));
 
             const neededValue = await zksync.l2TransactionBaseCost(
+                chainId,
                 gasPrice,
                 priorityTxMaxGasLimit,
                 REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT

@@ -58,10 +58,12 @@ async function main() {
 
     program
         .option('--private-key <private-key>')
+        .option('--chain-id <chain-id>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
         .option('--erc20-bridge <erc20-bridge>')
         .action(async (cmd) => {
+            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
                 : Wallet.fromMnemonic(
@@ -82,13 +84,13 @@ async function main() {
                 verbose: true
             });
 
-            const zkSync = deployer.zkSyncContract(deployWallet);
+            const factory = deployer.bridgeheadContract(deployWallet);
             const erc20Bridge = cmd.erc20Bridge
                 ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
                 : deployer.defaultERC20Bridge(deployWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-            const l1GovernorAddress = await zkSync.getGovernor();
+            const l1GovernorAddress = await factory.getGovernor();
             // Check whether governor is a smart contract on L1 to apply alias if needed.
             const l1GovernorCodeSize = ethers.utils.hexDataLength(
                 await deployWallet.provider.getCode(l1GovernorAddress)
@@ -134,20 +136,23 @@ async function main() {
             );
 
             // There will be two deployments done during the initial initialization
-            const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
+            const requiredValueToInitializeBridge = await factory.l2TransactionBaseCost(
+                chainId,
                 gasPrice,
                 DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
 
-            const requiredValueToPublishBytecodes = await zkSync.l2TransactionBaseCost(
+            const requiredValueToPublishBytecodes = await factory.l2TransactionBaseCost(
+                chainId,
                 gasPrice,
                 priorityTxMaxGasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
 
             const independentInitialization = [
-                zkSync.requestL2Transaction(
+                factory.requestL2Transaction(
+                    chainId,
                     ethers.constants.AddressZero,
                     0,
                     '0x',
@@ -158,6 +163,7 @@ async function main() {
                     { gasPrice, nonce, value: requiredValueToPublishBytecodes }
                 ),
                 erc20Bridge.initialize(
+                    chainId,
                     [
                         L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
                         L2_ERC20_BRIDGE_PROXY_BYTECODE,

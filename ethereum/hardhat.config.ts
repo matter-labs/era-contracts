@@ -2,6 +2,7 @@ import '@nomiclabs/hardhat-waffle';
 import '@nomiclabs/hardhat-solpp';
 import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
+import '@openzeppelin/hardhat-upgrades';
 import 'hardhat-typechain';
 import 'hardhat-contract-sizer';
 import 'solidity-coverage';

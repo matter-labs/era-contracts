@@ -24,13 +24,13 @@ async function main() {
 
     // Contracts without constructor parameters
     for (const address of [
-        addresses.ZkSync.DiamondCutFacet,
-        addresses.ZkSync.GettersFacet,
-        addresses.ZkSync.DiamondInit,
-        addresses.ZkSync.GovernanceFacet,
-        addresses.ZkSync.MailboxFacet,
-        addresses.ZkSync.ExecutorFacet,
-        addresses.ZkSync.Verifier
+        addresses.ProofSystem.ProofDiamondCutFacet,
+        addresses.ProofSystem.ProofGettersFacet,
+        addresses.ProofSystem.ProofDiamondInit,
+        addresses.ProofSystem.ProofGovernanceFacet,
+        addresses.ProofSystem.ProofExecutorFacet,
+        addresses.ProofSystem.Verifier
+        // kl todo add bridgehead here
     ]) {
         const promise = verifyPromise(address);
         promises.push(promise);

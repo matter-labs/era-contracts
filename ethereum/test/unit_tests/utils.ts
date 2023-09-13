@@ -41,6 +41,7 @@ export async function getCallRevertReason(promise) {
 }
 
 export async function requestExecute(
+    chainId: ethers.BigNumberish,
     mailbox: ethers.Contract,
     to: Address,
     l2Value: ethers.BigNumber,
@@ -55,6 +56,7 @@ export async function requestExecute(
 
     if (!overrides.value) {
         const baseCost = await mailbox.l2TransactionBaseCost(
+            chainId,
             overrides.gasPrice,
             l2GasLimit,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA
@@ -63,6 +65,7 @@ export async function requestExecute(
     }
 
     return await mailbox.requestL2Transaction(
+        chainId,
         to,
         l2Value,
         calldata,

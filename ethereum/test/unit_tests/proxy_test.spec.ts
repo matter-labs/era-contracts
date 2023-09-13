@@ -62,19 +62,19 @@ describe('Diamond proxy tests', function () {
             facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
         ];
 
-        const dummyVerifierParams = {
-            recursionNodeLevelVkHash: ethers.constants.HashZero,
-            recursionLeafLevelVkHash: ethers.constants.HashZero,
-            recursionCircuitsSetVksHash: ethers.constants.HashZero
-        };
+        // const dummyVerifierParams = {
+        //     recursionNodeLevelVkHash: ethers.constants.HashZero,
+        //     recursionLeafLevelVkHash: ethers.constants.HashZero,
+        //     recursionCircuitsSetVksHash: ethers.constants.HashZero
+        // };
         const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
-            '0x03752D8252d67f99888E741E3fB642803B29B155',
+            // '0x03752D8252d67f99888E741E3fB642803B29B155',
             governorAddress,
             '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
             0,
             '0x0000000000000000000000000000000000000000000000000000000000000000',
             '0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55',
-            dummyVerifierParams,
+            // dummyVerifierParams,
             false,
             '0x0100000000000000000000000000000000000000000000000000000000000000',
             '0x0100000000000000000000000000000000000000000000000000000000000000',

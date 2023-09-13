@@ -1,8 +1,8 @@
 import * as hardhat from 'hardhat';
 import { Command } from 'commander';
-import { deployedAddressesFromEnv } from '../src.ts/deploy';
-import { getNumberFromEnv } from './utils';
-import { diamondCut } from '../src.ts/diamondCut';
+import { deployedAddressesFromEnv } from '../../src.ts/deploy';
+import { getNumberFromEnv } from '../utils';
+import { diamondCut } from '../../src.ts/diamondCut';
 import { BigNumberish, BytesLike } from 'ethers';
 import { ethers } from 'hardhat';
 
@@ -25,6 +25,7 @@ async function main() {
         .command('prepare-upgrade-params <deployment-params>')
         .option('--factory-deps <factory-deps>')
         .action(async (deploymentParams: string, cmd) => {
+            // kl todo
             // Get deployed L1 contract addresses from environment variables and interfaces for them
             const l1Contracts = deployedAddressesFromEnv();
 
@@ -43,7 +44,7 @@ async function main() {
                 factoryDeps,
                 priorityTxMaxGasLimit
             ]);
-            const upgradeParam = diamondCut([], l1Contracts.ZkSync.DiamondUpgradeInit, upgradeInitData);
+            const upgradeParam = diamondCut([], l1Contracts.Bridgehead.DiamondUpgradeInit, upgradeInitData);
 
             // Get transaction data of the `proposeDiamondCut`
             const proposeDiamondCut = await diamondCutFacet.interface.encodeFunctionData('proposeDiamondCut', [

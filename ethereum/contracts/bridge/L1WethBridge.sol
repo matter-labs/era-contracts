@@ -8,11 +8,12 @@ import "./interfaces/IL1Bridge.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
-import "../zksync/interfaces/IZkSync.sol";
+import "../bridgehead/bridgehead-interfaces/IBridgehead.sol";
 import "../common/interfaces/IAllowList.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
+import "../common/Messaging.sol";
 import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
@@ -46,7 +47,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     IAllowList public immutable allowList;
 
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IZkSync public immutable zkSync;
+    IBridgehead public immutable zkSync;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
     address public l2Bridge;
@@ -56,13 +57,13 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
     /// @dev A mapping L2 block number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address payable _l1WethAddress,
-        IZkSync _zkSync,
+        IBridgehead _zkSync,
         IAllowList _allowList
     ) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
@@ -80,6 +81,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge implementation
     /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge proxy
     function initialize(
+        uint256 _chainId,
         bytes[] calldata _factoryDeps,
         address _l2WethAddress,
         address _governor,
@@ -100,7 +102,9 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         bytes32 l2WethBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
 
         // Deploy L2 bridge implementation contract
+        // KL todo remove chainId, make it L2 independent
         address wethBridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
+            _chainId,
             zkSync,
             _deployBridgeImplementationFee,
             l2WethBridgeImplementationBytecodeHash,
@@ -125,6 +129,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         // Deploy L2 bridge proxy contract
         l2Bridge = BridgeInitializationHelper.requestDeployTransaction(
+            _chainId,
             zkSync,
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
@@ -152,6 +157,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return txHash The L2 transaction hash of deposit finalization
     function deposit(
+        uint256 _chainId,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -178,6 +184,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
         txHash = zkSync.requestL2Transaction{value: _amount + msg.value}(
+            _chainId,
             l2Bridge,
             _amount,
             l2TxCalldata,
@@ -206,6 +213,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// Note: Refund is performed by sending an equivalent amount of ETH on L2 to the specified deposit refund recipient address.
     function claimFailedDeposit(
+        uint256, // _chainId,
         address, // _depositSender,
         address, // _l1Token,
         bytes32, // _l2TxHash
@@ -224,18 +232,22 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
+        uint256 _chainId,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "Withdrawal is already finalized");
-
-        (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
+        {
+            require(
+                !isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex],
+                "Withdrawal is already finalized"
+            );
+        }
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
+        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBlock);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
@@ -243,19 +255,36 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
                 sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
                 data: _message
             });
-            bool success = zkSync.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
-            require(success, "vq");
+            {
+                bool success = zkSync.proveL2MessageInclusion(
+                    _chainId,
+                    _l2BlockNumber,
+                    _l2MessageIndex,
+                    l2ToL1Message,
+                    _merkleProof
+                );
+                require(success, "vq");
+            }
         } else {
             // Finalize the withdrawal if it is not yet done.
-            zkSync.finalizeEthWithdrawal(_l2BlockNumber, _l2MessageIndex, _l2TxNumberInBlock, _message, _merkleProof);
+            zkSync.finalizeEthWithdrawal(
+                _chainId,
+                _l2BlockNumber,
+                _l2MessageIndex,
+                _l2TxNumberInBlock,
+                _message,
+                _merkleProof
+            );
         }
+
+        (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
 
         // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
         IWETH9(l1WethAddress).deposit{value: amount}();
         // Transfer WETH tokens from the smart contract address to the withdrawal receiver
         IERC20(l1WethAddress).safeTransfer(l1WethWithdrawReceiver, amount);
 
-        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex] = true;
 
         emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
     }

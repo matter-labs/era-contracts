@@ -141,7 +141,7 @@ async function main() {
                 governorAddress: ZERO_ADDRESS,
                 verbose: true
             });
-            const zkSyncContract = deployer.zkSyncContract(deployWallet);
+            const zkSyncContract = deployer.bridgeheadContract(deployWallet);
 
             // Get address of the diamond init contract
             const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

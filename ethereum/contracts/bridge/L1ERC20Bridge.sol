@@ -12,7 +12,8 @@ import "./interfaces/IL2ERC20Bridge.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
-import "../zksync/interfaces/IZkSync.sol";
+import "../bridgehead/bridgehead-interfaces/IBridgehead.sol";
+import "../common/Messaging.sol";
 import "../common/interfaces/IAllowList.sol";
 import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
@@ -31,11 +32,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     IAllowList internal immutable allowList;
 
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IZkSync internal immutable zkSync;
+    IBridgehead internal immutable zkSync;
 
-    /// @dev A mapping L2 block number => message number => flag
+    /// @dev A mapping L2 _chainId => block number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
@@ -61,7 +62,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IZkSync _zkSync, IAllowList _allowList) reentrancyGuardInitializer {
+    constructor(IBridgehead _zkSync, IAllowList _allowList) reentrancyGuardInitializer {
         zkSync = _zkSync;
         allowList = _allowList;
     }
@@ -79,6 +80,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge implementation
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function initialize(
+        uint256 _chainId,
         bytes[] calldata _factoryDeps,
         address _l2TokenBeacon,
         address _governor,
@@ -98,7 +100,9 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
 
         // Deploy L2 bridge implementation contract
+        // KL todo we need to make the bridge L2 independent
         address bridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
+            _chainId,
             zkSync,
             _deployBridgeImplementationFee,
             l2BridgeImplementationBytecodeHash,
@@ -118,7 +122,9 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         }
 
         // Deploy L2 bridge proxy contract
+        //KL todo remove chainId, make it L2 independent
         l2Bridge = BridgeInitializationHelper.requestDeployTransaction(
+            _chainId,
             zkSync,
             _deployBridgeProxyFee,
             l2BridgeProxyBytecodeHash,
@@ -144,7 +150,39 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        // KL todo 9, get default Era chainId
+        l2TxHash = deposit(9, _l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+    }
+
+    /// @notice Legacy deposit method with no chainId, use another `deposit` method instead.
+    /// @dev Initiates a deposit by locking funds on the contract and sending the request
+    /// of processing an L2 transaction where tokens would be minted
+    /// @param _l2Receiver The account address that should receive funds on L2
+    /// @param _l1Token The L1 token address which is deposited
+    /// @param _amount The total amount of tokens to be bridged
+    /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
+    /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
+    /// @return l2TxHash The L2 transaction hash of deposit finalization
+    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
+    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner method does.
+    function deposit(
+        address _l2Receiver,
+        address _l1Token,
+        uint256 _amount,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient
+    ) external payable returns (bytes32 l2TxHash) {
+        // KL todo 9, get default Era chainIds
+        l2TxHash = deposit(
+            270,
+            _l2Receiver,
+            _l1Token,
+            _amount,
+            _l2TxGasLimit,
+            _l2TxGasPerPubdataByte,
+            _refundRecipient
+        );
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -166,6 +204,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return l2TxHash The L2 transaction hash of deposit finalization
     function deposit(
+        uint256 _chainId,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -188,6 +227,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
         l2TxHash = zkSync.requestL2Transaction{value: msg.value}(
+            _chainId,
             l2Bridge,
             0, // L2 msg.value
             l2TxCalldata,
@@ -249,6 +289,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     function claimFailedDeposit(
+        uint256 _chainId,
         address _depositSender,
         address _l1Token,
         bytes32 _l2TxHash,
@@ -258,6 +299,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
         bool proofValid = zkSync.proveL1ToL2TransactionStatus(
+            _chainId,
             _l2TxHash,
             _l2BlockNumber,
             _l2MessageIndex,
@@ -287,13 +329,16 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
+        uint256 _chainId,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "pw");
+        {
+            require(!isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex], "pw");
+        }
 
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBlock: _l2TxNumberInBlock,
@@ -301,18 +346,30 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             data: _message
         });
 
-        (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(l2ToL1Message.data);
         // Preventing the stack too deep error
         {
-            bool success = zkSync.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
+            bool success = zkSync.proveL2MessageInclusion(
+                _chainId,
+                _l2BlockNumber,
+                _l2MessageIndex,
+                l2ToL1Message,
+                _merkleProof
+            );
             require(success, "nq");
         }
 
-        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
-        // Withdraw funds
-        IERC20(l1Token).safeTransfer(l1Receiver, amount);
+        {
+            isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex] = true;
+        }
 
-        emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+        {
+            (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(l2ToL1Message.data);
+
+            // Withdraw funds
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
+
+            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+        }
     }
 
     /// @dev Decode the withdraw message that came from L2
