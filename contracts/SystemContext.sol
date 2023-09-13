@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -18,6 +18,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated {
         _;
     }
 
+    modifier onlyForceDeployer() {
+        require(msg.sender == FORCE_DEPLOYER);
+        _;
+    }
     /// @notice The number of latest L2 blocks to store.
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:
@@ -81,6 +85,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated {
 
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
+
+    /// @notice Set the chainId origin.
+    /// @param _newChainId The chainId
+    function setChainId(uint256 _newChainId) external onlyForceDeployer{
+        chainId = _newChainId;
+    }
 
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.
