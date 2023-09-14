@@ -1,75 +1,227 @@
-// import * as hardhat from 'hardhat';
-// import { expect } from 'chai';
-// import { Verifier, VerifierFactory } from '../../typechain';
-//
-// describe('Verifier tests', function () {
-//     const PROOF = {
-//         public_inputs: ['0x143e5a9ae11ce7c212304dd3f434ac8dff25332ad8adfc4203d95c7b4aea2f'],
-//         serialized_proof: [
-//             '0x010f11270a0ddb00a666e1c6532065905092112e5fad0d1c9b615f9f3065c8dd',
-//             '0x014f93fc29fed9372193fc9535150c8d4ebe2b49fad387fc230344d16149a9bb',
-//             '0x23a4dc9d7f679cd15923c6dfc0e8e457edc0a3862a824e5aa4702ceabda0a047',
-//             '0x948cb016bb21c4dd9c8cf107ddd4ddbc308eff7743c019d680fb4d8587d05a',
-//             '0x133b7e7e63f70910acce3feaf44d89cf893d410b0880f87ff308ef44c5aee773',
-//             '0x24878e90e224cb4246492115e94e79809dce757ca7a4decbcff6092ea5ce510a',
-//             '0x2e172ed1fb272478ca968965488da0b5c18d7fce9241f4a8ad295f01ba8478bd',
-//             '0x108bbbc2153a50515d9d8b2a5757a4b4d62efd3fd425da9d8b9a1b2f795421ea',
-//             '0x21ebacd434b555e1a82af0e0535f6aa47c9b38006a10f79f0fe8a52df474c51c',
-//             '0x1c2c8ca9750ed300dbc06ade43e69acbb614592a305c8e7ef4bf8aee50865fc8',
-//             '0x9e1b717a35bb31ab11d7ecd5802f7e598ca7918f79d575f17921d6681f7e79',
-//             '0x038209dfd674204198de3d291ca47b4212dfd4d6a20a2b360b1a6138623094ac',
-//             '0x1036e836c58c78400fd7b30e337e26d765b19d51d3d3447a01c0a003306b7efc',
-//             '0x1e7f110f8601fe84c79bb7a6c75cbd8cb92658ef563245280b9457c2a69139',
-//             '0x01cc91f946efb91a4e14f2d0790f73d6ba647aa414bc2e6fddd800d925371d82',
-//             '0x04e93b5790dd468d77df0b9b8bea80dc2ebe525412db5e724510e2feb7cad955',
-//             '0x06ebd8b3c96266a6fb9ff923431147bef97d701d1a2333bbf91cbfdb276080f2',
-//             '0x2d5dab85db469066124fb7706b9c710773c05d8c360efc1c31992e336762c7d7',
-//             '0x114f8bf9a2050f2763affa8d7213c22adbcf01e42e785d3441ffea118888243d',
-//             '0x2692422d6933cdf24274fd29cef859856cc169e5d2e72b31deb620001cf3b940',
-//             '0x2ca0abed52054af163f83d0d6fabf082579d20bbb734eb9bf4e33a28cd8b4bdd',
-//             '0x0a44d037425f05a738e6ebc2e44127c05d6a6564a9091bab3407c223dbd2900f',
-//             '0x2e74025e8f7b63473b2639e8e876c04ce28907892ce6f56d976f16a9d5d3d314',
-//             '0x0caa73604a585da384d06686f4cc7b01f4cdc9627ff9b32b954048da29538f08',
-//             '0x0a79a1acfe5cc1064672fe805b8efa3b3730dfa6558a17f323ad94bc47ab6d4a',
-//             '0x23922b78fa043a80c9cfdae2907a050804e7821e71d8fdcabeaece0d47eba0ad',
-//             '0x27394d6a7c23dff26d46eb9a0a4ded65f663359db6dfaf5d020bbdf4defd4a',
-//             '0x21be59cd244bd991ddf098d632c68a61a1f5834567906aa6129aa1e38d269f6c',
-//             '0x0fb1ba84318af85e01302d8610a3810aea901f783e4f38cf01130f4774569079',
-//             '0x26fdabdf196e08cbb15d242b74604fdf5466e34ac457f7776b166f9e74d4d09b',
-//             '0x15aae20ac54fb73ac5f19f5e8d8234bc619c2f93e14894e53e3a39059e9904d4',
-//             '0x23cee98e838bc6f77a12ceb104f87f6a72974827e8a64698e18c3485a4e09544',
-//             '0x1a0a8d84b5833271ad69ee59116ba97d1dd86efa77f75486a049195b47c499bd',
-//             '0x1fe6778aa9d3d435ad39d30564ecf51751db67f12669fa1bdae3f84c163f75c7',
-//             '0x0feb723ac8ddd1a21c6adaedc36c86d1f6d5177183afa8d288ba699bac17b1c5',
-//             '0x02bdd5679a965f57d8e1f71306c0adb67ccf46163b4538af86aa49d8d917590f',
-//             '0x1ce9caaed894da866c8a904161f4490c4381e073dbc1959cff9fbdc5ad8395a2',
-//             '0x303af8ffd4f4c8accf6bec9c91bb29ab90a334291134aaa3fcc392f156fc8bc2',
-//             '0x0902d7167e48f2a66924d91098ce44aaf35c6c45df42ab66fea90bb4935e26e8',
-//             '0x15fb71a86f46171b9fb5e77f2789b663643450e0ecc4a321089518f21f0838f7',
-//             '0x0b1a21e343b967eed4b93b0764708d8ec57597848658bf8777dff4541faf0bf2',
-//             '0x20117d30650de2bb1812f77f853ae99e5de5ff48587f5e4277061ad19bfcbd30',
-//             '0x0e4d544ce4205b02bf74dd6e2dd6d132a3dd678a09fef6f98f3917b04bf1583e',
-//             '0x2673b5373e44ec861370732e2d2a8eeb2b719e12f4d7e085c2ee7bfdc4e9475f'
-//         ]
-//     };
-//     let verifier: Verifier;
-//
-//     before(async function () {
-//         const verifierFactory = await hardhat.ethers.getContractFactory('Verifier');
-//         const verifierContract = await verifierFactory.deploy();
-//         verifier = VerifierFactory.connect(verifierContract.address, verifierContract.signer);
-//     });
-//
-//     it('Should verify proof', async () => {
-//         // Call the verifier directly (though the call, not static call) to add the save the consumed gas into the statistic.
-//         const calldata = verifier.interface.encodeFunctionData('verify_serialized_proof', [
-//             PROOF.public_inputs,
-//             PROOF.serialized_proof
-//         ]);
-//         await verifier.fallback({ data: calldata });
-//
-//         // Check that proof is verified
-//         let result = await verifier.verify_serialized_proof(PROOF.public_inputs, PROOF.serialized_proof);
-//         expect(result, 'proof verification failed').true;
-//     });
-// });
+import * as hardhat from 'hardhat';
+import { expect } from 'chai';
+import { VerifierTest, VerifierTestFactory } from '../../typechain';
+import { getCallRevertReason } from './utils';
+import { ethers } from 'hardhat';
+
+describe('Verifier test', function () {
+    const Q_MOD = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
+    const R_MOD = '21888242871839275222246405745257275088548364400416034343698204186575808495617';
+
+    const PROOF = {
+        publicInputs: ['0x00461afd95c6bd5a38a01a995f5c292d19a816a139bbc78fc23321c3b8da6243'],
+        serializedProof: [
+            '0x2b80ef6480b0c1a4ab9ccac1b1f5549d8d0e875e45f445599de5e1a88c3ccf25',
+            '0x173e23b955ea8f1972358bbeae3539d96e60494032faf3ada36fb3660f45d752',
+            '0x0579422893e75ebcf9ebfefd6bf80513bee55e16f0971779d774cca3227c11a3',
+            '0x257c35d228de381fa897042758ef80e4f29c84e8851878d12bae17d7700059e5',
+            '0x11cb7bc2927e1ffd32b7c0bf9b75e7f3f2915c33ca525bbb91a39d5ba9d050d1',
+            '0x0b396e2027a7e5cbffb8ef303560420c2ec2c25df1325b037208f61679596021',
+            '0x1d6feb9bfaf92d370a8041b1669fc901ac083c6f09d815df8e57e3bc0af529c6',
+            '0x1dd56a14ac384b74aab66e11dfeb36242a3d3c83c7fc11beed1ebb2d4b921aa3',
+            '0x07158e6a51b6354ab3355f298d5cc24948bddd48b0715eff52e0f135936536fc',
+            '0x18969b22583c701ef304d793e22d11a56ca9e5b08c20cd877b4fb142dfab852f',
+            '0x0c49d474877b03b231cb8aeb592728c93f6b5b62e357a4a77c7dd2818181fc43',
+            '0x186e08d590ce9937d193189a0c74890237df96ebc6593dc55b988eae74b9ea44',
+            '0x180772b6ef5bd078663a3ba77c3c997b0f9d6a62664a9aa35be4acfe5fd52acb',
+            '0x01e19ccd1fa25da95ce7799c6946a64eb12b04bb59fb31b0f48346e844ee06bb',
+            '0x0a991aee2dfdea382dd4ed65083c15004d812dcc6017aed812360c1a750f6994',
+            '0x2eba4d12e899bd433bc277127d3bb98997ea4953aa092705e185971c5bf95057',
+            '0x16ebb143325b1da3c88baf9f69a6911962c89cc34f364cb62f0db35e645baaa3',
+            '0x10a1806face2c2906455ac9060155bd648eb18f30a73f0d8214ef75683a2f015',
+            '0x2f153ebf44a9ebe05033a085c9c5a20ef002437420badd9723b59d9d9fed7666',
+            '0x054da7edbb7dd64940f64d5a46e6d2b70f8d16496657acf01d1bff905e70fe34',
+            '0x11a54b951c5f0120c00d6c0ad6b188f21c3d2b955ebea2578926eaf7b0607a34',
+            '0x2b5266f06d505e753e8ca5b9a4718f060ed1386313ef9c78b79f7f0474b3ecfc',
+            '0x202b9746f651068481021d43598dafcd8aa5e1c662de5baf24507cf8483e517f',
+            '0x0e4c150798976c5dbf261b2f50d43e2ae145eec6d63d361b79abdf5a875c7312',
+            '0x0d78beaef934700a7a3f63cc94f8ff11f056b770fc7f2e72f6cf2b7b29fb2298',
+            '0x26d892a58479bb3a147a7bfd8488ab1e6d97a89b647c886ace6d072134be3474',
+            '0x22ee472ea71eb002d8e3b35f93825ef831ab6d321eccc62ae4a1230449f05316',
+            '0x18b8f397a1a1db84ce0985252007c532c7d6f0454ef88a446180d6ab3b348321',
+            '0x0cbecff5b91f1da7dd1d440f7dd8c48726d7edd5cd119c8f2603fbfba03acd59',
+            '0x1f73e67e371a989ef56adc605ce4be99fb1a1200cdc9f15e1cbd9c825a400ed7',
+            '0x028667567deeadd469936a07962ba1c7215df0b9d27836cb1160088fc9e44b4c',
+            '0x17d4f2ed4b820a8222d2b839035ef0c26ee5ec8e8d2d1a7c16486e54240455cd',
+            '0x07a3089dc75c8035530c84d5067f481d42d2a095e9a8bb839c20909b5c978fcc',
+            '0x091c2be5555c05bb87116b667992af159e4ad0616c0ec7335570e26c6e627531',
+            '0x03c5e763840a185dbc363ed770645d8a0fef39736741848f12d90c3027d3fbfd',
+            '0x1f6e675ad9dd1cb9f92086111c47511f510e27c3632527d56c48be1c7b8a03e2',
+            '0x23aa0ab9bfb0e38ff029ba5a4cc6f4b8a1dde5b54b1db7435e22c9048ffa7029',
+            '0x19a6d569cc94a65fa3685ea1144db7415ceb1cabb11e267c35097dea637536d9',
+            '0x04dc0a7c7669340261725af51e4c32eb7f8968b163e70f0beccdf20bd7f771c1',
+            '0x1bf9dd4999e0e82da492c292fbb8287bcccd0cb3cd2f1de14f8b4a1592786715',
+            '0x257c2aa02452019ea981bc722f0777552be886772eea9a3bdf3257a1e3b75954',
+            '0x01b4dc62f39bdb3596ff653b6035e5fb17d278466ba4621a632962a7299523f1',
+            '0x0df615b627d9dd8e0d4d7f96c7e30f34d0cbda04c761c191d81cac19de41ccbd',
+            '0x1c22d1d281177a86617454edf488d6bb18c6a60222be2121091f4b18d4f5be92'
+        ],
+        recursiveAggregationInput: [
+            '0x04fdf01a2faedb9e3a620bc1cd8ceb4b0adac04631bdfa9e7e9fc15e35693cc0',
+            '0x1419728b438cc9afa63ab4861753e0798e29e08aac0da17b2c7617b994626ca2',
+            '0x23ca418458f6bdc30dfdbc13b80c604f8864619582eb247d09c8e4703232897b',
+            '0x0713c1371914ac18d7dced467a8a60eeca0f3d80a2cbd5dcc75abb6cbab39f39'
+        ]
+    };
+    let verifier: VerifierTest;
+
+    before(async function () {
+        const verifierFactory = await hardhat.ethers.getContractFactory('VerifierTest');
+        const verifierContract = await verifierFactory.deploy();
+        verifier = VerifierTestFactory.connect(verifierContract.address, verifierContract.signer);
+    });
+
+    it('Should verify proof', async () => {
+        // Call the verifier directly (though the call, not static call) to add the save the consumed gas into the statistic.
+        const calldata = verifier.interface.encodeFunctionData('verify', [
+            PROOF.publicInputs,
+            PROOF.serializedProof,
+            PROOF.recursiveAggregationInput
+        ]);
+        await verifier.fallback({ data: calldata });
+
+        // Check that proof is verified
+        let result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
+        expect(result, 'proof verification failed').true;
+    });
+
+    describe('Should verify valid proof with fields values in non standard format', function () {
+        it('Public input with dirty bits over Fr mask', async () => {
+            let validProof = JSON.parse(JSON.stringify(PROOF));
+            // Fill dirty bits
+            validProof.publicInputs[0] = ethers.BigNumber.from(validProof.publicInputs[0])
+                .add('0xe000000000000000000000000000000000000000000000000000000000000000')
+                .toHexString();
+            const result = await verifier.verify(
+                validProof.publicInputs,
+                validProof.serializedProof,
+                validProof.recursiveAggregationInput
+            );
+            expect(result, 'proof verification failed').true;
+        });
+
+        it('Elliptic curve points over modulo', async () => {
+            let validProof = JSON.parse(JSON.stringify(PROOF));
+            // Add modulo to points
+            validProof.serializedProof[0] = ethers.BigNumber.from(validProof.serializedProof[0]).add(Q_MOD);
+            validProof.serializedProof[1] = ethers.BigNumber.from(validProof.serializedProof[1]).add(Q_MOD).add(Q_MOD);
+            const result = await verifier.verify(
+                validProof.publicInputs,
+                validProof.serializedProof,
+                validProof.recursiveAggregationInput
+            );
+            expect(result, 'proof verification failed').true;
+        });
+
+        it('Fr over modulo', async () => {
+            let validProof = JSON.parse(JSON.stringify(PROOF));
+            // Add modulo to number
+            validProof.serializedProof[22] = ethers.BigNumber.from(validProof.serializedProof[22]).add(R_MOD);
+            const result = await verifier.verify(
+                validProof.publicInputs,
+                validProof.serializedProof,
+                validProof.recursiveAggregationInput
+            );
+            expect(result, 'proof verification failed').true;
+        });
+    });
+
+    describe('Should revert on invalid input', function () {
+        it('More than 1 public inputs', async () => {
+            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            // Add one more public input to proof
+            invalidProof.publicInputs.push(invalidProof.publicInputs[0]);
+            const revertReason = await getCallRevertReason(
+                verifier.verify(
+                    invalidProof.publicInputs,
+                    invalidProof.serializedProof,
+                    invalidProof.recursiveAggregationInput
+                )
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('Empty public inputs', async () => {
+            const revertReason = await getCallRevertReason(
+                verifier.verify([], PROOF.serializedProof, PROOF.recursiveAggregationInput)
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('More than 44 words for proof', async () => {
+            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            // Add one more "serialized proof" input
+            invalidProof.serializedProof.push(invalidProof.serializedProof[0]);
+            const revertReason = await getCallRevertReason(
+                verifier.verify(
+                    invalidProof.publicInputs,
+                    invalidProof.serializedProof,
+                    invalidProof.recursiveAggregationInput
+                )
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('Empty serialized proof', async () => {
+            const revertReason = await getCallRevertReason(
+                verifier.verify(PROOF.publicInputs, [], PROOF.recursiveAggregationInput)
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('More than 4 words for recursive aggregation input', async () => {
+            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            // Add one more "recursive aggregation input" value
+            invalidProof.recursiveAggregationInput.push(invalidProof.recursiveAggregationInput[0]);
+            const revertReason = await getCallRevertReason(
+                verifier.verify(
+                    invalidProof.publicInputs,
+                    invalidProof.serializedProof,
+                    invalidProof.recursiveAggregationInput
+                )
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('Empty recursive aggregation input', async () => {
+            const revertReason = await getCallRevertReason(
+                verifier.verify(PROOF.publicInputs, PROOF.serializedProof, [])
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+
+        it('Elliptic curve point at infinity', async () => {
+            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            // Change first point to point at infinity (encode as (0, 0) on EVM)
+            invalidProof.serializedProof[0] = ethers.constants.HashZero;
+            invalidProof.serializedProof[1] = ethers.constants.HashZero;
+            const revertReason = await getCallRevertReason(
+                verifier.verify(
+                    invalidProof.publicInputs,
+                    invalidProof.serializedProof,
+                    invalidProof.recursiveAggregationInput
+                )
+            );
+            expect(revertReason).equal('loadProof: Proof is invalid');
+        });
+    });
+
+    it('Should failed with invalid public input', async () => {
+        const revertReason = await getCallRevertReason(
+            verifier.verify([ethers.constants.HashZero], PROOF.serializedProof, PROOF.recursiveAggregationInput)
+        );
+        expect(revertReason).equal('invalid quotient evaluation');
+    });
+
+    it('Should failed with invalid recursive aggregative input', async () => {
+        const revertReason = await getCallRevertReason(
+            verifier.verify(PROOF.publicInputs, PROOF.serializedProof, [1, 2, 1, 2])
+        );
+        expect(revertReason).equal('finalPairing: pairing failure');
+    });
+
+    it('Should return correct Verification key hash', async () => {
+        const vksHash = await verifier.verificationKeyHash();
+        expect(vksHash).equal('0x8a50c24dacf7e4d0e8cccb618261cbc775f7b8a2a1e5e794510b10ff42a49323');
+    });
+});
