@@ -234,7 +234,7 @@ contract Verifier is IVerifier {
     /// @dev flip of 0xe000000000000000000000000000000000000000000000000000000000000000;
     uint256 internal constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-    {residue_g2_elements}
+    {{residue_g2_elements}}
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
     /// @return vkHash The keccak256 hash of the loaded verification keys.
@@ -263,7 +263,7 @@ contract Verifier is IVerifier {
     /// [table_type]                                 - lookup table type commitment
     function _loadVerificationKey() internal pure virtual {
         assembly {
-            {commitments}
+            {{commitments}}
         }
     }
 

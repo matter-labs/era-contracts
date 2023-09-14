@@ -1,3 +1,5 @@
+use handlebars::Handlebars;
+use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -133,15 +135,18 @@ fn insert_residue_elements_and_commitments(
     template: &str,
     vk: &HashMap<String, Value>,
 ) -> Result<String, Box<dyn Error>> {
+    let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(&vk);
+    let commitments = generate_commitments(&vk);
+
     let verifier_contract_template =
         template.replace("{residue_g2_elements}", &residue_g2_elements);
 
-    let commitments = generate_commitments(&vk);
-    let verifier_contract_template =
-        verifier_contract_template.replace("{commitments}", &commitments);
-
-    Ok(verifier_contract_template)
+    Ok(reg.render_template(
+        &verifier_contract_template,
+        &json!({"residue_g2_elements": residue_g2_elements,
+                        "commitments": commitments}),
+    )?)
 }
 
 fn format_mstore(hex_value: &str, slot: &str) -> String {
