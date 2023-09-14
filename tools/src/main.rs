@@ -120,9 +120,11 @@ fn format_mstore(hex_value: &str, slot: &str) -> String {
 }
 
 fn format_const(hex_value: &str, slot_name: &str) -> String {
+    let hex_value = hex_value.trim_start_matches('0');
+    let hex_value_formatted = format!("{:0>2}", hex_value);
     format!(
         "    uint256 internal constant {} = 0x{};\n",
-        slot_name, hex_value
+        slot_name, hex_value_formatted
     )
 }
 
