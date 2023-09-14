@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -10,67 +11,70 @@ use structopt::StructOpt;
 type CommitmentSlot = (&'static str, &'static str);
 type G2Elements = (&'static str, &'static str, &'static str, &'static str);
 
+fn create_hash_map<Type: Copy>(
+    key_value_pairs: &[(&'static str, Type)],
+) -> HashMap<&'static str, Type> {
+    let mut hash_map = HashMap::new();
+    for &(key, value) in key_value_pairs {
+        hash_map.insert(key, value);
+    }
+    hash_map
+}
+
 lazy_static! {
-    static ref COMMITMENTS_SLOTS: HashMap<&'static str, CommitmentSlot> = {
-        let mut m = HashMap::new();
-        m.insert(
+    static ref COMMITMENTS_SLOTS: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[
+        (
             "gate_setup_commitments",
-            ("VK_GATE_SETUP_{}_X_SLOT", "VK_GATE_SETUP_{}_Y_SLOT"),
-        );
-        m.insert(
+            ("VK_GATE_SETUP_{}_X_SLOT", "VK_GATE_SETUP_{}_Y_SLOT")
+        ),
+        (
             "gate_selectors_commitments",
-            ("VK_GATE_SELECTORS_{}_X_SLOT", "VK_GATE_SELECTORS_{}_Y_SLOT"),
-        );
-        m.insert(
+            ("VK_GATE_SELECTORS_{}_X_SLOT", "VK_GATE_SELECTORS_{}_Y_SLOT")
+        ),
+        (
             "permutation_commitments",
-            ("VK_PERMUTATION_{}_X_SLOT", "VK_PERMUTATION_{}_Y_SLOT"),
-        );
-        m.insert(
+            ("VK_PERMUTATION_{}_X_SLOT", "VK_PERMUTATION_{}_Y_SLOT")
+        ),
+        (
             "lookup_tables_commitments",
-            ("VK_LOOKUP_TABLE_{}_X_SLOT", "VK_LOOKUP_TABLE_{}_Y_SLOT"),
-        );
-        m
-    };
-    static ref INDIVIDUAL_COMMITMENTS: HashMap<&'static str, CommitmentSlot> = {
-        let mut m = HashMap::new();
-        m.insert(
+            ("VK_LOOKUP_TABLE_{}_X_SLOT", "VK_LOOKUP_TABLE_{}_Y_SLOT")
+        ),
+    ]);
+    static ref INDIVIDUAL_COMMITMENTS: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[
+        (
             "lookup_selector_commitment",
-            ("VK_LOOKUP_SELECTOR_X_SLOT", "VK_LOOKUP_SELECTOR_Y_SLOT"),
-        );
-        m.insert(
+            ("VK_LOOKUP_SELECTOR_X_SLOT", "VK_LOOKUP_SELECTOR_Y_SLOT")
+        ),
+        (
             "lookup_table_type_commitment",
-            ("VK_LOOKUP_TABLE_TYPE_X_SLOT", "VK_LOOKUP_TABLE_TYPE_Y_SLOT"),
-        );
-        m
-    };
-    static ref G2_ELEMENTS: HashMap<&'static str, G2Elements> = {
-        let mut m = HashMap::new();
-        m.insert(
-            "g2_elements",
-            (
-                "VK_G2_ELEMENTS_{}_X1",
-                "VK_G2_ELEMENTS_{}_X2",
-                "VK_G2_ELEMENTS_{}_Y1",
-                "VK_G2_ELEMENTS_{}_Y2",
-            ),
-        );
-        m
-    };
-    static ref NON_RESIDUES: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert("non_residues", "VK_NON_RESIDUES_{}_SLOT");
-        m
-    };
+            ("VK_LOOKUP_TABLE_TYPE_X_SLOT", "VK_LOOKUP_TABLE_TYPE_Y_SLOT")
+        ),
+    ]);
+    static ref G2_ELEMENTS: HashMap<&'static str, G2Elements> = create_hash_map(&[(
+        "g2_elements",
+        (
+            "VK_G2_ELEMENTS_{}_X1",
+            "VK_G2_ELEMENTS_{}_X2",
+            "VK_G2_ELEMENTS_{}_Y1",
+            "VK_G2_ELEMENTS_{}_Y2",
+        )
+    ),]);
+    static ref NON_RESIDUES: HashMap<&'static str, &'static str> =
+        create_hash_map(&[("non_residues", "VK_NON_RESIDUES_{}_SLOT"),]);
 }
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-name = "zksync_verifier_contract_generator",
-about = "Tool for generating verifier contract using scheduler json key"
+    name = "zksync_verifier_contract_generator",
+    about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
     /// Input path to scheduler verification key file.
-    #[structopt(short = "i", long = "input_path", default_value = "data/scheduler_key.json")]
+    #[structopt(
+        short = "i",
+        long = "input_path",
+        default_value = "data/scheduler_key.json"
+    )]
     input_path: String,
 
     /// Output path to verifier contract file.
@@ -78,36 +82,37 @@ struct Opt {
     output_path: String,
 }
 
-
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
-    let reader = BufReader::new(File::open(&opt.input_path)
-        .expect("Unable to open file"));
+    let reader = BufReader::new(File::open(&opt.input_path)?);
 
-    let vk: HashMap<String, Value> = from_reader(reader)
-        .expect("Unable to parse JSON");
+    let vk: HashMap<String, Value> = from_reader(reader)?;
 
-    let verifier_contract_template = fs::read_to_string("data/verifier_contract_template.txt")
-        .expect("Could not read verifier contract template");
+    let verifier_contract_template = fs::read_to_string("data/verifier_contract_template.txt")?;
 
-    // Insert the residue_g2_elements into the verifier_contract_template
+    let verifier_contract_template =
+        insert_residue_elements_and_commitments(&verifier_contract_template, &vk)?;
+
+    let mut file = File::create(opt.output_path)?;
+
+    file.write_all(verifier_contract_template.as_bytes())?;
+    Ok(())
+}
+
+fn insert_residue_elements_and_commitments(
+    template: &str,
+    vk: &HashMap<String, Value>,
+) -> Result<String, Box<dyn Error>> {
     let residue_g2_elements = generate_residue_g2_elements(&vk);
     let verifier_contract_template =
-        verifier_contract_template.replace("{residue_g2_elements}", &residue_g2_elements);
+        template.replace("{residue_g2_elements}", &residue_g2_elements);
 
-    // Insert the commitments into the verifier_contract_template
     let commitments = generate_commitments(&vk);
     let verifier_contract_template =
         verifier_contract_template.replace("{commitments}", &commitments);
 
-    // Open the output file
-    let mut file = File::create(opt.output_path)
-        .expect("Could not create output file");
-
-    // Write the create verifier.sol contract to the file
-    file.write_all(verifier_contract_template.as_bytes())
-        .expect("Could not write to output file");
+    Ok(verifier_contract_template)
 }
 
 fn format_mstore(hex_value: &str, slot: &str) -> String {
@@ -119,6 +124,14 @@ fn format_const(hex_value: &str, slot_name: &str) -> String {
         "    uint256 internal constant {} = 0x{};\n",
         slot_name, hex_value
     )
+}
+
+fn convert_list_to_hexadecimal(numbers: &Vec<Value>) -> String {
+    numbers
+        .iter()
+        .map(|v| format!("{:01$x}", v.as_u64().expect("Failed to parse as u64"), 16))
+        .rev()
+        .collect::<String>()
 }
 
 fn extract_commitment_slots(items: &[Value], slot_tuple: (&str, &str)) -> String {
@@ -142,6 +155,19 @@ fn extract_commitment_slots(items: &[Value], slot_tuple: (&str, &str)) -> String
     output
 }
 
+fn extract_non_residues(items: &[Value], slot_name: &str) -> String {
+    let mut output = vec![];
+    for (idx, item) in items.iter().enumerate() {
+        let hex_value =
+            convert_list_to_hexadecimal(item.as_array().expect("Failed to parse item as array"));
+        output.push(format_const(
+            &hex_value,
+            &slot_name.replace("{}", &idx.to_string()),
+        ));
+    }
+    output.join("")
+}
+
 fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> String {
     let x = convert_list_to_hexadecimal(
         item.get("x")
@@ -162,135 +188,64 @@ fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> Str
     output
 }
 
-fn convert_list_to_hexadecimal(numbers: &Vec<Value>) -> String {
-    numbers
-        .iter()
-        .map(|v| format!("{:01$x}", v.as_u64().expect("Failed to parse as u64"), 16))
-        .rev()
-        .collect::<String>()
-}
-
 fn extract_g2_elements(elements: &[Value], slot_tuple: (&str, &str, &str, &str)) -> String {
     let mut output = vec![];
+    let slots: [&str; 4] = [slot_tuple.0, slot_tuple.1, slot_tuple.2, slot_tuple.3];
     for (idx, element) in elements.iter().enumerate() {
-        let x = element
-            .get("x")
-            .expect("x value not found")
-            .as_object()
-            .expect("x value not an object");
-        let y = element
-            .get("y")
-            .expect("y value not found")
-            .as_object()
-            .expect("y value not an object");
+        let xy_pairs = [("x", "c0"), ("x", "c1"), ("y", "c0"), ("y", "c1")];
+        for (i, &(xy, c)) in xy_pairs.iter().enumerate() {
+            let field = element
+                .get(xy)
+                .expect(&format!("{} value not found", xy))
+                .as_object()
+                .expect(&format!("{} value not an object", xy));
 
-        let x_c0 = convert_list_to_hexadecimal(
-            x.get("c0")
-                .expect("c0 value not found")
-                .as_array()
-                .expect("c0 value not an array"),
-        );
-        let x_c1 = convert_list_to_hexadecimal(
-            x.get("c1")
-                .expect("c1 value not found")
-                .as_array()
-                .expect("c1 value not an array"),
-        );
-        let y_c0 = convert_list_to_hexadecimal(
-            y.get("c0")
-                .expect("c0 value not found")
-                .as_array()
-                .expect("c0 value not an array"),
-        );
-        let y_c1 = convert_list_to_hexadecimal(
-            y.get("c1")
-                .expect("c1 value not found")
-                .as_array()
-                .expect("c1 value not an array"),
-        );
-
-        output.push(format_const(
-            &x_c0,
-            &slot_tuple.0.replace("{}", &idx.to_string()),
-        ));
-        output.push(format_const(
-            &x_c1,
-            &slot_tuple.1.replace("{}", &idx.to_string()),
-        ));
-        output.push(format_const(
-            &y_c0,
-            &slot_tuple.2.replace("{}", &idx.to_string()),
-        ));
-        output.push(format_const(
-            &y_c1,
-            &slot_tuple.3.replace("{}", &idx.to_string()),
-        ));
-    }
-    output.join("")
-}
-
-fn extract_non_residues(items: &[Value], slot_name: &str) -> String {
-    let mut output = vec![];
-    for (idx, item) in items.iter().enumerate() {
-        let hex_value = convert_list_to_hexadecimal(item.as_array().expect("Failed to parse item as array"));
-        output.push(format_const(
-            &hex_value,
-            &slot_name.replace("{}", &idx.to_string()),
-        ));
+            let c_value = convert_list_to_hexadecimal(
+                field
+                    .get(c)
+                    .expect(&format!("{} value not found", c))
+                    .as_array()
+                    .expect(&format!("{} value not an array", c)),
+            );
+            output.push(format_const(
+                &c_value,
+                &slots[i].replace("{}", &idx.to_string()),
+            ));
+        }
     }
     output.join("")
 }
 
 fn generate_commitments(vk: &HashMap<String, Value>) -> String {
+    let commitments_data = [
+        ("gate_setup_commitments", "gate setup commitments"),
+        ("gate_selectors_commitments", "gate selectors commitments"),
+        ("permutation_commitments", "permutation commitments"),
+        ("lookup_tables_commitments", "lookup tables commitments"),
+    ];
+
+    let individual_commitments_data = [
+        ("lookup_selector_commitment", "lookup selector commitment"),
+        ("lookup_table_type_commitment", "table type commitment"),
+    ];
+
     let mut commitments = String::new();
 
-    if let Some(Value::Array(vk_gate_setup_commitments)) = vk.get("gate_setup_commitments") {
-        commitments.push_str("\n            // gate setup commitments\n");
-        commitments.push_str(&extract_commitment_slots(
-            vk_gate_setup_commitments,
-            COMMITMENTS_SLOTS["gate_setup_commitments"],
-        ));
+    for (key, comment) in &commitments_data {
+        if let Some(Value::Array(data)) = vk.get(*key) {
+            commitments.push_str(&format!("\n            // {}\n", comment));
+            commitments.push_str(&extract_commitment_slots(data, COMMITMENTS_SLOTS[*key]));
+        }
     }
 
-    if let Some(Value::Array(vk_gate_selectors_commitments)) = vk.get("gate_selectors_commitments")
-    {
-        commitments.push_str("\n            // gate selectors commitments\n");
-        commitments.push_str(&extract_commitment_slots(
-            vk_gate_selectors_commitments,
-            COMMITMENTS_SLOTS["gate_selectors_commitments"],
-        ));
-    }
-
-    if let Some(Value::Array(vk_permutation_commitments)) = vk.get("permutation_commitments") {
-        commitments.push_str("\n            // permutation commitments\n");
-        commitments.push_str(&extract_commitment_slots(
-            vk_permutation_commitments,
-            COMMITMENTS_SLOTS["permutation_commitments"],
-        ));
-    }
-
-    if let Some(vk_lookup_selector_commitment) = vk.get("lookup_selector_commitment") {
-        commitments.push_str("\n            // lookup selector commitment\n");
-        commitments.push_str(&extract_individual_commitments(
-            vk_lookup_selector_commitment,
-            INDIVIDUAL_COMMITMENTS["lookup_selector_commitment"],
-        ));
-    }
-
-    if let Some(Value::Array(vk_lookup_tables_commitments)) = vk.get("lookup_tables_commitments") {
-        commitments.push_str("\n            // lookup tables commitments\n");
-        commitments.push_str(&extract_commitment_slots(
-            vk_lookup_tables_commitments,
-            COMMITMENTS_SLOTS["lookup_tables_commitments"],
-        ));
-    }
-
-    if let Some(vk_lookup_table_type_commitment) = vk.get("lookup_table_type_commitment") {
-        commitments.push_str("\n            // table type commitment\n");
-        commitments.push_str(&extract_individual_commitments(
-            vk_lookup_table_type_commitment,
-            INDIVIDUAL_COMMITMENTS["lookup_table_type_commitment"],
-        ));
+    for (key, comment) in &individual_commitments_data {
+        if let Some(data) = vk.get(*key) {
+            commitments.push_str(&format!("\n            // {}\n", comment));
+            commitments.push_str(&extract_individual_commitments(
+                data,
+                INDIVIDUAL_COMMITMENTS[*key],
+            ));
+        }
     }
 
     commitments
