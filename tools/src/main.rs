@@ -135,37 +135,41 @@ fn convert_list_to_hexadecimal(numbers: &Vec<Value>) -> String {
 }
 
 fn extract_commitment_slots(items: &[Value], slot_tuple: (&str, &str)) -> String {
-    let mut output = String::new();
-    for (idx, item) in items.iter().enumerate() {
-        if let Value::Object(map) = item {
-            if let (Some(Value::Array(x)), Some(Value::Array(y))) = (map.get("x"), map.get("y")) {
-                let x = convert_list_to_hexadecimal(x);
-                output.push_str(&format_mstore(
-                    &x,
-                    &slot_tuple.0.replace("{}", &idx.to_string()),
-                ));
-                let y = convert_list_to_hexadecimal(y);
-                output.push_str(&format_mstore(
-                    &y,
-                    &slot_tuple.1.replace("{}", &idx.to_string()),
-                ));
+    items
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, item)| {
+            if let Value::Object(map) = item {
+                if let (Some(Value::Array(x)), Some(Value::Array(y))) = (map.get("x"), map.get("y"))
+                {
+                    let x = convert_list_to_hexadecimal(x);
+                    let mstore_x = format_mstore(&x, &slot_tuple.0.replace("{}", &idx.to_string()));
+                    let y = convert_list_to_hexadecimal(y);
+                    let mstore_y = format_mstore(&y, &slot_tuple.1.replace("{}", &idx.to_string()));
+                    Some(format!("{}{}", mstore_x, mstore_y))
+                } else {
+                    None
+                }
+            } else {
+                None
             }
-        }
-    }
-    output
+        })
+        .collect::<Vec<String>>()
+        .join("")
 }
 
 fn extract_non_residues(items: &[Value], slot_name: &str) -> String {
-    let mut output = vec![];
-    for (idx, item) in items.iter().enumerate() {
-        let hex_value =
-            convert_list_to_hexadecimal(item.as_array().expect("Failed to parse item as array"));
-        output.push(format_const(
-            &hex_value,
-            &slot_name.replace("{}", &idx.to_string()),
-        ));
-    }
-    output.join("")
+    items
+        .iter()
+        .enumerate()
+        .map(|(idx, item)| {
+            let hex_value = convert_list_to_hexadecimal(
+                item.as_array().expect("Failed to parse item as array"),
+            );
+            format_const(&hex_value, &slot_name.replace("{}", &idx.to_string()))
+        })
+        .collect::<Vec<String>>()
+        .join("")
 }
 
 fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> String {
@@ -189,31 +193,32 @@ fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> Str
 }
 
 fn extract_g2_elements(elements: &[Value], slot_tuple: (&str, &str, &str, &str)) -> String {
-    let mut output = vec![];
     let slots: [&str; 4] = [slot_tuple.0, slot_tuple.1, slot_tuple.2, slot_tuple.3];
-    for (idx, element) in elements.iter().enumerate() {
-        let xy_pairs = [("x", "c0"), ("x", "c1"), ("y", "c0"), ("y", "c1")];
-        for (i, &(xy, c)) in xy_pairs.iter().enumerate() {
-            let field = element
-                .get(xy)
-                .expect(&format!("{} value not found", xy))
-                .as_object()
-                .expect(&format!("{} value not an object", xy));
+    let xy_pairs = [("x", "c0"), ("x", "c1"), ("y", "c0"), ("y", "c1")];
 
-            let c_value = convert_list_to_hexadecimal(
-                field
-                    .get(c)
-                    .expect(&format!("{} value not found", c))
-                    .as_array()
-                    .expect(&format!("{} value not an array", c)),
-            );
-            output.push(format_const(
-                &c_value,
-                &slots[i].replace("{}", &idx.to_string()),
-            ));
-        }
-    }
-    output.join("")
+    elements
+        .iter()
+        .enumerate()
+        .flat_map(|(idx, element)| {
+            xy_pairs.iter().enumerate().map(move |(i, &(xy, c))| {
+                let field = element
+                    .get(xy)
+                    .expect(&format!("{} value not found", xy))
+                    .as_object()
+                    .expect(&format!("{} value not an object", xy));
+
+                let c_value = convert_list_to_hexadecimal(
+                    field
+                        .get(c)
+                        .expect(&format!("{} value not found", c))
+                        .as_array()
+                        .expect(&format!("{} value not an array", c)),
+                );
+                format_const(&c_value, &slots[i].replace("{}", &idx.to_string()))
+            })
+        })
+        .collect::<Vec<String>>()
+        .join("")
 }
 
 fn generate_commitments(vk: &HashMap<String, Value>) -> String {
@@ -229,26 +234,39 @@ fn generate_commitments(vk: &HashMap<String, Value>) -> String {
         ("lookup_table_type_commitment", "table type commitment"),
     ];
 
-    let mut commitments = String::new();
+    let commitments = commitments_data
+        .iter()
+        .filter_map(|(key, comment)| {
+            vk.get(*key).and_then(|value| {
+                if let Value::Array(data) = value {
+                    Some(format!(
+                        "\n            // {}\n{}",
+                        comment,
+                        extract_commitment_slots(data, COMMITMENTS_SLOTS[*key])
+                    ))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Vec<String>>()
+        .join("");
 
-    for (key, comment) in &commitments_data {
-        if let Some(Value::Array(data)) = vk.get(*key) {
-            commitments.push_str(&format!("\n            // {}\n", comment));
-            commitments.push_str(&extract_commitment_slots(data, COMMITMENTS_SLOTS[*key]));
-        }
-    }
+    let individual_commitments = individual_commitments_data
+        .iter()
+        .filter_map(|(key, comment)| {
+            vk.get(*key).map(|value| {
+                format!(
+                    "\n            // {}\n{}",
+                    comment,
+                    extract_individual_commitments(value, INDIVIDUAL_COMMITMENTS[*key],)
+                )
+            })
+        })
+        .collect::<Vec<String>>()
+        .join("");
 
-    for (key, comment) in &individual_commitments_data {
-        if let Some(data) = vk.get(*key) {
-            commitments.push_str(&format!("\n            // {}\n", comment));
-            commitments.push_str(&extract_individual_commitments(
-                data,
-                INDIVIDUAL_COMMITMENTS[*key],
-            ));
-        }
-    }
-
-    commitments
+    format!("{}{}", commitments, individual_commitments)
 }
 
 fn generate_residue_g2_elements(vk: &HashMap<String, Value>) -> String {

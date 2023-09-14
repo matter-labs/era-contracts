@@ -1,5 +1,3 @@
-// This code is auto-generated using a tool and must not be edited manually.
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.13;
@@ -1566,18 +1564,18 @@ contract Verifier is IVerifier {
                     mstore(0x000, mload(PAIRING_PAIR_WITH_GENERATOR_X_SLOT))
                     mstore(0x020, mload(PAIRING_PAIR_WITH_GENERATOR_Y_SLOT))
 
-                    mstore(0x040, VK_G2_ELEMENTS_0_X1)
-                    mstore(0x060, VK_G2_ELEMENTS_0_X2)
-                    mstore(0x080, VK_G2_ELEMENTS_0_Y1)
-                    mstore(0x0a0, VK_G2_ELEMENTS_0_Y2)
+                    mstore(0x040, G2_ELEMENTS_0_X1)
+                    mstore(0x060, G2_ELEMENTS_0_X2)
+                    mstore(0x080, G2_ELEMENTS_0_Y1)
+                    mstore(0x0a0, G2_ELEMENTS_0_Y2)
 
                     mstore(0x0c0, mload(PAIRING_PAIR_WITH_X_X_SLOT))
                     mstore(0x0e0, mload(PAIRING_PAIR_WITH_X_Y_SLOT))
 
-                    mstore(0x100, VK_G2_ELEMENTS_1_X1)
-                    mstore(0x120, VK_G2_ELEMENTS_1_X2)
-                    mstore(0x140, VK_G2_ELEMENTS_1_Y1)
-                    mstore(0x160, VK_G2_ELEMENTS_1_Y2)
+                    mstore(0x100, G2_ELEMENTS_1_X1)
+                    mstore(0x120, G2_ELEMENTS_1_X2)
+                    mstore(0x140, G2_ELEMENTS_1_Y1)
+                    mstore(0x160, G2_ELEMENTS_1_Y2)
 
                     let success := staticcall(gas(), 8, 0, 0x180, 0x00, 0x20)
                     if iszero(success) {
