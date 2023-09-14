@@ -238,15 +238,15 @@ contract Verifier is IVerifier {
     uint256 internal constant NON_RESIDUES_1 = 0x07;
     uint256 internal constant NON_RESIDUES_2 = 0x0a;
 
-    uint256 internal constant VK_G2_ELEMENTS_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
-    uint256 internal constant VK_G2_ELEMENTS_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
-    uint256 internal constant VK_G2_ELEMENTS_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
-    uint256 internal constant VK_G2_ELEMENTS_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
+    uint256 internal constant G2_ELEMENTS_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
+    uint256 internal constant G2_ELEMENTS_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
+    uint256 internal constant G2_ELEMENTS_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
+    uint256 internal constant G2_ELEMENTS_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
 
-    uint256 internal constant VK_G2_ELEMENTS_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
-    uint256 internal constant VK_G2_ELEMENTS_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
-    uint256 internal constant VK_G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
-    uint256 internal constant VK_G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
+    uint256 internal constant G2_ELEMENTS_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
+    uint256 internal constant G2_ELEMENTS_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
+    uint256 internal constant G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
+    uint256 internal constant G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
     /// @return vkHash The keccak256 hash of the loaded verification keys.
@@ -1620,18 +1620,18 @@ contract Verifier is IVerifier {
                     mstore(0x000, mload(PAIRING_PAIR_WITH_GENERATOR_X_SLOT))
                     mstore(0x020, mload(PAIRING_PAIR_WITH_GENERATOR_Y_SLOT))
 
-                    mstore(0x040, VK_G2_ELEMENTS_0_X1)
-                    mstore(0x060, VK_G2_ELEMENTS_0_X2)
-                    mstore(0x080, VK_G2_ELEMENTS_0_Y1)
-                    mstore(0x0a0, VK_G2_ELEMENTS_0_Y2)
+                    mstore(0x040, G2_ELEMENTS_0_X1)
+                    mstore(0x060, G2_ELEMENTS_0_X2)
+                    mstore(0x080, G2_ELEMENTS_0_Y1)
+                    mstore(0x0a0, G2_ELEMENTS_0_Y2)
 
                     mstore(0x0c0, mload(PAIRING_PAIR_WITH_X_X_SLOT))
                     mstore(0x0e0, mload(PAIRING_PAIR_WITH_X_Y_SLOT))
 
-                    mstore(0x100, VK_G2_ELEMENTS_1_X1)
-                    mstore(0x120, VK_G2_ELEMENTS_1_X2)
-                    mstore(0x140, VK_G2_ELEMENTS_1_Y1)
-                    mstore(0x160, VK_G2_ELEMENTS_1_Y2)
+                    mstore(0x100, G2_ELEMENTS_1_X1)
+                    mstore(0x120, G2_ELEMENTS_1_X2)
+                    mstore(0x140, G2_ELEMENTS_1_Y1)
+                    mstore(0x160, G2_ELEMENTS_1_Y2)
 
                     let success := staticcall(gas(), 8, 0, 0x180, 0x00, 0x20)
                     if iszero(success) {
