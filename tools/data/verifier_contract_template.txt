@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./IVerifier.sol";
+import "./interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge (PLONK) verifier.
