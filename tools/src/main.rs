@@ -8,8 +8,19 @@ use lazy_static::lazy_static;
 use serde_json::{from_reader, Value};
 use structopt::StructOpt;
 
-type CommitmentSlot = (&'static str, &'static str);
-type G2Elements = (&'static str, &'static str, &'static str, &'static str);
+#[derive(Debug, Clone, Copy)]
+struct CommitmentSlot {
+    x: &'static str,
+    y: &'static str,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct G2Elements {
+    x1: &'static str,
+    x2: &'static str,
+    y1: &'static str,
+    y2: &'static str,
+}
 
 fn create_hash_map<Type: Copy>(
     key_value_pairs: &[(&'static str, Type)],
@@ -25,39 +36,57 @@ lazy_static! {
     static ref COMMITMENTS_SLOTS: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[
         (
             "gate_setup_commitments",
-            ("VK_GATE_SETUP_{}_X_SLOT", "VK_GATE_SETUP_{}_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_GATE_SETUP_{}_X_SLOT",
+                y: "VK_GATE_SETUP_{}_Y_SLOT"
+            }
         ),
         (
             "gate_selectors_commitments",
-            ("VK_GATE_SELECTORS_{}_X_SLOT", "VK_GATE_SELECTORS_{}_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_GATE_SELECTORS_{}_X_SLOT",
+                y: "VK_GATE_SELECTORS_{}_Y_SLOT"
+            }
         ),
         (
             "permutation_commitments",
-            ("VK_PERMUTATION_{}_X_SLOT", "VK_PERMUTATION_{}_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_PERMUTATION_{}_X_SLOT",
+                y: "VK_PERMUTATION_{}_Y_SLOT"
+            }
         ),
         (
             "lookup_tables_commitments",
-            ("VK_LOOKUP_TABLE_{}_X_SLOT", "VK_LOOKUP_TABLE_{}_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_LOOKUP_TABLE_{}_X_SLOT",
+                y: "VK_LOOKUP_TABLE_{}_Y_SLOT"
+            }
         ),
     ]);
     static ref INDIVIDUAL_COMMITMENTS: HashMap<&'static str, CommitmentSlot> = create_hash_map(&[
         (
             "lookup_selector_commitment",
-            ("VK_LOOKUP_SELECTOR_X_SLOT", "VK_LOOKUP_SELECTOR_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_LOOKUP_SELECTOR_X_SLOT",
+                y: "VK_LOOKUP_SELECTOR_Y_SLOT"
+            }
         ),
         (
             "lookup_table_type_commitment",
-            ("VK_LOOKUP_TABLE_TYPE_X_SLOT", "VK_LOOKUP_TABLE_TYPE_Y_SLOT")
+            CommitmentSlot {
+                x: "VK_LOOKUP_TABLE_TYPE_X_SLOT",
+                y: "VK_LOOKUP_TABLE_TYPE_Y_SLOT"
+            }
         ),
     ]);
     static ref G2_ELEMENTS: HashMap<&'static str, G2Elements> = create_hash_map(&[(
         "g2_elements",
-        (
-            "VK_G2_ELEMENTS_{}_X1",
-            "VK_G2_ELEMENTS_{}_X2",
-            "VK_G2_ELEMENTS_{}_Y1",
-            "VK_G2_ELEMENTS_{}_Y2",
-        )
+        G2Elements {
+            x1: "VK_G2_ELEMENTS_{}_X1",
+            x2: "VK_G2_ELEMENTS_{}_X2",
+            y1: "VK_G2_ELEMENTS_{}_Y1",
+            y2: "VK_G2_ELEMENTS_{}_Y2",
+        }
     ),]);
     static ref NON_RESIDUES: HashMap<&'static str, &'static str> =
         create_hash_map(&[("non_residues", "VK_NON_RESIDUES_{}_SLOT"),]);
@@ -136,7 +165,7 @@ fn convert_list_to_hexadecimal(numbers: &Vec<Value>) -> String {
         .collect::<String>()
 }
 
-fn extract_commitment_slots(items: &[Value], slot_tuple: (&str, &str)) -> String {
+fn extract_commitment_slots(items: &[Value], slot_tuple: CommitmentSlot) -> String {
     items
         .iter()
         .enumerate()
@@ -145,9 +174,9 @@ fn extract_commitment_slots(items: &[Value], slot_tuple: (&str, &str)) -> String
                 if let (Some(Value::Array(x)), Some(Value::Array(y))) = (map.get("x"), map.get("y"))
                 {
                     let x = convert_list_to_hexadecimal(x);
-                    let mstore_x = format_mstore(&x, &slot_tuple.0.replace("{}", &idx.to_string()));
+                    let mstore_x = format_mstore(&x, &slot_tuple.x.replace("{}", &idx.to_string()));
                     let y = convert_list_to_hexadecimal(y);
-                    let mstore_y = format_mstore(&y, &slot_tuple.1.replace("{}", &idx.to_string()));
+                    let mstore_y = format_mstore(&y, &slot_tuple.y.replace("{}", &idx.to_string()));
                     Some(format!("{}{}", mstore_x, mstore_y))
                 } else {
                     None
@@ -174,14 +203,14 @@ fn extract_non_residues(items: &[Value], slot_name: &str) -> String {
         .join("")
 }
 
-fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> String {
+fn extract_individual_commitments(item: &Value, commitment_slot: CommitmentSlot) -> String {
     let x = convert_list_to_hexadecimal(
         item.get("x")
             .expect("x value not found")
             .as_array()
             .expect("x value not an array"),
     );
-    let mut output = format_mstore(&x, slot_tuple.0);
+    let mut output = format_mstore(&x, commitment_slot.x);
 
     let y = convert_list_to_hexadecimal(
         item.get("y")
@@ -189,13 +218,18 @@ fn extract_individual_commitments(item: &Value, slot_tuple: (&str, &str)) -> Str
             .as_array()
             .expect("y value not an array"),
     );
-    output.push_str(&format_mstore(&y, slot_tuple.1));
+    output.push_str(&format_mstore(&y, commitment_slot.y));
 
     output
 }
 
-fn extract_g2_elements(elements: &[Value], slot_tuple: (&str, &str, &str, &str)) -> String {
-    let slots: [&str; 4] = [slot_tuple.0, slot_tuple.1, slot_tuple.2, slot_tuple.3];
+fn extract_g2_elements(elements: &[Value], g2_elements: G2Elements) -> String {
+    let slots: [&str; 4] = [
+        g2_elements.x1,
+        g2_elements.x2,
+        g2_elements.y1,
+        g2_elements.y2,
+    ];
     let xy_pairs = [("x", "c0"), ("x", "c1"), ("y", "c0"), ("y", "c1")];
 
     elements
