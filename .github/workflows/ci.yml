@@ -28,7 +28,7 @@ jobs:
         run: yarn install
 
       - name: Lint
-        run: echo 'No linting yet'
+        run: yarn lint
 
   build:
     runs-on: ubuntu-latest
