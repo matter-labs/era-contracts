@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../verifier/Verifier.sol";
+import "../../zksync/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierTest is Verifier {
