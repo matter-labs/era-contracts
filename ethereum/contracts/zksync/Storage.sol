@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./../verifier/IVerifier.sol";
+import "./../zksync/interfaces/IVerifier.sol";
 import "../common/interfaces/IAllowList.sol";
 import "./libraries/PriorityQueue.sol";
 

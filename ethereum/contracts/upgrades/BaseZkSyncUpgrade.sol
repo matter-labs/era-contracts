@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "../zksync/facets/Base.sol";
 import "../zksync/interfaces/IMailbox.sol";
-import "../verifier/IVerifier.sol";
+import "../zksync/interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../zksync/libraries/TransactionValidator.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS} from "../zksync/Config.sol";
