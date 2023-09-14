@@ -170,20 +170,14 @@ fn extract_commitment_slots(items: &[Value], slot_tuple: CommitmentSlot) -> Stri
         .iter()
         .enumerate()
         .filter_map(|(idx, item)| {
-            if let Value::Object(map) = item {
-                if let (Some(Value::Array(x)), Some(Value::Array(y))) = (map.get("x"), map.get("y"))
-                {
-                    let x = convert_list_to_hexadecimal(x);
-                    let mstore_x = format_mstore(&x, &slot_tuple.x.replace("{}", &idx.to_string()));
-                    let y = convert_list_to_hexadecimal(y);
-                    let mstore_y = format_mstore(&y, &slot_tuple.y.replace("{}", &idx.to_string()));
-                    Some(format!("{}{}", mstore_x, mstore_y))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+            let map = item.as_object().unwrap();
+            let x = map.get("x").unwrap().as_array().unwrap();
+            let y = map.get("y").unwrap().as_array().unwrap();
+            let x = convert_list_to_hexadecimal(x);
+            let mstore_x = format_mstore(&x, &slot_tuple.x.replace("{}", &idx.to_string()));
+            let y = convert_list_to_hexadecimal(y);
+            let mstore_y = format_mstore(&y, &slot_tuple.y.replace("{}", &idx.to_string()));
+            Some(format!("{}{}", mstore_x, mstore_y))
         })
         .collect::<Vec<String>>()
         .join("")
@@ -230,7 +224,7 @@ fn extract_g2_elements(elements: &[Value], g2_elements: G2Elements) -> String {
         g2_elements.y1,
         g2_elements.y2,
     ];
-    let xy_pairs = [("x", "c0"), ("x", "c1"), ("y", "c0"), ("y", "c1")];
+    let xy_pairs = [("x", "c1"), ("x", "c0"), ("y", "c1"), ("y", "c0")];
 
     elements
         .iter()
@@ -272,32 +266,25 @@ fn generate_commitments(vk: &HashMap<String, Value>) -> String {
 
     let commitments = commitments_data
         .iter()
-        .filter_map(|(key, comment)| {
-            vk.get(*key).and_then(|value| {
-                if let Value::Array(data) = value {
-                    Some(format!(
-                        "\n            // {}\n{}",
-                        comment,
-                        extract_commitment_slots(data, COMMITMENTS_SLOTS[*key])
-                    ))
-                } else {
-                    None
-                }
-            })
+        .map(|(key, comment)| {
+            let data = vk.get(*key).unwrap().as_array().unwrap();
+            format!(
+                "\n            // {}\n{}",
+                comment,
+                extract_commitment_slots(data, COMMITMENTS_SLOTS[*key])
+            )
         })
         .collect::<Vec<String>>()
         .join("");
 
     let individual_commitments = individual_commitments_data
         .iter()
-        .filter_map(|(key, comment)| {
-            vk.get(*key).map(|value| {
-                format!(
-                    "\n            // {}\n{}",
-                    comment,
-                    extract_individual_commitments(value, INDIVIDUAL_COMMITMENTS[*key],)
-                )
-            })
+        .map(|(key, comment)| {
+            format!(
+                "\n            // {}\n{}",
+                comment,
+                extract_individual_commitments(vk.get(*key).unwrap(), INDIVIDUAL_COMMITMENTS[*key])
+            )
         })
         .collect::<Vec<String>>()
         .join("");
@@ -308,21 +295,19 @@ fn generate_commitments(vk: &HashMap<String, Value>) -> String {
 fn generate_residue_g2_elements(vk: &HashMap<String, Value>) -> String {
     let mut residue_g2_elements = String::new();
 
-    if let Some(Value::Array(vk_non_residues)) = vk.get("non_residues") {
-        residue_g2_elements.push_str("\n    // non residues\n");
-        residue_g2_elements.push_str(&extract_non_residues(
-            vk_non_residues,
-            NON_RESIDUES["non_residues"],
-        ));
-    }
+    let vk_non_residues = vk.get("non_residues").unwrap().as_array().unwrap();
+    residue_g2_elements.push_str("\n    // non residues\n");
+    residue_g2_elements.push_str(&extract_non_residues(
+        vk_non_residues,
+        NON_RESIDUES["non_residues"],
+    ));
 
-    if let Some(Value::Array(vk_g2_elements)) = vk.get("g2_elements") {
-        residue_g2_elements.push_str("\n    // g2 elements\n");
-        residue_g2_elements.push_str(&extract_g2_elements(
-            vk_g2_elements,
-            G2_ELEMENTS["g2_elements"],
-        ));
-    }
+    let vk_g2_elements = vk.get("g2_elements").unwrap().as_array().unwrap();
+    residue_g2_elements.push_str("\n    // g2 elements\n");
+    residue_g2_elements.push_str(&extract_g2_elements(
+        vk_g2_elements,
+        G2_ELEMENTS["g2_elements"],
+    ));
 
     residue_g2_elements
 }
