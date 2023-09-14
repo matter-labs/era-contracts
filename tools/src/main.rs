@@ -84,14 +84,14 @@ lazy_static! {
     static ref G2_ELEMENTS: HashMap<&'static str, G2Elements> = create_hash_map(&[(
         "g2_elements",
         G2Elements {
-            x1: "VK_G2_ELEMENTS_{}_X1",
-            x2: "VK_G2_ELEMENTS_{}_X2",
-            y1: "VK_G2_ELEMENTS_{}_Y1",
-            y2: "VK_G2_ELEMENTS_{}_Y2",
+            x1: "G2_ELEMENTS_{}_X1",
+            x2: "G2_ELEMENTS_{}_X2",
+            y1: "G2_ELEMENTS_{}_Y1",
+            y2: "G2_ELEMENTS_{}_Y2",
         }
     ),]);
     static ref NON_RESIDUES: HashMap<&'static str, &'static str> =
-        create_hash_map(&[("non_residues", "VK_NON_RESIDUES_{}_SLOT"),]);
+        create_hash_map(&[("non_residues", "NON_RESIDUES_{}"),]);
 }
 
 #[derive(Debug, StructOpt)]
@@ -140,7 +140,7 @@ fn insert_residue_elements_and_commitments(
     let commitments = generate_commitments(&vk);
 
     let verifier_contract_template =
-        template.replace("{residue_g2_elements}", &residue_g2_elements);
+        template.replace("{{residue_g2_elements}}", &residue_g2_elements);
 
     Ok(reg.render_template(
         &verifier_contract_template,
