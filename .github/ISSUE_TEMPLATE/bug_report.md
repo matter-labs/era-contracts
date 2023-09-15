@@ -1,12 +1,12 @@
 ---
 name: Scripts-Related Bug Report
-about: Use this template for reporting script related bugs. For contract bugs, see our security policy.
+about: Use this template for reporting script-related bugs. For contract-related bugs, see our security policy.
 title: ''
 labels: bug
 assignees: ''
 ---
 
-### 🐛 Bug Report for zkSync Era In-Memory Node
+### 🐛 Script Bug Report
 
 #### 📝 Description
 
