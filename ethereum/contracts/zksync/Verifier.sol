@@ -233,7 +233,7 @@ contract Verifier is IVerifier {
 
     /// @dev flip of 0xe000000000000000000000000000000000000000000000000000000000000000;
     uint256 internal constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-    
+
     // non residues
     uint256 internal constant NON_RESIDUES_0 = 0x5;
     uint256 internal constant NON_RESIDUES_1 = 0x7;
@@ -276,7 +276,6 @@ contract Verifier is IVerifier {
     /// [table_type]                                 - lookup table type commitment
     function _loadVerificationKey() internal pure virtual {
         assembly {
-            
             // gate setup commitments
             mstore(VK_GATE_SETUP_0_X_SLOT, 0x14c289d746e37aa82ec428491881c4732766492a8bc2e8e3cca2000a40c0ea27)
             mstore(VK_GATE_SETUP_0_Y_SLOT, 0x2f617a7eb9808ad9843d1e080b7cfbf99d61bb1b02076c905f31adb12731bc41)
@@ -328,7 +327,6 @@ contract Verifier is IVerifier {
             // table type commitment
             mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x2f85df2d6249ccbcc11b91727333cc800459de6ee274f29c657c8d56f6f01563)
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x088e1df178c47116a69c3c8f6d0c5feb530e2a72493694a623b1cceb7d44a76c)
-
         }
     }
 

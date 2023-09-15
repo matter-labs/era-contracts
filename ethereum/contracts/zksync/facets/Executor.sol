@@ -352,11 +352,19 @@ contract ExecutorFacet is Base, IExecutor {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
         if (_proof.serializedProof.length > 0) {
-            bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof.serializedProof, _proof.recursiveAggregationInput);
+            bool successVerifyProof = s.verifier.verify(
+                proofPublicInput,
+                _proof.serializedProof,
+                _proof.recursiveAggregationInput
+            );
             require(successVerifyProof, "p"); // Proof verification fail
         }
         // #else
-        bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof.serializedProof, _proof.recursiveAggregationInput);
+        bool successVerifyProof = s.verifier.verify(
+            proofPublicInput,
+            _proof.serializedProof,
+            _proof.recursiveAggregationInput
+        );
         require(successVerifyProof, "p"); // Proof verification fail
         // #endif
 
