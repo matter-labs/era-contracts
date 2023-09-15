@@ -5,7 +5,8 @@ pragma solidity ^0.8.13;
 import "../../zksync/interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
-/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
+/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing
+/// purposes.
 contract DummyExecutor is IExecutor {
     address owner;
 
@@ -46,9 +47,10 @@ contract DummyExecutor is IExecutor {
         shouldRevertOnExecuteBlocks = _shouldRevert;
     }
 
-    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external
-    {
+    function commitBlocks(
+        StoredBlockInfo calldata _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) external {
         require(!shouldRevertOnCommitBlocks, "DummyExecutor: shouldRevertOnCommitBlocks");
         require(
             _lastCommittedBlockData.blockNumber == getTotalBlocksCommitted,

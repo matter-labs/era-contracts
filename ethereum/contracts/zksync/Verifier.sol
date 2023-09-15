@@ -4,15 +4,19 @@ pragma solidity ^0.8.13;
 
 import "./interfaces/IVerifier.sol";
 
+/* solhint-disable max-line-length */
 /// @author Matter Labs
-/// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge (PLONK) verifier.
+/// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
+/// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for zkSync Era circuits.
-/// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the constants below.
+/// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
+/// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
 /// * Original Plonk Article: https://eprint.iacr.org/2019/953.pdf
 /// * Original LookUp Article: https://eprint.iacr.org/2020/315.pdf
 /// * Plonk for zkSync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
+/* solhint-enable max-line-length */
 contract Verifier is IVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
@@ -264,7 +268,8 @@ contract Verifier is IVerifier {
     }
 
     /// @notice Load verification keys to memory in runtime.
-    /// @dev The constants are loaded into memory in a specific layout declared in the constants starting from `VK_` prefix.
+    /// @dev The constants are loaded into memory in a specific layout declared in the constants starting from
+    /// `VK_` prefix.
     /// NOTE: Function may corrupt the memory state if some memory was used before this function was called.
     /// The VK consists of commitments to setup polynomials:
     /// [q_a], [q_b], [q_c], [q_d],                  - main gate setup commitments
@@ -342,7 +347,8 @@ contract Verifier is IVerifier {
         _loadVerificationKey();
 
         // Begining of the big inline assembly block that makes all the verification work.
-        // Note: We use the custom memory layout, so the return value should be returned from the assembly, not Solidity code.
+        // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
+        // Solidity code.
         assembly {
             /*//////////////////////////////////////////////////////////////
                                     Utils
@@ -479,7 +485,8 @@ contract Verifier is IVerifier {
 
             /// @dev This function loads a zk-SNARK proof, ensures it's properly formatted, and stores it in memory.
             /// It ensures the number of inputs and the elliptic curve point's validity.
-            /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the module bounds.
+            /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the
+            /// module bounds.
             /// The proof consists of:
             /// 1. Public input: (1 field element from F_r)
             ///
@@ -842,10 +849,14 @@ contract Verifier is IVerifier {
                     mstore(STATE_POWER_OF_ALPHA_8_SLOT, currentAlpha)
                 }
 
-                let stateZ := mload(STATE_Z_SLOT) // z
-                mstore(STATE_L_0_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(0, stateZ)) // L_0(z)
-                mstore(STATE_L_N_MINUS_ONE_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(sub(DOMAIN_SIZE, 1), stateZ)) // L_{n-1}(z)
-                let stateT := mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(PROOF_PUBLIC_INPUT), R_MOD) // L_0(z) * PI
+                // z
+                let stateZ := mload(STATE_Z_SLOT)
+                // L_0(z)
+                mstore(STATE_L_0_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(0, stateZ))
+                // L_{n-1}(z)
+                mstore(STATE_L_N_MINUS_ONE_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(sub(DOMAIN_SIZE, 1), stateZ))
+                // L_0(z) * PI
+                let stateT := mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(PROOF_PUBLIC_INPUT), R_MOD)
 
                 // Compute main gate contribution
                 let result := mulmod(stateT, mload(PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT), R_MOD)
@@ -1102,7 +1113,8 @@ contract Verifier is IVerifier {
                 let l0AtZ := mload(STATE_L_0_AT_Z_SLOT)
                 factor := addmod(factor, mulmod(l0AtZ, mload(STATE_POWER_OF_ALPHA_5_SLOT), R_MOD), R_MOD)
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_perm]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(COPY_PERMUTATION_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
@@ -1171,7 +1183,8 @@ contract Verifier is IVerifier {
                 factor := mulmod(factor, mload(STATE_Z_MINUS_LAST_OMEGA_SLOT), R_MOD)
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [s]
                 mstore(LOOKUP_S_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
 
@@ -1227,7 +1240,8 @@ contract Verifier is IVerifier {
                     R_MOD
                 )
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_lookup]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(LOOKUP_GRAND_PRODUCT_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
@@ -1241,32 +1255,32 @@ contract Verifier is IVerifier {
             /// We use the formula:
             ///     [D0] = [t_0] + z^n * [t_1] + z^{2n} * [t_2] + z^{3n} * [t_3]
             /// and
-            ///     [D1] = main_gate_selector(z) * (                                         \
-            ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +   | - main gate contribution
-            ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                 |
-            ///                [q_const] + d(z*omega) * [q_{d_next}])                        /
+            ///     [D1] = main_gate_selector(z) * (                                        \
+            ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +  | - main gate contribution
+            ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                |
+            ///                [q_const] + d(z*omega) * [q_{d_next}])                       /
             ///
-            ///            + alpha * [custom_gate_selector] * (                              \
-            ///                (a(z)^2 - b(z))              +                                | - custom gate contribution
-            ///                (b(z)^2 - c(z))    * alpha   +                                |
-            ///                (a(z)*c(z) - d(z)) * alpha^2 )                                /
+            ///            + alpha * [custom_gate_selector] * (                             \
+            ///                (a(z)^2 - b(z))              +                               | - custom gate contribution
+            ///                (b(z)^2 - c(z))    * alpha   +                               |
+            ///                (a(z)*c(z) - d(z)) * alpha^2 )                               /
             ///
-            ///            + alpha^4 * [z_perm] *                                            \
-            ///                (a(z) + beta * z      + gamma) *                              |
-            ///                (b(z) + beta * z * k0 + gamma) *                              |
-            ///                (c(z) + beta * z * k1 + gamma) *                              |
-            ///                (d(z) + beta * z * k2 + gamma)                                | - permutation contribution
-            ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                  |
-            ///                (a(z) + beta * sigma_0(z) + gamma) *                          |
-            ///                (b(z) + beta * sigma_1(z) + gamma) *                          |
-            ///                (c(z) + beta * sigma_2(z) + gamma) *                          |
-            ///            + alpha^5 * L_0(z) * [z_perm]                                     /
+            ///            + alpha^4 * [z_perm] *                                           \
+            ///                (a(z) + beta * z      + gamma) *                             |
+            ///                (b(z) + beta * z * k0 + gamma) *                             |
+            ///                (c(z) + beta * z * k1 + gamma) *                             |
+            ///                (d(z) + beta * z * k2 + gamma)                               | - permutation contribution
+            ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                 |
+            ///                (a(z) + beta * sigma_0(z) + gamma) *                         |
+            ///                (b(z) + beta * sigma_1(z) + gamma) *                         |
+            ///                (c(z) + beta * sigma_2(z) + gamma) *                         |
+            ///            + alpha^5 * L_0(z) * [z_perm]                                    /
             ///
-            ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *   \
-            ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup]  |
-            ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]           | - lookup contribution
-            ///            + alpha^7 * L_0(z) * [z_lookup]                                   |
-            ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                               /
+            ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *  \
+            ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup] |
+            ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]          | - lookup contribution
+            ///            + alpha^7 * L_0(z) * [z_lookup]                                  |
+            ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                              /
             function prepareQueries() {
                 // Calculate [D0]
                 {

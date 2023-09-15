@@ -27,7 +27,8 @@ contract DiamondInit is Base {
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
     /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy initializer
+    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
+    /// initializer
     function initialize(
         IVerifier _verifier,
         address _governor,
