@@ -5,9 +5,13 @@
     "prettier/prettier": ["error"],
     "func-visibility": ["error", { "ignoreConstructors": true }],
     "compiler-version": ["error", ">=0.8.0"],
-    "max-line-length": ["warn", 120],
+    "max-line-length": ["error", 120],
     "var-name-mixedcase": "off",
     "func-name-mixedcase": "off",
-    "no-inline-assembly": "off"
+    "no-inline-assembly": "off",
+    "custom-errors": "off",
+    "no-global-import": "off",
+    "no-complex-fallback": "off",
+    "immutable-vars-naming": ["warn", { "immutablesAsConstants": false }]
   }
 }
