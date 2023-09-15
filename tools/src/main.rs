@@ -155,7 +155,7 @@ fn format_mstore(hex_value: &str, slot: &str) -> String {
 
 fn format_const(hex_value: &str, slot_name: &str) -> String {
     let hex_value = hex_value.trim_start_matches('0');
-    let formatted_hex_value = if hex_value.len() < 64 && hex_value.len() > 2 {
+    let formatted_hex_value = if hex_value.len() < 64 && hex_value.len() >= 1 {
         format!("0{}", hex_value)
     } else {
         String::from(hex_value)
