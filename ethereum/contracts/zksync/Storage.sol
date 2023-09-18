@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./Verifier.sol";
+import "./../zksync/interfaces/IVerifier.sol";
 import "../common/interfaces/IAllowList.sol";
 import "./libraries/PriorityQueue.sol";
 
@@ -83,7 +83,7 @@ struct AppStorage {
     /// @notice List of permitted validators
     mapping(address => bool) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for blocks
-    Verifier verifier;
+    IVerifier verifier;
     /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
     uint256 totalBlocksExecuted;
     /// @notice Total number of proved blocks i.e. blocks[totalBlocksProved] points at the latest proved block
