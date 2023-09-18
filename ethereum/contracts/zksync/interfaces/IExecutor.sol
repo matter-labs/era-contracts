@@ -53,6 +53,8 @@ interface IExecutor is IBase {
     /// @param newStateRoot The state root of the full state tree
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this block
+    /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
+    /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the block
     /// @param totalL2ToL1Pubdata Total pubdata committed to as part of bootloader run. Contents are: l2Tol1Logs <> l2Tol1Messages <> publishedBytecodes <> stateDiffs
     struct CommitBlockInfo {
@@ -62,6 +64,8 @@ interface IExecutor is IBase {
         bytes32 newStateRoot;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 bootloaderHeapInitialContentsHash;
+        bytes32 eventsQueueStateHash;
         bytes systemLogs;
         bytes totalL2ToL1Pubdata;
     }
