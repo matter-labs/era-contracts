@@ -2,32 +2,20 @@
 
 pragma solidity ^0.8.13;
 
+// import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
 import "./IChainBase.sol";
 import "../../common/Messaging.sol";
+import "./IMailboxEvents.sol";
 
-interface IMailboxEvents {
-    /// @notice New priority request event. Emitted when a request is placed into the priority queue
-    /// @param txId Serial number of the priority operation
-    /// @param txHash keccak256 hash of encoded transaction representation
-    /// @param expirationTimestamp Timestamp up to which priority request should be processed
-    /// @param transaction The whole transaction structure that is requested to be executed on L2
-    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data. Will be marked as known bytecodes in L2
-    event NewPriorityRequest(
-        uint256 txId,
-        bytes32 txHash,
-        uint64 expirationTimestamp,
-        L2CanonicalTransaction transaction,
-        bytes[] factoryDeps
-    );
+interface IBridgeheadMailbox is IMailboxEvents, IChainBase {
+    function isEthWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2MessageIndex,
+        uint256 _l2TxNumberInBlock
+    ) external view returns (bool);
 
-    /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
-    /// @param to The address to which the funds were sent
-    /// @param amount The amount of funds that were sent
-    event EthWithdrawalFinalized(address indexed to, uint256 amount);
-}
-
-interface IMailboxCore is IMailboxEvents, IChainBase {
     function proveL2MessageInclusion(
+        uint256 _chainId,
         uint256 _blockNumber,
         uint256 _index,
         L2Message calldata _message,
@@ -35,6 +23,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external view returns (bool);
 
     function proveL2LogInclusion(
+        uint256 _chainId,
         uint256 _blockNumber,
         uint256 _index,
         L2Log memory _log,
@@ -42,6 +31,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external view returns (bool);
 
     function proveL1ToL2TransactionStatus(
+        uint256 _chainId,
         bytes32 _l2TxHash,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
@@ -51,6 +41,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external view returns (bool);
 
     function finalizeEthWithdrawal(
+        uint256 _chainId,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBlock,
@@ -59,6 +50,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external;
 
     function requestL2Transaction(
+        uint256 _chainId,
         address _contractL2,
         uint256 _l2Value,
         bytes calldata _calldata,
@@ -69,6 +61,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external payable returns (bytes32 canonicalTxHash);
 
     function requestL2TransactionProof(
+        uint256 _chainId,
         WritePriorityOpParams memory _params,
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps,
@@ -76,6 +69,7 @@ interface IMailboxCore is IMailboxEvents, IChainBase {
     ) external returns (bytes32 canonicalTxHash);
 
     function l2TransactionBaseCost(
+        uint256 _chainId,
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit

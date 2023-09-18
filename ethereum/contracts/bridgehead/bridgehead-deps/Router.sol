@@ -46,15 +46,13 @@ contract Router is ReentrancyGuard, BridgeheadBase {
      * @dev This is a virtual function that should be overridden so it returns the address to which the fallback function
      * and {_fallback} should delegate.
      */
-    function _findChain() internal view virtual returns (address) {
+    function _findChain() internal view virtual returns (address contractAddress) {
         uint256 chainId;
         assembly {
             chainId := calldataload(4)
         }
-        address contractAddress = bridgeheadStorage.chainContract[chainId];
+        contractAddress = bridgeheadStorage.chainContract[chainId];
         require(contractAddress != address(0), "Chain not found in bridgehead router");
-        return contractAddress;
-        // return address(0);
     }
 
     /**

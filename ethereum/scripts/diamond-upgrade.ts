@@ -9,7 +9,7 @@ import { FacetCut, getAllSelectors } from '../src.ts/diamondCut';
 const provider = web3Provider();
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 
-function getFactoryContract() {
+function getBridgeheadContract() {
     // Create the dummy wallet with provider to get contracts from `Deployer`
     const dummyWallet = ethers.Wallet.createRandom().connect(provider);
     const deployer = new Deployer({ deployWallet: dummyWallet });
@@ -46,7 +46,7 @@ async function main() {
     });
 
     program.command('diamond-loupe-view').action(async () => {
-        const facets = await getFactoryContract().facets();
+        const facets = await getBridgeheadContract().facets();
 
         print('Facets', facets);
     });
@@ -97,7 +97,7 @@ async function main() {
             const initData = cmd.initData ? cmd.initData : '0x';
             const proposalId = cmd.proposalId
                 ? cmd.proposalId
-                : (await getFactoryContract().getCurrentProposalId()).add(1);
+                : (await getBridgeheadContract().getCurrentProposalId()).add(1);
 
             const upgradeParam = diamondCut(facetCuts, initAddress, initData);
             print('DiamondCut', upgradeParam);

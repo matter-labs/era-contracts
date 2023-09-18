@@ -23,6 +23,7 @@ contract BridgeheadChain is IBridgeheadChain, ChainExecutor, ChainGetters, Chain
     ) external reentrancyGuardInitializer {
         require(_governor != address(0), "vy");
 
+        chainStorage.bridgehead = msg.sender;
         chainStorage.chainId = _chainId;
         chainStorage.proofSystem = _proofSystem;
         chainStorage.governor = _governor;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../chain-interfaces/IMailbox.sol";
+import "../chain-interfaces/IBridgeheadMailbox.sol";
 import "../Config.sol";
 
 /// @title zkSync Library for validating L1 -> L2 transactions

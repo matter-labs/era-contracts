@@ -13,4 +13,12 @@ abstract contract AllowListed {
         }
         _;
     }
+
+    modifier knownSenderCanCallFunction(address _sender, IAllowList _allowList) {
+        // Preventing the stack too deep error
+        {
+            require(_allowList.canCall(_sender, address(this), msg.sig), "nr");
+        }
+        _;
+    }
 }

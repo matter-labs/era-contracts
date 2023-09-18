@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-// import "./IMailbox.sol";
+// import "./IBridgeheadMailbox.sol";
 import "./IProofChainGovernance.sol";
 import "./IProofChainExecutor.sol";
 import "./IProofDiamondCut.sol";

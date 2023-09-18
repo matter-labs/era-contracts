@@ -23,7 +23,7 @@ import {
     L2_TO_L1_MESSENGER,
     genesisStoredBlockInfo,
     getCallRevertReason,
-    packBatchTimestampAndBlockTimestamp,
+    packBatchTimestampAndBlockTimestamp
     // requestExecute
 } from './utils';
 
@@ -760,17 +760,17 @@ describe(`Executor tests`, function () {
         //         ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
         //     );
 
-            // const correctL2Logs = ethers.utils.hexConcat([
-            //     `0x00000002`,
-            //     `0x00000000`,
-            //     L2_SYSTEM_CONTEXT_ADDRESS,
-            //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            //     ethers.constants.HashZero,
-            //     `0x00010000`,
-            //     L2_BOOTLOADER_ADDRESS,
-            //     arbitraryCanonicalTxHash,
-            //     ethers.utils.hexZeroPad(`0x01`, 32)
-            // ]);
+        // const correctL2Logs = ethers.utils.hexConcat([
+        //     `0x00000002`,
+        //     `0x00000000`,
+        //     L2_SYSTEM_CONTEXT_ADDRESS,
+        //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
+        //     ethers.constants.HashZero,
+        //     `0x00010000`,
+        //     L2_BOOTLOADER_ADDRESS,
+        //     arbitraryCanonicalTxHash,
+        //     ethers.utils.hexZeroPad(`0x01`, 32)
+        // ]);
 
         //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
         //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;
@@ -807,17 +807,17 @@ describe(`Executor tests`, function () {
         //         ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
         //     );
 
-            // const correctL2Logs = ethers.utils.hexConcat([
-            //     `0x00000002`,
-            //     `0x00000000`,
-            //     L2_SYSTEM_CONTEXT_ADDRESS,
-            //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            //     ethers.constants.HashZero,
-            //     `0x00010000`,
-            //     L2_BOOTLOADER_ADDRESS,
-            //     arbitraryCanonicalTxHash,
-            //     ethers.utils.hexZeroPad(`0x01`, 32)
-            // ]);
+        // const correctL2Logs = ethers.utils.hexConcat([
+        //     `0x00000002`,
+        //     `0x00000000`,
+        //     L2_SYSTEM_CONTEXT_ADDRESS,
+        //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
+        //     ethers.constants.HashZero,
+        //     `0x00010000`,
+        //     L2_BOOTLOADER_ADDRESS,
+        //     arbitraryCanonicalTxHash,
+        //     ethers.utils.hexZeroPad(`0x01`, 32)
+        // ]);
 
         //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
         //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;

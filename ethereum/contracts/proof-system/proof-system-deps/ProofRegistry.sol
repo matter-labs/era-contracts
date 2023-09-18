@@ -38,7 +38,7 @@ contract ProofRegistry is ProofBase, IProofRegistry {
         bytes memory setChainIdCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
         bytes[] memory emptyA;
 
-        IBridgeheadChain(_chainContract).requestL2TransactionProof(_chainId, params, setChainIdCalldata, emptyA, true);
+        IBridgeheadChain(_chainContract).requestL2TransactionProof(params, setChainIdCalldata, emptyA, true);
     }
 
     /// @notice

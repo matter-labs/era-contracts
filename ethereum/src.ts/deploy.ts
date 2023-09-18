@@ -45,17 +45,19 @@ export interface DeployedAddresses {
         ProofChainImplementation: string;
         ProofChainProxy: string;
         ProofChainProxyAdmin: string;
-        // ProofGovernanceFacet: string;
-        // ProofExecutorFacet: string;
-        // ProofRegistryFacet: string;
-        // ProofDiamondCutFacet: string;
-        // ProofGettersFacet: string;
-        // ProofDiamondInit: string;
-        // ProofDiamondUpgradeInit: string;
-        // ProofDefaultUpgrade: string;
-        // ProofDiamondProxy: string;
         Verifier: string;
     };
+    Legacy: {
+        ProofGovernanceFacet: string;
+        ProofExecutorFacet: string;
+        ProofRegistryFacet: string;
+        ProofDiamondCutFacet: string;
+        ProofGettersFacet: string;
+        ProofDiamondInit: string;
+        ProofDiamondUpgradeInit: string;
+        ProofDefaultUpgrade: string;
+        ProofDiamondProxy: string;
+    }
     Bridges: {
         ERC20BridgeImplementation: string;
         ERC20BridgeProxy: string;
@@ -90,16 +92,19 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             ProofChainImplementation: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_IMPL_ADDR'),
             ProofChainProxy: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_PROXY_ADDR'),
             ProofChainProxyAdmin: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_PROXY_ADMIN_ADDR'),
-            // ProofGovernanceFacet: getAddressFromEnv('CONTRACTS_PROOF_GOVERNANCE_FACET_ADDR'),
-            // ProofDiamondCutFacet: getAddressFromEnv('CONTRACTS_PROOF_DIAMOND_CUT_FACET_ADDR'),
-            // ProofExecutorFacet: getAddressFromEnv('CONTRACTS_PROOF_EXECUTOR_FACET_ADDR'),
-            // ProofRegistryFacet: getAddressFromEnv('CONTRACTS_PROOF_REGISTRY_FACET_ADDR'),
-            // ProofGettersFacet: getAddressFromEnv('CONTRACTS_PROOF_GETTERS_FACET_ADDR'),
-            // ProofDiamondInit: getAddressFromEnv('CONTRACTS_PROOF_DIAMOND_INIT_ADDR'),
-            // ProofDiamondUpgradeInit: getAddressFromEnv('CONTRACTS_PROOF_DIAMOND_UPGRADE_INIT_ADDR'),
-            // ProofDefaultUpgrade: getAddressFromEnv('CONTRACTS_PROOF_DEFAULT_UPGRADE_ADDR'),
-            // ProofDiamondProxy: getAddressFromEnv('CONTRACTS_PROOF_DIAMOND_PROXY_ADDR'),
+
             Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR')
+        },
+        Legacy: {           
+            ProofGovernanceFacet: getAddressFromEnv('CONTRACTS_LEGACY_GOVERNANCE_FACET_ADDR'),
+            ProofDiamondCutFacet: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_CUT_FACET_ADDR'),
+            ProofExecutorFacet: getAddressFromEnv('CONTRACTS_LEGACY_EXECUTOR_FACET_ADDR'),
+            ProofRegistryFacet: getAddressFromEnv('CONTRACTS_LEGACY_REGISTRY_FACET_ADDR'),
+            ProofGettersFacet: getAddressFromEnv('CONTRACTS_LEGACY_GETTERS_FACET_ADDR'),
+            ProofDiamondInit: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_INIT_ADDR'),
+            ProofDiamondUpgradeInit: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_UPGRADE_INIT_ADDR'),
+            ProofDefaultUpgrade: getAddressFromEnv('CONTRACTS_LEGACY_DEFAULT_UPGRADE_ADDR'),
+            ProofDiamondProxy: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_PROXY_ADDR')
         },
         Bridges: {
             ERC20BridgeImplementation: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR'),

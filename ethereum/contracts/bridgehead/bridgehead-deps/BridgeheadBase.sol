@@ -16,4 +16,9 @@ contract BridgeheadBase is ReentrancyGuard, AllowListed {
         require(msg.sender == bridgeheadStorage.governor, "12g"); // only by governor
         _;
     }
+
+    modifier onlyChainContract(uint256 _chainId) {
+        require(msg.sender == bridgeheadStorage.chainContract[_chainId], "12c"); // only by chain contract
+        _;
+    }
 }

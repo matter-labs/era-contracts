@@ -81,6 +81,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge implementation
     /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge proxy
     function initialize(
+        // kl todo we need to split initialize and initialize chain
         uint256 _chainId,
         bytes[] calldata _factoryDeps,
         address _l2WethAddress,
@@ -302,7 +303,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(
-            bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector,
+            bytes4(functionSignature) == IBridgeheadMailbox.finalizeEthWithdrawal.selector,
             "Incorrect ETH message function selector"
         );
 

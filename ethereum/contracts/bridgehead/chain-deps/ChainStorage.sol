@@ -19,6 +19,8 @@ struct ChainStorage {
     address pendingGovernor;
     /// @notice chainIds
     uint256 chainId;
+    /// @notice The bridgehead Contract
+    address bridgehead;
     /// @notice The proof System
     address proofSystem;
     /// @notice The proof chain contract address
