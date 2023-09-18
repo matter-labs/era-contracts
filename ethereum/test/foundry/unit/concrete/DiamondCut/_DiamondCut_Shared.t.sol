@@ -8,8 +8,8 @@ import "../../../../../cache/solpp-generated-contracts/dev-contracts/test/Diamon
 contract DiamondCutTest is Test {
     using Utils for *;
 
-    DiamondCutTestContract diamondCutTestContract;
-    GettersFacet gettersFacet;
+    DiamondCutTestContract internal diamondCutTestContract;
+    GettersFacet internal gettersFacet;
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](32);

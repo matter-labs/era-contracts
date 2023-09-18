@@ -12,18 +12,14 @@ contract ExecutingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(
-                currentTimestamp,
-                currentTimestamp
-            ),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
             bytes32("")
         );
 
         newCommitBlockInfo.l2Logs = correctL2Logs;
         newCommitBlockInfo.timestamp = uint64(currentTimestamp);
 
-        IExecutor.CommitBlockInfo[]
-            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         commitBlockInfoArray[0] = newCommitBlockInfo;
 
         vm.prank(validator);
@@ -42,25 +38,18 @@ contract ExecutingTest is ExecutorTest {
             commitment: entries[0].topics[3]
         });
 
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = newStoredBlockInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(
-            genesisStoredBlockInfo,
-            storedBlockInfoArray,
-            proofInput
-        );
+        executor.proveBlocks(genesisStoredBlockInfo, storedBlockInfoArray, proofInput);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongBlockNumber() public {
-        IExecutor.StoredBlockInfo
-            memory wrongNewStoredBlockInfo = newStoredBlockInfo;
+        IExecutor.StoredBlockInfo memory wrongNewStoredBlockInfo = newStoredBlockInfo;
         wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
 
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
 
         vm.prank(validator);
@@ -69,12 +58,10 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
-        IExecutor.StoredBlockInfo
-            memory wrongNewStoredBlockInfo = newStoredBlockInfo;
+        IExecutor.StoredBlockInfo memory wrongNewStoredBlockInfo = newStoredBlockInfo;
         wrongNewStoredBlockInfo.timestamp = 0; // incorrect timestamp
 
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
 
         vm.prank(validator);
@@ -82,14 +69,11 @@ contract ExecutingTest is ExecutorTest {
         executor.executeBlocks(storedBlockInfoArray);
     }
 
-    function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain()
-        public
-    {
+    function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
         vm.prank(validator);
         executor.revertBlocks(0);
 
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = newStoredBlockInfo;
 
         vm.prank(validator);
@@ -97,27 +81,18 @@ contract ExecutingTest is ExecutorTest {
         executor.executeBlocks(storedBlockInfoArray);
     }
 
-    function test_RevertWhen_ExecutingUnavailablePriorityOperationHash()
-        public
-    {
+    function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
         vm.prank(validator);
         executor.revertBlocks(0);
 
-        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32(
-            "arbitraryCanonicalTxHash"
-        );
-        bytes32 chainedPriorityTxHash = keccak256(
-            bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
-        );
+        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
+        bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000002),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(
-                currentTimestamp,
-                currentTimestamp
-            ),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
             bytes32(""),
             bytes4(0x00010000),
             L2_BOOTLOADER_ADDRESS,
@@ -125,74 +100,48 @@ contract ExecutingTest is ExecutorTest {
             uint256(1)
         );
 
-        IExecutor.CommitBlockInfo
-            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
         correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        correctNewCommitBlockInfo
-            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
 
-        IExecutor.CommitBlockInfo[]
-            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-                1
-            );
+        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(
-            genesisStoredBlockInfo,
-            correctNewCommitBlockInfoArray
-        );
+        executor.commitBlocks(genesisStoredBlockInfo, correctNewCommitBlockInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        IExecutor.StoredBlockInfo
-            memory correctNewStoredBlockInfo = newStoredBlockInfo;
+        IExecutor.StoredBlockInfo memory correctNewStoredBlockInfo = newStoredBlockInfo;
         correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
         correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        correctNewStoredBlockInfo
-            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewStoredBlockInfo.commitment = entries[0].topics[3];
 
-        IExecutor.StoredBlockInfo[]
-            memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](
-                1
-            );
+        IExecutor.StoredBlockInfo[] memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(
-            genesisStoredBlockInfo,
-            correctNewStoredBlockInfoArray,
-            proofInput
-        );
+        executor.proveBlocks(genesisStoredBlockInfo, correctNewStoredBlockInfoArray, proofInput);
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("s"));
         executor.executeBlocks(correctNewStoredBlockInfoArray);
     }
 
-    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash()
-        public
-    {
+    function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
         vm.prank(validator);
         executor.revertBlocks(0);
 
-        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32(
-            "arbitraryCanonicalTxHash"
-        );
-        bytes32 chainedPriorityTxHash = keccak256(
-            bytes.concat(keccak256(""), arbitraryCanonicalTxHash)
-        );
+        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
+        bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000002),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(
-                currentTimestamp,
-                currentTimestamp
-            ),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
             bytes32(""),
             bytes4(0x00010000),
             L2_BOOTLOADER_ADDRESS,
@@ -200,47 +149,30 @@ contract ExecutingTest is ExecutorTest {
             uint256(1)
         );
 
-        IExecutor.CommitBlockInfo
-            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
         correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        correctNewCommitBlockInfo
-            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
 
-        IExecutor.CommitBlockInfo[]
-            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-                1
-            );
+        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(
-            genesisStoredBlockInfo,
-            correctNewCommitBlockInfoArray
-        );
+        executor.commitBlocks(genesisStoredBlockInfo, correctNewCommitBlockInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        IExecutor.StoredBlockInfo
-            memory correctNewStoredBlockInfo = newStoredBlockInfo;
+        IExecutor.StoredBlockInfo memory correctNewStoredBlockInfo = newStoredBlockInfo;
         correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
         correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        correctNewStoredBlockInfo
-            .priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewStoredBlockInfo.commitment = entries[0].topics[3];
 
-        IExecutor.StoredBlockInfo[]
-            memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](
-                1
-            );
+        IExecutor.StoredBlockInfo[] memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(
-            genesisStoredBlockInfo,
-            correctNewStoredBlockInfoArray,
-            proofInput
-        );
+        executor.proveBlocks(genesisStoredBlockInfo, correctNewStoredBlockInfoArray, proofInput);
 
         bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
 
@@ -249,11 +181,7 @@ contract ExecutingTest is ExecutorTest {
 
         uint256 gasPrice = 1000000000;
         uint256 l2GasLimit = 1000000;
-        uint256 baseCost = mailbox.l2TransactionBaseCost(
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
+        uint256 baseCost = mailbox.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
@@ -272,33 +200,22 @@ contract ExecutingTest is ExecutorTest {
         executor.executeBlocks(correctNewStoredBlockInfoArray);
     }
 
-    function test_RevertWhen_CommittingBlockWithWrongPreviousBlockHash()
-        public
-    {
+    function test_RevertWhen_CommittingBlockWithWrongPreviousBlockHash() public {
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(
-                currentTimestamp,
-                currentTimestamp
-            ),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
             bytes32("")
         );
 
-        IExecutor.CommitBlockInfo
-            memory correctNewCommitBlockInfo = newCommitBlockInfo;
+        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
         correctNewCommitBlockInfo.l2Logs = correctL2Logs;
 
-        IExecutor.CommitBlockInfo[]
-            memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](
-                1
-            );
+        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
 
-        bytes32 wrongPreviousBlockHash = Utils.randomBytes32(
-            "wrongPreviousBlockHash"
-        );
+        bytes32 wrongPreviousBlockHash = Utils.randomBytes32("wrongPreviousBlockHash");
 
         IExecutor.StoredBlockInfo memory genesisBlock = genesisStoredBlockInfo;
         genesisBlock.blockHash = wrongPreviousBlockHash;
@@ -309,8 +226,7 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_ShouldExecuteBlockSuccessfully() public {
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = newStoredBlockInfo;
 
         vm.prank(validator);

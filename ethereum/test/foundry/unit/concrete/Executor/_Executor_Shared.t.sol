@@ -15,29 +15,26 @@ import "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 contract ExecutorTest is Test {
     using Utils for *;
 
-    address constant L2_SYSTEM_CONTEXT_ADDRESS =
-        0x000000000000000000000000000000000000800B;
-    address constant L2_KNOWN_CODE_STORAGE_ADDRESS =
-        0x0000000000000000000000000000000000008004;
-    address constant L2_TO_L1_MESSENGER =
-        0x0000000000000000000000000000000000008008;
+    address internal constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
+    address internal constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
+    address internal constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 
-    address owner;
-    address validator;
-    address randomSigner;
-    AllowList allowList;
-    GovernanceFacet governance;
-    ExecutorFacet executor;
-    GettersFacet getters;
-    MailboxFacet mailbox;
-    bytes32 newCommittedBlockBlockHash;
-    bytes32 newCommittedBlockCommitment;
-    uint256 currentTimestamp;
-    IExecutor.CommitBlockInfo newCommitBlockInfo;
-    IExecutor.StoredBlockInfo newStoredBlockInfo;
+    address internal owner;
+    address internal validator;
+    address internal randomSigner;
+    AllowList internal allowList;
+    GovernanceFacet internal governance;
+    ExecutorFacet internal executor;
+    GettersFacet internal getters;
+    MailboxFacet internal mailbox;
+    bytes32 internal newCommittedBlockBlockHash;
+    bytes32 internal newCommittedBlockCommitment;
+    uint256 internal currentTimestamp;
+    IExecutor.CommitBlockInfo internal newCommitBlockInfo;
+    IExecutor.StoredBlockInfo internal newStoredBlockInfo;
 
-    IExecutor.StoredBlockInfo genesisStoredBlockInfo;
-    IExecutor.ProofInput proofInput;
+    IExecutor.StoredBlockInfo internal genesisStoredBlockInfo;
+    IExecutor.ProofInput internal proofInput;
 
     function getGovernanceSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](5);
@@ -129,11 +126,7 @@ contract ExecutorTest is Test {
             0,
             0,
             allowList,
-            VerifierParams({
-                recursionNodeLevelVkHash: 0,
-                recursionLeafLevelVkHash: 0,
-                recursionCircuitsSetVksHash: 0
-            }),
+            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
             false,
             dummyHash,
             dummyHash,
@@ -176,10 +169,7 @@ contract ExecutorTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
         vm.prank(owner);
-        allowList.setAccessMode(
-            address(diamondProxy),
-            IAllowList.AccessMode.Public
-        );
+        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
 
         executor = ExecutorFacet(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
@@ -191,10 +181,7 @@ contract ExecutorTest is Test {
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
-        proofInput = IExecutor.ProofInput(
-            recursiveAggregationInput,
-            serializedProof
-        );
+        proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
 
         genesisStoredBlockInfo = IExecutor.StoredBlockInfo({
             blockNumber: 0,

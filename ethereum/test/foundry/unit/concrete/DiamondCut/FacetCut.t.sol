@@ -6,9 +6,9 @@ import "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol
 import "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
 
 contract FacetCutTest is DiamondCutTest {
-    MailboxFacet mailboxFacet;
-    ExecutorFacet executorFacet1;
-    ExecutorFacet executorFacet2;
+    MailboxFacet private mailboxFacet;
+    ExecutorFacet private executorFacet1;
+    ExecutorFacet private executorFacet2;
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
@@ -65,21 +65,13 @@ contract FacetCutTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint256 numOfFacetsBefore = diamondCutTestContract
-            .facetAddresses()
-            .length;
+        uint256 numOfFacetsBefore = diamondCutTestContract.facetAddresses().length;
 
         diamondCutTestContract.diamondCut(diamondCutData);
 
-        uint256 numOfFacetsAfter = diamondCutTestContract
-            .facetAddresses()
-            .length;
+        uint256 numOfFacetsAfter = diamondCutTestContract.facetAddresses().length;
 
-        assertEq(
-            numOfFacetsBefore + facetCuts.length,
-            numOfFacetsAfter,
-            "wrong number of facets added"
-        );
+        assertEq(numOfFacetsBefore + facetCuts.length, numOfFacetsAfter, "wrong number of facets added");
     }
 
     function test_RevertWhen_AddingFacetToOccupiedSelector() public {
@@ -258,9 +250,7 @@ contract FacetCutTest is DiamondCutTest {
 
         diamondCutTestContract.diamondCut(diamondCutData1);
 
-        uint256 numOfFacetsAfterAdd = diamondCutTestContract
-            .facetAddresses()
-            .length;
+        uint256 numOfFacetsAfterAdd = diamondCutTestContract.facetAddresses().length;
 
         Diamond.FacetCut[] memory facetCuts2 = new Diamond.FacetCut[](1);
         facetCuts2[0] = Diamond.FacetCut({
@@ -278,16 +268,12 @@ contract FacetCutTest is DiamondCutTest {
 
         diamondCutTestContract.diamondCut(diamondCutData2);
 
-        uint256 numOfFacetsAfterReplace = diamondCutTestContract
-            .facetAddresses()
-            .length;
+        uint256 numOfFacetsAfterReplace = diamondCutTestContract.facetAddresses().length;
 
         assertEq(numOfFacetsAfterAdd, numOfFacetsAfterReplace);
     }
 
-    function test_RevertWhen_AddingFacetWithDifferentFreezabilityThanExistingFacets()
-        public
-    {
+    function test_RevertWhen_AddingFacetWithDifferentFreezabilityThanExistingFacets() public {
         bytes4[] memory selectors1 = new bytes4[](1);
         selectors1[0] = 0x00000001;
 
@@ -318,9 +304,7 @@ contract FacetCutTest is DiamondCutTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_RevertWhen_ReplacingFacetWithDifferentFreezabilityThanExistingFacets()
-        public
-    {
+    function test_RevertWhen_ReplacingFacetWithDifferentFreezabilityThanExistingFacets() public {
         bytes4[] memory selectors1 = new bytes4[](1);
         selectors1[0] = 0x00000001;
         bytes4[] memory selectors2 = new bytes4[](1);

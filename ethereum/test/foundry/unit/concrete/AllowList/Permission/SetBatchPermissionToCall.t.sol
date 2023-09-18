@@ -24,12 +24,7 @@ contract SetBatchPermissionToCall is PermissionTest {
 
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(randomSigner);
-        allowList.setBatchPermissionToCall(
-            callers,
-            targets,
-            functionSigs,
-            enables
-        );
+        allowList.setBatchPermissionToCall(callers, targets, functionSigs, enables);
     }
 
     function test_Owner() public {
@@ -50,12 +45,7 @@ contract SetBatchPermissionToCall is PermissionTest {
         enables[1] = true;
 
         vm.prank(owner);
-        allowList.setBatchPermissionToCall(
-            callers,
-            targets,
-            functionSigs,
-            enables
-        );
+        allowList.setBatchPermissionToCall(callers, targets, functionSigs, enables);
     }
 
     function test_RevertWhen_ArrayLengthNotEqual() public {
@@ -76,11 +66,6 @@ contract SetBatchPermissionToCall is PermissionTest {
 
         vm.expectRevert(abi.encodePacked("yw"));
         vm.prank(owner);
-        allowList.setBatchPermissionToCall(
-            callers,
-            targets,
-            functionSigs,
-            enables
-        );
+        allowList.setBatchPermissionToCall(callers, targets, functionSigs, enables);
     }
 }

@@ -6,9 +6,9 @@ import "../../../../../cache/solpp-generated-contracts/dev-contracts/RevertFallb
 import "../../../../../cache/solpp-generated-contracts/dev-contracts/ReturnSomething.sol";
 
 contract InitializationTest is DiamondCutTest {
-    address revertFallbackAddress;
-    address returnSomethingAddress;
-    address signerAddress; // EOA
+    address private revertFallbackAddress;
+    address private returnSomethingAddress;
+    address private signerAddress; // EOA
 
     function setUp() public {
         signerAddress = makeAddr("signer");
@@ -43,9 +43,7 @@ contract InitializationTest is DiamondCutTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_RevertWhen_InitializingDiamondCutWithZeroAddressAndNonZeroData()
-        public
-    {
+    function test_RevertWhen_InitializingDiamondCutWithZeroAddressAndNonZeroData() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

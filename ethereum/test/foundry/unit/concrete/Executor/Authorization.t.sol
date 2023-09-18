@@ -4,8 +4,8 @@ pragma solidity ^0.8.13;
 import "./_Executor_Shared.t.sol";
 
 contract AuthorizationTest is ExecutorTest {
-    IExecutor.StoredBlockInfo storedBlockInfo;
-    IExecutor.CommitBlockInfo commitBlockInfo;
+    IExecutor.StoredBlockInfo private storedBlockInfo;
+    IExecutor.CommitBlockInfo private commitBlockInfo;
 
     function setUp() public {
         storedBlockInfo = IExecutor.StoredBlockInfo({
@@ -36,8 +36,7 @@ contract AuthorizationTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommitingByUnauthorisedAddress() public {
-        IExecutor.CommitBlockInfo[]
-            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         commitBlockInfoArray[0] = commitBlockInfo;
 
         vm.prank(randomSigner);
@@ -47,8 +46,7 @@ contract AuthorizationTest is ExecutorTest {
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = storedBlockInfo;
 
         vm.prank(owner);
@@ -58,8 +56,7 @@ contract AuthorizationTest is ExecutorTest {
     }
 
     function test_RevertWhen_ExecutingByUnauthorizedAddress() public {
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = storedBlockInfo;
 
         vm.prank(randomSigner);

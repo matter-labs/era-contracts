@@ -25,16 +25,8 @@ contract SetAccessModeTest is AccessModeTest {
     }
 
     function test_AccessModeBefore() public {
-        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
-            owner,
-            target,
-            functionSig
-        );
-        assertEq(
-            hasSpecialAccessToCall,
-            false,
-            "hasSpecialAccessToCall should be false"
-        );
+        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(owner, target, functionSig);
+        assertEq(hasSpecialAccessToCall, false, "hasSpecialAccessToCall should be false");
 
         IAllowList.AccessMode accessMode = allowList.getAccessMode(target);
         bool isClosed = accessMode == IAllowList.AccessMode.Closed;
@@ -48,16 +40,8 @@ contract SetAccessModeTest is AccessModeTest {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
 
-        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
-            owner,
-            target,
-            functionSig
-        );
-        assertEq(
-            hasSpecialAccessToCall,
-            false,
-            "hasSpecialAccessToCall should be false"
-        );
+        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(owner, target, functionSig);
+        assertEq(hasSpecialAccessToCall, false, "hasSpecialAccessToCall should be false");
 
         IAllowList.AccessMode accessMode = allowList.getAccessMode(target);
         bool isPublic = accessMode == IAllowList.AccessMode.Public;
@@ -74,16 +58,8 @@ contract SetAccessModeTest is AccessModeTest {
         vm.prank(owner);
         allowList.setAccessMode(target, IAllowList.AccessMode.Public);
 
-        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(
-            owner,
-            target,
-            functionSig
-        );
-        assertEq(
-            hasSpecialAccessToCall,
-            false,
-            "hasSpecialAccessToCall should be false"
-        );
+        bool hasSpecialAccessToCall = allowList.hasSpecialAccessToCall(owner, target, functionSig);
+        assertEq(hasSpecialAccessToCall, false, "hasSpecialAccessToCall should be false");
 
         IAllowList.AccessMode accessMode = allowList.getAccessMode(target);
         bool isPublic = accessMode == IAllowList.AccessMode.Public;

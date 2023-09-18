@@ -11,10 +11,7 @@ contract UtilsTest is Test {
     function test_PackBatchTimestampAndBlockTimestamp() public {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
-        bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(
-            batchTimestamp,
-            blockTimestamp
-        );
+        bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, blockTimestamp);
 
         assertEq(
             packedBytes,

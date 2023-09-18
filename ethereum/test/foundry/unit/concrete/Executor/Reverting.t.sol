@@ -12,18 +12,14 @@ contract RevertingTest is ExecutorTest {
             bytes4(0x00000001),
             bytes4(0x00000000),
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(
-                currentTimestamp,
-                currentTimestamp
-            ),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
             bytes32("")
         );
 
         newCommitBlockInfo.timestamp = uint64(currentTimestamp);
         newCommitBlockInfo.l2Logs = correctL2Logs;
 
-        IExecutor.CommitBlockInfo[]
-            memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
+        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
         commitBlockInfoArray[0] = newCommitBlockInfo;
 
         vm.prank(validator);
@@ -42,17 +38,12 @@ contract RevertingTest is ExecutorTest {
             commitment: entries[0].topics[3]
         });
 
-        IExecutor.StoredBlockInfo[]
-            memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
+        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
         storedBlockInfoArray[0] = newStoredBlockInfo;
 
         vm.prank(validator);
 
-        executor.proveBlocks(
-            genesisStoredBlockInfo,
-            storedBlockInfoArray,
-            proofInput
-        );
+        executor.proveBlocks(genesisStoredBlockInfo, storedBlockInfoArray, proofInput);
     }
 
     function test_RevertWhen_RevertingMoreBlocksThanAlreadyCommitted() public {

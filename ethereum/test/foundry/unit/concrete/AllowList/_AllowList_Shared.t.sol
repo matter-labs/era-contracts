@@ -7,9 +7,9 @@ import "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 
 contract AllowListTest is Test {
-    AllowList allowList;
-    address owner = makeAddr("owner");
-    address randomSigner = makeAddr("randomSigner");
+    AllowList internal allowList;
+    address internal owner = makeAddr("owner");
+    address internal randomSigner = makeAddr("randomSigner");
 
     function setUp() public {
         allowList = new AllowList(owner);

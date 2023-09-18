@@ -7,13 +7,13 @@ import "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import "../../../../../cache/solpp-generated-contracts/zksync/facets/DiamondCut.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
-    DiamondProxy diamondProxy;
-    DiamondInit diamondInit;
-    DiamondCutFacet diamondCutFacet;
-    DiamondCutFacet proxyAsDiamondCut;
-    GettersFacet proxyAsGetters;
-    address governor;
-    address randomSigner;
+    DiamondProxy private diamondProxy;
+    DiamondInit private diamondInit;
+    DiamondCutFacet private diamondCutFacet;
+    DiamondCutFacet private proxyAsDiamondCut;
+    GettersFacet private proxyAsGetters;
+    address private governor;
+    address private randomSigner;
 
     function getDiamondCutSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory dcSelectors = new bytes4[](8);
@@ -106,9 +106,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         proxyAsDiamondCut.unfreezeDiamond();
     }
 
-    function test_RevertWhen_ExecutingUnapprovedProposalWHenDiamondStorageIsFrozen()
-        public
-    {
+    function test_RevertWhen_ExecutingUnapprovedProposalWHenDiamondStorageIsFrozen() public {
         vm.startPrank(governor);
 
         proxyAsDiamondCut.freezeDiamond();
@@ -133,9 +131,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
     }
 
-    function test_RevertWhen_ExecutingProposalWithDifferentInitAddress()
-        public
-    {
+    function test_RevertWhen_ExecutingProposalWithDifferentInitAddress() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -144,30 +140,23 @@ contract UpgradeLogicTest is DiamondCutTest {
             selectors: getGettersSelectors()
         });
 
-        Diamond.DiamondCutData memory proposedDiamondCutData = Diamond
-            .DiamondCutData({
-                facetCuts: facetCuts,
-                initAddress: address(0),
-                initCalldata: bytes("")
-            });
+        Diamond.DiamondCutData memory proposedDiamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
 
-        Diamond.DiamondCutData memory executedDiamondCutData = Diamond
-            .DiamondCutData({
-                facetCuts: facetCuts,
-                initAddress: address(1),
-                initCalldata: bytes("")
-            });
+        Diamond.DiamondCutData memory executedDiamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(1),
+            initCalldata: bytes("")
+        });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            proposedDiamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(proposedDiamondCutData, nextProposalId);
 
         vm.expectRevert(abi.encodePacked("a4"));
         proxyAsDiamondCut.executeUpgrade(executedDiamondCutData, 0);
@@ -196,22 +185,16 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        Diamond.DiamondCutData memory invalidDiamondCutData = Diamond
-            .DiamondCutData({
-                facetCuts: invalidFacetCuts,
-                initAddress: address(0),
-                initCalldata: bytes("")
-            });
+        Diamond.DiamondCutData memory invalidDiamondCutData = Diamond.DiamondCutData({
+            facetCuts: invalidFacetCuts,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
         vm.expectRevert(abi.encodePacked("a4"));
         proxyAsDiamondCut.executeUpgrade(invalidDiamondCutData, 0);
@@ -241,16 +224,11 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
 
@@ -281,16 +259,11 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
 
@@ -313,22 +286,14 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
         vm.expectRevert(abi.encodePacked("a8"));
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
     }
 
     function test_RevertWhen_ExecutingUnapprovedShadowUpgrade() public {
@@ -346,48 +311,30 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        bytes32 executingProposalHash = proxyAsDiamondCut.upgradeProposalHash(
-            diamondCutData,
-            nextProposalId,
-            0
-        );
+        bytes32 executingProposalHash = proxyAsDiamondCut.upgradeProposalHash(diamondCutData, nextProposalId, 0);
 
-        proxyAsDiamondCut.proposeShadowUpgrade(
-            executingProposalHash,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeShadowUpgrade(executingProposalHash, nextProposalId);
 
         vm.expectRevert(abi.encodePacked("av"));
         proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
     }
 
-    function test_RevertWhen_ProposingShadowUpgradeWithWrongProposalId()
-        public
-    {
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+    function test_RevertWhen_ProposingShadowUpgradeWithWrongProposalId() public {
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
         bytes32 porposalHash = Utils.randomBytes32("porposalHash");
 
         vm.expectRevert(abi.encodePacked("ya"));
-        proxyAsDiamondCut.proposeShadowUpgrade(
-            porposalHash,
-            nextProposalId + 1
-        );
+        proxyAsDiamondCut.proposeShadowUpgrade(porposalHash, nextProposalId + 1);
     }
 
-    function test_RevertWhen_ProposingTransparentUpgradeWithWrongProposalId()
-        public
-    {
+    function test_RevertWhen_ProposingTransparentUpgradeWithWrongProposalId() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -402,17 +349,12 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 currentProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId()
-        );
+        uint40 currentProposalId = uint40(proxyAsGetters.getCurrentProposalId());
 
         vm.startPrank(governor);
 
         vm.expectRevert(abi.encodePacked("yb"));
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            currentProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, currentProposalId);
     }
 
     function test_RevertWhen_CancellingUpgradeProposalWithWrongHash() public {
@@ -430,28 +372,19 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
-        bytes32 proposedUpgradeHash = Utils.randomBytes32(
-            "proposedUpgradeHash"
-        );
+        bytes32 proposedUpgradeHash = Utils.randomBytes32("proposedUpgradeHash");
 
         vm.expectRevert(abi.encodePacked("rx"));
         proxyAsDiamondCut.cancelUpgradeProposal(proposedUpgradeHash);
     }
 
-    function test_RevertWhen_ExecutingTransparentUpgradeWithNonZeroSalt()
-        public
-    {
+    function test_RevertWhen_ExecutingTransparentUpgradeWithNonZeroSalt() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -466,16 +399,11 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(
-            proxyAsGetters.getCurrentProposalId() + 1
-        );
+        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
 
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(
-            diamondCutData,
-            nextProposalId
-        );
+        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
 
         bytes32 proposalSalt = Utils.randomBytes32("proposalSalt");
 

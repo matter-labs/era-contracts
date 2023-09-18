@@ -10,8 +10,7 @@ contract SetBatchAccessModeTest is AccessModeTest {
         targets[0] = target;
         targets[1] = target;
 
-        IAllowList.AccessMode[]
-            memory accessModes = new IAllowList.AccessMode[](2);
+        IAllowList.AccessMode[] memory accessModes = new IAllowList.AccessMode[](2);
         accessModes[0] = IAllowList.AccessMode.Public;
         accessModes[1] = IAllowList.AccessMode.Public;
 
@@ -25,8 +24,7 @@ contract SetBatchAccessModeTest is AccessModeTest {
         targets[0] = target;
         targets[1] = target;
 
-        IAllowList.AccessMode[]
-            memory accessModes = new IAllowList.AccessMode[](2);
+        IAllowList.AccessMode[] memory accessModes = new IAllowList.AccessMode[](2);
         accessModes[0] = IAllowList.AccessMode.Public;
         accessModes[1] = IAllowList.AccessMode.Public;
 
@@ -38,8 +36,7 @@ contract SetBatchAccessModeTest is AccessModeTest {
         address[] memory targets = new address[](1);
         targets[0] = target;
 
-        IAllowList.AccessMode[]
-            memory accessModes = new IAllowList.AccessMode[](2);
+        IAllowList.AccessMode[] memory accessModes = new IAllowList.AccessMode[](2);
         accessModes[0] = IAllowList.AccessMode.Public;
         accessModes[1] = IAllowList.AccessMode.Public;
 

@@ -6,31 +6,21 @@ import "forge-std/Test.sol";
 import "../../../../../cache/solpp-generated-contracts/dev-contracts/test/UnsafeBytesTest.sol";
 
 contract UnsafeBytesTestTest is Test {
-    UnsafeBytesTest unsafeBytesTest;
-    bytes bytesData;
-    address addr0 = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
-    address addr1 = 0x7aFd58312784ACf80E2ba97Dd84Ff2bADeA9e4A2;
-    uint256 u256 = 0x15;
-    uint32 u321 = 0xffffffff;
-    uint32 u322 = 0x16;
-    address addr2 = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    bytes32 b32 =
-        0x4845bfb858e60647a4f22f02d3712a20fa6b557288dbe97b6ae719390482ef4b;
-    address addr3 = 0xaBEA9132b05A70803a4E85094fD0e1800777fBEF;
+    UnsafeBytesTest private unsafeBytesTest;
+    bytes private bytesData;
+    address private addr0 = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;
+    address private addr1 = 0x7aFd58312784ACf80E2ba97Dd84Ff2bADeA9e4A2;
+    uint256 private u256 = 0x15;
+    uint32 private u321 = 0xffffffff;
+    uint32 private u322 = 0x16;
+    address private addr2 = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    bytes32 private b32 = 0x4845bfb858e60647a4f22f02d3712a20fa6b557288dbe97b6ae719390482ef4b;
+    address private addr3 = 0xaBEA9132b05A70803a4E85094fD0e1800777fBEF;
 
     function setUp() public {
         unsafeBytesTest = new UnsafeBytesTest();
 
-        bytesData = abi.encodePacked(
-            addr0,
-            addr1,
-            u256,
-            u321,
-            u322,
-            addr2,
-            b32,
-            addr3
-        );
+        bytesData = abi.encodePacked(addr0, addr1, u256, u321, u322, addr2, b32, addr3);
     }
 
     function test() public {
