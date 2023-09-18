@@ -57,7 +57,7 @@ export interface DeployedAddresses {
         ProofDiamondUpgradeInit: string;
         ProofDefaultUpgrade: string;
         ProofDiamondProxy: string;
-    }
+    };
     Bridges: {
         ERC20BridgeImplementation: string;
         ERC20BridgeProxy: string;
@@ -95,7 +95,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
 
             Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR')
         },
-        Legacy: {           
+        Legacy: {
             ProofGovernanceFacet: getAddressFromEnv('CONTRACTS_LEGACY_GOVERNANCE_FACET_ADDR'),
             ProofDiamondCutFacet: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_CUT_FACET_ADDR'),
             ProofExecutorFacet: getAddressFromEnv('CONTRACTS_LEGACY_EXECUTOR_FACET_ADDR'),

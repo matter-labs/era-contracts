@@ -296,7 +296,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public  nonReentrant knownSenderCanCallFunction(_sender, chainStorage.allowList) {
+    ) public nonReentrant knownSenderCanCallFunction(_sender, chainStorage.allowList) {
         require(!chainStorage.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({
