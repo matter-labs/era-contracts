@@ -119,9 +119,10 @@ contract MailboxFacet is Base, IMailbox {
         // Check that hashed log is not the default one,
         // otherwise it means that the value is out of range of sent L2 -> L1 logs
         require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
-        // Check that the proof length is exactly the same as tree height, to prevent
-        // any shorter/longer paths attack on the Merkle path validation
-        require(_proof.length == L2_TO_L1_LOG_MERKLE_TREE_HEIGHT, "rz");
+
+        // It is ok to not check length of `_proof` array, as length
+        // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
+        // equal to the length of other nodes preimages (which are `2 * 32`)
 
         bytes32 calculatedRootHash = Merkle.calculateRoot(_proof, _index, hashedLog);
         bytes32 actualRootHash = s.l2LogsRootHashes[_blockNumber];

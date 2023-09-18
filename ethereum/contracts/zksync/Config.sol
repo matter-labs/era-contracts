@@ -12,9 +12,6 @@ uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
 uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
 
-/// @dev L2 -> L1 logs Merkle tree height
-uint256 constant L2_TO_L1_LOG_MERKLE_TREE_HEIGHT = 9;
-
 /// @dev The value of default leaf hash for L2 -> L1 logs Merkle tree
 /// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
 /// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`

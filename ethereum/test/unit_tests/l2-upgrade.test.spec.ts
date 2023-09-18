@@ -24,6 +24,10 @@ import {
     CommitBlockInfo,
     L2_SYSTEM_CONTEXT_ADDRESS,
     L2_BOOTLOADER_ADDRESS,
+    createSystemLogs,
+    SYSTEM_LOG_KEYS,
+    constructL2Log,
+    L2_TO_L1_MESSENGER,
     packBatchTimestampAndBlockTimestamp
 } from './utils';
 import * as ethers from 'ethers';
@@ -476,59 +480,110 @@ describe('L2 upgrade test', function () {
         const revertReason = await getCallRevertReason(
             proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoNoUpgradeTx])
         );
-        expect(revertReason).to.equal('bw');
+        expect(revertReason).to.equal('b8');
     });
 
     it('Should ensure any additional upgrade logs go to the priority ops hash', async () => {
         if (!l2UpgradeTxHash) {
             throw new Error('Can not perform this test without l2UpgradeTxHash');
         }
-        const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([
-            contextLog(timestamp, storedBlock1Info.blockHash),
-            bootloaderLog(l2UpgradeTxHash),
-            bootloaderLog(l2UpgradeTxHash)
-        ]);
 
-        const block2InfoNoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
+
+        const block2InfoNoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 2
+            },
+            systemLogs
+        );
         const revertReason = await getCallRevertReason(
             proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoNoUpgradeTx])
         );
-        expect(revertReason).to.equal('t');
+        expect(revertReason).to.equal('kp');
     });
 
     it('Should fail to commit when upgrade tx hash does not match', async () => {
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([
-            contextLog(timestamp, storedBlock1Info.blockHash),
-            bootloaderLog('0x' + '0'.repeat(64))
-        ]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                ethers.constants.HashZero
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const block2InfoTwoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
         const revertReason = await getCallRevertReason(
             proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])
         );
-        expect(revertReason).to.equal('bz');
+        expect(revertReason).to.equal('ut');
     });
 
     it('Should commit successfully when the upgrade tx is present', async () => {
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([contextLog(timestamp, storedBlock1Info.blockHash), bootloaderLog(l2UpgradeTxHash)]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const block2InfoTwoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
         await (await proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])).wait();
 
@@ -538,13 +593,30 @@ describe('L2 upgrade test', function () {
     it('Should commit successfully when block was reverted and reupgraded', async () => {
         await (await proxyExecutor.revertBlocks(1)).wait();
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([contextLog(timestamp, storedBlock1Info.blockHash), bootloaderLog(l2UpgradeTxHash)]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const block2InfoTwoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
         const commitReceipt = await (
             await proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])
@@ -568,11 +640,23 @@ describe('L2 upgrade test', function () {
         ).wait();
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+        const systemLogs = createSystemLogs();
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
 
-        const block3InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 3,
-            timestamp
-        });
+        const block3InfoTwoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 3,
+                timestamp
+            },
+            systemLogs
+        );
+
         const commitReceipt = await (
             await proxyExecutor.commitBlocks(storedBlock1Info, [block3InfoTwoUpgradeTx])
         ).wait();
@@ -610,11 +694,23 @@ describe('L2 upgrade test', function () {
         });
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+        const systemLogs = createSystemLogs();
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            ethers.utils.hexlify(storedBlock1Info.blockHash)
+        );
 
-        const block3InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 4,
-            timestamp
-        });
+        const block3InfoTwoUpgradeTx = await buildCommitBlockInfoWithCustomLogs(
+            storedBlock1Info,
+            {
+                blockNumber: 4,
+                timestamp
+            },
+            systemLogs
+        );
+
         const commitReceipt = await (
             await proxyExecutor.commitBlocks(storedBlock1Info, [block3InfoTwoUpgradeTx])
         ).wait();
@@ -676,18 +772,49 @@ async function buildCommitBlockInfo(
     info: CommitBlockInfoWithTimestamp
 ): Promise<CommitBlockInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+    let systemLogs = createSystemLogs();
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+        true,
+        L2_SYSTEM_CONTEXT_ADDRESS,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+        packBatchTimestampAndBlockTimestamp(timestamp, timestamp)
+    );
+
     return {
         timestamp,
         indexRepeatedStorageChanges: 0,
         newStateRoot: ethers.utils.randomBytes(32),
         numberOfLayer1Txs: 0,
-        l2LogsTreeRoot: ethers.constants.HashZero,
         priorityOperationsHash: EMPTY_STRING_KECCAK,
-        initialStorageChanges: `0x00000000`,
-        repeatedStorageChanges: `0x`,
-        l2Logs: encodeLogs([contextLog(timestamp, prevInfo.blockHash)]),
-        l2ArbitraryLengthMessages: [],
-        factoryDeps: [],
+        systemLogs: ethers.utils.hexConcat([`0x00000007`].concat(systemLogs)),
+        totalL2ToL1Pubdata: ethers.constants.HashZero,
+        ...info
+    };
+}
+
+async function buildCommitBlockInfoWithCustomLogs(
+    prevInfo: StoredBlockInfo,
+    info: CommitBlockInfoWithTimestamp,
+    systemLogs: string[]
+): Promise<CommitBlockInfo> {
+    const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+        true,
+        L2_SYSTEM_CONTEXT_ADDRESS,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+        packBatchTimestampAndBlockTimestamp(timestamp, timestamp)
+    );
+
+    const size = systemLogs.length == 7 ? `0x00000007` : `0x00000008`;
+
+    return {
+        timestamp,
+        indexRepeatedStorageChanges: 0,
+        newStateRoot: ethers.utils.randomBytes(32),
+        numberOfLayer1Txs: 0,
+        priorityOperationsHash: EMPTY_STRING_KECCAK,
+        systemLogs: ethers.utils.hexConcat([size].concat(systemLogs)),
+        totalL2ToL1Pubdata: ethers.constants.HashZero,
         ...info
     };
 }
@@ -699,7 +826,7 @@ function getBlockStoredInfo(commitInfo: CommitBlockInfo, commitment: string): St
         indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
         numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
         priorityOperationsHash: commitInfo.priorityOperationsHash,
-        l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
+        l2LogsTreeRoot: ethers.constants.HashZero,
         timestamp: commitInfo.timestamp,
         commitment: commitment
     };

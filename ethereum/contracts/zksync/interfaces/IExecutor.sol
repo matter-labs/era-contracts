@@ -4,6 +4,27 @@ pragma solidity ^0.8.13;
 
 import "./IBase.sol";
 
+/// @dev Enum used by L2 System Contracts to differentiate logs.
+enum SystemLogKey {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BLOCK_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
+}
+
+/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
+uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
+
+/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for isService) + 20 (bytes for address)
+uint256 constant L2_LOG_KEY_OFFSET = 24;
+
+/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
+uint256 constant L2_LOG_VALUE_OFFSET = 56;
+
 interface IExecutor is IBase {
     /// @notice Rollup block stored data
     /// @param blockNumber Rollup block number
@@ -31,26 +52,18 @@ interface IExecutor is IBase {
     /// @param indexRepeatedStorageChanges The serial number of the shortcut index that's used as a unique identifier for storage keys that were used twice or more
     /// @param newStateRoot The state root of the full state tree
     /// @param numberOfLayer1Txs Number of priority operations to be processed
-    /// @param l2LogsTreeRoot The root hash of the tree that contains all L2 -> L1 logs in the block
     /// @param priorityOperationsHash Hash of all priority operations from this block
-    /// @param initialStorageChanges Storage write access as a concatenation key-value
-    /// @param repeatedStorageChanges Storage write access as a concatenation index-value
-    /// @param l2Logs concatenation of all L2 -> L1 logs in the block
-    /// @param l2ArbitraryLengthMessages array of hash preimages that were sent as value of L2 logs by special system L2 contract
-    /// @param factoryDeps array of l2 bytecodes that were marked as known on L2
+    /// @param systemLogs concatenation of all L2 -> L1 system logs in the block
+    /// @param totalL2ToL1Pubdata Total pubdata committed to as part of bootloader run. Contents are: l2Tol1Logs <> l2Tol1Messages <> publishedBytecodes <> stateDiffs
     struct CommitBlockInfo {
         uint64 blockNumber;
         uint64 timestamp;
         uint64 indexRepeatedStorageChanges;
         bytes32 newStateRoot;
         uint256 numberOfLayer1Txs;
-        bytes32 l2LogsTreeRoot;
         bytes32 priorityOperationsHash;
-        bytes initialStorageChanges;
-        bytes repeatedStorageChanges;
-        bytes l2Logs;
-        bytes[] l2ArbitraryLengthMessages;
-        bytes[] factoryDeps;
+        bytes systemLogs;
+        bytes totalL2ToL1Pubdata;
     }
 
     /// @notice Recursive proof input data (individual commitments are constructed onchain)

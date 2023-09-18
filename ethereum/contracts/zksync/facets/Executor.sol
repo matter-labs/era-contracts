@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, INPUT_MASK, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK} from "../Config.sol";
-import {IExecutor} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey} from "../interfaces/IExecutor.sol";
 import {PairingsBn254} from "../libraries/PairingsBn254.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
@@ -37,6 +37,8 @@ contract ExecutorFacet is Base, IExecutor {
             uint256 expectedNumberOfLayer1Txs,
             bytes32 expectedPriorityOperationsHash,
             bytes32 previousBlockHash,
+            bytes32 stateDiffHash,
+            bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp
         ) = _processL2Logs(_newBlock, _expectedSystemContractUpgradeTxHash);
 
@@ -49,19 +51,8 @@ contract ExecutorFacet is Base, IExecutor {
         // Check the timestamp of the new block
         _verifyBlockTimestamp(packedBatchAndL2BlockTimestamp, _newBlock.timestamp, _previousBlock.timestamp);
 
-        // Preventing "stack too deep error"
-        {
-            // Check the index of repeated storage writes
-            uint256 newStorageChangesIndexes = uint256(uint32(bytes4(_newBlock.initialStorageChanges[:4])));
-            require(
-                _previousBlock.indexRepeatedStorageChanges + newStorageChangesIndexes ==
-                    _newBlock.indexRepeatedStorageChanges,
-                "yq"
-            );
-        }
-
         // Create block commitment for the proof verification
-        bytes32 commitment = _createBlockCommitment(_newBlock);
+        bytes32 commitment = _createBlockCommitment(_newBlock, stateDiffHash);
 
         return
             StoredBlockInfo(
@@ -70,7 +61,7 @@ contract ExecutorFacet is Base, IExecutor {
                 _newBlock.indexRepeatedStorageChanges,
                 _newBlock.numberOfLayer1Txs,
                 _newBlock.priorityOperationsHash,
-                _newBlock.l2LogsTreeRoot,
+                l2LogsTreeRoot,
                 _newBlock.timestamp,
                 commitment
             );
@@ -91,7 +82,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         // While the fact that _previousBatchTimestamp < batchTimestamp is already checked on L2,
         // we double check it here for clarity
-        require(_previousBatchTimestamp < batchTimestamp, "h");
+        require(_previousBatchTimestamp < batchTimestamp, "h3");
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
@@ -104,6 +95,9 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @dev Check that L2 logs are proper and block contain all meta information for them
+    /// @dev The logs processed here should line up such that only one log for each key from the
+    ///      SystemLogKey enum in Constants.sol is processed per new block.
+    /// @dev Data returned from here will be used to form the block commitment.
     function _processL2Logs(CommitBlockInfo calldata _newBlock, bytes32 _expectedSystemContractUpgradeTxHash)
         internal
         pure
@@ -111,66 +105,69 @@ contract ExecutorFacet is Base, IExecutor {
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
             bytes32 previousBlockHash,
+            bytes32 stateDiffHash,
+            bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp
         )
     {
         // Copy L2 to L1 logs into memory.
-        bytes memory emittedL2Logs = _newBlock.l2Logs[4:];
-        uint256 currentMessage;
-        // Auxiliary variable that is needed to enforce that `previousBlockHash` and `blockTimestamp` was read exactly one time
-        bool isSystemContextLogProcessed;
-        bytes[] calldata factoryDeps = _newBlock.factoryDeps;
-        uint256 currentBytecode;
+        bytes memory emittedL2Logs = _newBlock.systemLogs[4:];
 
-        chainedPriorityTxsHash = EMPTY_STRING_KECCAK;
+        // Used as bitmap to set/check log processing happens exactly once.
+        // See SystemLogKey enum in Constants.sol for ordering.
+        uint256 processedLogs;
+
+        bytes32 providedL2ToL1PubdataHash = keccak256(_newBlock.totalL2ToL1Pubdata);
 
         // linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
-            (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + 4);
+            // Extract the values to be compared to/used such as the log sender, key, and value
+            (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+            (uint256 logKey, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+            (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
 
-            // show preimage for hashed message stored in log
-            if (logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                (bytes32 hashedMessage, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
-                require(keccak256(_newBlock.l2ArbitraryLengthMessages[currentMessage]) == hashedMessage, "k2");
+            // Ensure that the log hasn't been processed already
+            require(!_checkBit(processedLogs, uint8(logKey)), "kp");
+            processedLogs = _setBit(processedLogs, uint8(logKey));
 
-                currentMessage = currentMessage.uncheckedInc();
-            } else if (logSender == L2_BOOTLOADER_ADDRESS) {
-                (bytes32 canonicalTxHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 24);
-
-                if (_expectedSystemContractUpgradeTxHash != bytes32(0)) {
-                    require(_expectedSystemContractUpgradeTxHash == canonicalTxHash, "bz");
-                    _expectedSystemContractUpgradeTxHash = bytes32(0);
-                } else {
-                    chainedPriorityTxsHash = keccak256(abi.encode(chainedPriorityTxsHash, canonicalTxHash));
-                    // Overflow is not realistic
-                    numberOfLayer1Txs = numberOfLayer1Txs.uncheckedInc();
-                }
-            } else if (logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
-                // Make sure that the system context log wasn't processed yet, to
-                // avoid accident double reading `blockTimestamp` and `previousBlockHash`
-                require(!isSystemContextLogProcessed, "fx");
-                (packedBatchAndL2BlockTimestamp, ) = UnsafeBytes.readUint256(emittedL2Logs, i + 24);
-                (previousBlockHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
-                // Mark system context log as processed
-                isSystemContextLogProcessed = true;
-            } else if (logSender == L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR) {
-                (bytes32 bytecodeHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 24);
-                require(bytecodeHash == L2ContractHelper.hashL2Bytecode(factoryDeps[currentBytecode]), "k3");
-
-                currentBytecode = currentBytecode.uncheckedInc();
+            // Need to check that each log was sent by the correct address.
+            if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
+                l2LogsTreeRoot = logValue;
+            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
+                require(providedL2ToL1PubdataHash == logValue, "wp");
+            } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
+                stateDiffHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
+                require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
+                packedBatchAndL2BlockTimestamp = uint256(logValue);
+            } else if (logKey == uint256(SystemLogKey.PREV_BLOCK_HASH_KEY)) {
+                require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sv");
+                previousBlockHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
+                require(logSender == L2_BOOTLOADER_ADDRESS, "bl");
+                chainedPriorityTxsHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
+                require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
+                numberOfLayer1Txs = uint256(logValue);
+            } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH)) {
+                require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
+                require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
             } else {
-                // Only some system contracts could send raw logs from L2 to L1, double check that invariant holds here.
-                revert("ne");
+                revert("ul");
             }
         }
-        // To check that only relevant preimages have been included in the calldata
-        require(currentBytecode == factoryDeps.length, "ym");
-        require(currentMessage == _newBlock.l2ArbitraryLengthMessages.length, "pl");
-        // `blockTimestamp` and `previousBlockHash` wasn't read from L2 logs
-        require(isSystemContextLogProcessed, "by");
 
-        // Making sure that the system contract upgrade was included if needed
-        require(_expectedSystemContractUpgradeTxHash == bytes32(0), "bw");
+        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
+        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
+            require(processedLogs == 127, "b7");
+        } else {
+            require(processedLogs == 255, "b8");
+        }
     }
 
     /// @notice Commit block
@@ -461,10 +458,14 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @dev Creates block commitment from its data
-    function _createBlockCommitment(CommitBlockInfo calldata _newBlockData) internal view returns (bytes32) {
+    function _createBlockCommitment(CommitBlockInfo calldata _newBlockData, bytes32 _stateDiffHash)
+        internal
+        view
+        returns (bytes32)
+    {
         bytes32 passThroughDataHash = keccak256(_blockPassThroughData(_newBlockData));
         bytes32 metadataHash = keccak256(_blockMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(_blockAuxiliaryOutput(_newBlockData));
+        bytes32 auxiliaryOutputHash = keccak256(_blockAuxiliaryOutput(_newBlockData, _stateDiffHash));
 
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
@@ -483,20 +484,30 @@ contract ExecutorFacet is Base, IExecutor {
         return abi.encodePacked(s.zkPorterIsAvailable, s.l2BootloaderBytecodeHash, s.l2DefaultAccountBytecodeHash);
     }
 
-    function _blockAuxiliaryOutput(CommitBlockInfo calldata _block) internal pure returns (bytes memory) {
-        require(_block.initialStorageChanges.length <= MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, "pf");
-        require(_block.repeatedStorageChanges.length <= MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, "py");
-        require(_block.l2Logs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
+    function _blockAuxiliaryOutput(CommitBlockInfo calldata _block, bytes32 _stateDiffHash)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        require(_block.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
-        bytes32 initialStorageChangesHash = keccak256(_block.initialStorageChanges);
-        bytes32 repeatedStorageChangesHash = keccak256(_block.repeatedStorageChanges);
-        bytes32 l2ToL1LogsHash = keccak256(_block.l2Logs);
+        bytes32 l2ToL1LogsHash = keccak256(_block.systemLogs);
 
-        return abi.encode(_block.l2LogsTreeRoot, l2ToL1LogsHash, initialStorageChangesHash, repeatedStorageChangesHash);
+        return abi.encode(l2ToL1LogsHash, _stateDiffHash);
     }
 
     /// @notice Returns the keccak hash of the ABI-encoded StoredBlockInfo
     function _hashStoredBlockInfo(StoredBlockInfo memory _storedBlockInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBlockInfo));
+    }
+
+    /// @notice Returns if the bit at index {_index} is 1
+    function _checkBit(uint256 _bitMap, uint8 _index) internal pure returns (bool) {
+        return (_bitMap & (1 << _index)) > 0;
+    }
+
+    /// @notice Sets the given bit in {_num} at index {_index} to 1.
+    function _setBit(uint256 _num, uint8 _index) internal pure returns (uint256) {
+        return _num | (1 << _index);
     }
 }

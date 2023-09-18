@@ -10,6 +10,18 @@ export const L2_SYSTEM_CONTEXT_ADDRESS = `0x000000000000000000000000000000000000
 export const L2_BOOTLOADER_ADDRESS = `0x0000000000000000000000000000000000008001`;
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = `0x0000000000000000000000000000000000008004`;
 export const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
+export const L2_BYTECODE_COMPRESSOR_ADDRESS = `0x000000000000000000000000000000000000800e`;
+
+export enum SYSTEM_LOG_KEYS {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BLOCK_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
+}
 
 // The default price for the pubdata in L2 gas to be used in L1->L2 transactions
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA =
@@ -74,6 +86,48 @@ export async function requestExecute(
     );
 }
 
+export function constructL2Log(isService: boolean, sender: string, key: number | string, value: string) {
+    return ethers.utils.hexConcat([
+        isService ? `0x0001` : `0x0000`,
+        `0x0000`,
+        sender,
+        ethers.utils.hexZeroPad(ethers.utils.hexlify(key), 32),
+        ethers.utils.hexZeroPad(ethers.utils.hexlify(value), 32)
+    ]);
+}
+
+export function createSystemLogs() {
+    return [
+        constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY,
+            ethers.constants.HashZero
+        ),
+        constructL2Log(
+            true,
+            L2_TO_L1_MESSENGER,
+            SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
+            `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
+        ),
+        constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
+        constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+            ethers.constants.HashZero
+        ),
+        constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY, ethers.constants.HashZero),
+        constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY, EMPTY_STRING_KECCAK),
+        constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+            ethers.constants.HashZero
+        )
+    ];
+}
+
 export function genesisStoredBlockInfo(): StoredBlockInfo {
     return {
         blockNumber: 0,
@@ -89,7 +143,10 @@ export function genesisStoredBlockInfo(): StoredBlockInfo {
 
 // Packs the batch timestamp and block timestamp and returns the 32-byte hex string
 // which should be used for the "key" field of the L2->L1 system context log.
-export function packBatchTimestampAndBlockTimestamp(batchTimestamp: number, blockTimestamp: number): string {
+export function packBatchTimestampAndBlockTimestamp(
+    batchTimestamp: BigNumberish,
+    blockTimestamp: BigNumberish
+): string {
     const packedNum = BigNumber.from(batchTimestamp).shl(128).or(BigNumber.from(blockTimestamp));
     return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
@@ -111,11 +168,7 @@ export interface CommitBlockInfo {
     indexRepeatedStorageChanges: BigNumberish;
     newStateRoot: BytesLike;
     numberOfLayer1Txs: BigNumberish;
-    l2LogsTreeRoot: BytesLike;
     priorityOperationsHash: BytesLike;
-    initialStorageChanges: BytesLike;
-    repeatedStorageChanges: BytesLike;
-    l2Logs: BytesLike;
-    l2ArbitraryLengthMessages: BytesLike[];
-    factoryDeps: BytesLike[];
+    systemLogs: BytesLike;
+    totalL2ToL1Pubdata: BytesLike;
 }

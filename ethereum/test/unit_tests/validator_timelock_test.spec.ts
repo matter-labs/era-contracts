@@ -23,13 +23,9 @@ describe(`ValidatorTimelock tests`, function () {
             indexRepeatedStorageChanges: 0,
             newStateRoot: ethers.constants.HashZero,
             numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: ethers.constants.HashZero,
             priorityOperationsHash: ethers.constants.HashZero,
-            initialStorageChanges: `0x00000000`,
-            repeatedStorageChanges: `0x`,
-            l2Logs: [],
-            l2ArbitraryLengthMessages: [],
-            factoryDeps: []
+            systemLogs: [],
+            totalL2ToL1Pubdata: `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
         };
     }
 

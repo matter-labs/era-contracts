@@ -18,9 +18,10 @@ import {
     AccessMode,
     EMPTY_STRING_KECCAK,
     L2_BOOTLOADER_ADDRESS,
-    L2_KNOWN_CODE_STORAGE_ADDRESS,
     L2_SYSTEM_CONTEXT_ADDRESS,
-    L2_TO_L1_MESSENGER,
+    SYSTEM_LOG_KEYS,
+    constructL2Log,
+    createSystemLogs,
     genesisStoredBlockInfo,
     getCallRevertReason,
     packBatchTimestampAndBlockTimestamp,
@@ -40,6 +41,7 @@ describe(`Executor tests`, function () {
     let currentTimestamp: number;
     let newCommitBlockInfo: any;
     let newStoredBlockInfo: any;
+    let logs: any;
 
     const proofInput = {
         recursiveAggregationInput: [],
@@ -134,13 +136,9 @@ describe(`Executor tests`, function () {
             indexRepeatedStorageChanges: 0,
             newStateRoot: ethers.utils.randomBytes(32),
             numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: ethers.utils.randomBytes(32),
             priorityOperationsHash: ethers.utils.randomBytes(32),
-            initialStorageChanges: `0x`,
-            repeatedStorageChanges: `0x`,
-            l2Logs: `0x`,
-            l2ArbitraryLengthMessages: [],
-            factoryDeps: []
+            systemLogs: `0x`,
+            totalL2ToL1Pubdata: `0x`
         };
 
         it(`Should revert on committing by unauthorised address`, async () => {
@@ -150,7 +148,7 @@ describe(`Executor tests`, function () {
             expect(revertReason).equal(`1h`);
         });
 
-        it(`Should revert on committing by unauthorised address`, async () => {
+        it(`Should revert on proving by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
                 executor.connect(randomSigner).proveBlocks(storedBlockInfo, [storedBlockInfo], proofInput)
             );
@@ -168,19 +166,16 @@ describe(`Executor tests`, function () {
     describe(`Commiting functionality`, async function () {
         before(async () => {
             currentTimestamp = (await hardhat.ethers.providers.getDefaultProvider().getBlock(`latest`)).timestamp;
+            logs = ethers.utils.hexConcat([`0x00000007`].concat(createSystemLogs()));
             newCommitBlockInfo = {
                 blockNumber: 1,
                 timestamp: currentTimestamp,
                 indexRepeatedStorageChanges: 0,
                 newStateRoot: ethers.utils.randomBytes(32),
                 numberOfLayer1Txs: 0,
-                l2LogsTreeRoot: ethers.constants.HashZero,
                 priorityOperationsHash: EMPTY_STRING_KECCAK,
-                initialStorageChanges: `0x00000000`,
-                repeatedStorageChanges: `0x`,
-                l2Logs: `0x`,
-                l2ArbitraryLengthMessages: [],
-                factoryDeps: []
+                systemLogs: logs,
+                totalL2ToL1Pubdata: ethers.constants.HashZero
             };
         });
 
@@ -205,17 +200,17 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing with wrong new block timestamp`, async () => {
-            const wrongNewBlockTimestamp = ethers.utils.randomBytes(32); // correct value is 0
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            const wrongNewBlockTimestamp = ethers.utils.hexValue(ethers.utils.randomBytes(32)); // correct value is 0
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                wrongNewBlockTimestamp,
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                wrongNewBlockTimestamp.toString()
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
@@ -224,17 +219,20 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing with too small new block timestamp`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            const wrongNewBlockTimestamp = 1; // too small
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(1, 1),
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                ethers.utils.hexlify(
+                    packBatchTimestampAndBlockTimestamp(wrongNewBlockTimestamp, wrongNewBlockTimestamp)
+                )
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.timestamp = 1; // too small
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            wrongNewCommitBlockInfo.timestamp = wrongNewBlockTimestamp;
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
@@ -243,18 +241,18 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing with too big last L2 block timestamp`, async () => {
-            const wrongL2BlockTimestamp = parseInt('0xffffffff');
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            const wrongNewBlockTimestamp = `0xffffffff`; // too big
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(wrongL2BlockTimestamp, wrongL2BlockTimestamp),
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(wrongNewBlockTimestamp, wrongNewBlockTimestamp)
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.timestamp = wrongL2BlockTimestamp;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            wrongNewCommitBlockInfo.timestamp = parseInt(wrongNewBlockTimestamp);
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
@@ -264,16 +262,16 @@ describe(`Executor tests`, function () {
 
         it(`Should revert on committing with wrong previous blockhash`, async () => {
             const wrongPreviousBlockHash = ethers.utils.randomBytes(32); // correct value is bytes32(0)
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                wrongPreviousBlockHash
-            ]);
+                SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+                ethers.utils.hexlify(wrongPreviousBlockHash)
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
@@ -282,74 +280,70 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing without processing system context log`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([`0x00000000`]);
+            var wrongL2Logs = createSystemLogs();
+            delete wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY];
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
-            expect(revertReason).equal(`by`);
+            expect(revertReason).equal(`b7`);
         });
 
         it(`Should revert on committing with processing system context log twice`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero
-            ]);
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs.push(
+                constructL2Log(
+                    true,
+                    L2_SYSTEM_CONTEXT_ADDRESS,
+                    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                    ethers.constants.HashZero
+                )
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
-            expect(revertReason).equal(`fx`);
+            expect(revertReason).equal(`kp`);
         });
 
         it('Should revert on unexpected L2->L1 log', async () => {
             // We do not expect to receive an L2->L1 log from zero address
             const unexpectedAddress = ethers.constants.AddressZero;
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 unexpectedAddress,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 ethers.constants.HashZero
-            ]);
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
-            expect(revertReason).equal(`ne`);
+            expect(revertReason).equal(`sc`);
         });
 
         it(`Should revert on committing with wrong canonical tx hash`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
+            var wrongChainedPriorityHash = ethers.utils.randomBytes(32);
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
+                true,
                 L2_BOOTLOADER_ADDRESS,
-                ethers.utils.randomBytes(32), //wrong canonical tx hash
-                ethers.utils.hexZeroPad(`0x01`, 32)
-            ]);
+                SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+                ethers.utils.hexlify(wrongChainedPriorityHash)
+            );
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
@@ -358,26 +352,16 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should revert on committing with wrong number of layer 1 TXs`, async () => {
-            const arbitraryCanonicalTxHash = ethers.utils.randomBytes(32);
-            const chainedPriorityTxHash = ethers.utils.keccak256(
-                ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs[SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY] = constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+                ethers.utils.hexlify(0x01)
             );
 
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_BOOTLOADER_ADDRESS,
-                arbitraryCanonicalTxHash,
-                ethers.utils.hexZeroPad(`0x01`, 32)
-            ]);
-
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
             wrongNewCommitBlockInfo.numberOfLayer1Txs = 2; // wrong number
 
             const revertReason = await getCallRevertReason(
@@ -386,256 +370,71 @@ describe(`Executor tests`, function () {
             expect(revertReason).equal(`ta`);
         });
 
-        it(`Should revert on committing with wrong factory deps data`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_KNOWN_CODE_STORAGE_ADDRESS,
-                ethers.utils.randomBytes(32)
-            ]);
+        it(`Should revert on committing with unknown system log key`, async () => {
+            var wrongL2Logs = createSystemLogs();
+            wrongL2Logs.push(constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, 119, ethers.constants.HashZero));
 
             const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(32)];
+            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
                 executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
             );
-            expect(revertReason).equal(`k3`);
+            expect(revertReason).equal(`ul`);
         });
 
-        it(`Should revert on committing with wrong factory deps array length`, async () => {
-            const arbitraryBytecode = ethers.utils.randomBytes(32);
-            const arbitraryBytecodeHash = ethers.utils.sha256(arbitraryBytecode);
-            const arbitraryBytecodeHashManipulated1 = BigNumber.from(arbitraryBytecodeHash).and(
-                `0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF`
-            );
-            const arbitraryBytecodeHashManipulated2 = BigNumber.from(arbitraryBytecodeHashManipulated1).or(
-                `0x0100000100000000000000000000000000000000000000000000000000000000`
-            );
+        it(`Should revert for system log from incorrect address`, async () => {
+            var tests = [
+                [ethers.constants.HashZero, 'lm'],
+                [`0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`, 'ln'],
+                [ethers.constants.HashZero, 'lb'],
+                [ethers.constants.HashZero, 'sc'],
+                [ethers.constants.HashZero, 'sv'],
+                [EMPTY_STRING_KECCAK, 'bl'],
+                [ethers.constants.HashZero, 'bk']
+            ];
 
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_KNOWN_CODE_STORAGE_ADDRESS,
-                ethers.utils.hexlify(arbitraryBytecodeHashManipulated2)
-            ]);
+            for (var i = 0; i < tests.length; i++) {
+                var wrongL2Logs = createSystemLogs();
+                var wrong_addr = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+                wrongL2Logs[i] = constructL2Log(true, wrong_addr, i, tests[i][0]);
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.factoryDeps = [arbitraryBytecode, arbitraryBytecode];
+                const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+                wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`ym`);
+                const revertReason = await getCallRevertReason(
+                    executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                );
+                expect(revertReason).equal(tests[i][1]);
+            }
         });
 
-        it(`Should revert on committing with wrong hashed message`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_TO_L1_MESSENGER,
-                ethers.constants.HashZero,
-                ethers.utils.randomBytes(32)
-            ]);
+        it(`Should revert for system log missing`, async () => {
+            for (var i = 0; i < 7; i++) {
+                var l2Logs = createSystemLogs();
+                delete l2Logs[i];
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = [ethers.utils.randomBytes(32)];
+                const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+                wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(l2Logs));
 
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`k2`);
-        });
-
-        it(`Should revert on committing with wrong number of messages`, async () => {
-            const arbitraryMessage = `0xaa`;
-            const arbitraryHashedMessage = ethers.utils.keccak256(arbitraryMessage);
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_TO_L1_MESSENGER,
-                ethers.constants.HashZero,
-                arbitraryHashedMessage
-            ]);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = [arbitraryMessage, arbitraryMessage]; // wrong number
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`pl`);
-        });
-
-        it(`Should revert on committing with wrong bytecode length`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_KNOWN_CODE_STORAGE_ADDRESS,
-                ethers.utils.randomBytes(32)
-            ]);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(20)];
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal('bl');
-        });
-
-        it(`Should revert on committing with wrong number of words in the bytecode`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-                ethers.constants.HashZero,
-                `0x00010000`,
-                L2_KNOWN_CODE_STORAGE_ADDRESS,
-                ethers.utils.randomBytes(32)
-            ]);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.factoryDeps = [ethers.utils.randomBytes(64)];
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`pr`);
-        });
-
-        it(`Should revert on committing with wrong reapeated storage writes`, async () => {
-            const wrongL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.indexRepeatedStorageChanges = 0; // wrong value, it should be 1
-            wrongNewCommitBlockInfo.initialStorageChanges = `0x00000001`;
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`yq`);
-        });
-
-        it(`Should revert on committing with too long L2 logs`, async () => {
-            // uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
-            const arr1 = Array(512)
-                .fill([`0x00000000`, L2_TO_L1_MESSENGER, ethers.constants.HashZero, ethers.utils.keccak256('0x')])
-                .flat();
-
-            const arr2 = [
-                `0x00000001`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ].concat(arr1);
-
-            const wrongL2Logs = ethers.utils.hexConcat(arr2);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = wrongL2Logs;
-            wrongNewCommitBlockInfo.l2ArbitraryLengthMessages = Array(512).fill('0x');
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`pu`);
-        });
-
-        it(`Should revert on committing with too long reapeated storage changes`, async () => {
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
-
-            // uint256 constant MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + REPEATED_STORAGE_CHANGE_SERIALIZE_SIZE * 7564;
-            const arr1 = Array(7565).fill(ethers.utils.randomBytes(40)).flat();
-            const arr2 = [`0x00000000`].concat(arr1);
-            const wrongRepeatedStorageChanges = ethers.utils.hexConcat(arr2);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
-            wrongNewCommitBlockInfo.repeatedStorageChanges = wrongRepeatedStorageChanges; // too long repeated storage changes
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`py`);
-        });
-
-        it(`Should revert on committing with too long initial storage changes`, async () => {
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
-
-            // uint256 constant MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES = 4 + INITIAL_STORAGE_CHANGE_SERIALIZE_SIZE * 4765;
-            const arr1 = Array(4766).fill(ethers.utils.randomBytes(64));
-            const arr2 = [`0x00000000`].concat(arr1);
-            const wrongInitialStorageChanges = ethers.utils.hexConcat(arr2);
-
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.l2Logs = correctL2Logs;
-            wrongNewCommitBlockInfo.initialStorageChanges = wrongInitialStorageChanges; // too long initial storage changes
-
-            const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
-            );
-            expect(revertReason).equal(`pf`);
+                const revertReason = await getCallRevertReason(
+                    executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                );
+                expect(revertReason).equal('b7');
+            }
         });
 
         it(`Should successfully commit a block`, async () => {
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            var correctL2Logs = createSystemLogs();
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
 
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
             const commitTx = await executor
                 .connect(validator)
@@ -652,6 +451,20 @@ describe(`Executor tests`, function () {
 
     describe(`Proving functionality`, async function () {
         before(async () => {
+            // Reusing the old timestamp
+            currentTimestamp = newCommitBlockInfo.timestamp;
+
+            newCommitBlockInfo = {
+                blockNumber: 1,
+                timestamp: currentTimestamp,
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: ethers.utils.randomBytes(32),
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: EMPTY_STRING_KECCAK,
+                systemLogs: logs,
+                totalL2ToL1Pubdata: ethers.constants.HashZero
+            };
+
             newStoredBlockInfo = {
                 blockNumber: 1,
                 blockHash: newCommitedBlockBlockHash,
@@ -694,18 +507,25 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should prove successfuly`, async () => {
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            var correctL2Logs = createSystemLogs();
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
 
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
-            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+            var commitTx = await executor
+                .connect(validator)
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+
+            var result = await commitTx.wait();
+
+            newStoredBlockInfo.blockHash = result.events[0].args.blockHash;
+            newStoredBlockInfo.commitment = result.events[0].args.commitment;
 
             await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
             expect(await getters.getTotalBlocksVerified()).equal(1);
@@ -755,20 +575,29 @@ describe(`Executor tests`, function () {
                 ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
             );
 
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
+            var correctL2Logs = createSystemLogs();
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero,
-                `0x00010000`,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
+            correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
+                true,
                 L2_BOOTLOADER_ADDRESS,
-                arbitraryCanonicalTxHash,
-                ethers.utils.hexZeroPad(`0x01`, 32)
-            ]);
+                SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+                chainedPriorityTxHash
+            );
+            correctL2Logs[SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY] = constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+                '0x01'
+            );
 
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+
             correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
             correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
 
@@ -802,20 +631,28 @@ describe(`Executor tests`, function () {
                 ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
             );
 
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000002`,
-                `0x00000000`,
+            var correctL2Logs = createSystemLogs();
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero,
-                `0x00010000`,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
+            correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
+                true,
                 L2_BOOTLOADER_ADDRESS,
-                arbitraryCanonicalTxHash,
-                ethers.utils.hexZeroPad(`0x01`, 32)
-            ]);
+                SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+                chainedPriorityTxHash
+            );
+            correctL2Logs[SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY] = constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+                '0x01'
+            );
 
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
             correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
             correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
 
@@ -875,16 +712,16 @@ describe(`Executor tests`, function () {
         });
 
         it(`Should execute a block successfully`, async () => {
-            const correctL2Logs = ethers.utils.hexConcat([
-                `0x00000001`,
-                `0x00000000`,
+            var correctL2Logs = createSystemLogs();
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+                true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-                ethers.constants.HashZero
-            ]);
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
 
             const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
             await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
             await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
