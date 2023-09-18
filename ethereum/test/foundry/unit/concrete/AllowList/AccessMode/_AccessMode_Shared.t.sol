@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../_AllowList_Shared.t.sol";
+import {AllowListTest} from "../_AllowList_Shared.t.sol";
 
 contract AccessModeTest is AllowListTest {
     address internal target = 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045;

@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./_DiamondCut_Shared.t.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/DiamondCut.sol";
+// solhint-disable max-line-length
+
+import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
+import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
+import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {DiamondCutFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/DiamondCut.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+
+// solhint-enable max-line-length
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;

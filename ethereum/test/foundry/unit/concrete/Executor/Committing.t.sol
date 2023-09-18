@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./_Executor_Shared.t.sol";
+import {Vm} from "forge-std/Test.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
+import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
 contract CommittingTest is ExecutorTest {
     function test_RevertWhen_ComittingWithWrongLastCommittedBlockData() public {

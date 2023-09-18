@@ -2,9 +2,10 @@
 
 pragma solidity ^0.8.13;
 
-import "./_AccessMode_Shared.t.sol";
+import {AccessModeTest} from "./_AccessMode_Shared.t.sol";
+import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 
-contract DepositLimitTest is AllowListTest {
+contract DepositLimitTest is AccessModeTest {
     address private l1token = makeAddr("l1token");
 
     function test_RevertWhen_NonOwner() public {

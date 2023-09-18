@@ -2,7 +2,8 @@
 
 pragma solidity ^0.8.13;
 
-import "./_Permission_Shared.t.sol";
+import {PermissionTest} from "./_Permission_Shared.t.sol";
+import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 
 contract SetPermissionToCallTest is PermissionTest {
     function test_RevertWhen_NonOwner() public {

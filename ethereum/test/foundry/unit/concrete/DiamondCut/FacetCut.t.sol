@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./_DiamondCut_Shared.t.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+// solhint-disable max-line-length
+
+import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
+import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+
+// solhint-enable max-line-length
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;

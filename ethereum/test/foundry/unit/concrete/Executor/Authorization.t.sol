@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./_Executor_Shared.t.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBlockInfo private storedBlockInfo;

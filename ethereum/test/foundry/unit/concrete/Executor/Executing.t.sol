@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "./_Executor_Shared.t.sol";
+// solhint-disable max-line-length
+
+import {Vm} from "forge-std/Test.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
+import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+
+// solhint-enable max-line-length
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {

@@ -2,12 +2,10 @@
 
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-import "./Utils.sol";
+import {Test} from "forge-std/Test.sol";
+import {Utils} from "./Utils.sol";
 
 contract UtilsTest is Test {
-    using Utils for *;
-
     function test_PackBatchTimestampAndBlockTimestamp() public {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;

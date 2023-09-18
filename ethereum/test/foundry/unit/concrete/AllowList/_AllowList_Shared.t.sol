@@ -2,9 +2,8 @@
 
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-import "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
+import {Test} from "forge-std/Test.sol";
+import {AllowList} from "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 
 contract AllowListTest is Test {
     AllowList internal allowList;

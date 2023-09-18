@@ -2,19 +2,22 @@
 
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
-import "../Utils/Utils.sol";
-import "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Governance.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
+import {Test} from "forge-std/Test.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {AllowList} from "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
+import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
+import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
+import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
+import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {GovernanceFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Governance.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 
 contract ExecutorTest is Test {
-    using Utils for *;
-
     address internal constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
     address internal constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
     address internal constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
