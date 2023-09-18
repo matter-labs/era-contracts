@@ -384,8 +384,6 @@ contract ExecutorFacet is Base, IExecutor {
                         _currentBlockCommitment,
                         _verifierParams.recursionNodeLevelVkHash,
                         _verifierParams.recursionLeafLevelVkHash,
-                        _verifierParams.recursionCircuitsSetVksHash,
-                        _proof.recursiveAggregationInput
                     )
                 )
             ) & INPUT_MASK;
@@ -454,7 +452,12 @@ contract ExecutorFacet is Base, IExecutor {
 
         bytes32 l2ToL1LogsHash = keccak256(_block.systemLogs);
 
-        return abi.encode(l2ToL1LogsHash, _stateDiffHash);
+        return abi.encode(
+            l2ToL1LogsHash, 
+            _stateDiffHash,
+            _block.bootloaderHeapInitialContentsHash,
+            _block.eventsQueueStateHash
+        );
     }
 
     /// @notice Returns the keccak hash of the ABI-encoded StoredBlockInfo
