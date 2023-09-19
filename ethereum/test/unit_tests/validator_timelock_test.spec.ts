@@ -24,6 +24,8 @@ describe(`ValidatorTimelock tests`, function () {
             newStateRoot: ethers.constants.HashZero,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: ethers.constants.HashZero,
+            bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+            eventsQueueStateHash: ethers.utils.randomBytes(32),
             systemLogs: [],
             totalL2ToL1Pubdata: `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
         };

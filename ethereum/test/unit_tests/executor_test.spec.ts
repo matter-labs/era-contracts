@@ -137,6 +137,8 @@ describe(`Executor tests`, function () {
             newStateRoot: ethers.utils.randomBytes(32),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: ethers.utils.randomBytes(32),
+            bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+            eventsQueueStateHash: ethers.utils.randomBytes(32),
             systemLogs: `0x`,
             totalL2ToL1Pubdata: `0x`
         };
@@ -174,6 +176,8 @@ describe(`Executor tests`, function () {
                 newStateRoot: ethers.utils.randomBytes(32),
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: EMPTY_STRING_KECCAK,
+                bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+                eventsQueueStateHash: ethers.utils.randomBytes(32),
                 systemLogs: logs,
                 totalL2ToL1Pubdata: ethers.constants.HashZero
             };
@@ -461,6 +465,8 @@ describe(`Executor tests`, function () {
                 newStateRoot: ethers.utils.randomBytes(32),
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: EMPTY_STRING_KECCAK,
+                bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+                eventsQueueStateHash: ethers.utils.randomBytes(32),
                 systemLogs: logs,
                 totalL2ToL1Pubdata: ethers.constants.HashZero
             };

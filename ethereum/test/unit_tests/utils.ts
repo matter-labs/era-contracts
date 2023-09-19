@@ -169,6 +169,8 @@ export interface CommitBlockInfo {
     newStateRoot: BytesLike;
     numberOfLayer1Txs: BigNumberish;
     priorityOperationsHash: BytesLike;
+    bootloaderHeapInitialContentsHash: BytesLike;
+    eventsQueueStateHash: BytesLike;
     systemLogs: BytesLike;
     totalL2ToL1Pubdata: BytesLike;
 }

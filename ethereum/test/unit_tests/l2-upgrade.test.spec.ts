@@ -788,6 +788,8 @@ async function buildCommitBlockInfo(
         priorityOperationsHash: EMPTY_STRING_KECCAK,
         systemLogs: ethers.utils.hexConcat([`0x00000007`].concat(systemLogs)),
         totalL2ToL1Pubdata: ethers.constants.HashZero,
+        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+        eventsQueueStateHash: ethers.utils.randomBytes(32),
         ...info
     };
 }
@@ -815,6 +817,8 @@ async function buildCommitBlockInfoWithCustomLogs(
         priorityOperationsHash: EMPTY_STRING_KECCAK,
         systemLogs: ethers.utils.hexConcat([size].concat(systemLogs)),
         totalL2ToL1Pubdata: ethers.constants.HashZero,
+        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+        eventsQueueStateHash: ethers.utils.randomBytes(32),
         ...info
     };
 }
