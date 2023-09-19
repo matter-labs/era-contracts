@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./interfaces/IVerifier.sol";
+import "./chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
