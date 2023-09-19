@@ -42,9 +42,9 @@ async function main() {
 
             const zkSync = deployer.proofSystemContract(deployWallet);
             const verifierParams = {
-                recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_NODE'),
-                recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_LEAF'),
-                recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_BASIC_CIRCUITS')
+                recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+                recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+                recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
             };
             const tx = await zkSync.setVerifierParams(verifierParams);
             console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);

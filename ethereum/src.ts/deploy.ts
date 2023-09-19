@@ -146,9 +146,9 @@ export class Deployer {
     //     const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
     //     const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
     //     const verifierParams = {
-    //         recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_NODE'),
-    //         recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_LEAF'),
-    //         recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_BASIC_CIRCUITS')
+        // recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+        // recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+        // recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
     //     };
     //     const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
     //     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('ProofDiamondInit').abi);
@@ -310,9 +310,9 @@ export class Deployer {
 
         const chainId = getNumberFromEnv('CHAIN_ETH_ZKSYNC_NETWORK_ID');
         const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_NODE'),
-            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_LEAF'),
-            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_VK_COMMITMENT_BASIC_CIRCUITS')
+            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
         };
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 
