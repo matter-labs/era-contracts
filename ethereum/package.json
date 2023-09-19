@@ -2,6 +2,9 @@
   "name": "l1-zksync-contracts",
   "version": "0.1.0",
   "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
