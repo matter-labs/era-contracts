@@ -8,11 +8,12 @@ import "./chain-interfaces/IProofChainExecutor.sol";
 /// @author Matter Labs
 /// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying block execution without
-/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main contract.
+/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main
+/// contract.
 /// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
-/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the block is committed, the
-/// timestamp is stored for it. Later, when the owner calls the block execution, the contract checks that block
+/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the block is committed,
+/// the timestamp is stored for it. Later, when the owner calls the block execution, the contract checks that block
 /// was committed not earlier than X time ago.
 contract ValidatorTimelock is IProofExecutor, Ownable2Step {
     /// @dev Part of the IBase interface. Not used in this contract.

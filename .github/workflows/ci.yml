@@ -1,26 +1,105 @@
 name: CI
 
-on:
-  pull_request
+on: pull_request
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ethereum
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout the repository
+        uses: actions/checkout@v3
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16.15.1'
+          node-version: 16.15.1
+          cache: yarn
+          cache-dependency-path: ethereum/yarn.lock
 
       - name: Install yarn
         run: npm install -g yarn
 
       - name: Install dependencies
-        run: cd ethereum && yarn install
+        run: yarn install
+
+      - name: Lint
+        run: yarn lint
+
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ethereum
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.15.1
+          cache: yarn
+          cache-dependency-path: ethereum/yarn.lock
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build artifacts
+        run: yarn build
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-${{ github.sha }}
+          path: |
+            ethereum/artifacts
+            ethereum/cache
+            ethereum/typechain
+
+  test:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ethereum
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.15.1
+          cache: yarn
+          cache-dependency-path: ethereum/yarn.lock
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-${{ github.sha }}
+          path: |
+            ethereum/artifacts
+            ethereum/cache
+            ethereum/typechain
 
       - name: Run tests
-        working-directory: ethereum
-        run: yarn test
+        run: yarn test --no-compile

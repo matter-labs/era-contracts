@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "../proof-system/chain-deps/facets/ProofChainBase.sol";
 import "../bridgehead/chain-interfaces/IMailbox.sol";
-import "../proof-system/Verifier.sol";
+import "../proof-system/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/Messaging.sol";
 import "../bridgehead/libraries/TransactionValidator.sol";
@@ -20,10 +20,13 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
     /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
     /// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
-    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently in each upgrade. Usually empty.
-    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each upgrade. Usually empty.
+    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
+    /// in each upgrade. Usually empty.
+    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
+    /// upgrade. Usually empty.
     /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than the previous protocol version.
+    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
+    /// the previous protocol version.
     /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
     struct ProposedUpgrade {
         L2CanonicalTransaction l2ProtocolUpgradeTx;
@@ -117,16 +120,16 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(Verifier _newVerifier) private {
+    function _setVerifier(IVerifier _newVerifier) private {
         // An upgrade to the verifier must be done carefully to ensure there aren't blocks in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed blocks.
         // Blocks committed expecting the old verifier will fail. Ensure all commited blocks are finalized before the
         // verifier is upgraded.
-        if (_newVerifier == Verifier(address(0))) {
+        if (_newVerifier == IVerifier(address(0))) {
             return;
         }
 
-        Verifier oldVerifier = chainStorage.verifier;
+        IVerifier oldVerifier = chainStorage.verifier;
         chainStorage.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
@@ -151,7 +154,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If either of the fields is 0, the params will not be updated.
     function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
-        _setVerifier(Verifier(_newVerifier));
+        _setVerifier(IVerifier(_newVerifier));
         _setVerifierParams(_verifierParams);
     }
 

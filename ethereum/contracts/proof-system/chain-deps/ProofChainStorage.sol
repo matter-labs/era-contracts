@@ -18,10 +18,12 @@ enum ProofUpgradeState {
     Shadow
 }
 
-/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy upgrades and diamond cuts
+/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy
+/// upgrades and diamond cuts
 /// @param proposedUpgradeHash The hash of the current upgrade proposal, zero if there is no active proposal
 /// @param state Indicates whether an upgrade is initiated and if yes what type
-/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis multisig)
+/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis
+/// multisig)
 /// @param approvedBySecurityCouncil Indicates whether the security council has approved the upgrade
 /// @param proposedUpgradeTimestamp The timestamp when the upgrade was proposed, zero if there are no active proposals
 /// @param currentProposalId The serial number of proposed upgrades, increments when proposing a new one
@@ -49,8 +51,9 @@ struct ProofChainStorage {
     /// @notice List of permitted validators
     mapping(address => bool) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for blocks
-    Verifier verifier;
-    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
+    IVerifier verifier;
+    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block
+    /// (block 0 is genesis)
     uint256 totalBlocksExecuted;
     /// @notice Total number of proved blocks i.e. blocks[totalBlocksProved] points at the latest proved block
     uint256 totalBlocksVerified;
@@ -97,7 +100,8 @@ struct ProofChainStorage {
     uint256 protocolVersion;
     /// @dev Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
+    /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has
+    /// happened yet.
     uint256 l2SystemContractsUpgradeBlockNumber;
     /// new fields
     uint256 chainId;

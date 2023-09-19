@@ -367,27 +367,20 @@ contract ProofExecutorFacet is ProofChainBase, IProofExecutor {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
         if (_proof.serializedProof.length > 0) {
-            // TODO: We keep the code duplication here to NOT to invalidate the audit, refactor it before the next audit. (SMA-1631)
-            bool successVerifyProof = chainStorage.verifier.verify_serialized_proof(
+            bool successVerifyProof = chainStorage.verifier.verify(
                 proofPublicInput,
-                _proof.serializedProof
+                _proof.serializedProof,
+                _proof.recursiveAggregationInput
             );
             require(successVerifyProof, "p"); // Proof verification fail
-
-            // Verify the recursive part that was given to us through the public input
-            bool successProofAggregation = _verifyRecursivePartOfProof(_proof.recursiveAggregationInput);
-            require(successProofAggregation, "hh"); // Proof aggregation must be valid
         }
         // #else
-        bool successVerifyProof = chainStorage.verifier.verify_serialized_proof(
+        bool successVerifyProof = chainStorage.verifier.verify(
             proofPublicInput,
-            _proof.serializedProof
+            _proof.serializedProof,
+            _proof.recursiveAggregationInput
         );
         require(successVerifyProof, "p"); // Proof verification fail
-
-        // Verify the recursive part that was given to us through the public input
-        bool successProofAggregation = _verifyRecursivePartOfProof(_proof.recursiveAggregationInput);
-        require(successProofAggregation, "hh"); // Proof aggregation must be valid
         // #endif
 
         emit BlocksVerification(chainStorage.totalBlocksVerified, currentTotalBlocksVerified);
@@ -414,43 +407,6 @@ contract ProofExecutorFacet is ProofChainBase, IProofExecutor {
                     )
                 )
             ) & INPUT_MASK;
-    }
-
-    /// @dev Verify a part of the zkp, that is responsible for the aggregation
-    function _verifyRecursivePartOfProof(uint256[] calldata _recursiveAggregationInput) internal view returns (bool) {
-        require(_recursiveAggregationInput.length == 4, "vr");
-
-        PairingsBn254.G1Point memory pairWithGen = PairingsBn254.new_g1_checked(
-            _recursiveAggregationInput[0],
-            _recursiveAggregationInput[1]
-        );
-        PairingsBn254.G1Point memory pairWithX = PairingsBn254.new_g1_checked(
-            _recursiveAggregationInput[2],
-            _recursiveAggregationInput[3]
-        );
-
-        PairingsBn254.G2Point memory g2Gen = PairingsBn254.new_g2(
-            [
-                0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2,
-                0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed
-            ],
-            [
-                0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b,
-                0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa
-            ]
-        );
-        PairingsBn254.G2Point memory g2X = PairingsBn254.new_g2(
-            [
-                0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1,
-                0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0
-            ],
-            [
-                0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4,
-                0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55
-            ]
-        );
-
-        return PairingsBn254.pairingProd2(pairWithGen, g2Gen, pairWithX, g2X);
     }
 
     /// @notice Reverts unexecuted blocks

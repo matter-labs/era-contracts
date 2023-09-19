@@ -77,7 +77,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @notice At the time of the function call, it is not yet deployed in L2, but knowledge of its address
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _governor Address which can change L2 token implementation and upgrade the bridge
-    /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge implementation
+    /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge
+    /// implementation
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function initialize(
         uint256 _chainId,
@@ -129,7 +130,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             _deployBridgeProxyFee,
             l2BridgeProxyBytecodeHash,
             l2BridgeProxyConstructorData,
-            new bytes[](0) // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+            // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+            new bytes[](0)
         );
     }
 
@@ -142,7 +144,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return l2TxHash The L2 transaction hash of deposit finalization
-    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner method does.
+    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner
+    /// method does.
     function deposit(
         address _l2Receiver,
         address _l1Token,
@@ -194,14 +197,18 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
     /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
+    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
+    /// out of control.
     /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds are controllable through the Mailbox,
-    /// since the Mailbox applies address aliasing to the from address for the L2 tx if the L1 msg.sender is a contract.
-    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx requests
-    /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
+    /// be sent to the `msg.sender` address.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
+    /// sent to the aliased `msg.sender` address.
+    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
+    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
+    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
+    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
+    /// the funds would be lost.
     /// @return l2TxHash The L2 transaction hash of deposit finalization
     function deposit(
         uint256 _chainId,
@@ -245,11 +252,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFunds(
-        address _from,
-        IERC20 _token,
-        uint256 _amount
-    ) internal returns (uint256) {
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
@@ -373,17 +376,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(bytes memory _l2ToL1message)
-        internal
-        pure
-        returns (
-            address l1Receiver,
-            address l1Token,
-            uint256 amount
-        )
-    {
+    function _parseL2WithdrawalMessage(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Receiver, address l1Token, uint256 amount) {
         // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 = 76 (bytes).
+        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+        // 76 (bytes).
         require(_l2ToL1message.length == 76, "kk");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
@@ -395,12 +393,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Verify the deposit limit is reached to its cap or not
-    function _verifyDepositLimit(
-        address _l1Token,
-        address _depositor,
-        uint256 _amount,
-        bool _claiming
-    ) internal {
+    function _verifyDepositLimit(address _l1Token, address _depositor, uint256 _amount, bool _claiming) internal {
         IAllowList.Deposit memory limitData = IAllowList(allowList).getTokenDepositLimitData(_l1Token);
         if (!limitData.depositLimitation) return; // no deposit limitation is placed for this token
 

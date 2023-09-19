@@ -8,3 +8,13 @@ struct VerifierParams {
     bytes32 recursionLeafLevelVkHash;
     bytes32 recursionCircuitsSetVksHash;
 }
+
+interface IVerifier {
+    function verify(
+        uint256[] calldata _publicInputs,
+        uint256[] calldata _proof,
+        uint256[] calldata _recursiveAggregationInput
+    ) external view returns (bool);
+
+    function verificationKeyHash() external pure returns (bytes32);
+}

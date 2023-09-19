@@ -1,2 +1,4 @@
 .idea
 /ethereum/.openzeppelin
+tools/target
+tools/data/Verifier.sol
