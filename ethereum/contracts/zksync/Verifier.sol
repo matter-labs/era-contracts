@@ -234,7 +234,6 @@ contract Verifier is IVerifier {
     /// @dev flip of 0xe000000000000000000000000000000000000000000000000000000000000000;
     uint256 internal constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-
     // non residues
     uint256 internal constant NON_RESIDUES_0 = 0x05;
     uint256 internal constant NON_RESIDUES_1 = 0x07;
@@ -249,7 +248,6 @@ contract Verifier is IVerifier {
     uint256 internal constant G2_ELEMENTS_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
     uint256 internal constant G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
     uint256 internal constant G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
-
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
     /// @return vkHash The keccak256 hash of the loaded verification keys.
@@ -278,7 +276,6 @@ contract Verifier is IVerifier {
     /// [table_type]                                 - lookup table type commitment
     function _loadVerificationKey() internal pure virtual {
         assembly {
-
             // gate setup commitments
             mstore(VK_GATE_SETUP_0_X_SLOT, 0x13598f50f1a62920416dd9f16d46032cbe810bb384da5b0ff42bdf6ab1e69662)
             mstore(VK_GATE_SETUP_0_Y_SLOT, 0x19df99dfa60feb4bd15ddb271efac0179104c5b7a27078115a91079ca2826d51)
@@ -330,7 +327,6 @@ contract Verifier is IVerifier {
             // table type commitment
             mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x006f5f6969088413e15abe92418dd7668c6c5fa2dcca168e71a98d84a9fe39de)
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x18550c804fadc55861b6a34d5341d594486833e62bd6137089f3335566ca40ee)
-
         }
     }
 
