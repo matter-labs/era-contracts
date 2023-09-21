@@ -4,7 +4,7 @@
   "repository": "git@github.com:matter-labs/system-contracts.git",
   "license": "MIT",
   "dependencies": {
-    "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
+    "@matterlabs/hardhat-zksync-deploy": "^0.6.3",
     "@nomiclabs/hardhat-solpp": "^2.0.1",
     "commander": "^9.4.1",
     "ethers": "^5.7.0",
@@ -13,7 +13,7 @@
     "zksync-web3": "^0.13.0"
   },
   "devDependencies": {
-    "@matterlabs/hardhat-zksync-solc": "^0.4.2",
+    "@matterlabs/hardhat-zksync-solc": "^0.3.15",
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@typechain/ethers-v5": "^10.0.0",
     "@types/chai": "^4.3.1",
