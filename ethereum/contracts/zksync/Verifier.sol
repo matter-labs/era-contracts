@@ -678,7 +678,7 @@ contract Verifier is IVerifier {
                 switch mload(VK_RECURSIVE_FLAG)
                 case 0 {
                     // recursive part should be empty
-                    isValid := and(eq(recursiveProofLengthInWords, 0), isValid)
+                    isValid := and(iszero(recursiveProofLengthInWords), isValid)
                 }
                 default {
                     // recursive part should be consist of 2 points
