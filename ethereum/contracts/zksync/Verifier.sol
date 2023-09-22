@@ -674,9 +674,8 @@ contract Verifier is IVerifier {
                 // 3. Load the recursive part of the proof
                 offset := calldataload(0x44)
                 let recursiveProofLengthInWords := calldataload(add(offset, 0x04))
-                let use_recursive := mload(VK_RECURSIVE_FLAG)
 
-                switch use_recursive
+                switch mload(VK_RECURSIVE_FLAG)
                 case 0 {
                     // recursive part should be empty
                     isValid := and(eq(recursiveProofLengthInWords, 0), isValid)
@@ -1648,9 +1647,7 @@ contract Verifier is IVerifier {
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
                 // Add recursive proof part if needed
-                switch mload(VK_RECURSIVE_FLAG)
-                case 0 {}
-                default {
+                if mload(VK_RECURSIVE_FLAG) {
                     let uu := mulmod(u, u, R_MOD)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
