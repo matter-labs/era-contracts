@@ -17,12 +17,12 @@ import {
     getAddressFromEnv,
     getHashFromEnv,
     getNumberFromEnv,
-    readBlockBootloaderBytecode,
+    readBatchBootloaderBytecode,
     getTokens
 } from '../scripts/utils';
 import { deployViaCreate2 } from './deploy-utils';
 
-const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
 
 export interface DeployedAddresses {
@@ -104,9 +104,9 @@ export class Deployer {
                 this.addresses.ZkSync.GovernanceFacet
             )
         );
-        const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
+        const genesisBatchHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
-        const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
+        const genesisBatchCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
         const verifierParams = {
             recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
             recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
@@ -118,9 +118,9 @@ export class Deployer {
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             this.addresses.ZkSync.Verifier,
             this.governorAddress,
-            genesisBlockHash,
+            genesisBatchHash,
             genesisRollupLeafIndex,
-            genesisBlockCommitment,
+            genesisBatchCommitment,
             this.addresses.AllowList,
             verifierParams,
             false, // isPorterAvailable

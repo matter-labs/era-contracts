@@ -74,7 +74,7 @@ export function applyL1ToL2Alias(address: string): string {
     return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
 }
 
-export function readBlockBootloaderBytecode() {
+export function readBatchBootloaderBytecode() {
     const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
     return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
 }

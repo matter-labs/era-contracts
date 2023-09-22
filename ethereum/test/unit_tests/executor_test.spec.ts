@@ -22,9 +22,9 @@ import {
     SYSTEM_LOG_KEYS,
     constructL2Log,
     createSystemLogs,
-    genesisStoredBlockInfo,
+    genesisStoredBatchInfo,
     getCallRevertReason,
-    packBatchTimestampAndBlockTimestamp,
+    packBatchTimestampAndBatchTimestamp,
     requestExecute
 } from './utils';
 
@@ -36,11 +36,11 @@ describe(`Executor tests`, function () {
     let executor: ExecutorFacet;
     let getters: GettersFacet;
     let mailbox: MailboxFacet;
-    let newCommitedBlockBlockHash: any;
-    let newCommitedBlockCommitment: any;
+    let newCommitedBatchBatchHash: any;
+    let newCommitedBatchCommitment: any;
     let currentTimestamp: number;
-    let newCommitBlockInfo: any;
-    let newStoredBlockInfo: any;
+    let newCommitBatchInfo: any;
+    let newStoredBatchInfo: any;
     let logs: any;
 
     const proofInput = {
@@ -120,9 +120,9 @@ describe(`Executor tests`, function () {
     });
 
     describe(`Authorization check`, function () {
-        const storedBlockInfo = {
-            blockNumber: 0,
-            blockHash: ethers.utils.randomBytes(32),
+        const storedBatchInfo = {
+            batchNumber: 0,
+            batchHash: ethers.utils.randomBytes(32),
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: ethers.utils.randomBytes(32),
@@ -130,8 +130,8 @@ describe(`Executor tests`, function () {
             timestamp: 0,
             commitment: ethers.utils.randomBytes(32)
         };
-        const commitBlockInfo = {
-            blockNumber: 0,
+        const commitBatchInfo = {
+            batchNumber: 0,
             timestamp: 0,
             indexRepeatedStorageChanges: 0,
             newStateRoot: ethers.utils.randomBytes(32),
@@ -145,21 +145,21 @@ describe(`Executor tests`, function () {
 
         it(`Should revert on committing by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
-                executor.connect(randomSigner).commitBlocks(storedBlockInfo, [commitBlockInfo])
+                executor.connect(randomSigner).commitBatches(storedBatchInfo, [commitBatchInfo])
             );
             expect(revertReason).equal(`1h`);
         });
 
         it(`Should revert on proving by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
-                executor.connect(randomSigner).proveBlocks(storedBlockInfo, [storedBlockInfo], proofInput)
+                executor.connect(randomSigner).proveBatches(storedBatchInfo, [storedBatchInfo], proofInput)
             );
             expect(revertReason).equal(`1h`);
         });
 
         it(`Should revert on executing by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
-                executor.connect(randomSigner).executeBlocks([storedBlockInfo])
+                executor.connect(randomSigner).executeBatches([storedBatchInfo])
             );
             expect(revertReason).equal(`1h`);
         });
@@ -169,8 +169,8 @@ describe(`Executor tests`, function () {
         before(async () => {
             currentTimestamp = (await hardhat.ethers.providers.getDefaultProvider().getBlock(`latest`)).timestamp;
             logs = ethers.utils.hexConcat([`0x00000007`].concat(createSystemLogs()));
-            newCommitBlockInfo = {
-                blockNumber: 1,
+            newCommitBatchInfo = {
+                batchNumber: 1,
                 timestamp: currentTimestamp,
                 indexRepeatedStorageChanges: 0,
                 newStateRoot: ethers.utils.randomBytes(32),
@@ -183,115 +183,115 @@ describe(`Executor tests`, function () {
             };
         });
 
-        it(`Should revert on committing with wrong last committed block data`, async () => {
-            const wrongGenesisStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo());
-            wrongGenesisStoredBlockInfo.timestamp = 1000; // wrong timestamp
+        it(`Should revert on committing with wrong last committed batch data`, async () => {
+            const wrongGenesisStoredBatchInfo = Object.assign({}, genesisStoredBatchInfo());
+            wrongGenesisStoredBatchInfo.timestamp = 1000; // wrong timestamp
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(wrongGenesisStoredBlockInfo, [newCommitBlockInfo])
+                executor.connect(validator).commitBatches(wrongGenesisStoredBatchInfo, [newCommitBatchInfo])
             );
             expect(revertReason).equal(`i`);
         });
 
-        it(`Should revert on committing with wrong order of blocks`, async () => {
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.blockNumber = 2; //wrong block number
+        it(`Should revert on committing with wrong order of batches`, async () => {
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.batchNumber = 2; //wrong batch number
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`f`);
         });
 
-        it(`Should revert on committing with wrong new block timestamp`, async () => {
-            const wrongNewBlockTimestamp = ethers.utils.hexValue(ethers.utils.randomBytes(32)); // correct value is 0
+        it(`Should revert on committing with wrong new batch timestamp`, async () => {
+            const wrongNewBatchTimestamp = ethers.utils.hexValue(ethers.utils.randomBytes(32)); // correct value is 0
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                wrongNewBlockTimestamp.toString()
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                wrongNewBatchTimestamp.toString()
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`tb`);
         });
 
-        it(`Should revert on committing with too small new block timestamp`, async () => {
-            const wrongNewBlockTimestamp = 1; // too small
+        it(`Should revert on committing with too small new batch timestamp`, async () => {
+            const wrongNewBatchTimestamp = 1; // too small
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
                 ethers.utils.hexlify(
-                    packBatchTimestampAndBlockTimestamp(wrongNewBlockTimestamp, wrongNewBlockTimestamp)
+                    packBatchTimestampAndBatchTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
                 )
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
-            wrongNewCommitBlockInfo.timestamp = wrongNewBlockTimestamp;
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            wrongNewCommitBatchInfo.timestamp = wrongNewBatchTimestamp;
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`h1`);
         });
 
         it(`Should revert on committing with too big last L2 block timestamp`, async () => {
-            const wrongNewBlockTimestamp = `0xffffffff`; // too big
+            const wrongNewBatchTimestamp = `0xffffffff`; // too big
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(wrongNewBlockTimestamp, wrongNewBlockTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
-            wrongNewCommitBlockInfo.timestamp = parseInt(wrongNewBlockTimestamp);
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            wrongNewCommitBatchInfo.timestamp = parseInt(wrongNewBatchTimestamp);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`h2`);
         });
 
-        it(`Should revert on committing with wrong previous blockhash`, async () => {
-            const wrongPreviousBlockHash = ethers.utils.randomBytes(32); // correct value is bytes32(0)
+        it(`Should revert on committing with wrong previous batchhash`, async () => {
+            const wrongPreviousBatchHash = ethers.utils.randomBytes(32); // correct value is bytes32(0)
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
-                ethers.utils.hexlify(wrongPreviousBlockHash)
+                SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+                ethers.utils.hexlify(wrongPreviousBatchHash)
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`l`);
         });
 
         it(`Should revert on committing without processing system context log`, async () => {
             var wrongL2Logs = createSystemLogs();
-            delete wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY];
+            delete wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY];
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`b7`);
         });
@@ -302,16 +302,16 @@ describe(`Executor tests`, function () {
                 constructL2Log(
                     true,
                     L2_SYSTEM_CONTEXT_ADDRESS,
-                    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
                     ethers.constants.HashZero
                 )
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`kp`);
         });
@@ -320,18 +320,18 @@ describe(`Executor tests`, function () {
             // We do not expect to receive an L2->L1 log from zero address
             const unexpectedAddress = ethers.constants.AddressZero;
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 unexpectedAddress,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
                 ethers.constants.HashZero
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`sc`);
         });
@@ -346,11 +346,11 @@ describe(`Executor tests`, function () {
                 ethers.utils.hexlify(wrongChainedPriorityHash)
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`t`);
         });
@@ -364,12 +364,12 @@ describe(`Executor tests`, function () {
                 ethers.utils.hexlify(0x01)
             );
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
-            wrongNewCommitBlockInfo.numberOfLayer1Txs = 2; // wrong number
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+            wrongNewCommitBatchInfo.numberOfLayer1Txs = 2; // wrong number
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`ta`);
         });
@@ -378,11 +378,11 @@ describe(`Executor tests`, function () {
             var wrongL2Logs = createSystemLogs();
             wrongL2Logs.push(constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, 119, ethers.constants.HashZero));
 
-            const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
+            const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000008`].concat(wrongL2Logs));
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
             );
             expect(revertReason).equal(`ul`);
         });
@@ -403,11 +403,11 @@ describe(`Executor tests`, function () {
                 var wrong_addr = ethers.utils.hexlify(ethers.utils.randomBytes(20));
                 wrongL2Logs[i] = constructL2Log(true, wrong_addr, i, tests[i][0]);
 
-                const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-                wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
+                const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+                wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(wrongL2Logs));
 
                 const revertReason = await getCallRevertReason(
-                    executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                    executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
                 );
                 expect(revertReason).equal(tests[i][1]);
             }
@@ -418,48 +418,48 @@ describe(`Executor tests`, function () {
                 var l2Logs = createSystemLogs();
                 delete l2Logs[i];
 
-                const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-                wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(l2Logs));
+                const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+                wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(l2Logs));
 
                 const revertReason = await getCallRevertReason(
-                    executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
+                    executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [wrongNewCommitBatchInfo])
                 );
                 expect(revertReason).equal('b7');
             }
         });
 
-        it(`Should successfully commit a block`, async () => {
+        it(`Should successfully commit a batch`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+                .commitBatches(genesisStoredBatchInfo(), [correctNewCommitBatchInfo]);
 
             const result = await commitTx.wait();
 
-            newCommitedBlockBlockHash = result.events[0].args.blockHash;
-            newCommitedBlockCommitment = result.events[0].args.commitment;
+            newCommitedBatchBatchHash = result.events[0].args.batchHash;
+            newCommitedBatchCommitment = result.events[0].args.commitment;
 
-            expect(await getters.getTotalBlocksCommitted()).equal(1);
+            expect(await getters.getTotalBatchesCommitted()).equal(1);
         });
     });
 
     describe(`Proving functionality`, async function () {
         before(async () => {
             // Reusing the old timestamp
-            currentTimestamp = newCommitBlockInfo.timestamp;
+            currentTimestamp = newCommitBatchInfo.timestamp;
 
-            newCommitBlockInfo = {
-                blockNumber: 1,
+            newCommitBatchInfo = {
+                batchNumber: 1,
                 timestamp: currentTimestamp,
                 indexRepeatedStorageChanges: 0,
                 newStateRoot: ethers.utils.randomBytes(32),
@@ -471,106 +471,108 @@ describe(`Executor tests`, function () {
                 totalL2ToL1Pubdata: ethers.constants.HashZero
             };
 
-            newStoredBlockInfo = {
-                blockNumber: 1,
-                blockHash: newCommitedBlockBlockHash,
+            newStoredBatchInfo = {
+                batchNumber: 1,
+                batchHash: newCommitedBatchBatchHash,
                 indexRepeatedStorageChanges: 0,
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: EMPTY_STRING_KECCAK,
                 l2LogsTreeRoot: ethers.constants.HashZero,
                 timestamp: currentTimestamp,
-                commitment: newCommitedBlockCommitment
+                commitment: newCommitedBatchCommitment
             };
         });
 
-        it(`Should revert on proving with wrong previous block data`, async () => {
-            const wrongPreviousStoredBlockInfo = Object.assign({}, genesisStoredBlockInfo());
-            wrongPreviousStoredBlockInfo.blockNumber = 10; // Correct is 0
+        it(`Should revert on proving with wrong previous batch data`, async () => {
+            const wrongPreviousStoredBatchInfo = Object.assign({}, genesisStoredBatchInfo());
+            wrongPreviousStoredBatchInfo.batchNumber = 10; // Correct is 0
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).proveBlocks(wrongPreviousStoredBlockInfo, [newStoredBlockInfo], proofInput)
+                executor.connect(validator).proveBatches(wrongPreviousStoredBatchInfo, [newStoredBatchInfo], proofInput)
             );
             expect(revertReason).equal(`t1`);
         });
 
-        it(`Should revert on proving with wrong committed block`, async () => {
-            const wrongNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-            wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
+        it(`Should revert on proving with wrong committed batch`, async () => {
+            const wrongNewStoredBatchInfo = Object.assign({}, newStoredBatchInfo);
+            wrongNewStoredBatchInfo.batchNumber = 10; // Correct is 1
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [wrongNewStoredBlockInfo], proofInput)
+                executor
+                    .connect(validator)
+                    .proveBatches(genesisStoredBatchInfo(), [wrongNewStoredBatchInfo], proofInput)
             );
             expect(revertReason).equal(`o1`);
         });
 
-        it(`Should not allow proving a reverted block without commiting again`, async () => {
-            await executor.connect(validator).revertBlocks(0);
+        it(`Should not allow proving a reverted batch without commiting again`, async () => {
+            await executor.connect(validator).revertBatches(0);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput)
+                executor.connect(validator).proveBatches(genesisStoredBatchInfo(), [newStoredBatchInfo], proofInput)
             );
             expect(revertReason).equal(`q`);
         });
 
         it(`Should prove successfuly`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
             var commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+                .commitBatches(genesisStoredBatchInfo(), [correctNewCommitBatchInfo]);
 
             var result = await commitTx.wait();
 
-            newStoredBlockInfo.blockHash = result.events[0].args.blockHash;
-            newStoredBlockInfo.commitment = result.events[0].args.commitment;
+            newStoredBatchInfo.batchHash = result.events[0].args.batchHash;
+            newStoredBatchInfo.commitment = result.events[0].args.commitment;
 
-            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
-            expect(await getters.getTotalBlocksVerified()).equal(1);
+            await executor.connect(validator).proveBatches(genesisStoredBatchInfo(), [newStoredBatchInfo], proofInput);
+            expect(await getters.getTotalBatchesVerified()).equal(1);
         });
     });
 
-    describe(`Reverting blocks functionality`, async function () {
-        it(`Should not allow reverting more blocks than already committed`, async () => {
-            const revertReason = await getCallRevertReason(executor.connect(validator).revertBlocks(10));
+    describe(`Reverting batches functionality`, async function () {
+        it(`Should not allow reverting more batches than already committed`, async () => {
+            const revertReason = await getCallRevertReason(executor.connect(validator).revertBatches(10));
             expect(revertReason).equal(`v1`);
         });
     });
 
     describe(`Executing functionality`, async function () {
-        it(`Should revert on executing a block with wrong block number`, async () => {
-            const wrongNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-            wrongNewStoredBlockInfo.blockNumber = 10; // correct is 1
+        it(`Should revert on executing a batch with wrong batch number`, async () => {
+            const wrongNewStoredBatchInfo = Object.assign({}, newStoredBatchInfo);
+            wrongNewStoredBatchInfo.batchNumber = 10; // correct is 1
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).executeBlocks([wrongNewStoredBlockInfo])
+                executor.connect(validator).executeBatches([wrongNewStoredBatchInfo])
             );
             expect(revertReason).equal(`k`);
         });
 
-        it(`Should revert on executing a block with wrong data`, async () => {
-            const wrongNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-            wrongNewStoredBlockInfo.timestamp = 0; // incorrect data
+        it(`Should revert on executing a batch with wrong data`, async () => {
+            const wrongNewStoredBatchInfo = Object.assign({}, newStoredBatchInfo);
+            wrongNewStoredBatchInfo.timestamp = 0; // incorrect data
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).executeBlocks([wrongNewStoredBlockInfo])
+                executor.connect(validator).executeBatches([wrongNewStoredBatchInfo])
             );
             expect(revertReason).equal(`exe10`);
         });
 
-        it(`Should revert on executing a reverted block without committing and proving again`, async () => {
-            await executor.connect(validator).revertBlocks(0);
+        it(`Should revert on executing a reverted batch without committing and proving again`, async () => {
+            await executor.connect(validator).revertBatches(0);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).executeBlocks([newStoredBlockInfo])
+                executor.connect(validator).executeBatches([newStoredBatchInfo])
             );
             expect(revertReason).equal(`n`);
         });
@@ -582,11 +584,11 @@ describe(`Executor tests`, function () {
             );
 
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
             correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
                 true,
@@ -601,34 +603,34 @@ describe(`Executor tests`, function () {
                 '0x01'
             );
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
-            correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-            correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+            correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+                .commitBatches(genesisStoredBatchInfo(), [correctNewCommitBatchInfo]);
 
             const result = await commitTx.wait();
 
-            const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-            correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
-            correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-            correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-            correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
+            const correctNewStoredBatchInfo = Object.assign({}, newStoredBatchInfo);
+            correctNewStoredBatchInfo.batchHash = result.events[0].args.batchHash;
+            correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
+            correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewStoredBatchInfo.commitment = result.events[0].args.commitment;
 
             await executor
                 .connect(validator)
-                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
+                .proveBatches(genesisStoredBatchInfo(), [correctNewStoredBatchInfo], proofInput);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
+                executor.connect(validator).executeBatches([correctNewStoredBatchInfo])
             );
             expect(revertReason).equal(`s`);
 
-            await executor.connect(validator).revertBlocks(0);
+            await executor.connect(validator).revertBatches(0);
         });
 
         it(`Should revert on executing with unmatched prioirty operation hash`, async () => {
@@ -638,11 +640,11 @@ describe(`Executor tests`, function () {
             );
 
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
             correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
                 true,
@@ -657,26 +659,26 @@ describe(`Executor tests`, function () {
                 '0x01'
             );
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
-            correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-            correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+            correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
             const commitTx = await executor
                 .connect(validator)
-                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+                .commitBatches(genesisStoredBatchInfo(), [correctNewCommitBatchInfo]);
 
             const result = await commitTx.wait();
 
-            const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-            correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
-            correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-            correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-            correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
+            const correctNewStoredBatchInfo = Object.assign({}, newStoredBatchInfo);
+            correctNewStoredBatchInfo.batchHash = result.events[0].args.batchHash;
+            correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
+            correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewStoredBatchInfo.commitment = result.events[0].args.commitment;
 
             await executor
                 .connect(validator)
-                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
+                .proveBatches(genesisStoredBatchInfo(), [correctNewStoredBatchInfo], proofInput);
 
             await requestExecute(
                 mailbox,
@@ -689,14 +691,14 @@ describe(`Executor tests`, function () {
             );
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
+                executor.connect(validator).executeBatches([correctNewStoredBatchInfo])
             );
             expect(revertReason).equal(`x`);
 
-            await executor.connect(validator).revertBlocks(0);
+            await executor.connect(validator).revertBatches(0);
         });
 
-        it(`Should fail to commit block with wrong previous blockhash`, async () => {
+        it(`Should fail to commit batch with wrong previous batchhash`, async () => {
             const correctL2Logs = ethers.utils.hexConcat([
                 `0x00000001`,
                 `0x00000000`,
@@ -705,35 +707,35 @@ describe(`Executor tests`, function () {
                 ethers.constants.HashZero
             ]);
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.l2Logs = correctL2Logs;
 
-            const block = genesisStoredBlockInfo();
-            block.blockHash = '0x' + '1'.repeat(64);
+            const batch = genesisStoredBatchInfo();
+            batch.batchHash = '0x' + '1'.repeat(64);
 
             const revertReason = await getCallRevertReason(
-                executor.connect(validator).commitBlocks(block, [correctNewCommitBlockInfo])
+                executor.connect(validator).commitBatches(batch, [correctNewCommitBatchInfo])
             );
             expect(revertReason).to.equal('i');
         });
 
-        it(`Should execute a block successfully`, async () => {
+        it(`Should execute a batch successfully`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 
-            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-            correctNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
+            const correctNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
+            correctNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000007`].concat(correctL2Logs));
 
-            await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
-            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
-            await executor.connect(validator).executeBlocks([newStoredBlockInfo]);
+            await executor.connect(validator).commitBatches(genesisStoredBatchInfo(), [correctNewCommitBatchInfo]);
+            await executor.connect(validator).proveBatches(genesisStoredBatchInfo(), [newStoredBatchInfo], proofInput);
+            await executor.connect(validator).executeBatches([newStoredBatchInfo]);
 
-            expect(await getters.getTotalBlocksExecuted()).equal(1);
+            expect(await getters.getTotalBatchesExecuted()).equal(1);
         });
     });
 });
