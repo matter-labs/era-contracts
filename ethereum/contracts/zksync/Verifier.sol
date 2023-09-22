@@ -1648,8 +1648,9 @@ contract Verifier is IVerifier {
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
                 // Add recursive proof part if needed
-                let use_recursive := mload(VK_RECURSIVE_FLAG)
-                if not(iszero(use_recursive)) {
+                switch mload(VK_RECURSIVE_FLAG)
+                case 0 {}
+                default {
                     let uu := mulmod(u, u, R_MOD)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
