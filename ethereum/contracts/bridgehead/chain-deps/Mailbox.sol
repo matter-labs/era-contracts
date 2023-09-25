@@ -14,7 +14,6 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_T
 import "../../vendor/AddressAliasHelper.sol";
 
 import "../chain-interfaces/IMailbox.sol";
-import "../chain-interfaces/IBridgeheadMailbox.sol";
 import "../bridgehead-interfaces/IBridgehead.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -22,49 +21,6 @@ import "../bridgehead-interfaces/IBridgehead.sol";
 contract Mailbox is IMailbox, ChainBase {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
-
-    // KL todo, we have these dual definitions, to keep the zksync-web3 interface compatible for testing
-    // this contract, the eth watcher and the rust and js sdks should be updated at the same time.
-    // we should include chainId everywhere, and that will make it simpler. Unless we need backwards compatibility for smart contracts.
-    function proveL2MessageInclusion(
-        uint256,
-        uint256 _blockNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) external view returns (bool) {
-        return proveL2MessageInclusion(_blockNumber, _index, _message, _proof);
-    }
-
-    function proveL2LogInclusion(
-        uint256,
-        uint256 _blockNumber,
-        uint256 _index,
-        L2Log memory _log,
-        bytes32[] calldata _proof
-    ) external view returns (bool) {
-        return proveL2LogInclusion(_blockNumber, _index, _log, _proof);
-    }
-
-    function proveL1ToL2TransactionStatus(
-        uint256,
-        bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) external view returns (bool) {
-        return
-            proveL1ToL2TransactionStatus(
-                _l2TxHash,
-                _l2BlockNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBlock,
-                _merkleProof,
-                _status
-            );
-    }
 
     function finalizeEthWithdrawalBridgehead(
         address _sender,
@@ -106,23 +62,6 @@ contract Mailbox is IMailbox, ChainBase {
             _factoryDeps,
             _refundRecipient
         );
-    }
-
-    function l2TransactionBaseCost(
-        uint256,
-        uint256 _gasPrice,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
-    ) external pure returns (uint256) {
-        return l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
-    }
-
-    function isEthWithdrawalFinalized(
-        uint256,
-        uint256 _l2MessageIndex,
-        uint256 _l2TxNumberInBlock
-    ) external view returns (bool) {
-        return chainStorage.isEthWithdrawalFinalized[_l2MessageIndex][_l2TxNumberInBlock];
     }
 
     //////////////////

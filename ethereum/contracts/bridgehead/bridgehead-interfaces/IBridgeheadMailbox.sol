@@ -3,11 +3,18 @@
 pragma solidity ^0.8.13;
 
 // import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
-import "./IChainBase.sol";
 import "../../common/Messaging.sol";
-import "./IMailboxEvents.sol";
+import "../chain-interfaces/IMailboxEvents.sol";
 
-interface IBridgeheadMailbox is IMailboxEvents, IChainBase {
+interface IBridgeheadMailbox is IMailboxEvents {
+    function deposit(uint256 _chainId) external payable;
+
+    function withdrawFunds(
+        uint256 _chainId,
+        address _to,
+        uint256 _amount
+    ) external;
+
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,

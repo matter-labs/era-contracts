@@ -7,7 +7,7 @@ import "./BridgeheadBase.sol";
 // import "../Config.sol";
 import "../bridgehead-interfaces/IRegistry.sol";
 import "../../common/libraries/UncheckedMath.sol";
-// import "../chain-interfaces/IBridgeheadMailbox.sol";
+// import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
 // import "../../common/interfaces/IAllowList.sol";
 // import "../../common/libraries/Diamond.sol";
 // import "../../common/libraries/L2ContractHelper.sol";
