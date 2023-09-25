@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./IBase.sol";
+import {IBase} from "./IBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -10,10 +10,10 @@ enum SystemLogKey {
     TOTAL_L2_TO_L1_PUBDATA_KEY,
     STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    PREV_BLOCK_HASH_KEY,
+    PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)

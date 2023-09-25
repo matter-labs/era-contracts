@@ -22,7 +22,7 @@ library Merkle {
         uint256 pathLength = _path.length;
         require(pathLength > 0, "xc");
         require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "pz");
+        require(_index < (1 << pathLength), "px");
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {

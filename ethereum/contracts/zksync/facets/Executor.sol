@@ -142,7 +142,7 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
                 packedBatchAndL2BlockTimestamp = uint256(logValue);
-            } else if (logKey == uint256(SystemLogKey.PREV_BLOCK_HASH_KEY)) {
+            } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sv");
                 previousBlockHash = logValue;
             } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
@@ -151,7 +151,7 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 numberOfLayer1Txs = uint256(logValue);
-            } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH)) {
+            } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
             } else {
@@ -395,16 +395,16 @@ contract ExecutorFacet is Base, IExecutor {
     /// counters that are responsible for the number of blocks
     function revertBlocks(uint256 _newLastBlock) external nonReentrant onlyValidator {
         require(s.totalBlocksCommitted > _newLastBlock, "v1"); // The last committed block is less than new last block
-        uint256 newTotalBlocksCommitted = _maxU256(_newLastBlock, s.totalBlocksExecuted);
+        require(_newLastBlock >= s.totalBlocksExecuted, "v2"); // Already executed blocks cannot be reverted
 
-        if (newTotalBlocksCommitted < s.totalBlocksVerified) {
-            s.totalBlocksVerified = newTotalBlocksCommitted;
+        if (_newLastBlock < s.totalBlocksVerified) {
+            s.totalBlocksVerified = _newLastBlock;
         }
-        s.totalBlocksCommitted = newTotalBlocksCommitted;
+        s.totalBlocksCommitted = _newLastBlock;
 
         // Reset the block number of the executed system contracts upgrade transaction if the block
         // where the system contracts upgrade was committed is among the reverted blocks.
-        if (s.l2SystemContractsUpgradeBlockNumber > newTotalBlocksCommitted) {
+        if (s.l2SystemContractsUpgradeBlockNumber > _newLastBlock) {
             delete s.l2SystemContractsUpgradeBlockNumber;
         }
 
@@ -466,13 +466,13 @@ contract ExecutorFacet is Base, IExecutor {
         return keccak256(abi.encode(_storedBlockInfo));
     }
 
-    /// @notice Returns if the bit at index {_index} is 1
+    /// @notice Returns true if the bit at index {_index} is 1
     function _checkBit(uint256 _bitMap, uint8 _index) internal pure returns (bool) {
         return (_bitMap & (1 << _index)) > 0;
     }
 
     /// @notice Sets the given bit in {_num} at index {_index} to 1.
-    function _setBit(uint256 _num, uint8 _index) internal pure returns (uint256) {
-        return _num | (1 << _index);
+    function _setBit(uint256 _bitMap, uint8 _index) internal pure returns (uint256) {
+        return _bitMap | (1 << _index);
     }
 }

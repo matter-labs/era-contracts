@@ -25,7 +25,7 @@ contract Base is ReentrancyGuard, AllowListed {
 
     /// @notice Checks if `msg.sender` is the security council
     modifier onlySecurityCouncil() {
-        require(msg.sender == s.upgrades.securityCouncil, "a9"); // not a security council
+        require(msg.sender == s.upgrades.securityCouncil, "a5"); // not a security council
         _;
     }
 }

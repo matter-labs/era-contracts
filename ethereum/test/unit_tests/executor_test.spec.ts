@@ -93,7 +93,7 @@ describe(`Executor tests`, function () {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
         const facetCuts = [
@@ -267,10 +267,10 @@ describe(`Executor tests`, function () {
         it(`Should revert on committing with wrong previous blockhash`, async () => {
             const wrongPreviousBlockHash = ethers.utils.randomBytes(32); // correct value is bytes32(0)
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+                SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
                 ethers.utils.hexlify(wrongPreviousBlockHash)
             );
 
@@ -420,7 +420,6 @@ describe(`Executor tests`, function () {
 
                 const wrongNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
                 wrongNewCommitBlockInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(l2Logs));
-
                 const revertReason = await getCallRevertReason(
                     executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [wrongNewCommitBlockInfo])
                 );

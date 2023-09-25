@@ -105,7 +105,7 @@ describe('L2 upgrade test', function () {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
         const facetCuts = [
@@ -493,7 +493,7 @@ describe('L2 upgrade test', function () {
             constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
                 l2UpgradeTxHash
             )
         );
@@ -501,14 +501,14 @@ describe('L2 upgrade test', function () {
             constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
                 l2UpgradeTxHash
             )
         );
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
@@ -532,14 +532,14 @@ describe('L2 upgrade test', function () {
             constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
                 ethers.constants.HashZero
             )
         );
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
@@ -565,14 +565,14 @@ describe('L2 upgrade test', function () {
             constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
                 l2UpgradeTxHash
             )
         );
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
@@ -598,14 +598,14 @@ describe('L2 upgrade test', function () {
             constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
                 l2UpgradeTxHash
             )
         );
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
@@ -641,10 +641,10 @@ describe('L2 upgrade test', function () {
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
         const systemLogs = createSystemLogs();
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
@@ -695,10 +695,10 @@ describe('L2 upgrade test', function () {
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
         const systemLogs = createSystemLogs();
-        systemLogs[SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY] = constructL2Log(
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
             ethers.utils.hexlify(storedBlock1Info.blockHash)
         );
 
