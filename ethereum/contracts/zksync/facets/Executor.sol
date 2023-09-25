@@ -67,7 +67,7 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
-    /// @param _packedBatchAndL2BlockTimestamp - packed batch and L2 block timestamp in a foramt of batchTimestamp * 2**128 + l2BatchTimestamp
+    /// @param _packedBatchAndL2BlockTimestamp - packed batch and L2 block timestamp in a format of batchTimestamp * 2**128 + l2BatchTimestamp
     /// @param _expectedBatchTimestamp - expected batch timestamp
     /// @param _previousBatchTimestamp - the timestamp of the previous batch
     function _verifyBatchTimestamp(
