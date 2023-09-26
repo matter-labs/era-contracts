@@ -3,14 +3,14 @@
 pragma solidity ^0.8.13;
 
 import "../../../common/libraries/UncheckedMath.sol";
-import "../../chain-interfaces/IProofDiamondCut.sol";
+import "../../chain-interfaces/IDiamondCut.sol";
 import "../../../common/libraries/Diamond.sol";
 import "../../Config.sol";
-import "./ProofChainBase.sol";
+import "./Base.sol";
 
 /// @title DiamondCutFacet - contract responsible for the management of upgrades.
 /// @author Matter Labs
-contract ProofDiamondCutFacet is ProofChainBase, IProofDiamondCut {
+contract DiamondCutFacet is ProofChainBase, IProofDiamondCut {
     using UncheckedMath for uint256;
 
     string public constant getName = "DiamondCutFacet";

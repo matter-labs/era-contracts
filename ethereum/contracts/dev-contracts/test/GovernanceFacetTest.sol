@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.13;
 
-import "../../proof-system/chain-deps/facets/ProofChainGovernance.sol";
+import "../../proof-system/chain-deps/facets/Governance.sol";
 
-contract GovernanceFacetTest is ProofGovernanceFacet {
+contract GovernanceFacetTest is GovernanceFacet {
     constructor() {
         chainStorage.governor = msg.sender;
     }

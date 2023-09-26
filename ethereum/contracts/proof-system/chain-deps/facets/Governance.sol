@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.13;
 
-import "../../chain-interfaces/IProofChainGovernance.sol";
-import "./ProofChainBase.sol";
+import "../../chain-interfaces/IGovernance.sol";
+import "./Base.sol";
 
 /// @title Governance Contract controls access rights for contract management.
 /// @author Matter Labs
-contract ProofGovernanceFacet is ProofChainBase, IProofGovernance {
-    // string public constant override getName = "GovernanceFacet";
+contract GovernanceFacet is ProofChainBase, IProofGovernance {
+    string public constant override getName = "GovernanceFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
     /// @notice New governor can accept governor rights by calling `acceptGovernor` function.

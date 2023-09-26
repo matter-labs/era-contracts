@@ -3,10 +3,10 @@
 pragma solidity ^0.8.13;
 
 // import "./IBridgeheadMailbox.sol";
-import "./IProofChainGovernance.sol";
-import "./IProofChainExecutor.sol";
-import "./IProofDiamondCut.sol";
-import "./IProofChainGetters.sol";
+import "./IGovernance.sol";
+import "./IExecutor.sol";
+import "./IDiamondCut.sol";
+import "./IGetters.sol";
 
 // kl to do remove this, needed for the server for now
 import "../../common/libraries/Diamond.sol";

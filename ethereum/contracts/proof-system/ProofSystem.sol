@@ -22,8 +22,6 @@ contract ProofSystem is ProofGetters, ProofRegistry {
     // /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy initializer
     function initialize(
         address _bridgehead,
-        address _proofChainImplementation,
-        address _proofChainProxyAdmin,
         address _verifier,
         address _governor,
         bytes32 _genesisBlockHash,
@@ -34,15 +32,12 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         bytes32 _l2DefaultAccountBytecodeHash,
         uint256 _priorityTxMaxGasLimit
     ) external reentrancyGuardInitializer returns (bytes32) {
-        require(proofStorage.proofChainImplementation == address(0), "r1");
         require(_governor != address(0), "vy");
 
         proofStorage.bridgeheadContract = _bridgehead;
 
         proofStorage.verifier = _verifier;
         proofStorage.governor = _governor;
-        proofStorage.proofChainImplementation = _proofChainImplementation;
-        proofStorage.proofChainProxyAdmin = _proofChainProxyAdmin;
 
         // We need to initialize the state hash because it is used in the commitment of the next block
         IProofExecutor.StoredBlockInfo memory storedBlockZero = IProofExecutor.StoredBlockInfo(
@@ -55,7 +50,6 @@ contract ProofSystem is ProofGetters, ProofRegistry {
             0,
             _genesisBlockCommitment
         );
-        // // KL Todo, we might have to change this around to include the chainId for the specific chain
         proofStorage.blockHashZero = keccak256(abi.encode(storedBlockZero));
         proofStorage.allowList = _allowList;
         proofStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
@@ -65,7 +59,11 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    function setVerifierParams(VerifierParams calldata _verifierParams) external onlyGovernor {
+    function setParams(VerifierParams calldata _verifierParams, Diamond.DiamondCutData calldata _cutData)
+        external
+        onlyGovernor
+    {
         proofStorage.verifierParams = _verifierParams;
+        proofStorage.cutHash = keccak256(abi.encode(_cutData));
     }
 }

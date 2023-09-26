@@ -6,6 +6,7 @@ import "./IProofRegistry.sol";
 import "../Verifier.sol";
 import "../../common/interfaces/IAllowList.sol";
 import "../chain-interfaces/IVerifier.sol";
+import "../../common/libraries/Diamond.sol";
 
 interface IProofSystem is IProofRegistry {
     function initialize(
@@ -21,5 +22,5 @@ interface IProofSystem is IProofRegistry {
         uint256 _priorityTxMaxGasLimit
     ) external;
 
-    function setVerifierParams(VerifierParams calldata _verifierParams) external;
+    function setParams(VerifierParams calldata _verifierParams, Diamond.DiamondCutData calldata _cutData) external;
 }

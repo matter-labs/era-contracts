@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../../common/libraries/Diamond.sol";
-import "./IProofChainBase.sol";
+import "./IBase.sol";
 
 interface IProofDiamondCut is IProofChainBase {
     function proposeTransparentUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint40 _proposalId) external;

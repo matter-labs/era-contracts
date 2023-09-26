@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 import "../../common/interfaces/IAllowList.sol";
 import "../Verifier.sol";
 import "../chain-deps/ProofChainStorage.sol";
-import "./IProofChainBase.sol";
+import "./IBase.sol";
 
 interface IProofGovernance is IProofChainBase {
     function setPendingGovernor(address _newPendingGovernor) external;

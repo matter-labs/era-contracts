@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../../common/libraries/Diamond.sol";
-import "../chain-deps/facets/ProofChainBase.sol";
+import "../chain-deps/facets/Base.sol";
 
 interface IOldDiamondCut {
     function proposeDiamondCut(Diamond.FacetCut[] calldata _facetCuts, address _initAddress) external;
