@@ -32,7 +32,6 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         bytes32 _l2DefaultAccountBytecodeHash,
         uint256 _priorityTxMaxGasLimit
     ) external reentrancyGuardInitializer returns (bytes32) {
-        require(proofStorage.proofChainImplementation == address(0), "r1");
         require(_governor != address(0), "vy");
 
         proofStorage.bridgeheadContract = _bridgehead;
