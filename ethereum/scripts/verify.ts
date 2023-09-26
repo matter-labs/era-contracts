@@ -24,11 +24,11 @@ async function main() {
 
     // Contracts without constructor parameters
     for (const address of [
-        addresses.ProofSystem.ProofDiamondCutFacet,
-        addresses.ProofSystem.ProofGettersFacet,
-        addresses.ProofSystem.ProofDiamondInit,
-        addresses.ProofSystem.ProofGovernanceFacet,
-        addresses.ProofSystem.ProofExecutorFacet,
+        addresses.ProofSystem.DiamondCutFacet,
+        addresses.ProofSystem.GettersFacet,
+        addresses.ProofSystem.DiamondInit,
+        addresses.ProofSystem.GovernanceFacet,
+        addresses.ProofSystem.ExecutorFacet,
         addresses.ProofSystem.Verifier
         // kl todo add bridgehead here
     ]) {
@@ -55,7 +55,7 @@ async function main() {
 
     // Bridges
     const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [
-        addresses.ZkSync.DiamondProxy,
+        addresses.ProofSystem.DiamondProxy,
         addresses.AllowList
     ]);
     promises.push(promise);

@@ -51,10 +51,6 @@ struct ProofStorage {
     address pendingGovernor;
     /// @notice Address of the factory
     address bridgeheadContract;
-    /// @notice Address of the factory
-    address proofChainImplementation;
-    /// @notice Address of the factory
-    address proofChainProxyAdmin;
     /// @notice chainContract
     mapping(uint256 => address) proofChainContract;
     /// @dev Verifier contract. Used to verify aggregated proof for blocks
@@ -75,6 +71,8 @@ struct ProofStorage {
     address allowList;
     /// @dev Block hash zero, calculated at initialization
     bytes32 blockHashZero;
+    /// @dev Stored cutData for diamond cut
+    bytes32 cutHash;
     /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
     VerifierParams verifierParams;
     /// @notice Bytecode hash of bootloader program.

@@ -2,20 +2,20 @@
 
 pragma solidity ^0.8.13;
 
-import "./ProofChainBase.sol";
+import "./Base.sol";
 import "../../../common/libraries/Diamond.sol";
 // import "../../bridgehead/libraries/PriorityQueue.sol";
 import "../../../common/libraries/UncheckedMath.sol";
-import "../../chain-interfaces/IProofChainGetters.sol";
+import "../../chain-interfaces/IGetters.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
-contract ProofGettersFacet is ProofChainBase, IProofGetters {
+contract GettersFacet is ProofChainBase, IProofGetters {
     using UncheckedMath for uint256;
 
     // using PriorityQueue for PriorityQueue.Queue;
 
-    // string public constant override getName = "GettersFacet";
+    string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS

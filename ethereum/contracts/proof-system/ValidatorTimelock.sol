@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "./chain-interfaces/IProofChainExecutor.sol";
+import "./chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../proof-system/chain-deps/facets/ProofChainBase.sol";
+import "../proof-system/chain-deps/facets/Base.sol";
 import "../bridgehead/chain-interfaces/IMailbox.sol";
 import "../proof-system/Verifier.sol";
 import "../common/libraries/L2ContractHelper.sol";

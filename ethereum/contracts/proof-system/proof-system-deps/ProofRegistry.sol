@@ -15,9 +15,10 @@ import "../../common/L2ContractAddresses.sol";
 
 import "../../bridgehead/chain-interfaces/IBridgeheadChain.sol";
 
-import "../chain-interfaces/IProofChain.sol";
+// import "../chain-interfaces/IProofChain.sol";
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "../ProofDiamondProxy.sol";
+import "../chain-interfaces/IDiamondInit.sol";
 
 /// @title Registry contract capable of handling new Hyperchains.
 /// @author Matter Labs
@@ -45,25 +46,29 @@ contract ProofRegistry is ProofBase, IProofRegistry {
     function newChain(
         uint256 _chainId,
         address _bridgeheadChainContract,
-        address _governor
+        address _governor,
+        Diamond.DiamondCutData calldata _diamondCut
     ) external onlyBridgehead {
-        bytes memory data = abi.encodeWithSelector(
-            IProofChain.initialize.selector,
-            _chainId,
-            _bridgeheadChainContract,
-            _governor,
-            proofStorage.allowList,
-            proofStorage.verifier,
-            proofStorage.verifierParams,
-            proofStorage.l2BootloaderBytecodeHash,
-            proofStorage.l2DefaultAccountBytecodeHash,
-            proofStorage.blockHashZero,
-            proofStorage.priorityTxMaxGasLimit
+        bytes32 cutHash = keccak256(abi.encode(_diamondCut));
+        require(cutHash == proofStorage.cutHash, "r25");
+
+        bytes memory initData;
+        bytes memory copiedData = _diamondCut.initCalldata[132:];
+        initData = bytes.concat(
+            IDiamondInit.initialize.selector,
+            bytes32(_chainId),
+            bytes32(uint256(uint160(_bridgeheadChainContract))),
+            bytes32(uint256(uint160(_governor))),
+            bytes32(proofStorage.blockHashZero),
+            copiedData
         );
-        TransparentUpgradeableProxy proofChainContract = new TransparentUpgradeableProxy(
-            proofStorage.proofChainImplementation,
-            proofStorage.proofChainProxyAdmin,
-            data
+        Diamond.DiamondCutData memory cutData = _diamondCut;
+        cutData.initCalldata = initData;
+
+        ProofDiamondProxy proofChainContract = new ProofDiamondProxy(
+            block.chainid,
+            cutData
+            // _diamondCut
         );
 
         IBridgeheadChain(_bridgeheadChainContract).setProofChainContract(address(proofChainContract));

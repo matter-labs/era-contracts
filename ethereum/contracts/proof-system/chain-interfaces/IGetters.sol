@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 // import "../libraries/PriorityQueue.sol";
 import {VerifierParams, ProofUpgradeState} from "../chain-deps/ProofChainStorage.sol";
-import "./IProofChainBase.sol";
+import "./IBase.sol";
 
 interface IProofGetters is IProofChainBase {
     /*//////////////////////////////////////////////////////////////

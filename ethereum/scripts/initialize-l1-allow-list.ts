@@ -43,7 +43,7 @@ async function main() {
                     deployer.addresses.Bridgehead.BridgeheadProxy,
                     deployer.addresses.Bridgehead.ChainProxy,
                     deployer.addresses.ProofSystem.ProofSystemProxy,
-                    deployer.addresses.ProofSystem.ProofChainProxy,
+                    deployer.addresses.ProofSystem.DiamondProxy,
                     deployer.addresses.Bridges.ERC20BridgeProxy,
                     deployer.addresses.Bridges.WethBridgeProxy
                 ],

@@ -5,13 +5,15 @@ pragma solidity ^0.8.13;
 import "./IBridgeheadBase.sol";
 import "../../proof-system/proof-system-interfaces/IProofForBridgehead.sol";
 import "../../common/interfaces/IAllowList.sol";
+import "../../common/libraries/Diamond.sol";
 
 interface IRegistry is IBridgeheadBase {
     function newChain(
         uint256 _chainId,
         address _proofSystem,
         address _chainGovernor,
-        IAllowList _allowList
+        IAllowList _allowList,
+        Diamond.DiamondCutData calldata _diamondCut
     ) external returns (uint256 chainId);
 
     function newProofSystem(address _proofSystem) external;

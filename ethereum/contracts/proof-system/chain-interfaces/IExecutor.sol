@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./IProofChainBase.sol";
+import "./IBase.sol";
 
 interface IProofExecutor is IProofChainBase {
     /// @notice Rollup block stored data

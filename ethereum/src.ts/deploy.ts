@@ -3,12 +3,12 @@ import '@nomiclabs/hardhat-ethers';
 import '@openzeppelin/hardhat-upgrades';
 
 import { BigNumberish, ethers, providers, Signer, Wallet } from 'ethers';
-// import { Interface } from 'ethers/lib/utils';
-// import { diamondCut, FacetCut } from './diamondCut';
+import { Interface } from 'ethers/lib/utils';
+import { diamondCut, FacetCut } from './diamondCut';
 import { IBridgeheadFactory } from '../typechain/IBridgeheadFactory';
 import { IProofSystemFactory } from '../typechain/IProofSystemFactory';
 import { IProofChainFactory } from '../typechain/IProofChainFactory';
-// import { getCurrentFacetCutsForAdd } from './diamondCut';
+import { getCurrentFacetCutsForAdd } from './diamondCut';
 import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
 import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
@@ -42,21 +42,15 @@ export interface DeployedAddresses {
         ProofSystemProxy: string;
         ProofSystemImplementation: string;
         ProofSystemProxyAdmin: string;
-        ProofChainImplementation: string;
-        ProofChainProxy: string;
-        ProofChainProxyAdmin: string;
         Verifier: string;
-    };
-    Legacy: {
-        ProofGovernanceFacet: string;
-        ProofExecutorFacet: string;
-        ProofRegistryFacet: string;
-        ProofDiamondCutFacet: string;
-        ProofGettersFacet: string;
-        ProofDiamondInit: string;
-        ProofDiamondUpgradeInit: string;
-        ProofDefaultUpgrade: string;
-        ProofDiamondProxy: string;
+        GovernanceFacet: string;
+        ExecutorFacet: string;
+        DiamondCutFacet: string;
+        GettersFacet: string;
+        DiamondInit: string;
+        DiamondUpgradeInit: string;
+        DefaultUpgrade: string;
+        DiamondProxy: string;
     };
     Bridges: {
         ERC20BridgeImplementation: string;
@@ -89,22 +83,15 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             ProofSystemProxy: getAddressFromEnv('CONTRACTS_PROOF_SYSTEM_PROXY_ADDR'),
             ProofSystemImplementation: getAddressFromEnv('CONTRACTS_PROOF_SYSTEM_IMPL_ADDR'),
             ProofSystemProxyAdmin: getAddressFromEnv('CONTRACTS_PROOF_SYSTEM_PROXY_ADMIN_ADDR'),
-            ProofChainImplementation: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_IMPL_ADDR'),
-            ProofChainProxy: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_PROXY_ADDR'),
-            ProofChainProxyAdmin: getAddressFromEnv('CONTRACTS_PROOF_CHAIN_PROXY_ADMIN_ADDR'),
-
-            Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR')
-        },
-        Legacy: {
-            ProofGovernanceFacet: getAddressFromEnv('CONTRACTS_LEGACY_GOVERNANCE_FACET_ADDR'),
-            ProofDiamondCutFacet: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_CUT_FACET_ADDR'),
-            ProofExecutorFacet: getAddressFromEnv('CONTRACTS_LEGACY_EXECUTOR_FACET_ADDR'),
-            ProofRegistryFacet: getAddressFromEnv('CONTRACTS_LEGACY_REGISTRY_FACET_ADDR'),
-            ProofGettersFacet: getAddressFromEnv('CONTRACTS_LEGACY_GETTERS_FACET_ADDR'),
-            ProofDiamondInit: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_INIT_ADDR'),
-            ProofDiamondUpgradeInit: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_UPGRADE_INIT_ADDR'),
-            ProofDefaultUpgrade: getAddressFromEnv('CONTRACTS_LEGACY_DEFAULT_UPGRADE_ADDR'),
-            ProofDiamondProxy: getAddressFromEnv('CONTRACTS_LEGACY_DIAMOND_PROXY_ADDR')
+            Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR'),
+            GovernanceFacet: getAddressFromEnv('CONTRACTS_GOVERNANCE_FACET_ADDR'),
+            DiamondCutFacet: getAddressFromEnv('CONTRACTS_DIAMOND_CUT_FACET_ADDR'),
+            ExecutorFacet: getAddressFromEnv('CONTRACTS_EXECUTOR_FACET_ADDR'),
+            GettersFacet: getAddressFromEnv('CONTRACTS_GETTERS_FACET_ADDR'),
+            DiamondInit: getAddressFromEnv('CONTRACTS_DIAMOND_INIT_ADDR'),
+            DiamondUpgradeInit: getAddressFromEnv('CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR'),
+            DefaultUpgrade: getAddressFromEnv('CONTRACTS_DEFAULT_UPGRADE_ADDR'),
+            DiamondProxy: getAddressFromEnv('CONTRACTS_DIAMOND_PROXY_ADDR')
         },
         Bridges: {
             ERC20BridgeImplementation: getAddressFromEnv('CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR'),
@@ -131,44 +118,43 @@ export class Deployer {
         this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
     }
 
-    // public async initialProofSystemProxyDiamondCut() {
-    //     const facetCuts: FacetCut[] = Object.values(
-    //         await getCurrentFacetCutsForAdd(
-    //             this.addresses.ProofSystem.ProofDiamondCutFacet,
-    //             this.addresses.ProofSystem.ProofGettersFacet,
-    //             this.addresses.ProofSystem.ProofExecutorFacet,
-    //             this.addresses.ProofSystem.ProofGovernanceFacet,
-    //             this.addresses.ProofSystem.ProofRegistryFacet
-    //         )
-    //     );
+    public async initialProofSystemProxyDiamondCut() {
+        const facetCuts: FacetCut[] = Object.values(
+            await getCurrentFacetCutsForAdd(
+                this.addresses.ProofSystem.DiamondCutFacet,
+                this.addresses.ProofSystem.GettersFacet,
+                this.addresses.ProofSystem.ExecutorFacet,
+                this.addresses.ProofSystem.GovernanceFacet
+            )
+        );
 
-    //     const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
-    //     const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
-    //     const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
-    //     const verifierParams = {
-    //          recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
-    //          recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
-    //          recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
-    //     };
-    //     const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-    //     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('ProofDiamondInit').abi);
+        // const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
+        // const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
+        // const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
+        const verifierParams = {
+            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
+        };
+        const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
+        const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
-    //     const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
-    //         this.addresses.Bridgehead.BridgeheadProxy,
-    //         this.addresses.ProofSystem.Verifier,
-    //         this.governorAddress,
-    //         genesisBlockHash,
-    //         genesisRollupLeafIndex,
-    //         genesisBlockCommitment,
-    //         this.addresses.AllowList,
-    //         verifierParams,
-    //         L2_BOOTLOADER_BYTECODE_HASH,
-    //         L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-    //         priorityTxMaxGasLimit
-    //     ]);
+        const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
+            // these are set in the contract
+            '0x0000000000000000000000000000000000001234',
+            '0x0000000000000000000000000000000000002234',
+            '0x0000000000000000000000000000000000003234',
+            '0x0000000000000000000000000000000000000000000000000000000000000000',
+            this.addresses.AllowList,
+            this.addresses.ProofSystem.Verifier,
+            verifierParams,
+            L2_BOOTLOADER_BYTECODE_HASH,
+            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+            priorityTxMaxGasLimit
+        ]);
 
-    //     return diamondCut(facetCuts, this.addresses.ProofSystem.ProofDiamondInit, diamondInitCalldata);
-    // }
+        return diamondCut(facetCuts, this.addresses.ProofSystem.DiamondInit, diamondInitCalldata);
+    }
 
     public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
@@ -302,60 +288,6 @@ export class Deployer {
         this.addresses.Bridgehead.BridgeheadProxyAdmin = adminAddress;
     }
 
-    public async deployProofChainProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        // we deploy a whole ProofChainProxy, but we only store the admin and implementation addresses
-        ethTxOptions.gasLimit ??= 10_000_000;
-
-        const ProofChain = await hardhat.ethers.getContractFactory('ProofChain');
-
-        const chainId = getNumberFromEnv('CHAIN_ETH_ZKSYNC_NETWORK_ID');
-        const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
-            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
-            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
-        };
-        const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-
-        //these constants don't matter, as we never use this proxy, as it is not deployed from the registry.
-        // its just for initialisaing the proxy and implementatin addresses.
-        const instance: ethers.Contract = await hardhat.upgrades.deployProxy(ProofChain, [
-            chainId,
-            this.addresses.Bridgehead.BridgeheadProxy,
-            this.governorAddress,
-            this.addresses.AllowList,
-            this.addresses.ProofSystem.Verifier,
-            verifierParams,
-            L2_BOOTLOADER_BYTECODE_HASH,
-            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-            L2_BOOTLOADER_BYTECODE_HASH,
-            priorityTxMaxGasLimit
-        ]);
-
-        await instance.deployed();
-
-        const adminAddress = await hardhat.upgrades.erc1967.getAdminAddress(instance.address);
-
-        const implAddress = await hardhat.upgrades.erc1967.getImplementationAddress(instance.address);
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_PROOF_CHAIN_IMPL_ADDR=${implAddress}`);
-        }
-
-        this.addresses.ProofSystem.ProofChainImplementation = implAddress;
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_PROOF_CHAIN_PROXY_ADMIN_ADDR=${adminAddress}`);
-        }
-
-        console.log(
-            `ProofSystem Proof Chain Proxy deployed, gas used: ${(
-                await instance.deployTransaction.wait()
-            ).gasUsed.toString()}`
-        );
-
-        this.addresses.ProofSystem.ProofChainProxyAdmin = adminAddress;
-    }
-
     public async deployProofSystemProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
 
@@ -368,8 +300,6 @@ export class Deployer {
 
         const instance = await hardhat.upgrades.deployProxy(ProofSystem, [
             this.addresses.Bridgehead.BridgeheadProxy,
-            this.addresses.ProofSystem.ProofChainImplementation,
-            this.addresses.ProofSystem.ProofChainProxyAdmin,
             this.addresses.ProofSystem.Verifier,
             this.governorAddress,
             genesisBlockHash,
@@ -408,49 +338,49 @@ export class Deployer {
         this.addresses.ProofSystem.ProofSystemProxyAdmin = adminAddress;
     }
 
-    // public async deployProofGovernanceFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofGovernanceFacet', [], create2Salt, ethTxOptions);
+    public async deployProofGovernanceFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('GovernanceFacet', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_GOVERNANCE_FACET_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_GOVERNANCE_FACET_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofGovernanceFacet = contractAddress;
-    // }
+        this.addresses.ProofSystem.GovernanceFacet = contractAddress;
+    }
 
-    // public async deployProofDiamondCutFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofDiamondCutFacet', [], create2Salt, ethTxOptions);
+    public async deployProofDiamondCutFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('DiamondCutFacet', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_DIAMOND_CUT_FACET_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_DIAMOND_CUT_FACET_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofDiamondCutFacet = contractAddress;
-    // }
+        this.addresses.ProofSystem.DiamondCutFacet = contractAddress;
+    }
 
-    // public async deployProofExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofExecutorFacet', [], create2Salt, ethTxOptions);
+    public async deployProofExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('ExecutorFacet', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_EXECUTOR_FACET_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_EXECUTOR_FACET_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofExecutorFacet = contractAddress;
-    // }
+        this.addresses.ProofSystem.ExecutorFacet = contractAddress;
+    }
 
-    // public async deployProofGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofGettersFacet', [], create2Salt, ethTxOptions);
+    public async deployProofGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('GettersFacet', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_GETTERS_FACET_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_GETTERS_FACET_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofGettersFacet = contractAddress;
-    // }
+        this.addresses.ProofSystem.GettersFacet = contractAddress;
+    }
 
     public async deployVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
@@ -462,17 +392,6 @@ export class Deployer {
 
         this.addresses.ProofSystem.Verifier = contractAddress;
     }
-
-    // public async deployProofRegistryFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofRegistryFacet', [], create2Salt, ethTxOptions);
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_REGISTRY_FACET_ADDR=${contractAddress}`);
-    //     }
-
-    //     this.addresses.ProofSystem.ProofRegistryFacet = contractAddress;
-    // }
 
     public async deployERC20BridgeImplementation(
         create2Salt: string,
@@ -556,66 +475,47 @@ export class Deployer {
         this.addresses.Bridges.WethBridgeProxy = contractAddress;
     }
 
-    // public async deployProofDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofDiamondInit', [], create2Salt, ethTxOptions);
+    public async deployProofDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('DiamondInit', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_DIAMOND_INIT_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_DIAMOND_INIT_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofDiamondInit = contractAddress;
-    // }
+        this.addresses.ProofSystem.DiamondInit = contractAddress;
+    }
 
-    // public async deployDiamondUpgradeInit(
-    //     create2Salt: string,
-    //     contractVersion: number,
-    //     ethTxOptions: ethers.providers.TransactionRequest
-    // ) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2(
-    //         `DiamondUpgradeInit${contractVersion}`,
-    //         [],
-    //         create2Salt,
-    //         ethTxOptions
-    //     );
+    public async deployDiamondUpgradeInit(
+        create2Salt: string,
+        contractVersion: number,
+        ethTxOptions: ethers.providers.TransactionRequest
+    ) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2(
+            `DiamondUpgradeInit${contractVersion}`,
+            [],
+            create2Salt,
+            ethTxOptions
+        );
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofDiamondUpgradeInit = contractAddress;
-    // }
+        this.addresses.ProofSystem.DiamondUpgradeInit = contractAddress;
+    }
 
-    // public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-    //     const contractAddress = await this.deployViaCreate2('ProofDefaultUpgrade', [], create2Salt, ethTxOptions);
+    public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('ProofDefaultUpgrade', [], create2Salt, ethTxOptions);
 
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
-    //     }
+        if (this.verbose) {
+            console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
+        }
 
-    //     this.addresses.ProofSystem.ProofDefaultUpgrade = contractAddress;
-    // }
-
-    // public async deployProofSystemDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-
-    //     const chainId = getNumberFromEnv('ETH_CLIENT_CHAIN_ID');
-    //     const initialDiamondCut = await this.initialProofSystemProxyDiamondCut();
-    //     const contractAddress = await this.deployViaCreate2(
-    //         'ProofDiamondProxy',
-    //         [chainId, initialDiamondCut],
-    //         create2Salt,
-    //         ethTxOptions
-    //     );
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_PROOF_DIAMOND_PROXY_ADDR=${contractAddress}`);
-    //     }
-
-    //     this.addresses.ProofSystem.ProofDiamondProxy = contractAddress;
-    // }
+        this.addresses.ProofSystem.DefaultUpgrade = contractAddress;
+    }
 
     public async deployBridgeheadContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -634,32 +534,28 @@ export class Deployer {
         // deploy Bridgehead contract
         // await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 1 });
         // await this.deployChainImplementation(create2Salt, { gasPrice, nonce: nonce });
-        await this.deployProofChainProxy(create2Salt, { gasPrice, nonce: nonce });
+        await this.deployProofDiamond(create2Salt, gasPrice, nonce);
         // await this.deployBridgeheadImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
         // await this.deployBridgeheadProxyAdmin(create2Salt, { gasPrice, nonce: nonce + 3 });
         await this.deployProofSystemProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
         await this.registerProofSystem();
     }
 
-    // public async deployProofSystemContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    //     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+    public async deployProofDiamond(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+        nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    //     // deploy Factory contract
-    //     const independentProofSystemDeployPromises = [
-    //         this.deployProofExecutorFacet(create2Salt, { gasPrice, nonce: nonce }),
-    //         this.deployProofDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
-    //         this.deployProofGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
-    //         this.deployProofGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
-    //         this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 }),
-    //         this.deployProofRegistryFacet(create2Salt, { gasPrice, nonce: nonce + 5 }),
-    //         this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 6 })
-    //     ];
-    //     await Promise.all(independentProofSystemDeployPromises);
-    //     nonce += 7;
-
-    //     await this.deployProofSystemDiamondProxy(create2Salt, { gasPrice, nonce });
-    //     await this.registerProofSystem(create2Salt, gasPrice, nonce + 1);
-    // }
+        // deploy Factory contract
+        const independentProofSystemDeployPromises = [
+            this.deployProofExecutorFacet(create2Salt, { gasPrice, nonce: nonce }),
+            this.deployProofDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
+            this.deployProofGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
+            this.deployProofGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
+            this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 }),
+            this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 })
+        ];
+        await Promise.all(independentProofSystemDeployPromises);
+        nonce += 6;
+    }
 
     public async registerProofSystem() {
         // const gasLimit = 10_000_000;
@@ -693,19 +589,20 @@ export class Deployer {
         const inputChainId = 0;
         const governor = this.governorAddress;
         const allowList = this.addresses.AllowList;
+        const initialDiamondCut = await this.initialProofSystemProxyDiamondCut();
 
         const tx = await bridgehead.newChain(
             inputChainId,
             this.addresses.ProofSystem.ProofSystemProxy,
             governor,
             allowList,
+            initialDiamondCut,
             { gasPrice, nonce, gasLimit }
         );
         const receipt = await tx.wait();
         const chainId = receipt.logs.find((log) => log.topics[0] == bridgehead.interface.getEventTopic('NewChain'))
             .topics[1];
 
-        console.log('KL todo', tx.hash);
         const contractAddress =
             '0x' +
             receipt.logs
@@ -719,13 +616,13 @@ export class Deployer {
                 .topics[2].slice(26);
 
         this.addresses.Bridgehead.ChainProxy = contractAddress;
-        this.addresses.ProofSystem.ProofChainProxy = proofContractAddress;
+        this.addresses.ProofSystem.DiamondProxy = proofContractAddress;
 
         console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()}`);
         // KL todo: ChainId is not a uint256 yet.
         console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
         console.log(`CONTRACTS_BRIDGEHEAD_CHAIN_PROXY_ADDR=${contractAddress}`);
-        console.log(`CONTRACTS_PROOF_CHAIN_PROXY_ADDR=${proofContractAddress}`);
+        console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${proofContractAddress}`);
     }
 
     public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -748,7 +645,7 @@ export class Deployer {
         const validatorAddress = getAddressFromEnv('ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR');
         const contractAddress = await this.deployViaCreate2(
             'ValidatorTimelock',
-            [this.governorAddress, this.addresses.ProofSystem.ProofChainProxy, executionDelay, validatorAddress],
+            [this.governorAddress, this.addresses.ProofSystem.DiamondProxy, executionDelay, validatorAddress],
             create2Salt,
             ethTxOptions
         );
@@ -782,7 +679,7 @@ export class Deployer {
     }
 
     public proofChainContract(signerOrProvider: Signer | providers.Provider) {
-        return IProofChainFactory.connect(this.addresses.ProofSystem.ProofChainProxy, signerOrProvider);
+        return IProofChainFactory.connect(this.addresses.ProofSystem.DiamondProxy, signerOrProvider);
     }
 
     public validatorTimelock(signerOrProvider: Signer | providers.Provider) {

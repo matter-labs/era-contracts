@@ -46,7 +46,9 @@ async function main() {
                 recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
                 recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
             };
-            const tx = await zkSync.setVerifierParams(verifierParams);
+            const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+
+            const tx = await zkSync.setParams(verifierParams, initialDiamondCut);
             console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);
             const receipt = await tx.wait();
 

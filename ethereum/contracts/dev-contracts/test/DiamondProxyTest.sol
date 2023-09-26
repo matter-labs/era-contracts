@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../../common/libraries/Diamond.sol";
-import "../../proof-system/chain-deps/facets/ProofChainBase.sol";
+import "../../proof-system/chain-deps/facets/Base.sol";
 
 contract DiamondProxyTest is ProofChainBase {
     function setFreezability(bool _freeze) external returns (bytes32) {

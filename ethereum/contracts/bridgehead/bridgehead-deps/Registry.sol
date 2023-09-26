@@ -9,7 +9,7 @@ import "../bridgehead-interfaces/IRegistry.sol";
 import "../../common/libraries/UncheckedMath.sol";
 // import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
 // import "../../common/interfaces/IAllowList.sol";
-// import "../../common/libraries/Diamond.sol";
+import "../../common/libraries/Diamond.sol";
 // import "../../common/libraries/L2ContractHelper.sol";
 // import "../../common/L2ContractAddresses.sol";
 import "../chain-interfaces/IBridgeheadChain.sol";
@@ -33,7 +33,8 @@ contract Registry is IRegistry, BridgeheadBase {
         uint256 _chainId,
         address _proofSystem,
         address _chainGovernor,
-        IAllowList _allowList
+        IAllowList _allowList,
+        Diamond.DiamondCutData calldata _diamondCut
     ) external onlyGovernor returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
         // KL Todo: uint16 until the server can take bigger numbers.
@@ -78,7 +79,7 @@ contract Registry is IRegistry, BridgeheadBase {
         );
         bridgeheadStorage.chainContract[chainId] = address(chainContract);
 
-        IProofForBridgehead(_proofSystem).newChain(chainId, address(chainContract), _chainGovernor);
+        IProofForBridgehead(_proofSystem).newChain(chainId, address(chainContract), _chainGovernor, _diamondCut);
 
         emit NewChain(uint16(chainId), address(chainContract), _proofSystem, msg.sender);
     }
