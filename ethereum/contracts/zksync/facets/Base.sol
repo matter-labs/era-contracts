@@ -6,6 +6,8 @@ import "../Storage.sol";
 import "../../common/ReentrancyGuard.sol";
 import "../../common/AllowListed.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 contract Base is ReentrancyGuard, AllowListed {
@@ -17,15 +19,17 @@ contract Base is ReentrancyGuard, AllowListed {
         _;
     }
 
-    /// @notice Checks if validator is active
-    modifier onlyValidator() {
-        require(s.validators[msg.sender], "1h"); // validator is not active
+    /// @notice  Checks that the message sender is an active governor or its owner
+    modifier onlyGovernorOrItsOwner() {
+        address governorAddr = s.governor;
+        address ownerAddr = Ownable(governorAddr).owner();
+        require(msg.sender == ownerAddr || msg.sender == governorAddr, "Only by governor owner");
         _;
     }
 
-    /// @notice Checks if `msg.sender` is the security council
-    modifier onlySecurityCouncil() {
-        require(msg.sender == s.upgrades.securityCouncil, "a9"); // not a security council
+    /// @notice Checks if validator is active
+    modifier onlyValidator() {
+        require(s.validators[msg.sender], "1h"); // validator is not active
         _;
     }
 }

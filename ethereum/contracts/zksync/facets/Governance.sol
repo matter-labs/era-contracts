@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../interfaces/IGovernance.sol";
+import "../libraries/Diamond.sol";
 import "./Base.sol";
 
 /// @title Governance Contract controls access rights for contract management.
@@ -43,7 +44,7 @@ contract GovernanceFacet is Base, IGovernance {
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
     /// @param _active Active flag
-    function setValidator(address _validator, bool _active) external onlyGovernor {
+    function setValidator(address _validator, bool _active) external onlyGovernorOrItsOwner {
         if (s.validators[_validator] != _active) {
             s.validators[_validator] = _active;
             emit ValidatorStatusUpdate(_validator, _active);
@@ -68,5 +69,42 @@ contract GovernanceFacet is Base, IGovernance {
             s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
             emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            UPGRADE EXECUTION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Executes a proposed governor upgrade
+    /// @dev Only the current governor can execute the upgrade
+    /// @param _diamondCut The diamond cut parameters to be executed
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyGovernor {
+        Diamond.diamondCut(_diamondCut);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CONTRACT FREEZING
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Instantly pause the functionality of all freezable facets & their selectors
+    /// @dev Only the governance mechanism may freeze Diamond Proxy
+    function freezeDiamond() external onlyGovernor {
+        Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
+
+        require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
+        diamondStorage.isFrozen = true;
+
+        emit Freeze();
+    }
+
+    /// @notice Unpause the functionality of all freezable facets & their selectors
+    /// @dev Both the governor and its owner can unfreeze Diamond Proxy
+    function unfreezeDiamond() external onlyGovernorOrItsOwner {
+        Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
+
+        require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen
+        diamondStorage.isFrozen = false;
+
+        emit Unfreeze();
     }
 }

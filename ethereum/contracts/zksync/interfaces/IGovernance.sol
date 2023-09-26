@@ -4,6 +4,8 @@ pragma solidity ^0.8.13;
 
 import "./IBase.sol";
 
+import {Diamond} from "../libraries/Diamond.sol";
+
 interface IGovernance is IBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
@@ -14,6 +16,12 @@ interface IGovernance is IBase {
     function setPorterAvailability(bool _zkPorterIsAvailable) external;
 
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
+
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
+
+    function freezeDiamond() external;
+
+    function unfreezeDiamond() external;
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
@@ -30,4 +38,13 @@ interface IGovernance is IBase {
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
+
+    /// @notice Emitted when an upgrade is executed.
+    event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
+
+    /// @notice Emitted when the contract is frozen.
+    event Freeze();
+
+    /// @notice Emitted when the contract is unfrozen.
+    event Unfreeze();
 }

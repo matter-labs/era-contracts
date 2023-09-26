@@ -114,7 +114,7 @@ struct AppStorage {
     /// without overhead for proving the block.
     uint256 priorityTxMaxGasLimit;
     /// @dev Storage of variables needed for upgrade facet
-    UpgradeStorage upgrades;
+    UpgradeStorage __DEPRECATED_upgrades;
     /// @dev A mapping L2 block number => message number => flag.
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
