@@ -106,5 +106,4 @@ struct ProofChainStorage {
     /// new fields
     uint256 chainId;
     address bridgeheadChainContract;
-    address proofChainImplementation;
 }

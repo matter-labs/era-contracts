@@ -29,11 +29,10 @@ contract DiamondInit is ProofChainBase {
     function initialize(
         uint256 _chainId,
         address _bridgeheadChainContract,
-        IVerifier _verifier,
         address _governor,
         bytes32 _blockHashZero,
         IAllowList _allowList,
-        Verifier _verifier,
+        IVerifier _verifier,
         VerifierParams calldata _verifierParams,
         bytes32 _l2BootloaderBytecodeHash,
         bytes32 _l2DefaultAccountBytecodeHash,
