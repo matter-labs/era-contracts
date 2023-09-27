@@ -4,6 +4,8 @@ import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
 import {
     MailboxFacet,
     MailboxFacetFactory,
+    MockExecutorFacet,
+    MockExecutorFacetFactory,
     DiamondInitFactory,
     AllowListFactory,
     AllowList,
@@ -21,6 +23,7 @@ import * as ethers from 'ethers';
 
 describe('Mailbox tests', function () {
     let mailbox: MailboxFacet;
+    let proxyAsMockExecutor: MockExecutorFacet;
     let allowList: AllowList;
     let diamondProxyContract: ethers.Contract;
     let owner: ethers.Signer;
@@ -35,6 +38,13 @@ describe('Mailbox tests', function () {
         const mailboxFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
         const mailboxContract = await mailboxFactory.deploy();
         const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+
+        const mockExecutorFactory = await hardhat.ethers.getContractFactory('MockExecutorFacet');
+        const mockExecutorContract = await mockExecutorFactory.deploy();
+        const mockExecutorFacet = MockExecutorFacetFactory.connect(
+            mockExecutorContract.address,
+            mockExecutorContract.signer
+        );
 
         const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
         const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
@@ -64,10 +74,13 @@ describe('Mailbox tests', function () {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
-        const facetCuts = [facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false)];
+        const facetCuts = [
+            facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false),
+            facetCut(mockExecutorFacet.address, mockExecutorFacet.interface, Action.Add, false)
+        ];
         const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
 
         const diamondProxyFactory = await hardhat.ethers.getContractFactory('DiamondProxy');
@@ -77,6 +90,10 @@ describe('Mailbox tests', function () {
         await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
 
         mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
+        proxyAsMockExecutor = MockExecutorFacetFactory.connect(
+            diamondProxyContract.address,
+            mockExecutorContract.signer
+        );
 
         const forwarderFactory = await hardhat.ethers.getContractFactory('Forwarder');
         const forwarderContract = await forwarderFactory.deploy();
@@ -112,7 +129,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('bl');
+        expect(revertReason).equal('pq');
     });
 
     it('Should not accept bytecode of even length in words', async () => {
@@ -128,7 +145,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('pr');
+        expect(revertReason).equal('ps');
     });
 
     it('Should not accept bytecode that is too long', async () => {
@@ -208,6 +225,60 @@ describe('Mailbox tests', function () {
             );
 
             expect(revertReason).equal(`d2`);
+        });
+    });
+
+    describe(`finalizeEthWithdrawal`, function () {
+        const BLOCK_NUMBER = 1;
+        const MESSAGE_INDEX = 0;
+        const TX_NUMBER_IN_BLOCK = 0;
+        const L1_RECEIVER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+        const AMOUNT = 1;
+        const MESSAGE =
+            '0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
+        // MESSAGE_HASH = 0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52
+        // HASHED_LOG = 0x110c937a27f7372384781fe744c2e971daa9556b1810f2edea90fb8b507f84b1
+        const L2_LOGS_TREE_ROOT = '0xfa6b5a02c911a05e9dfe9e03f6dedb9cd30795bbac2aaf5bdd2632d2671a7e3d';
+        const MERKLE_PROOF = [
+            '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba',
+            '0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0',
+            '0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111',
+            '0x199cc5812543ddceeddd0fc82807646a4899444240db2c0d2f20c3cceb5f51fa',
+            '0xe4733f281f18ba3ea8775dd62d2fcd84011c8c938f16ea5790fd29a03bf8db89',
+            '0x1798a1fd9c8fbb818c98cff190daa7cc10b6e5ac9716b4a2649f7c2ebcef2272',
+            '0x66d7c5983afe44cf15ea8cf565b34c6c31ff0cb4dd744524f7842b942d08770d',
+            '0xb04e5ee349086985f74b73971ce9dfe76bbed95c84906c5dffd96504e1e5396c',
+            '0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db'
+        ];
+
+        before(async () => {
+            await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
+        });
+
+        it(`Reverts when proof is invalid`, async () => {
+            let invalidProof = [...MERKLE_PROOF];
+            invalidProof[0] = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb';
+
+            const revertReason = await getCallRevertReason(
+                mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
+            );
+            expect(revertReason).equal(`pi`);
+        });
+
+        it(`Successful withdrawal`, async () => {
+            const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
+
+            await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
+
+            const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
+            expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
+        });
+
+        it(`Reverts when withdrawal is already finalized`, async () => {
+            const revertReason = await getCallRevertReason(
+                mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+            );
+            expect(revertReason).equal(`jj`);
         });
     });
 

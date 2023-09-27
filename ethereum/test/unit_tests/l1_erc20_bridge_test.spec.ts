@@ -64,7 +64,7 @@ describe(`L1ERC20Bridge tests`, function () {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
         const facetCuts = [

@@ -1,5 +1,8 @@
 import { BigNumber, BigNumberish, BytesLike, ethers } from 'ethers';
 import { Address } from 'zksync-web3/build/src/types';
+import { Action, diamondCut, facetCut, getAllSelectors } from '../../src.ts/diamondCut';
+import { expect } from 'chai';
+import * as hardhat from 'hardhat';
 
 export const IERC20_INTERFACE = require('@openzeppelin/contracts/build/contracts/IERC20');
 export const DEFAULT_REVERT_REASON = 'VM did not revert';
@@ -20,7 +23,7 @@ export enum SYSTEM_LOG_KEYS {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 // The default price for the pubdata in L2 gas to be used in L1->L2 transactions
@@ -128,7 +131,26 @@ export function createSystemLogs() {
     ];
 }
 
-export function genesisStoredBatchInfo(): StoredBatchInfo {
+export async function setSecurityCouncil(
+    proxyAsGetters: ethers.Contract,
+    proxyAsDiamondCut: ethers.Contract,
+    securityCouncil: ethers.Signer
+) {
+    const diamondUpgradeSecurityCouncilFactory = await hardhat.ethers.getContractFactory(
+        'DiamondUpgradeSecurityCouncil'
+    );
+    const diamondUpgradeSecurityCouncilContract = await diamondUpgradeSecurityCouncilFactory.deploy();
+    const calldata = diamondUpgradeSecurityCouncilContract.interface.encodeFunctionData('upgrade', [
+        await securityCouncil.getAddress()
+    ]);
+    const diamondCutData = diamondCut([], diamondUpgradeSecurityCouncilContract.address, calldata);
+
+    const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
+    await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
+    await proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
+}
+
+export function genesisStoredBlockInfo(): StoredBlockInfo {
     return {
         batchNumber: 0,
         batchHash: ethers.constants.HashZero,

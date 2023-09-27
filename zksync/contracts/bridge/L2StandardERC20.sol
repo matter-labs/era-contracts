@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
