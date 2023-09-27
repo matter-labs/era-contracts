@@ -56,8 +56,6 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         proofStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
         proofStorage.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         proofStorage.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
-
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
     function setParams(
