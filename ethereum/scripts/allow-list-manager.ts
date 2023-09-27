@@ -1,7 +1,7 @@
 import * as hardhat from 'hardhat';
 import { Interface } from 'ethers/lib/utils';
 import { Command } from 'commander';
-import { RermissionToCall, AccessMode, print } from './utils';
+import { PermissionToCall, AccessMode, print, getLowerCaseAddress, permissionToCallComparator } from './utils';
 
 // Get the interfaces for all needed contracts
 const allowList = new Interface(hardhat.artifacts.readArtifactSync('IAllowList').abi);
@@ -52,7 +52,13 @@ function functionSelector(functionName: string): string {
     return selectors[0];
 }
 
-function setBatchPermissionToCall(parameters: Array<RermissionToCall>) {
+function setBatchPermissionToCall(parameters: Array<PermissionToCall>) {
+    parameters.sort(permissionToCallComparator);
+    for (let i = 1; i < parameters.length; i++) {
+        if (permissionToCallComparator(parameters[i - 1], parameters[i]) === 0) {
+            throw new Error('Duplicates for the set batch permission to call method');
+        }
+    }
     // Extend parameters with the function selector, to check it manually
     const extendedParameters = parameters.map((param) =>
         Object.assign(param, { functionSel: functionSelector(param.functionName) })
@@ -89,6 +95,12 @@ function setAccessMode(target: string, mode: number) {
 }
 
 function setBatchAccessMode(parameters: Array<AccessMode>) {
+    parameters.sort((a, b) => getLowerCaseAddress(a.target).localeCompare(getLowerCaseAddress(b.target)));
+    for (let i = 1; i < parameters.length; i++) {
+        if (getLowerCaseAddress(parameters[i - 1].target) === getLowerCaseAddress(parameters[i].target)) {
+            throw new Error('Duplicated targets for the set batch access mode method');
+        }
+    }
     print('parameters', parameters);
 
     const targets = parameters.map((publicAccess) => publicAccess.target);
@@ -118,7 +130,7 @@ async function main() {
     prepareCalldataProgram
         .command('set-batch-permission-to-call <permission-to-call>')
         .action((permissionToCall: string) => {
-            const parameters: Array<RermissionToCall> = JSON.parse(permissionToCall);
+            const parameters: Array<PermissionToCall> = JSON.parse(permissionToCall);
             setBatchPermissionToCall(parameters);
         });
 
@@ -139,7 +151,7 @@ async function main() {
 
     alphaMainnet.command('add <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<RermissionToCall> = new Array(0);
+        let parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: true, ...permission });
@@ -151,7 +163,7 @@ async function main() {
 
     alphaMainnet.command('remove <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<RermissionToCall> = new Array(0);
+        let parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: false, ...permission });

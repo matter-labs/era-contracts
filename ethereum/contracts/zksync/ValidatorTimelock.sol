@@ -7,13 +7,15 @@ import "./libraries/LibMap.sol";
 import "./interfaces/IExecutor.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
-/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main contract.
+/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main
+/// contract.
 /// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
-/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed, the
-/// timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
+/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
+/// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
 contract ValidatorTimelock is IExecutor, Ownable2Step {
     using LibMap for LibMap.Uint32Map;
@@ -39,12 +41,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor(
-        address _initialOwner,
-        address _zkSyncContract,
-        uint32 _executionDelay,
-        address _validator
-    ) {
+    constructor(address _initialOwner, address _zkSyncContract, uint32 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
         zkSyncContract = _zkSyncContract;
         executionDelay = _executionDelay;

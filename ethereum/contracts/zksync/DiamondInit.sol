@@ -2,13 +2,17 @@
 
 pragma solidity ^0.8.13;
 
-import "../common/interfaces/IAllowList.sol";
-import "./interfaces/IExecutor.sol";
-import "./libraries/Diamond.sol";
-import "./facets/Base.sol";
-import "./Config.sol";
+import {IAllowList} from "../common/interfaces/IAllowList.sol";
+import {IVerifier} from "./interfaces/IVerifier.sol";
+import {IExecutor} from "./interfaces/IExecutor.sol";
+import {Diamond} from "./libraries/Diamond.sol";
+import {Base} from "./facets/Base.sol";
+import {Verifier} from "./Verifier.sol";
+import {VerifierParams} from "./Storage.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is Base {
@@ -27,7 +31,8 @@ contract DiamondInit is Base {
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
     /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy initializer
+    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
+    /// initializer
     function initialize(
         IVerifier _verifier,
         address _governor,
@@ -43,6 +48,7 @@ contract DiamondInit is Base {
     ) external reentrancyGuardInitializer returns (bytes32) {
         require(address(_verifier) != address(0), "vt");
         require(_governor != address(0), "vy");
+        require(_priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
         s.verifier = _verifier;
         s.governor = _governor;

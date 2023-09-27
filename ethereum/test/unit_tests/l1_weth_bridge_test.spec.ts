@@ -96,7 +96,7 @@ describe('WETH Bridge tests', () => {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
         const facetCuts = [

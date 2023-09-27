@@ -14,6 +14,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is Base, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
@@ -151,7 +152,7 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 numberOfLayer1Txs = uint256(logValue);
-            } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH)) {
+            } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
             } else {
@@ -398,16 +399,16 @@ contract ExecutorFacet is Base, IExecutor {
     /// counters that are responsible for the number of batches
     function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidator {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
-        uint256 newTotalBatchesCommitted = _maxU256(_newLastBatch, s.totalBatchesExecuted);
+        require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 
-        if (newTotalBatchesCommitted < s.totalBatchesVerified) {
-            s.totalBatchesVerified = newTotalBatchesCommitted;
+        if (_newLastBatch < s.totalBatchesVerified) {
+            s.totalBatchesVerified = _newLastBatch;
         }
-        s.totalBatchesCommitted = newTotalBatchesCommitted;
+        s.totalBatchesCommitted = _newLastBatch;
 
         // Reset the batch number of the executed system contracts upgrade transaction if the batch
         // where the system contracts upgrade was committed is among the reverted batches.
-        if (s.l2SystemContractsUpgradeBatchNumber > newTotalBatchesCommitted) {
+        if (s.l2SystemContractsUpgradeBatchNumber > _newLastBatch) {
             delete s.l2SystemContractsUpgradeBatchNumber;
         }
 
@@ -469,13 +470,13 @@ contract ExecutorFacet is Base, IExecutor {
         return keccak256(abi.encode(_storedBatchInfo));
     }
 
-    /// @notice Returns if the bit at index {_index} is 1
+    /// @notice Returns true if the bit at index {_index} is 1
     function _checkBit(uint256 _bitMap, uint8 _index) internal pure returns (bool) {
         return (_bitMap & (1 << _index)) > 0;
     }
 
     /// @notice Sets the given bit in {_num} at index {_index} to 1.
-    function _setBit(uint256 _num, uint8 _index) internal pure returns (uint256) {
-        return _num | (1 << _index);
+    function _setBit(uint256 _bitMap, uint8 _index) internal pure returns (uint256) {
+        return _bitMap | (1 << _index);
     }
 }

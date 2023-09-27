@@ -2,23 +2,38 @@
 
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../interfaces/IMailbox.sol";
-import "../libraries/Merkle.sol";
-import "../libraries/PriorityQueue.sol";
-import "../libraries/TransactionValidator.sol";
-import "../Storage.sol";
-import "../Config.sol";
-import "../../common/libraries/UncheckedMath.sol";
-import "../../common/libraries/UnsafeBytes.sol";
-import "../../common/libraries/L2ContractHelper.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
-import "../../vendor/AddressAliasHelper.sol";
-import "./Base.sol";
+import {IMailbox, TxStatus} from "../interfaces/IMailbox.sol";
+import {Merkle} from "../libraries/Merkle.sol";
+import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
+import {TransactionValidator} from "../libraries/TransactionValidator.sol";
+import {L2Message, L2Log} from "../Storage.sol";
+import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
+import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {IAllowList} from "../../common/interfaces/IAllowList.sol";
+import {Base} from "./Base.sol";
+import {
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    FAIR_L2_GAS_PRICE,
+    L1_GAS_PER_PUBDATA_BYTE,
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    PRIORITY_OPERATION_L2_TX_TYPE,
+    PRIORITY_EXPIRATION,
+    MAX_NEW_FACTORY_DEPS
+} from "../Config.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
+} from "../../common/L2ContractAddresses.sol";
+
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is Base, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
