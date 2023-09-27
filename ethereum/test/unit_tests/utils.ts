@@ -150,7 +150,7 @@ export async function setSecurityCouncil(
     await proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
 }
 
-export function genesisStoredBlockInfo(): StoredBlockInfo {
+export function genesisStoredBatchInfo(): StoredBatchInfo {
     return {
         batchNumber: 0,
         batchHash: ethers.constants.HashZero,
