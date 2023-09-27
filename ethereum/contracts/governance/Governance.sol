@@ -48,7 +48,10 @@ contract Governance is IGovernance, Ownable2Step {
         _transferOwnership(_admin);
 
         securityCouncil = _securityCouncil;
+        emit ChangeSecurityCouncil(address(0), _securityCouncil);
+
         minDelay = _minDelay;
+        emit ChangeMinDelay(0, _minDelay);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -127,6 +130,7 @@ contract Governance is IGovernance, Ownable2Step {
     function scheduleTransparent(Operation calldata _operation, uint256 _delay) external onlyOwner {
         bytes32 id = hashOperation(_operation);
         _schedule(id, _delay);
+        emit TransparentOperationScheduled(id, _delay, _operation);
     }
 
     /// @notice Propose "shadow" upgrade, upgrade data is not publishing on-chain.
@@ -138,6 +142,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _delay The delay time (in seconds) after which the proposed upgrade may be executed by the owner.
     function scheduleShadow(bytes32 _id, uint256 _delay) external onlyOwner {
         _schedule(_id, _delay);
+        emit ShadowOperationScheduled(_id, _delay);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -150,6 +155,7 @@ contract Governance is IGovernance, Ownable2Step {
     function cancel(bytes32 _id) external onlyOwnerOrSecurityCouncil {
         require(isOperationPending(_id));
         delete timestamps[_id];
+        emit OperationCancelled(_id);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -172,6 +178,7 @@ contract Governance is IGovernance, Ownable2Step {
         require(isOperationReady(id), "Operation must be ready after execution");
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
+        emit OperationExecuted(id);
     }
 
     /// @notice Executes the scheduled operation with the security council instantly.
@@ -190,6 +197,7 @@ contract Governance is IGovernance, Ownable2Step {
         require(isOperationPending(id), "Operation must be pending after execution");
         // Set operation to be done
         timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
+        emit OperationExecuted(id);
     }
 
     /// @dev Returns the identifier of an operation.
@@ -240,12 +248,14 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Changes the minimum timelock duration for future operations.
     /// @param _newDelay The new minimum delay time (in seconds) for future operations.
     function updateDelay(uint256 _newDelay) external onlySelf {
+        emit ChangeMinDelay(minDelay, _newDelay);
         minDelay = _newDelay;
     }
 
     /// @dev Updates the address of the security council.
     /// @param _newSecurityCouncil The address of the new security council.
     function updateSecurityCouncil(address _newSecurityCouncil) external onlySelf {
+        emit ChangeSecurityCouncil(securityCouncil, _newSecurityCouncil);
         securityCouncil = _newSecurityCouncil;
     }
 

@@ -60,4 +60,22 @@ interface IGovernance {
     function updateDelay(uint256 _newDelay) external;
 
     function updateSecurityCouncil(address _newSecurityCouncil) external;
+
+    /// @notice Emitted when transparent operation is scheduled.
+    event TransparentOperationScheduled(bytes32 indexed _id, uint256 delay, Operation _operation);
+
+    /// @notice Emitted when shadow operation is scheduled.
+    event ShadowOperationScheduled(bytes32 indexed _id, uint256 delay);
+
+    /// @notice Emitted when the operation is executed with delay or instantly.
+    event OperationExecuted(bytes32 indexed _id);
+
+    /// @notice Emitted when the security council address is changed.
+    event ChangeSecurityCouncil(address _securityCouncilBefore, address _securityCouncilAfter);
+
+    /// @notice Emitted when the minimum delay for future operations is modified.
+    event ChangeMinDelay(uint256 _delayBefore, uint256 _delayAfter);
+
+    /// @notice Emitted when the operation with specified id is cancelled.
+    event OperationCancelled(bytes32 indexed _id);
 }
