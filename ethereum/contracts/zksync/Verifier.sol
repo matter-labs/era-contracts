@@ -66,7 +66,7 @@ contract Verifier is IVerifier {
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_X_SLOT = 0x200 + 0x4c0;
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_Y_SLOT = 0x200 + 0x4e0;
 
-    uint256 internal constant VK_RECURSIVE_FLAG = 0x200 + 0x500;
+    uint256 internal constant VK_RECURSIVE_FLAG_SLOT = 0x200 + 0x500;
 
     /*//////////////////////////////////////////////////////////////
                              Proof
@@ -258,7 +258,7 @@ contract Verifier is IVerifier {
 
         assembly {
             let start := VK_GATE_SETUP_0_X_SLOT
-            let end := VK_LOOKUP_TABLE_TYPE_Y_SLOT
+            let end := VK_RECURSIVE_FLAG_SLOT
             let length := add(sub(end, start), 0x20)
 
             vkHash := keccak256(start, length)
@@ -331,7 +331,7 @@ contract Verifier is IVerifier {
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x18550c804fadc55861b6a34d5341d594486833e62bd6137089f3335566ca40ee)
 
             // flag for using recursive part
-            mstore(VK_RECURSIVE_FLAG, 0)
+            mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
 
@@ -668,7 +668,7 @@ contract Verifier is IVerifier {
                 offset := calldataload(0x44)
                 let recursiveProofLengthInWords := calldataload(add(offset, 0x04))
 
-                switch mload(VK_RECURSIVE_FLAG)
+                switch mload(VK_RECURSIVE_FLAG_SLOT)
                 case 0 {
                     // recursive part should be empty
                     isValid := and(iszero(recursiveProofLengthInWords), isValid)
@@ -1633,7 +1633,7 @@ contract Verifier is IVerifier {
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
                 // Add recursive proof part if needed
-                if mload(VK_RECURSIVE_FLAG) {
+                if mload(VK_RECURSIVE_FLAG_SLOT) {
                     let uu := mulmod(u, u, R_MOD)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
