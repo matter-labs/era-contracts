@@ -8,11 +8,12 @@ import "./interfaces/IExecutor.sol";
 /// @author Matter Labs
 /// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
-/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main contract.
+/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main
+/// contract.
 /// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
-/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed, the
-/// timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
+/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
+/// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
 contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Part of the IBase interface. Not used in this contract.
@@ -36,12 +37,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint256 public executionDelay;
 
-    constructor(
-        address _initialOwner,
-        address _zkSyncContract,
-        uint256 _executionDelay,
-        address _validator
-    ) {
+    constructor(address _initialOwner, address _zkSyncContract, uint256 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
         zkSyncContract = _zkSyncContract;
         executionDelay = _executionDelay;
@@ -69,10 +65,10 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkSync contract with the same calldata.
-    function commitBatches(StoredBatchInfo calldata, CommitBatchInfo[] calldata _newBatchesData)
-        external
-        onlyValidator
-    {
+    function commitBatches(
+        StoredBatchInfo calldata,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external onlyValidator {
         for (uint256 i = 0; i < _newBatchesData.length; ++i) {
             committedBatchTimestamp[_newBatchesData[i].batchNumber] = block.timestamp;
         }

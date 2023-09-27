@@ -16,10 +16,12 @@ enum UpgradeState {
     Shadow
 }
 
-/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy upgrades and diamond cuts
+/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy
+/// upgrades and diamond cuts
 /// @param proposedUpgradeHash The hash of the current upgrade proposal, zero if there is no active proposal
 /// @param state Indicates whether an upgrade is initiated and if yes what type
-/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis multisig)
+/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis
+/// multisig)
 /// @param approvedBySecurityCouncil Indicates whether the security council has approved the upgrade
 /// @param proposedUpgradeTimestamp The timestamp when the upgrade was proposed, zero if there are no active proposals
 /// @param currentProposalId The serial number of proposed upgrades, increments when proposing a new one
@@ -33,7 +35,8 @@ struct UpgradeStorage {
 }
 
 /// @dev The log passed from L2
-/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
+/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for
+/// the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
 /// This field is required formally but does not have any special meaning.
 /// @param txNumberInBatch The L2 transaction number in the batch, in which the log was sent
@@ -84,11 +87,13 @@ struct AppStorage {
     mapping(address => bool) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
     IVerifier verifier;
-    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch (batch 0 is genesis)
+    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
+    /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;
     /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
     uint256 totalBatchesVerified;
-    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed batch
+    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
+    /// batch
     uint256 totalBatchesCommitted;
     /// @dev Stored hashed StoredBatch for batch number
     mapping(uint256 => bytes32) storedBatchHashes;
@@ -131,6 +136,7 @@ struct AppStorage {
     uint256 protocolVersion;
     /// @dev Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @dev Batch number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
+    /// @dev Batch number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened
+    /// yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
 }

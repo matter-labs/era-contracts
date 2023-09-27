@@ -35,11 +35,7 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @param _caller The caller address, who is granted access
     /// @param _target The address of the smart contract which is called
     /// @param _functionSig The function signature (selector), access to which need to check
-    function canCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool) {
+    function canCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool) {
         AccessMode accessMode = getAccessMode[_target];
         return
             accessMode == AccessMode.Public ||
@@ -56,7 +52,8 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @notice Set many permission modes to call the target contracts
     /// @dev Analogous to function `setAccessMode` but performs a batch of changes
     /// @param _targets The array of smart contract addresses, of which access to the call is to be changed
-    /// @param _accessModes The array of new permission modes, whether no one, any or only some addresses can call the target contract
+    /// @param _accessModes The array of new permission modes, whether no one, any or only some addresses can call the
+    /// target contract
     function setBatchAccessMode(address[] calldata _targets, AccessMode[] calldata _accessModes) external onlyOwner {
         uint256 targetsLength = _targets.length;
         require(targetsLength == _accessModes.length, "yg"); // The size of arrays should be equal
@@ -80,7 +77,8 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @param _callers The array of caller addresses, who are granted access
     /// @param _targets The array of smart contract addresses, of which access to the call are to be changed
     /// @param _functionSigs The array of function signatures (selectors), access to which need to be changed
-    /// @param _enables The array of boolean flags, whether enable or disable the function access to the corresponding target address
+    /// @param _enables The array of boolean flags, whether enable or disable the function access to the corresponding
+    /// target address
     function setBatchPermissionToCall(
         address[] calldata _callers,
         address[] calldata _targets,
@@ -114,12 +112,7 @@ contract AllowList is IAllowList, Ownable2Step {
     }
 
     /// @dev Changes permission to call and emits the event if the permission was changed
-    function _setPermissionToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig,
-        bool _enable
-    ) internal {
+    function _setPermissionToCall(address _caller, address _target, bytes4 _functionSig, bool _enable) internal {
         bool currentPermission = hasSpecialAccessToCall[_caller][_target][_functionSig];
 
         if (currentPermission != _enable) {
@@ -132,11 +125,7 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @param _l1Token The address of L1 token
     /// @param _depositLimitation deposit limitation is active or not
     /// @param _depositCap The maximum amount that can be deposited.
-    function setDepositLimit(
-        address _l1Token,
-        bool _depositLimitation,
-        uint256 _depositCap
-    ) external onlyOwner {
+    function setDepositLimit(address _l1Token, bool _depositLimitation, uint256 _depositCap) external onlyOwner {
         tokenDeposit[_l1Token].depositLimitation = _depositLimitation;
         tokenDeposit[_l1Token].depositCap = _depositCap;
     }
