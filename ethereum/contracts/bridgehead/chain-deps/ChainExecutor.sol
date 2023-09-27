@@ -21,13 +21,9 @@ contract ChainExecutor is IChainExecutor, ChainBase {
     function executeBlocks() external override nonReentrant {}
 
     /// @return concatHash , Returns the concatenated Hash of operations from the priority queue
-    function collectOperationsFromPriorityQueue(uint256 _nPriorityOps)
-        external
-        override
-        nonReentrant
-        onlyProofChain
-        returns (bytes32 concatHash)
-    {
+    function collectOperationsFromPriorityQueue(
+        uint256 _nPriorityOps
+    ) external override nonReentrant onlyProofChain returns (bytes32 concatHash) {
         concatHash = EMPTY_STRING_KECCAK;
         require(_nPriorityOps <= chainStorage.priorityQueue.getSize(), "g1");
 

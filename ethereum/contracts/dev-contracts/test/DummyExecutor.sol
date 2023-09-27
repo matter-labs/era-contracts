@@ -52,9 +52,10 @@ contract DummyExecutor is IProofExecutor {
         shouldRevertOnExecuteBlocks = _shouldRevert;
     }
 
-    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external
-    {
+    function commitBlocks(
+        StoredBlockInfo calldata _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) external {
         require(!shouldRevertOnCommitBlocks, "DummyExecutor: shouldRevertOnCommitBlocks");
         require(
             _lastCommittedBlockData.blockNumber == getTotalBlocksCommitted,

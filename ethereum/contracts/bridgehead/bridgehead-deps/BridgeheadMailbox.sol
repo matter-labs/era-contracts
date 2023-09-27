@@ -113,11 +113,7 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
 
     /// @notice Transfer ether from the contract to the receiver
     /// @dev Reverts only if the transfer call failed
-    function withdrawFunds(
-        uint256 _chainId,
-        address _to,
-        uint256 _amount
-    ) external onlyChainContract(_chainId) {
+    function withdrawFunds(uint256 _chainId, address _to, uint256 _amount) external onlyChainContract(_chainId) {
         bool callSuccess;
         // Low-level assembly call, to avoid any memory copying (save gas)
         assembly {

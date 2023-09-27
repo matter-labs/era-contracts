@@ -35,11 +35,10 @@ contract DiamondCutFacet is ProofChainBase, IProofDiamondCut {
     /// - With security council approvals instantly
     /// @dev Only the current governor can propose an upgrade
     /// @param _diamondCut The diamond cut parameters will be executed with the upgrade
-    function proposeTransparentUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint40 _proposalId)
-        external
-        onlyGovernor
-        noUpgradeProposed
-    {
+    function proposeTransparentUpgrade(
+        Diamond.DiamondCutData calldata _diamondCut,
+        uint40 _proposalId
+    ) external onlyGovernor noUpgradeProposed {
         // Set the default value for proposal salt, since the proposal is fully transparent it doesn't change anything
         bytes32 proposalSalt;
         uint40 expectedProposalId = chainStorage.upgrades.currentProposalId + 1;

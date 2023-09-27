@@ -161,11 +161,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @notice Updates the bootloader hash and the hash of the default account
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    function _setBaseSystemContracts(
-        uint256 _chainId,
-        bytes32 _bootloaderHash,
-        bytes32 _defaultAccountHash
-    ) internal {
+    function _setBaseSystemContracts(uint256 _chainId, bytes32 _bootloaderHash, bytes32 _defaultAccountHash) internal {
         _setL2BootloaderBytecodeHash(_chainId, _bootloaderHash);
         _setL2DefaultAccountBytecodeHash(_chainId, _defaultAccountHash);
     }

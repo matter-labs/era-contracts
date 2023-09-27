@@ -126,7 +126,6 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
     l2Address = address(uint160(l1Address) + offset);
   }
 }
-
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
@@ -286,7 +285,6 @@ struct Deposit {
   bool depositLimitation;
   uint256 depositCap;
 }
-
 ```
 
 Currently, the limit is used only for blocking deposits of the specific token (turning on the limitation and setting the

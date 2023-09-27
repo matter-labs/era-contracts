@@ -101,7 +101,10 @@ contract ExecutorFacet is ProofChainBase, IProofExecutor {
     }
 
     /// @dev Check that L2 logs are proper and block contain all meta information for them
-    function _processL2Logs(CommitBlockInfo calldata _newBlock, bytes32 _expectedSystemContractUpgradeTxHash)
+    function _processL2Logs(
+        CommitBlockInfo calldata _newBlock,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    )
         internal
         pure
         returns (
@@ -174,12 +177,10 @@ contract ExecutorFacet is ProofChainBase, IProofExecutor {
     /// @notice 1. Checks timestamp.
     /// @notice 2. Process L2 logs.
     /// @notice 3. Store block commitments.
-    function commitBlocks(StoredBlockInfo memory _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external
-        override
-        nonReentrant
-        onlyValidator
-    {
+    function commitBlocks(
+        StoredBlockInfo memory _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) external override nonReentrant onlyValidator {
         // Check that we commit blocks after last committed block
         require(
             chainStorage.storedBlockHashes[chainStorage.totalBlocksCommitted] ==

@@ -59,8 +59,10 @@ interface IProofExecutor is IProofChainBase {
         uint256[] serializedProof;
     }
 
-    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external;
+    function commitBlocks(
+        StoredBlockInfo calldata _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) external;
 
     function proveBlocks(
         StoredBlockInfo calldata _prevBlock,

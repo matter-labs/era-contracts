@@ -87,7 +87,8 @@
     "upgrade-system": "ts-node upgrade-system/index.ts"
   },
   "dependencies": {
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "solhint-plugin-prettier": "^0.0.5"
   },
   "optionalDependencies": {
     "zksync-web3": "^0.14.3"

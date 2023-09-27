@@ -1,5 +1,4 @@
 ---
-
 name: Scripts-Related Bug Report
 about: Use this template for reporting script-related bugs. For contract-related bugs, see our security policy.
 title: ''
@@ -7,9 +6,7 @@ labels: bug
 assignees: ''
 ---
 
-
 ### 🐛 Script Bug Report
-
 
 #### 📝 Description
 

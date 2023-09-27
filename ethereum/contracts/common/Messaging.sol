@@ -11,9 +11,10 @@ enum TxStatus {
 }
 
 /// @dev The log passed from L2
-/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
+/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter
+/// All other values are not used but are reserved for the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
-/// This field is required formally but does not have any special meaning.
+/// This field is required formally but does not have any special meaning
 /// @param txNumberInBlock The L2 transaction number in a block, in which the log was sent
 /// @param sender The L2 address which sent the log
 /// @param key The 32 bytes of information that was sent in the log
@@ -65,18 +66,30 @@ struct WritePriorityOpParams {
 }
 
 /// @dev Structure that includes all fields of the L2 transaction
-/// @dev The hash of this structure is the "canonical L2 transaction hash" and can be used as a unique identifier of a tx
-/// @param txType The tx type number, depending on which the L2 transaction can be interpreted differently
-/// @param from The sender's address. `uint256` type for possible address format changes and maintaining backward compatibility
-/// @param to The recipient's address. `uint256` type for possible address format changes and maintaining backward compatibility
-/// @param gasLimit The L2 gas limit for L2 transaction. Analog to the `gasLimit` on an L1 transactions
-/// @param gasPerPubdataByteLimit Maximum number of L2 gas that will cost one byte of pubdata (every piece of data that will be stored on L1 as calldata)
-/// @param maxFeePerGas The absolute maximum sender willing to pay per unit of L2 gas to get the transaction included in a block. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
-/// @param maxPriorityFeePerGas The additional fee that is paid directly to the validator to incentivize them to include the transaction in a block. Analog to the EIP-1559 `maxPriorityFeePerGas` on an L1 transactions
-/// @param paymaster The address of the EIP-4337 paymaster, that will pay fees for the transaction. `uint256` type for possible address format changes and maintaining backward compatibility
-/// @param nonce The nonce of the transaction. For L1->L2 transactions it is the priority operation Id.
+/// @dev The hash of this structure is the "canonical L2 transaction hash" and can
+/// be used as a unique identifier of a tx
+/// @param txType The tx type number, depending on which the L2 transaction can be
+/// interpreted differently
+/// @param from The sender's address. `uint256` type for possible address format changes
+/// and maintaining backward compatibility
+/// @param to The recipient's address. `uint256` type for possible address format changes
+/// and maintaining backward compatibility
+/// @param gasLimit The L2 gas limit for L2 transaction. Analog to the `gasLimit` on an
+/// L1 transactions
+/// @param gasPerPubdataByteLimit Maximum number of L2 gas that will cost one byte of pubdata
+/// (every piece of data that will be stored on L1 as calldata)
+/// @param maxFeePerGas The absolute maximum sender willing to pay per unit of L2 gas to get
+/// the transaction included in a block. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
+/// @param maxPriorityFeePerGas The additional fee that is paid directly to the validator
+/// to incentivize them to include the transaction in a block. Analog to the EIP-1559
+/// `maxPriorityFeePerGas` on an L1 transactions
+/// @param paymaster The address of the EIP-4337 paymaster, that will pay fees for the
+/// transaction. `uint256` type for possible address format changes and maintaining backward compatibility
+/// @param nonce The nonce of the transaction. For L1->L2 transactions it is the priority
+/// operation Id
 /// @param value The value to pass with the transaction
-/// @param reserved The fixed-length fields for usage in a future extension of transaction formats
+/// @param reserved The fixed-length fields for usage in a future extension of transaction
+/// formats
 /// @param data The calldata that is transmitted for the transaction call
 /// @param signature An abstract set of bytes that are used for transaction authorization
 /// @param factoryDeps The set of L2 bytecode hashes whose preimages were shown on L1
@@ -97,16 +110,16 @@ struct L2CanonicalTransaction {
     // new fields to the struct. The `txData` struct
     // is to be passed to account and any changes to its structure
     // would mean a breaking change to these accounts. To prevent this,
-    // we should keep some fields as "reserved".
+    // we should keep some fields as "reserved"
     // It is also recommended that their length is fixed, since
     // it would allow easier proof integration (in case we will need
-    // some special circuit for preprocessing transactions).
+    // some special circuit for preprocessing transactions)
     uint256[4] reserved;
     bytes data;
     bytes signature;
     uint256[] factoryDeps;
     bytes paymasterInput;
     // Reserved dynamic type for the future use-case. Using it should be avoided,
-    // But it is still here, just in case we want to enable some additional functionality.
+    // But it is still here, just in case we want to enable some additional functionality
     bytes reservedDynamic;
 }

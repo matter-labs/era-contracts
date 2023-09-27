@@ -13,11 +13,7 @@ interface IBridgeheadForProof is IBridgeheadBase {
     function collectOperationsFromPriorityQueue(uint256 _chainId, uint256 _index) external returns (bytes32 concatHash);
 
     /// @notice Adding txs to the priority queue
-    function addL2Logs(
-        uint256 _chainId,
-        uint256 _index,
-        bytes32 _l2LogsRootHashes
-    ) external;
+    function addL2Logs(uint256 _chainId, uint256 _index, bytes32 _l2LogsRootHashes) external;
 
     function requestL2TransactionProof(
         uint256 _chainId,

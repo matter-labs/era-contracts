@@ -37,12 +37,7 @@ contract ValidatorTimelock is IProofExecutor, Ownable2Step {
     /// @dev The delay between committing and executing blocks.
     uint256 public executionDelay;
 
-    constructor(
-        address _initialOwner,
-        address _proofSystemContract,
-        uint256 _executionDelay,
-        address _validator
-    ) {
+    constructor(address _initialOwner, address _proofSystemContract, uint256 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
         proofSystemContract = _proofSystemContract;
         executionDelay = _executionDelay;

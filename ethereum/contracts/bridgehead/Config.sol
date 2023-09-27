@@ -6,7 +6,8 @@ pragma solidity ^0.8.13;
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
 /// @dev Bytes in raw L2 log
-/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
+/// @dev Equal to the bytes size of the tuple -
+/// (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
 uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
@@ -45,7 +46,8 @@ uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 uint256 constant PRIORITY_EXPIRATION = 0 days;
 
 /// @dev Notice period before activation preparation status of upgrade mode (in seconds)
-/// @dev NOTE: we must reserve for users enough time to send full exit operation, wait maximum time for processing this operation and withdraw funds from it.
+/// @dev NOTE: we must reserve for users enough time to send full exit operation,
+/// wait maximum time for processing this operation and withdraw funds from it.
 uint256 constant UPGRADE_NOTICE_PERIOD = $$(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : "14 days");
 
 /// @dev Timestamp - seconds since unix epoch
