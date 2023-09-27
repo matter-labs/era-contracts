@@ -19,7 +19,7 @@ contract Base is ReentrancyGuard, AllowListed {
         _;
     }
 
-    /// @notice  Checks that the message sender is an active governor or its owner
+    /// @notice Checks that the message sender is an active governor or its owner
     modifier onlyGovernorOrItsOwner() {
         address governorAddr = s.governor;
         address ownerAddr = Ownable(governorAddr).owner();

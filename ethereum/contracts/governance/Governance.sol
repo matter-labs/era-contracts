@@ -167,7 +167,7 @@ contract Governance is IGovernance, Ownable2Step {
         require(isOperationReady(id), "Operation must be ready before execution");
         // Execute operation.
         _execute(_operation.calls);
-        // Reconfirming that the operation is still ready before execution.
+        // Reconfirming that the operation is still ready after execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         require(isOperationReady(id), "Operation must be ready after execution");
         // Set operation to be done
@@ -215,7 +215,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Execute an operation's calls.
     /// @param _calls The array of calls to be executed.
     function _execute(Call[] calldata _calls) internal {
-        for (uint256 i = 0;i < _calls.length; ++i) {
+        for (uint256 i = 0; i < _calls.length; ++i) {
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (!success) {
                 // Propage an error if the call fails.
