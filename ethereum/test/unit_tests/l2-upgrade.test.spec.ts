@@ -19,12 +19,16 @@ import {
     getCallRevertReason,
     AccessMode,
     EMPTY_STRING_KECCAK,
-    genesisStoredBlockInfo,
-    StoredBlockInfo,
-    CommitBlockInfo,
+    genesisStoredBatchInfo,
+    StoredBatchInfo,
+    CommitBatchInfo,
     L2_SYSTEM_CONTEXT_ADDRESS,
     L2_BOOTLOADER_ADDRESS,
-    packBatchTimestampAndBlockTimestamp
+    createSystemLogs,
+    SYSTEM_LOG_KEYS,
+    constructL2Log,
+    L2_TO_L1_MESSENGER,
+    packBatchTimestampAndBatchTimestamp
 } from './utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, BytesLike } from 'ethers';
@@ -43,8 +47,8 @@ describe('L2 upgrade test', function () {
     let diamondProxyContract: ethers.Contract;
     let owner: ethers.Signer;
 
-    let block1Info: CommitBlockInfo;
-    let storedBlock1Info: StoredBlockInfo;
+    let batch1Info: CommitBatchInfo;
+    let storedBatch1Info: StoredBatchInfo;
 
     let verifier: string;
     let verifierParams: VerifierParams;
@@ -130,12 +134,12 @@ describe('L2 upgrade test', function () {
         await (await proxyGovernance.setValidator(await owner.getAddress(), true)).wait();
     });
 
-    it('Upgrade should work even if not all blocks are processed', async () => {
-        block1Info = await buildCommitBlockInfo(genesisStoredBlockInfo(), {
-            blockNumber: 1
+    it('Upgrade should work even if not all batches are processed', async () => {
+        batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
+            batchNumber: 1
         });
 
-        const commitReceipt = await (await proxyExecutor.commitBlocks(genesisStoredBlockInfo(), [block1Info])).wait();
+        const commitReceipt = await (await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1Info])).wait();
         const commitment = commitReceipt.events[0].args.commitment;
 
         expect(await proxyGetters.getProtocolVersion()).to.equal(0);
@@ -150,9 +154,9 @@ describe('L2 upgrade test', function () {
 
         expect(await proxyGetters.getProtocolVersion()).to.equal(1);
 
-        storedBlock1Info = getBlockStoredInfo(block1Info, commitment);
+        storedBatch1Info = getBatchStoredInfo(batch1Info, commitment);
 
-        await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBlockInfo(), [storedBlock1Info], []);
+        await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1Info], []);
     });
 
     it('Timestamp should behave correctly', async () => {
@@ -465,101 +469,169 @@ describe('L2 upgrade test', function () {
         expect(revertReason).to.equal('Previous upgrade has not been finalized');
     });
 
-    it('Should require that the next commit blocks contains an upgrade tx', async () => {
+    it('Should require that the next commit batches contains an upgrade tx', async () => {
         if (!l2UpgradeTxHash) {
             throw new Error('Can not perform this test without l2UpgradeTxHash');
         }
 
-        const block2InfoNoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2
+        const batch2InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch1Info, {
+            batchNumber: 2
         });
         const revertReason = await getCallRevertReason(
-            proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoNoUpgradeTx])
+            proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
         );
-        expect(revertReason).to.equal('bw');
+        expect(revertReason).to.equal('b8');
     });
 
     it('Should ensure any additional upgrade logs go to the priority ops hash', async () => {
         if (!l2UpgradeTxHash) {
             throw new Error('Can not perform this test without l2UpgradeTxHash');
         }
-        const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([
-            contextLog(timestamp, storedBlock1Info.blockHash),
-            bootloaderLog(l2UpgradeTxHash),
-            bootloaderLog(l2UpgradeTxHash)
-        ]);
 
-        const block2InfoNoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
-        const revertReason = await getCallRevertReason(
-            proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoNoUpgradeTx])
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
         );
-        expect(revertReason).to.equal('t');
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
+
+        const batch2InfoNoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 2
+            },
+            systemLogs
+        );
+        const revertReason = await getCallRevertReason(
+            proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
+        );
+        expect(revertReason).to.equal('kp');
     });
 
     it('Should fail to commit when upgrade tx hash does not match', async () => {
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([
-            contextLog(timestamp, storedBlock1Info.blockHash),
-            bootloaderLog('0x' + '0'.repeat(64))
-        ]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                ethers.constants.HashZero
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
         const revertReason = await getCallRevertReason(
-            proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])
+            proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])
         );
-        expect(revertReason).to.equal('bz');
+        expect(revertReason).to.equal('ut');
     });
 
     it('Should commit successfully when the upgrade tx is present', async () => {
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([contextLog(timestamp, storedBlock1Info.blockHash), bootloaderLog(l2UpgradeTxHash)]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
-        await (await proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])).wait();
+        await (await proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])).wait();
 
-        expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(2);
+        expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(2);
     });
 
-    it('Should commit successfully when block was reverted and reupgraded', async () => {
-        await (await proxyExecutor.revertBlocks(1)).wait();
+    it('Should commit successfully when batch was reverted and reupgraded', async () => {
+        await (await proxyExecutor.revertBatches(1)).wait();
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([contextLog(timestamp, storedBlock1Info.blockHash), bootloaderLog(l2UpgradeTxHash)]);
+        const systemLogs = createSystemLogs();
+        systemLogs.push(
+            constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH,
+                l2UpgradeTxHash
+            )
+        );
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
 
-        const block2InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 2,
-            timestamp,
-            l2Logs
-        });
+        const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 2,
+                timestamp
+            },
+            systemLogs
+        );
 
         const commitReceipt = await (
-            await proxyExecutor.commitBlocks(storedBlock1Info, [block2InfoTwoUpgradeTx])
+            await proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])
         ).wait();
 
-        expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(2);
+        expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(2);
         const commitment = commitReceipt.events[0].args.commitment;
-        const newBlockStoredInfo = getBlockStoredInfo(block2InfoTwoUpgradeTx, commitment);
-        await makeExecutedEqualCommitted(proxyExecutor, storedBlock1Info, [newBlockStoredInfo], []);
+        const newBatchStoredInfo = getBatchStoredInfo(batch2InfoTwoUpgradeTx, commitment);
+        await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
 
-        storedBlock1Info = newBlockStoredInfo;
+        storedBatch1Info = newBatchStoredInfo;
     });
 
     it('Should successfully commit a sequential upgrade', async () => {
-        expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(0);
+        expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
         await (
             await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
                 newProtocolVersion: 5,
@@ -568,24 +640,36 @@ describe('L2 upgrade test', function () {
         ).wait();
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+        const systemLogs = createSystemLogs();
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
 
-        const block3InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 3,
-            timestamp
-        });
+        const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 3,
+                timestamp
+            },
+            systemLogs
+        );
+
         const commitReceipt = await (
-            await proxyExecutor.commitBlocks(storedBlock1Info, [block3InfoTwoUpgradeTx])
+            await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])
         ).wait();
         const commitment = commitReceipt.events[0].args.commitment;
-        const newBlockStoredInfo = getBlockStoredInfo(block3InfoTwoUpgradeTx, commitment);
+        const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
 
-        expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(0);
+        expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
 
-        await makeExecutedEqualCommitted(proxyExecutor, storedBlock1Info, [newBlockStoredInfo], []);
+        await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
 
-        storedBlock1Info = newBlockStoredInfo;
+        storedBatch1Info = newBatchStoredInfo;
 
-        expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(0);
+        expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
     });
 
     it('Should successfully commit custom upgrade', async () => {
@@ -610,27 +694,39 @@ describe('L2 upgrade test', function () {
         });
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+        const systemLogs = createSystemLogs();
+        systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+            ethers.utils.hexlify(storedBatch1Info.batchHash)
+        );
 
-        const block3InfoTwoUpgradeTx = await buildCommitBlockInfo(storedBlock1Info, {
-            blockNumber: 4,
-            timestamp
-        });
+        const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+            storedBatch1Info,
+            {
+                batchNumber: 4,
+                timestamp
+            },
+            systemLogs
+        );
+
         const commitReceipt = await (
-            await proxyExecutor.commitBlocks(storedBlock1Info, [block3InfoTwoUpgradeTx])
+            await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])
         ).wait();
         const commitment = commitReceipt.events[0].args.commitment;
-        const newBlockStoredInfo = getBlockStoredInfo(block3InfoTwoUpgradeTx, commitment);
+        const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
 
-        await makeExecutedEqualCommitted(proxyExecutor, storedBlock1Info, [newBlockStoredInfo], []);
+        await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
 
-        storedBlock1Info = newBlockStoredInfo;
+        storedBatch1Info = newBatchStoredInfo;
 
         expect(upgradeEvents[1].name).to.equal('Test');
     });
 });
 
-type CommitBlockInfoWithTimestamp = Partial<CommitBlockInfo> & {
-    blockNumber: BigNumberish;
+type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
+    batchNumber: BigNumberish;
 };
 
 // An actual log should also contain shardId/isService and logIndex,
@@ -641,11 +737,11 @@ interface L2ToL1Log {
     value: string;
 }
 
-function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
+function contextLog(timestamp: number, prevBatchHash: BytesLike): L2ToL1Log {
     return {
         sender: L2_SYSTEM_CONTEXT_ADDRESS,
-        key: packBatchTimestampAndBlockTimestamp(timestamp, timestamp),
-        value: ethers.utils.hexlify(prevBlockHash)
+        key: packBatchTimestampAndBatchTimestamp(timestamp, timestamp),
+        value: ethers.utils.hexlify(prevBatchHash)
     };
 }
 
@@ -671,35 +767,70 @@ function encodeLogs(logs: L2ToL1Log[]) {
     return ethers.utils.hexConcat(['0x00000000', joinedLogs]);
 }
 
-async function buildCommitBlockInfo(
-    prevInfo: StoredBlockInfo,
-    info: CommitBlockInfoWithTimestamp
-): Promise<CommitBlockInfo> {
+async function buildCommitBatchInfo(
+    prevInfo: StoredBatchInfo,
+    info: CommitBatchInfoWithTimestamp
+): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+    let systemLogs = createSystemLogs();
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+        true,
+        L2_SYSTEM_CONTEXT_ADDRESS,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+        packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+    );
+
     return {
         timestamp,
         indexRepeatedStorageChanges: 0,
         newStateRoot: ethers.utils.randomBytes(32),
         numberOfLayer1Txs: 0,
-        l2LogsTreeRoot: ethers.constants.HashZero,
         priorityOperationsHash: EMPTY_STRING_KECCAK,
-        initialStorageChanges: `0x00000000`,
-        repeatedStorageChanges: `0x`,
-        l2Logs: encodeLogs([contextLog(timestamp, prevInfo.blockHash)]),
-        l2ArbitraryLengthMessages: [],
-        factoryDeps: [],
+        systemLogs: ethers.utils.hexConcat([`0x00000007`].concat(systemLogs)),
+        totalL2ToL1Pubdata: ethers.constants.HashZero,
+        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+        eventsQueueStateHash: ethers.utils.randomBytes(32),
         ...info
     };
 }
 
-function getBlockStoredInfo(commitInfo: CommitBlockInfo, commitment: string): StoredBlockInfo {
+async function buildCommitBatchInfoWithCustomLogs(
+    prevInfo: StoredBatchInfo,
+    info: CommitBatchInfoWithTimestamp,
+    systemLogs: string[]
+): Promise<CommitBatchInfo> {
+    const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+        true,
+        L2_SYSTEM_CONTEXT_ADDRESS,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+        packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+    );
+
+    const size = systemLogs.length == 7 ? `0x00000007` : `0x00000008`;
+
     return {
-        blockNumber: commitInfo.blockNumber,
-        blockHash: commitInfo.newStateRoot,
+        timestamp,
+        indexRepeatedStorageChanges: 0,
+        newStateRoot: ethers.utils.randomBytes(32),
+        numberOfLayer1Txs: 0,
+        priorityOperationsHash: EMPTY_STRING_KECCAK,
+        systemLogs: ethers.utils.hexConcat([size].concat(systemLogs)),
+        totalL2ToL1Pubdata: ethers.constants.HashZero,
+        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+        eventsQueueStateHash: ethers.utils.randomBytes(32),
+        ...info
+    };
+}
+
+function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
+    return {
+        batchNumber: commitInfo.batchNumber,
+        batchHash: commitInfo.newStateRoot,
         indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
         numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
         priorityOperationsHash: commitInfo.priorityOperationsHash,
-        l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
+        l2LogsTreeRoot: ethers.constants.HashZero,
         timestamp: commitInfo.timestamp,
         commitment: commitment
     };
@@ -870,18 +1001,18 @@ async function executeCustomTransparentUpgrade(
 
 async function makeExecutedEqualCommitted(
     proxyExecutor: ExecutorFacet,
-    prevBlockInfo: StoredBlockInfo,
-    blocksToProve: StoredBlockInfo[],
-    blocksToExecute: StoredBlockInfo[]
+    prevBatchInfo: StoredBatchInfo,
+    batchesToProve: StoredBatchInfo[],
+    batchesToExecute: StoredBatchInfo[]
 ) {
-    blocksToExecute = [...blocksToProve, ...blocksToExecute];
+    batchesToExecute = [...batchesToProve, ...batchesToExecute];
 
     await (
-        await proxyExecutor.proveBlocks(prevBlockInfo, blocksToProve, {
+        await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
             recursiveAggregationInput: [],
             serializedProof: []
         })
     ).wait();
 
-    await (await proxyExecutor.executeBlocks(blocksToExecute)).wait();
+    await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
 }

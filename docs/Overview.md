@@ -19,7 +19,8 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
 - **Governor** - a privileged address that controls the upgradability of the network and sets other privileged
   addresses.
 - **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
-- **Validator/Operator** - a privileged address that can commit/verify/execute L2 blocks.
+- **Validator/Operator** - a privileged address that can commit/verify/execute L2 batches.
+- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks, the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
 - **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
   zkSync Era network.
@@ -143,11 +144,11 @@ burn the funds on L2, allowing the user to reclaim them through the `finalizeEth
 L2 -> L1 communication, in contrast to L1 -> L2 communication, is based only on transferring the information, and not on
 the transaction execution on L1.
 
-From the L2 side, there is a special zkEVM opcode that saves `l2ToL1Log` in the L2 block. A validator will send all
-`l2ToL1Logs` when sending an L2 block to the L1 (see `ExecutorFacet`). Later on, users will be able to both read their
+From the L2 side, there is a special zkEVM opcode that saves `l2ToL1Log` in the L2 batch. A validator will send all
+`l2ToL1Logs` when sending an L2 batch to the L1 (see `ExecutorFacet`). Later on, users will be able to both read their
 `l2ToL1logs` on L1 and _prove_ that they sent it.
 
-From the L1 side, for each L2 block, a Merkle root with such logs in leaves is calculated. Thus, a user can provide
+From the L1 side, for each L2 batch, a Merkle root with such logs in leaves is calculated. Thus, a user can provide
 Merkle proof for each `l2ToL1Logs`.
 
 _NOTE_: For each executed L1 -> L2 transaction, the system program necessarily sends an L2 -> L1 log. To verify the
@@ -164,18 +165,18 @@ this trick:
 
 #### ExecutorFacet
 
-A contract that accepts L2 blocks, enforces data availability and checks the validity of zk-proofs.
+A contract that accepts L2 batches, enforces data availability and checks the validity of zk-proofs.
 
 The state transition is divided into three stages:
 
-- `commitBlocks` - check L2 block timestamp, process the L2 logs, save data for a block, and prepare data for zk-proof.
-- `proveBlocks` - validate zk-proof.
-- `executeBlocks` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
+- `commitBatches` - check L2 batch timestamp, process the L2 logs, save data for a batch, and prepare data for zk-proof.
+- `proveBatches` - validate zk-proof.
+- `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
-When a block is committed, we process L2 -> L1 logs. Here are the invariants that are expected there:
+When a batch is committed, we process L2 -> L1 logs. Here are the invariants that are expected there:
 
-- The only L2 -> L1 log from the `L2_SYSTEM_CONTEXT_ADDRESS`, with the `key == l2BlockTimestamp` and
-  `value == l2BlockHash`.
+- The only L2 -> L1 log from the `L2_SYSTEM_CONTEXT_ADDRESS`, with the `key == l2BatchTimestamp` and
+  `value == l2BatchHash`.
 - Several (or none) logs from the `L2_KNOWN_CODE_STORAGE_ADDRESS` with the `key == bytecodeHash`, where bytecode is
   marked as a known factory dependency.
 - Several (or none) logs from the `L2_BOOTLOADER_ADDRESS` with the `key == canonicalTxHash` where `canonicalTxHash` is a
@@ -230,7 +231,7 @@ the L1 recipient.
 #### ValidatorTimelock
 
 An intermediate smart contract between the validator EOA account and the zkSync smart contract. Its primary purpose is
-to provide a trustless means of delaying block execution without modifying the main zkSync contract. zkSync actively
+to provide a trustless means of delaying batch execution without modifying the main zkSync contract. zkSync actively
 monitors the chain activity and reacts to any suspicious activity by freezing the chain. This allows time for
 investigation and mitigation before resuming normal operations.
 

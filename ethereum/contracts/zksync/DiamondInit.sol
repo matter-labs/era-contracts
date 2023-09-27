@@ -18,9 +18,9 @@ contract DiamondInit is Base {
     /// @notice zkSync contract initialization
     /// @param _verifier address of Verifier contract
     /// @param _governor address who can manage the contract
-    /// @param _genesisBlockHash Block hash of the genesis (initial) block
-    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis block
-    /// @param _genesisBlockCommitment The zk-proof commitment for the genesis block
+    /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
+    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
+    /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
     /// @param _allowList The address of the allow list smart contract
     /// @param _verifierParams Verifier config parameters that describes the circuit to be verified
     /// @param _zkPorterIsAvailable The availability of zk porter shard
@@ -32,9 +32,9 @@ contract DiamondInit is Base {
     function initialize(
         IVerifier _verifier,
         address _governor,
-        bytes32 _genesisBlockHash,
+        bytes32 _genesisBatchHash,
         uint64 _genesisIndexRepeatedStorageChanges,
-        bytes32 _genesisBlockCommitment,
+        bytes32 _genesisBatchCommitment,
         IAllowList _allowList,
         VerifierParams calldata _verifierParams,
         bool _zkPorterIsAvailable,
@@ -48,25 +48,29 @@ contract DiamondInit is Base {
         s.verifier = _verifier;
         s.governor = _governor;
 
-        // We need to initialize the state hash because it is used in the commitment of the next block
-        IExecutor.StoredBlockInfo memory storedBlockZero = IExecutor.StoredBlockInfo(
+        // We need to initialize the state hash because it is used in the commitment of the next batch
+        IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(
             0,
-            _genesisBlockHash,
+            _genesisBatchHash,
             _genesisIndexRepeatedStorageChanges,
             0,
             EMPTY_STRING_KECCAK,
             DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             0,
-            _genesisBlockCommitment
+            _genesisBatchCommitment
         );
 
-        s.storedBlockHashes[0] = keccak256(abi.encode(storedBlockZero));
+        s.storedBatchHashes[0] = keccak256(abi.encode(storedBatchZero));
         s.allowList = _allowList;
         s.verifierParams = _verifierParams;
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
         s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
+
+        // While this does not provide a protection in the production, it is needed for local testing
+        // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
+        assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

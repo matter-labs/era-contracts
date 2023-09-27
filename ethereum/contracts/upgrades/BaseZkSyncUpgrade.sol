@@ -63,9 +63,9 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice The main function that will be provided by the upgrade proxy
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
-        // Note that due to commitment delay, the timestamp of the L2 upgrade block may be earlier than the timestamp
+        // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occured. This means that using timestamp as a signifier of "upgraded"
-        // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade blocks will be reduced
+        // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
     }
@@ -107,9 +107,9 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
     function _setVerifier(IVerifier _newVerifier) private {
-        // An upgrade to the verifier must be done carefully to ensure there aren't blocks in the committed state
-        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed blocks.
-        // Blocks committed expecting the old verifier will fail. Ensure all commited blocks are finalized before the
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all commited batches are finalized before the
         // verifier is upgraded.
         if (_newVerifier == IVerifier(address(0))) {
             return;
@@ -152,7 +152,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         _setL2DefaultAccountBytecodeHash(_defaultAccountHash);
     }
 
-    /// @notice Sets the hash of the L2 system contract upgrade transaction for the next block to be committed
+    /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
     /// @dev If the transaction is noop (i.e. its type is 0) it does nothing and returns 0.
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
@@ -219,8 +219,8 @@ abstract contract BaseZkSyncUpgrade is Base {
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            s.l2SystemContractsUpgradeBlockNumber == 0,
-            "The block number of the previous upgrade has not been cleaned"
+            s.l2SystemContractsUpgradeBatchNumber == 0,
+            "The batch number of the previous upgrade has not been cleaned"
         );
 
         s.protocolVersion = _newProtocolVersion;

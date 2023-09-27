@@ -163,7 +163,7 @@ describe(`L1ERC20Bridge tests`, function () {
         expect(revertReason).equal(`nt`);
     });
 
-    it(`Should revert on finalizing a withdrawal with wrong block number`, async () => {
+    it(`Should revert on finalizing a withdrawal with wrong batch number`, async () => {
         const functionSignature = `0x11a2ccc1`;
         const l1Receiver = await randomSigner.getAddress();
         const l2ToL1message = ethers.utils.hexConcat([
@@ -190,7 +190,7 @@ describe(`L1ERC20Bridge tests`, function () {
         const revertReason = await getCallRevertReason(
             l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
         );
-        expect(revertReason).equal(`rz`);
+        expect(revertReason).equal(`xc`);
     });
 
     it(`Should revert on finalizing a withdrawal with wrong proof`, async () => {

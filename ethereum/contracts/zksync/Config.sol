@@ -6,15 +6,12 @@ pragma solidity ^0.8.13;
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
 /// @dev Bytes in raw L2 log
-/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender,
+/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBatch, address sender,
 /// bytes32 key, bytes32 value)
 uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
 uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
-
-/// @dev L2 -> L1 logs Merkle tree height
-uint256 constant L2_TO_L1_LOG_MERKLE_TREE_HEIGHT = 9;
 
 /// @dev The value of default leaf hash for L2 -> L1 logs Merkle tree
 /// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
@@ -71,7 +68,7 @@ uint256 constant INPUT_MASK = $$(~uint256(0) >> 8);
 uint256 constant L2_TX_MAX_GAS_LIMIT = $(L2_TX_MAX_GAS_LIMIT);
 
 /// @dev The maximum number of the pubdata an L2 operation should be allowed to use.
-uint256 constant MAX_PUBDATA_PER_BLOCK = $(MAX_PUBDATA_PER_BLOCK);
+uint256 constant MAX_PUBDATA_PER_BATCH = $(MAX_PUBDATA_PER_BATCH);
 
 /// @dev The maximum number of the pubdata an priority operation should be allowed to use.
 /// For now, it is somewhat lower than the maximum number of pubdata allowed for an L2 transaction,
@@ -85,17 +82,17 @@ uint256 constant FAIR_L2_GAS_PRICE = $(FAIR_L2_GAS_PRICE);
 /// value.
 uint256 constant L1_GAS_PER_PUBDATA_BYTE = $(L1_GAS_PER_PUBDATA_BYTE);
 
-/// @dev The computational overhead of processing an L2 block.
-uint256 constant BLOCK_OVERHEAD_L2_GAS = $(BLOCK_OVERHEAD_L2_GAS);
+/// @dev The computational overhead of processing an L2 batch.
+uint256 constant BATCH_OVERHEAD_L2_GAS = $(BATCH_OVERHEAD_L2_GAS);
 
 /// @dev The overhead in L1 gas of interacting with the L1
-uint256 constant BLOCK_OVERHEAD_L1_GAS = $(BLOCK_OVERHEAD_L1_GAS);
+uint256 constant BATCH_OVERHEAD_L1_GAS = $(BATCH_OVERHEAD_L1_GAS);
 
 /// @dev The equivalent in L1 pubdata of L1 gas used for working with L1
-uint256 constant BLOCK_OVERHEAD_PUBDATA = BLOCK_OVERHEAD_L1_GAS / L1_GAS_PER_PUBDATA_BYTE;
+uint256 constant BATCH_OVERHEAD_PUBDATA = BATCH_OVERHEAD_L1_GAS / L1_GAS_PER_PUBDATA_BYTE;
 
-/// @dev The maximum number of transactions in L2 block:
-uint256 constant MAX_TRANSACTIONS_IN_BLOCK = $(MAX_TRANSACTIONS_IN_BLOCK);
+/// @dev The maximum number of transactions in L2 batch:
+uint256 constant MAX_TRANSACTIONS_IN_BATCH = $(MAX_TRANSACTIONS_IN_BATCH);
 
 /// @dev The size of the bootloader memory dedicated to the encodings of transactions
 uint256 constant BOOTLOADER_TX_ENCODING_SPACE = $(BOOTLOADER_TX_ENCODING_SPACE);
