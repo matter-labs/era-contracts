@@ -172,7 +172,7 @@ describe(`Executor tests`, function () {
 
     describe(`Commiting functionality`, async function () {
         before(async () => {
-            currentTimestamp = (await hardhat.ethers.providers.getDefaultProvider().getBlock(`latest`)).timestamp;
+            currentTimestamp = (await owner.provider.getBlock(`latest`)).timestamp;
             newCommitBlockInfo = {
                 blockNumber: 1,
                 timestamp: currentTimestamp,

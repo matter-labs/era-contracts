@@ -1,7 +1,6 @@
-name: CI
+name: Node license check
 
-on:
-  - pull_request
+on: pull_request
 
 env:
   ALLOWED_LICENSES: >
@@ -49,7 +48,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16.15.1'
+          node-version: 18
 
       - name: Install yarn
         run: npm install -g yarn license-checker
