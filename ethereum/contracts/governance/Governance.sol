@@ -19,7 +19,7 @@ import {IGovernance} from "./IGovernance.sol";
 /// with the security council’s permission.
 contract Governance is IGovernance, Ownable2Step {
     /// @notice A constant representing the timestamp for completed operations.
-    uint256 internal constant _DONE_TIMESTAMP = uint256(1);
+    uint256 internal constant EXECUTED_PROPOSAL_TIMESTAMP = uint256(1);
 
     /// @notice The address of the security council.
     /// @dev It is supposed to be multisig contract.
@@ -27,7 +27,7 @@ contract Governance is IGovernance, Ownable2Step {
 
     /// @notice A mapping to store timestamps where each operation will be ready for execution.
     /// @dev - 0 means the operation is not created.
-    /// @dev - 1 (_DONE_TIMESTAMP) means the operation is already executed.
+    /// @dev - 1 (EXECUTED_PROPOSAL_TIMESTAMP) means the operation is already executed.
     /// @dev - any other value means timestamp in seconds when the operation will be ready for execution.
     mapping(bytes32 => uint256) public timestamps;
 
@@ -104,7 +104,7 @@ contract Governance is IGovernance, Ownable2Step {
         uint256 timestamp = timestamps[_id];
         if (timestamp == 0) {
             return OperationState.Unset;
-        } else if (timestamp == _DONE_TIMESTAMP) {
+        } else if (timestamp == EXECUTED_PROPOSAL_TIMESTAMP) {
             return OperationState.Done;
         } else if (timestamp > block.timestamp) {
             return OperationState.Waiting;
@@ -171,7 +171,7 @@ contract Governance is IGovernance, Ownable2Step {
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         require(isOperationReady(id), "Operation must be ready after execution");
         // Set operation to be done
-        timestamps[id] = _DONE_TIMESTAMP;
+        timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
     }
 
     /// @notice Executes the scheduled operation with the security council instantly.
@@ -189,7 +189,7 @@ contract Governance is IGovernance, Ownable2Step {
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
         require(isOperationPending(id), "Operation must be pending after execution");
         // Set operation to be done
-        timestamps[id] = _DONE_TIMESTAMP;
+        timestamps[id] = EXECUTED_PROPOSAL_TIMESTAMP;
     }
 
     /// @dev Returns the identifier of an operation.

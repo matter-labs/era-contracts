@@ -80,6 +80,7 @@ contract GovernanceFacet is Base, IGovernance {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyGovernor {
         Diamond.diamondCut(_diamondCut);
+        emit ExecuteUpgrade(_diamondCut);
     }
 
     /*//////////////////////////////////////////////////////////////
