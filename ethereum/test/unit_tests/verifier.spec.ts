@@ -203,7 +203,7 @@ describe('Verifier test', function () {
 
     it('Should return correct Verification key hash', async () => {
         const vksHash = await verifier.verificationKeyHash();
-        expect(vksHash).equal('0x8a50c24dacf7e4d0e8cccb618261cbc775f7b8a2a1e5e794510b10ff42a49323');
+        expect(vksHash).equal('0x1400ce39763501f086ab7210ec2f020c0188cad25757ef756a7ba31fa62b1842');
     });
 });
 
@@ -425,6 +425,6 @@ describe('Verifier with recursive part test', function () {
 
     it('Should return correct Verification key hash', async () => {
         const vksHash = await verifier.verificationKeyHash();
-        expect(vksHash).equal('0x8a50c24dacf7e4d0e8cccb618261cbc775f7b8a2a1e5e794510b10ff42a49323');
+        expect(vksHash).equal('0x941b4da215420ba6a39c1c94ada871e89749bd84fdeedd079acb3f0d0e1b2acd');
     });
 });
