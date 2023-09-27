@@ -8,6 +8,7 @@ import {IGovernance} from "./IGovernance.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @dev Contract design is inspired by OpenZeppelin TimelockController and in-house Diamond Proxy upgrade mechanism.
 /// @notice This contract manages operations (calls with preconditions) for governance tasks.
 /// The contract allows for operations to be scheduled, executed, and canceled with 
 /// appropriate permissions and delays. It is used for managing and coordinating upgrades 
