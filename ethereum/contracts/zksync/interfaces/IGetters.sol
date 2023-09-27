@@ -17,11 +17,11 @@ interface IGetters is IBase {
 
     function getPendingGovernor() external view returns (address);
 
-    function getTotalBlocksCommitted() external view returns (uint256);
+    function getTotalBatchesCommitted() external view returns (uint256);
 
-    function getTotalBlocksVerified() external view returns (uint256);
+    function getTotalBatchesVerified() external view returns (uint256);
 
-    function getTotalBlocksExecuted() external view returns (uint256);
+    function getTotalBatchesExecuted() external view returns (uint256);
 
     function getTotalPriorityTxs() external view returns (uint256);
 
@@ -33,9 +33,9 @@ interface IGetters is IBase {
 
     function isValidator(address _address) external view returns (bool);
 
-    function l2LogsRootHash(uint256 _blockNumber) external view returns (bytes32 hash);
+    function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32 hash);
 
-    function storedBlockHash(uint256 _blockNumber) external view returns (bytes32);
+    function storedBatchHash(uint256 _batchNumber) external view returns (bytes32);
 
     function getL2BootloaderBytecodeHash() external view returns (bytes32);
 
@@ -59,7 +59,7 @@ interface IGetters is IBase {
 
     function getL2SystemContractsUpgradeTxHash() external view returns (bytes32);
 
-    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256);
+    function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
 
     function isApprovedBySecurityCouncil() external view returns (bool);
 
@@ -67,7 +67,7 @@ interface IGetters is IBase {
 
     function getAllowList() external view returns (address);
 
-    function isEthWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool);
+    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE

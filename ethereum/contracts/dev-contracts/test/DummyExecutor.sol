@@ -5,19 +5,20 @@ pragma solidity ^0.8.13;
 import "../../zksync/interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
-/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
+/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing
+/// purposes.
 contract DummyExecutor is IExecutor {
     address owner;
 
-    // Flags to control if the contract should revert during commit, prove, and execute blocks operations
-    bool shouldRevertOnCommitBlocks;
-    bool shouldRevertOnProveBlocks;
-    bool shouldRevertOnExecuteBlocks;
+    // Flags to control if the contract should revert during commit, prove, and execute batch operations
+    bool shouldRevertOnCommitBatches;
+    bool shouldRevertOnProveBatches;
+    bool shouldRevertOnExecuteBatches;
 
-    // Counters to track the total number of committed, verified, and executed blocks
-    uint256 public getTotalBlocksCommitted;
-    uint256 public getTotalBlocksVerified;
-    uint256 public getTotalBlocksExecuted;
+    // Counters to track the total number of committed, verified, and executed batches
+    uint256 public getTotalBatchesCommitted;
+    uint256 public getTotalBatchesVerified;
+    uint256 public getTotalBatchesExecuted;
     string public constant override getName = "DummyExecutor";
 
     /// @notice Constructor sets the contract owner to the message sender
@@ -31,83 +32,84 @@ contract DummyExecutor is IExecutor {
         _;
     }
 
-    /// @notice Allows the owner to set whether the contract should revert during commit blocks operation
-    function setShouldRevertOnCommitBlocks(bool _shouldRevert) external onlyOwner {
-        shouldRevertOnCommitBlocks = _shouldRevert;
+    /// @notice Allows the owner to set whether the contract should revert during commit batches operation
+    function setShouldRevertOnCommitBatches(bool _shouldRevert) external onlyOwner {
+        shouldRevertOnCommitBatches = _shouldRevert;
     }
 
-    /// @notice Allows the owner to set whether the contract should revert during prove blocks operation
-    function setShouldRevertOnProveBlocks(bool _shouldRevert) external onlyOwner {
-        shouldRevertOnProveBlocks = _shouldRevert;
+    /// @notice Allows the owner to set whether the contract should revert during prove batches operation
+    function setShouldRevertOnProveBatches(bool _shouldRevert) external onlyOwner {
+        shouldRevertOnProveBatches = _shouldRevert;
     }
 
-    /// @notice Allows the owner to set whether the contract should revert during execute blocks operation
-    function setShouldRevertOnExecuteBlocks(bool _shouldRevert) external onlyOwner {
-        shouldRevertOnExecuteBlocks = _shouldRevert;
+    /// @notice Allows the owner to set whether the contract should revert during execute batches operation
+    function setShouldRevertOnExecuteBatches(bool _shouldRevert) external onlyOwner {
+        shouldRevertOnExecuteBatches = _shouldRevert;
     }
 
-    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external
-    {
-        require(!shouldRevertOnCommitBlocks, "DummyExecutor: shouldRevertOnCommitBlocks");
+    function commitBatches(
+        StoredBatchInfo calldata _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external {
+        require(!shouldRevertOnCommitBatches, "DummyExecutor: shouldRevertOnCommitBatches");
         require(
-            _lastCommittedBlockData.blockNumber == getTotalBlocksCommitted,
-            "DummyExecutor: Invalid last committed block number"
+            _lastCommittedBatchData.batchNumber == getTotalBatchesCommitted,
+            "DummyExecutor: Invalid last committed batch number"
         );
 
-        uint256 blocksLength = _newBlocksData.length;
-        for (uint256 i = 0; i < blocksLength; ++i) {
-            require(getTotalBlocksCommitted + i + 1 == _newBlocksData[i].blockNumber);
+        uint256 batchesLength = _newBatchesData.length;
+        for (uint256 i = 0; i < batchesLength; ++i) {
+            require(getTotalBatchesCommitted + i + 1 == _newBatchesData[i].batchNumber);
         }
 
-        getTotalBlocksCommitted += blocksLength;
+        getTotalBatchesCommitted += batchesLength;
     }
 
-    function proveBlocks(
-        StoredBlockInfo calldata _prevBlock,
-        StoredBlockInfo[] calldata _committedBlocks,
+    function proveBatches(
+        StoredBatchInfo calldata _prevBatch,
+        StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata
     ) external {
-        require(!shouldRevertOnProveBlocks, "DummyExecutor: shouldRevertOnProveBlocks");
-        require(_prevBlock.blockNumber == getTotalBlocksVerified, "DummyExecutor: Invalid previous block number");
+        require(!shouldRevertOnProveBatches, "DummyExecutor: shouldRevertOnProveBatches");
+        require(_prevBatch.batchNumber == getTotalBatchesVerified, "DummyExecutor: Invalid previous batch number");
 
-        require(_committedBlocks.length == 1, "DummyExecutor: Can prove only one block");
+        require(_committedBatches.length == 1, "DummyExecutor: Can prove only one batch");
         require(
-            _committedBlocks[0].blockNumber == _prevBlock.blockNumber + 1,
-            "DummyExecutor: Can't prove block out of order"
+            _committedBatches[0].batchNumber == _prevBatch.batchNumber + 1,
+            "DummyExecutor: Can't prove batch out of order"
         );
 
-        getTotalBlocksVerified += 1;
+        getTotalBatchesVerified += 1;
         require(
-            getTotalBlocksVerified <= getTotalBlocksCommitted,
-            "DummyExecutor: prove more blocks than were committed"
-        );
-    }
-
-    function executeBlocks(StoredBlockInfo[] calldata _blocksData) external {
-        require(!shouldRevertOnExecuteBlocks, "DummyExecutor: shouldRevertOnExecuteBlocks");
-        uint256 nBlocks = _blocksData.length;
-        for (uint256 i = 0; i < nBlocks; ++i) {
-            require(_blocksData[i].blockNumber == getTotalBlocksExecuted + i + 1);
-        }
-        getTotalBlocksExecuted += nBlocks;
-        require(
-            getTotalBlocksExecuted <= getTotalBlocksVerified,
-            "DummyExecutor: Can't execute blocks more than committed and proven currently"
+            getTotalBatchesVerified <= getTotalBatchesCommitted,
+            "DummyExecutor: prove more batches than were committed"
         );
     }
 
-    function revertBlocks(uint256 _newLastBlock) external {
-        require(
-            getTotalBlocksCommitted > _newLastBlock,
-            "DummyExecutor: The last committed block is less than new last block"
-        );
-        uint256 newTotalBlocksCommitted = _maxU256(_newLastBlock, getTotalBlocksExecuted);
-
-        if (newTotalBlocksCommitted < getTotalBlocksVerified) {
-            getTotalBlocksVerified = newTotalBlocksCommitted;
+    function executeBatches(StoredBatchInfo[] calldata _batchesData) external {
+        require(!shouldRevertOnExecuteBatches, "DummyExecutor: shouldRevertOnExecuteBatches");
+        uint256 nBatches = _batchesData.length;
+        for (uint256 i = 0; i < nBatches; ++i) {
+            require(_batchesData[i].batchNumber == getTotalBatchesExecuted + i + 1);
         }
-        getTotalBlocksCommitted = newTotalBlocksCommitted;
+        getTotalBatchesExecuted += nBatches;
+        require(
+            getTotalBatchesExecuted <= getTotalBatchesVerified,
+            "DummyExecutor: Can't execute batches more than committed and proven currently"
+        );
+    }
+
+    function revertBatches(uint256 _newLastBatch) external {
+        require(
+            getTotalBatchesCommitted > _newLastBatch,
+            "DummyExecutor: The last committed batch is less than new last batch"
+        );
+        uint256 newTotalBatchesCommitted = _maxU256(_newLastBatch, getTotalBatchesExecuted);
+
+        if (newTotalBatchesCommitted < getTotalBatchesVerified) {
+            getTotalBatchesVerified = newTotalBatchesCommitted;
+        }
+        getTotalBatchesCommitted = newTotalBatchesCommitted;
     }
 
     /// @notice Returns larger of two values

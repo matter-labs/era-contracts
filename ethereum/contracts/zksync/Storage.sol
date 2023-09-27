@@ -16,10 +16,12 @@ enum UpgradeState {
     Shadow
 }
 
-/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy upgrades and diamond cuts
+/// @dev Logically separated part of the storage structure, which is responsible for everything related to proxy
+/// upgrades and diamond cuts
 /// @param proposedUpgradeHash The hash of the current upgrade proposal, zero if there is no active proposal
 /// @param state Indicates whether an upgrade is initiated and if yes what type
-/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis multisig)
+/// @param securityCouncil Address which has the permission to approve instant upgrades (expected to be a Gnosis
+/// multisig)
 /// @param approvedBySecurityCouncil Indicates whether the security council has approved the upgrade
 /// @param proposedUpgradeTimestamp The timestamp when the upgrade was proposed, zero if there are no active proposals
 /// @param currentProposalId The serial number of proposed upgrades, increments when proposing a new one
@@ -33,10 +35,11 @@ struct UpgradeStorage {
 }
 
 /// @dev The log passed from L2
-/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
+/// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for
+/// the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
 /// This field is required formally but does not have any special meaning.
-/// @param txNumberInBlock The L2 transaction number in a block, in which the log was sent
+/// @param txNumberInBatch The L2 transaction number in the batch, in which the log was sent
 /// @param sender The L2 address which sent the log
 /// @param key The 32 bytes of information that was sent in the log
 /// @param value The 32 bytes of information that was sent in the log
@@ -44,7 +47,7 @@ struct UpgradeStorage {
 struct L2Log {
     uint8 l2ShardId;
     bool isService;
-    uint16 txNumberInBlock;
+    uint16 txNumberInBatch;
     address sender;
     bytes32 key;
     bytes32 value;
@@ -52,11 +55,11 @@ struct L2Log {
 
 /// @dev An arbitrary length message passed from L2
 /// @notice Under the hood it is `L2Log` sent from the special system L2 contract
-/// @param txNumberInBlock The L2 transaction number in a block, in which the message was sent
+/// @param txNumberInBatch The L2 transaction number in the batch, in which the message was sent
 /// @param sender The address of the L2 account from which the message was passed
 /// @param data An arbitrary length message
 struct L2Message {
-    uint16 txNumberInBlock;
+    uint16 txNumberInBatch;
     address sender;
     bytes data;
 }
@@ -82,16 +85,18 @@ struct AppStorage {
     address pendingGovernor;
     /// @notice List of permitted validators
     mapping(address => bool) validators;
-    /// @dev Verifier contract. Used to verify aggregated proof for blocks
+    /// @dev Verifier contract. Used to verify aggregated proof for batches
     IVerifier verifier;
-    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
-    uint256 totalBlocksExecuted;
-    /// @notice Total number of proved blocks i.e. blocks[totalBlocksProved] points at the latest proved block
-    uint256 totalBlocksVerified;
-    /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
-    uint256 totalBlocksCommitted;
-    /// @dev Stored hashed StoredBlock for block number
-    mapping(uint256 => bytes32) storedBlockHashes;
+    /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
+    /// (batch 0 is genesis)
+    uint256 totalBatchesExecuted;
+    /// @notice Total number of proved batches i.e. batches[totalBatchesProved] points at the latest proved batch
+    uint256 totalBatchesVerified;
+    /// @notice Total number of committed batches i.e. batches[totalBatchesCommitted] points at the latest committed
+    /// batch
+    uint256 totalBatchesCommitted;
+    /// @dev Stored hashed StoredBatch for batch number
+    mapping(uint256 => bytes32) storedBatchHashes;
     /// @dev Stored root hashes of L2 -> L1 logs
     mapping(uint256 => bytes32) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
@@ -111,11 +116,11 @@ struct AppStorage {
     bool zkPorterIsAvailable;
     /// @dev The maximum number of the L2 gas that a user can request for L1 -> L2 transactions
     /// @dev This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e.
-    /// without overhead for proving the block.
+    /// without overhead for proving the batch.
     uint256 priorityTxMaxGasLimit;
     /// @dev Storage of variables needed for upgrade facet
     UpgradeStorage upgrades;
-    /// @dev A mapping L2 block number => message number => flag.
+    /// @dev A mapping L2 batch number => message number => flag.
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
     /// @dev Used to indicate that eth withdrawal was already processed
@@ -131,6 +136,7 @@ struct AppStorage {
     uint256 protocolVersion;
     /// @dev Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
     bytes32 l2SystemContractsUpgradeTxHash;
-    /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
-    uint256 l2SystemContractsUpgradeBlockNumber;
+    /// @dev Batch number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened
+    /// yet.
+    uint256 l2SystemContractsUpgradeBatchNumber;
 }

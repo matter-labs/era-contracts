@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Smart contract for sending arbitrary length messages to L1
  * @dev by default ZkSync can send fixed-length messages on L1.
  * A fixed length message has 4 parameters `senderAddress` `isService`, `key`, `value`,
@@ -21,6 +22,11 @@ interface IL2Messenger {
     function sendToL1(bytes memory _message) external returns (bytes32);
 }
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to deploy contracts on L2.
+ */
 interface IContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.
     /// @param bytecodeHash The bytecode hash to put on an address.
@@ -51,6 +57,11 @@ interface IContractDeployer {
     ) external;
 }
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to simulate ETH on L2.
+ */
 interface IEthToken {
     /// @notice Allows the withdrawal of ETH to a given L1 receiver along with an additional message.
     /// @param _l1Receiver The address on L1 to receive the withdrawn ETH.
@@ -70,6 +81,7 @@ IEthToken constant L2_ETH_ADDRESS = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Helper library for working with L2 contracts on L1.
  */
 library L2ContractHelper {

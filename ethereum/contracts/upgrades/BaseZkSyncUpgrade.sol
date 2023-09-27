@@ -9,6 +9,8 @@ import "../common/libraries/L2ContractHelper.sol";
 import "../zksync/libraries/TransactionValidator.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS} from "../zksync/Config.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is Base {
     /// @notice The struct that represents the upgrade proposal.
@@ -18,10 +20,13 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
     /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
     /// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
-    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently in each upgrade. Usually empty.
-    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each upgrade. Usually empty.
+    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
+    /// in each upgrade. Usually empty.
+    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
+    /// upgrade. Usually empty.
     /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than the previous protocol version.
+    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
+    /// the previous protocol version.
     /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
     struct ProposedUpgrade {
         IMailbox.L2CanonicalTransaction l2ProtocolUpgradeTx;
@@ -60,9 +65,9 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice The main function that will be provided by the upgrade proxy
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
-        // Note that due to commitment delay, the timestamp of the L2 upgrade block may be earlier than the timestamp
+        // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occured. This means that using timestamp as a signifier of "upgraded"
-        // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade blocks will be reduced
+        // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
     }
@@ -104,9 +109,9 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
     function _setVerifier(IVerifier _newVerifier) private {
-        // An upgrade to the verifier must be done carefully to ensure there aren't blocks in the committed state
-        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed blocks.
-        // Blocks committed expecting the old verifier will fail. Ensure all commited blocks are finalized before the
+        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier will fail. Ensure all commited batches are finalized before the
         // verifier is upgraded.
         if (_newVerifier == IVerifier(address(0))) {
             return;
@@ -149,7 +154,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         _setL2DefaultAccountBytecodeHash(_defaultAccountHash);
     }
 
-    /// @notice Sets the hash of the L2 system contract upgrade transaction for the next block to be committed
+    /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
     /// @dev If the transaction is noop (i.e. its type is 0) it does nothing and returns 0.
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
@@ -216,8 +221,8 @@ abstract contract BaseZkSyncUpgrade is Base {
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            s.l2SystemContractsUpgradeBlockNumber == 0,
-            "The block number of the previous upgrade has not been cleaned"
+            s.l2SystemContractsUpgradeBatchNumber == 0,
+            "The batch number of the previous upgrade has not been cleaned"
         );
 
         s.protocolVersion = _newProtocolVersion;

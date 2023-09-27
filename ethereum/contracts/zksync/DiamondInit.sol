@@ -2,13 +2,17 @@
 
 pragma solidity ^0.8.13;
 
-import "../common/interfaces/IAllowList.sol";
-import "./interfaces/IExecutor.sol";
-import "./libraries/Diamond.sol";
-import "./facets/Base.sol";
-import "./Config.sol";
+import {IAllowList} from "../common/interfaces/IAllowList.sol";
+import {IVerifier} from "./interfaces/IVerifier.sol";
+import {IExecutor} from "./interfaces/IExecutor.sol";
+import {Diamond} from "./libraries/Diamond.sol";
+import {Base} from "./facets/Base.sol";
+import {Verifier} from "./Verifier.sol";
+import {VerifierParams} from "./Storage.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is Base {
@@ -18,22 +22,23 @@ contract DiamondInit is Base {
     /// @notice zkSync contract initialization
     /// @param _verifier address of Verifier contract
     /// @param _governor address who can manage the contract
-    /// @param _genesisBlockHash Block hash of the genesis (initial) block
-    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis block
-    /// @param _genesisBlockCommitment The zk-proof commitment for the genesis block
+    /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
+    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
+    /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
     /// @param _allowList The address of the allow list smart contract
     /// @param _verifierParams Verifier config parameters that describes the circuit to be verified
     /// @param _zkPorterIsAvailable The availability of zk porter shard
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
     /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy initializer
+    /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
+    /// initializer
     function initialize(
         IVerifier _verifier,
         address _governor,
-        bytes32 _genesisBlockHash,
+        bytes32 _genesisBatchHash,
         uint64 _genesisIndexRepeatedStorageChanges,
-        bytes32 _genesisBlockCommitment,
+        bytes32 _genesisBatchCommitment,
         IAllowList _allowList,
         VerifierParams calldata _verifierParams,
         bool _zkPorterIsAvailable,
@@ -43,23 +48,24 @@ contract DiamondInit is Base {
     ) external reentrancyGuardInitializer returns (bytes32) {
         require(address(_verifier) != address(0), "vt");
         require(_governor != address(0), "vy");
+        require(_priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
         s.verifier = _verifier;
         s.governor = _governor;
 
-        // We need to initialize the state hash because it is used in the commitment of the next block
-        IExecutor.StoredBlockInfo memory storedBlockZero = IExecutor.StoredBlockInfo(
+        // We need to initialize the state hash because it is used in the commitment of the next batch
+        IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(
             0,
-            _genesisBlockHash,
+            _genesisBatchHash,
             _genesisIndexRepeatedStorageChanges,
             0,
             EMPTY_STRING_KECCAK,
             DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             0,
-            _genesisBlockCommitment
+            _genesisBatchCommitment
         );
 
-        s.storedBlockHashes[0] = keccak256(abi.encode(storedBlockZero));
+        s.storedBatchHashes[0] = keccak256(abi.encode(storedBatchZero));
         s.allowList = _allowList;
         s.verifierParams = _verifierParams;
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
