@@ -773,10 +773,10 @@ async function buildCommitBatchInfo(
 ): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
     let systemLogs = createSystemLogs();
-    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
         true,
         L2_SYSTEM_CONTEXT_ADDRESS,
-        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
         packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
     );
 
@@ -800,10 +800,10 @@ async function buildCommitBatchInfoWithCustomLogs(
     systemLogs: string[]
 ): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
         true,
         L2_SYSTEM_CONTEXT_ADDRESS,
-        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
         packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
     );
 

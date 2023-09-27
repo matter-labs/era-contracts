@@ -36,7 +36,7 @@ describe(`Executor tests`, function () {
     let executor: ExecutorFacet;
     let getters: GettersFacet;
     let mailbox: MailboxFacet;
-    let newCommitedBatchBatchHash: any;
+    let newCommitedBatchHash: any;
     let newCommitedBatchCommitment: any;
     let currentTimestamp: number;
     let newCommitBatchInfo: any;
@@ -206,10 +206,10 @@ describe(`Executor tests`, function () {
         it(`Should revert on committing with wrong new batch timestamp`, async () => {
             const wrongNewBatchTimestamp = ethers.utils.hexValue(ethers.utils.randomBytes(32)); // correct value is 0
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 wrongNewBatchTimestamp.toString()
             );
 
@@ -225,10 +225,10 @@ describe(`Executor tests`, function () {
         it(`Should revert on committing with too small new batch timestamp`, async () => {
             const wrongNewBatchTimestamp = 1; // too small
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 ethers.utils.hexlify(
                     packBatchTimestampAndBatchTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
                 )
@@ -247,10 +247,10 @@ describe(`Executor tests`, function () {
         it(`Should revert on committing with too big last L2 block timestamp`, async () => {
             const wrongNewBatchTimestamp = `0xffffffff`; // too big
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
             );
 
@@ -285,7 +285,7 @@ describe(`Executor tests`, function () {
 
         it(`Should revert on committing without processing system context log`, async () => {
             var wrongL2Logs = createSystemLogs();
-            delete wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY];
+            delete wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY];
 
             const wrongNewCommitBatchInfo = Object.assign({}, newCommitBatchInfo);
             wrongNewCommitBatchInfo.systemLogs = ethers.utils.hexConcat([`0x00000006`].concat(wrongL2Logs));
@@ -302,7 +302,7 @@ describe(`Executor tests`, function () {
                 constructL2Log(
                     true,
                     L2_SYSTEM_CONTEXT_ADDRESS,
-                    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                     ethers.constants.HashZero
                 )
             );
@@ -320,10 +320,10 @@ describe(`Executor tests`, function () {
             // We do not expect to receive an L2->L1 log from zero address
             const unexpectedAddress = ethers.constants.AddressZero;
             var wrongL2Logs = createSystemLogs();
-            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            wrongL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 unexpectedAddress,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 ethers.constants.HashZero
             );
 
@@ -430,10 +430,10 @@ describe(`Executor tests`, function () {
 
         it(`Should successfully commit a batch`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 
@@ -446,7 +446,7 @@ describe(`Executor tests`, function () {
 
             const result = await commitTx.wait();
 
-            newCommitedBatchBatchHash = result.events[0].args.batchHash;
+            newCommitedBatchHash = result.events[0].args.batchHash;
             newCommitedBatchCommitment = result.events[0].args.commitment;
 
             expect(await getters.getTotalBatchesCommitted()).equal(1);
@@ -473,7 +473,7 @@ describe(`Executor tests`, function () {
 
             newStoredBatchInfo = {
                 batchNumber: 1,
-                batchHash: newCommitedBatchBatchHash,
+                batchHash: newCommitedBatchHash,
                 indexRepeatedStorageChanges: 0,
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: EMPTY_STRING_KECCAK,
@@ -516,10 +516,10 @@ describe(`Executor tests`, function () {
 
         it(`Should prove successfuly`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 
@@ -584,10 +584,10 @@ describe(`Executor tests`, function () {
             );
 
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
             correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
@@ -640,10 +640,10 @@ describe(`Executor tests`, function () {
             );
 
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
             correctL2Logs[SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY] = constructL2Log(
@@ -721,10 +721,10 @@ describe(`Executor tests`, function () {
 
         it(`Should execute a batch successfully`, async () => {
             var correctL2Logs = createSystemLogs();
-            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY] = constructL2Log(
+            correctL2Logs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+                SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
                 packBatchTimestampAndBatchTimestamp(currentTimestamp, currentTimestamp)
             );
 

@@ -16,7 +16,7 @@ export enum SYSTEM_LOG_KEYS {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
     TOTAL_L2_TO_L1_PUBDATA_KEY,
     STATE_DIFF_HASH_KEY,
-    PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
@@ -114,7 +114,7 @@ export function createSystemLogs() {
         constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_TIMESTAMP_KEY,
+            SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
             ethers.constants.HashZero
         ),
         constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),

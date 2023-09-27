@@ -139,7 +139,7 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 stateDiffHash = logValue;
-            } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_TIMESTAMP_KEY)) {
+            } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
                 packedBatchAndL2BlockTimestamp = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
