@@ -17,7 +17,7 @@ export enum SYSTEM_LOG_KEYS {
     TOTAL_L2_TO_L1_PUBDATA_KEY,
     STATE_DIFF_HASH_KEY,
     PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    PREV_BLOCK_HASH_KEY,
+    PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
@@ -29,7 +29,7 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA =
 
 /// Set of parameters that are needed to test the processing of priority operations
 export class DummyOp {
-    constructor(public id: number, public expirationBlock: BigNumber, public layer2Tip: number) {}
+    constructor(public id: number, public expirationBatch: BigNumber, public layer2Tip: number) {}
 }
 
 export enum AccessMode {
@@ -117,7 +117,7 @@ export function createSystemLogs() {
             SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
             ethers.constants.HashZero
         ),
-        constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BLOCK_HASH_KEY, ethers.constants.HashZero),
+        constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),
         constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY, EMPTY_STRING_KECCAK),
         constructL2Log(
             true,
@@ -128,10 +128,10 @@ export function createSystemLogs() {
     ];
 }
 
-export function genesisStoredBlockInfo(): StoredBlockInfo {
+export function genesisStoredBatchInfo(): StoredBatchInfo {
     return {
-        blockNumber: 0,
-        blockHash: ethers.constants.HashZero,
+        batchNumber: 0,
+        batchHash: ethers.constants.HashZero,
         indexRepeatedStorageChanges: 0,
         numberOfLayer1Txs: 0,
         priorityOperationsHash: EMPTY_STRING_KECCAK,
@@ -141,19 +141,19 @@ export function genesisStoredBlockInfo(): StoredBlockInfo {
     };
 }
 
-// Packs the batch timestamp and block timestamp and returns the 32-byte hex string
+// Packs the batch timestamp and L2 block timestamp and returns the 32-byte hex string
 // which should be used for the "key" field of the L2->L1 system context log.
-export function packBatchTimestampAndBlockTimestamp(
+export function packBatchTimestampAndBatchTimestamp(
     batchTimestamp: BigNumberish,
-    blockTimestamp: BigNumberish
+    l2BlockTimestamp: BigNumberish
 ): string {
-    const packedNum = BigNumber.from(batchTimestamp).shl(128).or(BigNumber.from(blockTimestamp));
+    const packedNum = BigNumber.from(batchTimestamp).shl(128).or(BigNumber.from(l2BlockTimestamp));
     return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
 
-export interface StoredBlockInfo {
-    blockNumber: BigNumberish;
-    blockHash: BytesLike;
+export interface StoredBatchInfo {
+    batchNumber: BigNumberish;
+    batchHash: BytesLike;
     indexRepeatedStorageChanges: BigNumberish;
     numberOfLayer1Txs: BigNumberish;
     priorityOperationsHash: BytesLike;
@@ -162,8 +162,8 @@ export interface StoredBlockInfo {
     commitment: BytesLike;
 }
 
-export interface CommitBlockInfo {
-    blockNumber: BigNumberish;
+export interface CommitBatchInfo {
+    batchNumber: BigNumberish;
     timestamp: number;
     indexRepeatedStorageChanges: BigNumberish;
     newStateRoot: BytesLike;

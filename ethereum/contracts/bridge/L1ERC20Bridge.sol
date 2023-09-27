@@ -33,7 +33,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IZkSync internal immutable zkSync;
 
-    /// @dev A mapping L2 block number => message number => flag
+    /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
     mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
 
@@ -244,24 +244,24 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _depositSender The address of the deposit initiator
     /// @param _l1Token The address of the deposited L1 ERC20 token
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
-    /// @param _l2BlockNumber The L2 block number where the deposit finalization was processed
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     function claimFailedDeposit(
         address _depositSender,
         address _l1Token,
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
         bool proofValid = zkSync.proveL1ToL2TransactionStatus(
             _l2TxHash,
-            _l2BlockNumber,
+            _l2BatchNumber,
             _l2MessageIndex,
-            _l2TxNumberInBlock,
+            _l2TxNumberInBatch,
             _merkleProof,
             TxStatus.Failure
         );
@@ -281,22 +281,22 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the withdrawal was processed
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "pw");
+        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
 
         L2Message memory l2ToL1Message = L2Message({
-            txNumberInBlock: _l2TxNumberInBlock,
+            txNumberInBatch: _l2TxNumberInBatch,
             sender: l2Bridge,
             data: _message
         });
@@ -304,11 +304,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(l2ToL1Message.data);
         // Preventing the stack too deep error
         {
-            bool success = zkSync.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
+            bool success = zkSync.proveL2MessageInclusion(_l2BatchNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
             require(success, "nq");
         }
 
-        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
         // Withdraw funds
         IERC20(l1Token).safeTransfer(l1Receiver, amount);
 

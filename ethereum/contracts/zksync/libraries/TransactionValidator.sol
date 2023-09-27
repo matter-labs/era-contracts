@@ -100,9 +100,9 @@ library TransactionValidator {
         return costForComputation + costForPubdata;
     }
 
-    /// @notice Based on the full L2 gas limit (that includes the block overhead) and other
+    /// @notice Based on the full L2 gas limit (that includes the batch overhead) and other
     /// properties of the transaction, returns the l2GasLimit for the body of the transaction (the actual execution).
-    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the block
+    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the batch
     /// and the L2 gas needed to process the transaction itself (i.e. the actual l2GasLimit that will be used for the transaction).
     /// @param _gasPricePerPubdata The L2 gas price for each byte of pubdata.
     /// @param _encodingLength The length of the ABI-encoding of the transaction.
@@ -121,11 +121,11 @@ library TransactionValidator {
     }
 
     /// @notice Based on the total L2 gas limit and several other parameters of the transaction
-    /// returns the part of the L2 gas that will be spent on the block's overhead.
+    /// returns the part of the L2 gas that will be spent on the batch's overhead.
     /// @dev The details of how this function works can be checked in the documentation
     /// of the fee model of zkSync. The appropriate comments are also present
     /// in the Rust implementation description of function `get_maximal_allowed_overhead`.
-    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the block
+    /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the batch
     /// and the L2 gas needed to process the transaction itself (i.e. the actual gasLimit that will be used for the transaction).
     /// @param _gasPricePerPubdata The maximum amount of L2 gas that the operator may charge the user for a single byte of pubdata.
     /// @param _encodingLength The length of the binary encoding of the transaction in bytes
@@ -133,36 +133,36 @@ library TransactionValidator {
         uint256 _totalGasLimit,
         uint256 _gasPricePerPubdata,
         uint256 _encodingLength
-    ) internal pure returns (uint256 blockOverheadForTransaction) {
-        uint256 blockOverheadGas = BLOCK_OVERHEAD_L2_GAS + BLOCK_OVERHEAD_PUBDATA * _gasPricePerPubdata;
+    ) internal pure returns (uint256 batchOverheadForTransaction) {
+        uint256 batchOverheadGas = BATCH_OVERHEAD_L2_GAS + BATCH_OVERHEAD_PUBDATA * _gasPricePerPubdata;
 
         // The overhead from taking up the transaction's slot
-        uint256 txSlotOverhead = Math.ceilDiv(blockOverheadGas, MAX_TRANSACTIONS_IN_BLOCK);
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, txSlotOverhead);
+        uint256 txSlotOverhead = Math.ceilDiv(batchOverheadGas, MAX_TRANSACTIONS_IN_BATCH);
+        batchOverheadForTransaction = Math.max(batchOverheadForTransaction, txSlotOverhead);
 
         // The overhead for occupying the bootloader memory can be derived from encoded_len
-        uint256 overheadForLength = Math.ceilDiv(_encodingLength * blockOverheadGas, BOOTLOADER_TX_ENCODING_SPACE);
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForLength);
+        uint256 overheadForLength = Math.ceilDiv(_encodingLength * batchOverheadGas, BOOTLOADER_TX_ENCODING_SPACE);
+        batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForLength);
 
         // The overhead for possible published public data
         // TODO: possibly charge a separate fee for possible pubdata spending
         // uint256 overheadForPublicData;
         // {
-        //     uint256 numerator = (blockOverheadGas * _totalGasLimit + _gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK);
-        //     uint256 denominator = (_gasPricePerPubdata * MAX_PUBDATA_PER_BLOCK + blockOverheadGas);
+        //     uint256 numerator = (batchOverheadGas * _totalGasLimit + _gasPricePerPubdata * MAX_PUBDATA_PER_BATCH);
+        //     uint256 denominator = (_gasPricePerPubdata * MAX_PUBDATA_PER_BATCH + batchOverheadGas);
 
         //     overheadForPublicData = (numerator - 1) / denominator;
         // }
-        // blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForPublicData);
+        // batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForPublicData);
 
         // The overhead for ergs that could be used to use single-instance circuits
         uint256 overheadForGas;
         {
-            uint256 numerator = blockOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;
-            uint256 denominator = L2_TX_MAX_GAS_LIMIT + blockOverheadGas;
+            uint256 numerator = batchOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;
+            uint256 denominator = L2_TX_MAX_GAS_LIMIT + batchOverheadGas;
 
             overheadForGas = (numerator - 1) / denominator;
         }
-        blockOverheadForTransaction = Math.max(blockOverheadForTransaction, overheadForGas);
+        batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForGas);
     }
 }
