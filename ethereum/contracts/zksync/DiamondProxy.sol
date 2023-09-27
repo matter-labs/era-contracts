@@ -6,6 +6,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract DiamondProxy {
     constructor(uint256 _chainId, Diamond.DiamondCutData memory _diamondCut) {
         // Check that the contract is deployed on the expected chain.

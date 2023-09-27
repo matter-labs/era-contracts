@@ -9,6 +9,7 @@ import "./Base.sol";
 
 /// @title Governance Contract controls access rights for contract management.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract GovernanceFacet is Base, IGovernance {
     string public constant override getName = "GovernanceFacet";
 

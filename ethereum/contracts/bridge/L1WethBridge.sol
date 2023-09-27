@@ -21,6 +21,7 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev This contract is designed to streamline and enhance the user experience
 /// for bridging WETH tokens between L1 and L2 networks. The primary goal of this bridge is to
 /// simplify the process by minimizing the number of transactions required, thus improving

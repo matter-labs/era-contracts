@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 library Merkle {
     using UncheckedMath for uint256;
 

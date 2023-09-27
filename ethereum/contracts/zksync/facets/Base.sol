@@ -8,6 +8,7 @@ import "../../common/AllowListed.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract Base is ReentrancyGuard, AllowListed {
     AppStorage internal s;
 

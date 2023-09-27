@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "./interfaces/IExecutor.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
 /// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main

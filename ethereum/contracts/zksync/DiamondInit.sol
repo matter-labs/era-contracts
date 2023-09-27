@@ -12,6 +12,7 @@ import {VerifierParams} from "./Storage.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is Base {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Helper library for working with L2 contracts on L1.
  */
 library L2ContractHelper {

@@ -9,6 +9,8 @@ import "../common/libraries/L2ContractHelper.sol";
 import "../zksync/libraries/TransactionValidator.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS} from "../zksync/Config.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is Base {
     /// @notice The struct that represents the upgrade proposal.

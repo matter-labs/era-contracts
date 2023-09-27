@@ -33,6 +33,7 @@ import {
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is Base, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;

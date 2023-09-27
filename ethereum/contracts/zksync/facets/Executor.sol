@@ -14,6 +14,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is Base, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
