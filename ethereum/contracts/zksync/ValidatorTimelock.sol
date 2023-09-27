@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "./libraries/LibMap.sol";
 import "./interfaces/IExecutor.sol";
 
 /// @author Matter Labs
@@ -15,6 +16,8 @@ import "./interfaces/IExecutor.sol";
 /// timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
 contract ValidatorTimelock is IExecutor, Ownable2Step {
+    using LibMap for LibMap.Uint32Map;
+
     /// @dev Part of the IBase interface. Not used in this contract.
     string public constant override getName = "ValidatorTimelock";
 
@@ -27,19 +30,19 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The main zkSync smart contract.
     address public immutable zkSyncContract;
 
-    /// @dev The mapping of L2 batch number => timestamp when it was commited.
-    mapping(uint256 => uint256) public committedBatchTimestamp;
+    /// @dev The mapping of L2 batch number => timestamp when it was committed.
+    LibMap.Uint32Map committedBatchTimestamp;
 
     /// @dev The address that can commit/revert/validate/execute batches.
     address public validator;
 
     /// @dev The delay between committing and executing batches.
-    uint256 public executionDelay;
+    uint32 public executionDelay;
 
     constructor(
         address _initialOwner,
         address _zkSyncContract,
-        uint256 _executionDelay,
+        uint32 _executionDelay,
         address _validator
     ) {
         _transferOwnership(_initialOwner);
@@ -56,7 +59,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Set the delay between committing and executing batches.
-    function setExecutionDelay(uint256 _executionDelay) external onlyOwner {
+    function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
         executionDelay = _executionDelay;
         emit NewExecutionDelay(_executionDelay);
     }
@@ -67,14 +70,24 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _;
     }
 
+    /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
+    function getCommittedBatchTimestamp(uint256 _l2BatchNumber) external view returns (uint256) {
+        return committedBatchTimestamp.get(_l2BatchNumber);
+    }
+
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkSync contract with the same calldata.
     function commitBatches(StoredBatchInfo calldata, CommitBatchInfo[] calldata _newBatchesData)
         external
         onlyValidator
     {
-        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-            committedBatchTimestamp[_newBatchesData[i].batchNumber] = block.timestamp;
+        unchecked {
+            // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
+            // It is safe to cast.
+            uint32 timestamp = uint32(block.timestamp);
+            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
+                committedBatchTimestamp.set(_newBatchesData[i].batchNumber, timestamp);
+            }
         }
 
         _propagateToZkSync();
@@ -101,15 +114,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkSync contract with the same calldata.
     function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator {
-        for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-            uint256 commitBatchTimestamp = committedBatchTimestamp[_newBatchesData[i].batchNumber];
-
-            // Note: if the `commitBatchTimestamp` is zero, that means either:
-            // * The batch was committed, but not though this contract.
-            // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
-            // We allow executing such batches.
-
-            require(block.timestamp > commitBatchTimestamp + executionDelay, "5c"); // The delay is not passed
+        uint256 delay = executionDelay; // uint32
+        unchecked {
+            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
+                uint256 commitBlockTimestamp = committedBatchTimestamp.get(_newBatchesData[i].batchNumber);
+                
+                // Note: if the `commitBlockTimestamp` is zero, that means either:
+                // * The block was committed, but not through this contract.
+                // * The block wasn't committed at all, so execution will fail in the zkSync contract.
+                // We allow executing such blocks.
+                require(block.timestamp >= commitBlockTimestamp + delay, "5c"); // The delay is not passed
+            }
         }
 
         _propagateToZkSync();
