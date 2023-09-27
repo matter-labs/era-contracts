@@ -110,7 +110,7 @@ contract ExecutorFacet is Base, IExecutor {
         )
     {
         // Copy L2 to L1 logs into memory.
-        bytes memory emittedL2Logs = _newBlock.systemLogs[4:];
+        bytes memory emittedL2Logs = _newBlock.systemLogs;
 
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
