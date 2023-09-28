@@ -4,12 +4,11 @@ pragma solidity ^0.8.17;
 // solhint-disable max-line-length
 
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {DiamondCutFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/DiamondCut.sol";
+import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 
@@ -18,22 +17,24 @@ import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/lib
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
     DiamondInit private diamondInit;
-    DiamondCutFacet private diamondCutFacet;
-    DiamondCutFacet private proxyAsDiamondCut;
+    AdminFacet private adminFacet;
+    AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
     address private governor;
     address private randomSigner;
 
-    function getDiamondCutSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](8);
-        dcSelectors[0] = diamondCutFacet.proposeTransparentUpgrade.selector;
-        dcSelectors[1] = diamondCutFacet.proposeShadowUpgrade.selector;
-        dcSelectors[2] = diamondCutFacet.cancelUpgradeProposal.selector;
-        dcSelectors[3] = diamondCutFacet.securityCouncilUpgradeApprove.selector;
-        dcSelectors[4] = diamondCutFacet.executeUpgrade.selector;
-        dcSelectors[5] = diamondCutFacet.freezeDiamond.selector;
-        dcSelectors[6] = diamondCutFacet.unfreezeDiamond.selector;
-        dcSelectors[7] = diamondCutFacet.upgradeProposalHash.selector;
+    function getAdminSelectors() private view returns (bytes4[] memory) {
+        bytes4[] memory dcSelectors = new bytes4[](10);
+        dcSelectors[0] = adminFacet.setPendingGovernor.selector;
+        dcSelectors[1] = adminFacet.acceptGovernor.selector;
+        dcSelectors[2] = adminFacet.setPendingAdmin.selector;
+        dcSelectors[3] = adminFacet.acceptAdmin.selector;
+        dcSelectors[4] = adminFacet.setValidator.selector;
+        dcSelectors[5] = adminFacet.setPorterAvailability.selector;
+        dcSelectors[6] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        dcSelectors[7] = adminFacet.executeUpgrade.selector;
+        dcSelectors[8] = adminFacet.freezeDiamond.selector;
+        dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
         return dcSelectors;
     }
 
@@ -43,15 +44,15 @@ contract UpgradeLogicTest is DiamondCutTest {
 
         diamondCutTestContract = new DiamondCutTestContract();
         diamondInit = new DiamondInit();
-        diamondCutFacet = new DiamondCutFacet();
+        adminFacet = new AdminFacet();
         gettersFacet = new GettersFacet();
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(diamondCutFacet),
+            facet: address(adminFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getDiamondCutSelectors()
+            selectors: getAdminSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -89,7 +90,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         });
 
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
-        proxyAsDiamondCut = DiamondCutFacet(address(diamondProxy));
+        proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));
     }
 
@@ -97,30 +98,26 @@ contract UpgradeLogicTest is DiamondCutTest {
         vm.startPrank(randomSigner);
 
         vm.expectRevert(abi.encodePacked("1g"));
-        proxyAsDiamondCut.freezeDiamond();
+        proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_DoubleFreezingByGovernor() public {
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.freezeDiamond();
+        proxyAsAdmin.freezeDiamond();
 
         vm.expectRevert(abi.encodePacked("a9"));
-        proxyAsDiamondCut.freezeDiamond();
+        proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
         vm.startPrank(governor);
 
         vm.expectRevert(abi.encodePacked("a7"));
-        proxyAsDiamondCut.unfreezeDiamond();
+        proxyAsAdmin.unfreezeDiamond();
     }
 
-    function test_RevertWhen_ExecutingUnapprovedProposalWHenDiamondStorageIsFrozen() public {
-        vm.startPrank(governor);
-
-        proxyAsDiamondCut.freezeDiamond();
-
+    function test_ExecuteDiamondCut() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -135,112 +132,9 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, 1);
-
-        vm.expectRevert(abi.encodePacked("f3"));
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
-    }
-
-    function test_RevertWhen_ExecutingProposalWithDifferentInitAddress() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory proposedDiamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        Diamond.DiamondCutData memory executedDiamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(1),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(proposedDiamondCutData, nextProposalId);
-
-        vm.expectRevert(abi.encodePacked("a4"));
-        proxyAsDiamondCut.executeUpgrade(executedDiamondCutData, 0);
-    }
-
-    function test_RevertWhen_ExecutingProposalWithDifferentFacetCut() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.FacetCut[] memory invalidFacetCuts = new Diamond.FacetCut[](1);
-        invalidFacetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: false,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        Diamond.DiamondCutData memory invalidDiamondCutData = Diamond.DiamondCutData({
-            facetCuts: invalidFacetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        vm.expectRevert(abi.encodePacked("a4"));
-        proxyAsDiamondCut.executeUpgrade(invalidDiamondCutData, 0);
-    }
-
-    function test_RevertWhen_CancelingEmptyProposal() public {
-        bytes32 proposalHash = proxyAsGetters.getProposedUpgradeHash();
-
-        vm.startPrank(governor);
-
-        vm.expectRevert(abi.encodePacked("a3"));
-        proxyAsDiamondCut.cancelUpgradeProposal(proposalHash);
-    }
-
-    function test_ProposeAndExecuteDiamondCut() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
+        proxyAsAdmin.executeUpgrade(diamondCutData);
 
         bytes4[] memory gettersFacetSelectors = getGettersSelectors();
         for (uint256 i = 0; i < gettersFacetSelectors.length; i++) {
@@ -254,7 +148,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         }
     }
 
-    function test_RevertWhen_ExecutingSameProposalTwoTimes() public {
+    function test_ExecutingSameProposalTwoTimes() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(gettersFacet),
@@ -269,155 +163,9 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
         vm.startPrank(governor);
 
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
-
-        vm.expectRevert(abi.encodePacked("ab"));
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
-    }
-
-    function test_RevertWhen_ProposingAnAlreadyPropsedUpgrade() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        vm.expectRevert(abi.encodePacked("a8"));
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-    }
-
-    function test_RevertWhen_ExecutingUnapprovedShadowUpgrade() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        bytes32 executingProposalHash = proxyAsDiamondCut.upgradeProposalHash(diamondCutData, nextProposalId, 0);
-
-        proxyAsDiamondCut.proposeShadowUpgrade(executingProposalHash, nextProposalId);
-
-        vm.expectRevert(abi.encodePacked("av"));
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, 0);
-    }
-
-    function test_RevertWhen_ProposingShadowUpgradeWithWrongProposalId() public {
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        bytes32 porposalHash = Utils.randomBytes32("porposalHash");
-
-        vm.expectRevert(abi.encodePacked("ya"));
-        proxyAsDiamondCut.proposeShadowUpgrade(porposalHash, nextProposalId + 1);
-    }
-
-    function test_RevertWhen_ProposingTransparentUpgradeWithWrongProposalId() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 currentProposalId = uint40(proxyAsGetters.getCurrentProposalId());
-
-        vm.startPrank(governor);
-
-        vm.expectRevert(abi.encodePacked("yb"));
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, currentProposalId);
-    }
-
-    function test_RevertWhen_CancellingUpgradeProposalWithWrongHash() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        bytes32 proposedUpgradeHash = Utils.randomBytes32("proposedUpgradeHash");
-
-        vm.expectRevert(abi.encodePacked("rx"));
-        proxyAsDiamondCut.cancelUpgradeProposal(proposedUpgradeHash);
-    }
-
-    function test_RevertWhen_ExecutingTransparentUpgradeWithNonZeroSalt() public {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Replace,
-            isFreezable: true,
-            selectors: getGettersSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        uint40 nextProposalId = uint40(proxyAsGetters.getCurrentProposalId() + 1);
-
-        vm.startPrank(governor);
-
-        proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-
-        bytes32 proposalSalt = Utils.randomBytes32("proposalSalt");
-
-        vm.expectRevert(abi.encodePacked("po"));
-        proxyAsDiamondCut.executeUpgrade(diamondCutData, proposalSalt);
+        proxyAsAdmin.executeUpgrade(diamondCutData);
+        proxyAsAdmin.executeUpgrade(diamondCutData);
     }
 }
