@@ -70,6 +70,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             diamondInit.initialize.selector,
             0x03752D8252d67f99888E741E3fB642803B29B155,
             governor,
+            governor,
             0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             0,
             0x0000000000000000000000000000000000000000000000000000000000000000,

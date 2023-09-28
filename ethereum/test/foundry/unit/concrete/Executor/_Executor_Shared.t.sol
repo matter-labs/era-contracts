@@ -124,6 +124,7 @@ contract ExecutorTest is Test {
             diamondInit.initialize.selector,
             dummyAddress, //verifier
             owner,
+            owner,
             0,
             0,
             0,
