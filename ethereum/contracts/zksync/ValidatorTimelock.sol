@@ -74,10 +74,10 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkSync contract with the same calldata.
-    function commitBatches(StoredBatchInfo calldata, CommitBatchInfo[] calldata _newBatchesData)
-        external
-        onlyValidator
-    {
+    function commitBatches(
+        StoredBatchInfo calldata,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external onlyValidator {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -115,7 +115,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp.get(_newBatchesData[i].batchNumber);
-                
+
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
                 // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
