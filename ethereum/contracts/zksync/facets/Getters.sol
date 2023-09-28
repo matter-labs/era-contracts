@@ -106,31 +106,6 @@ contract GettersFacet is Base, IGetters, ILegacyGetters {
         return s.verifierParams;
     }
 
-    /// @return The address of the security council multisig
-    function getSecurityCouncil() external view returns (address) {
-        return s.upgrades.securityCouncil;
-    }
-
-    /// @return Current upgrade proposal state
-    function getUpgradeProposalState() external view returns (UpgradeState) {
-        return s.upgrades.state;
-    }
-
-    /// @return The upgrade proposal hash if there is an active one and zero otherwise
-    function getProposedUpgradeHash() external view returns (bytes32) {
-        return s.upgrades.proposedUpgradeHash;
-    }
-
-    /// @return The timestamp when the upgrade was proposed, zero if there are no active proposals
-    function getProposedUpgradeTimestamp() external view returns (uint256) {
-        return s.upgrades.proposedUpgradeTimestamp;
-    }
-
-    /// @return The serial number of a proposed upgrade, increments when proposing a new one
-    function getCurrentProposalId() external view returns (uint256) {
-        return s.upgrades.currentProposalId;
-    }
-
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256) {
         return s.protocolVersion;
@@ -148,11 +123,6 @@ contract GettersFacet is Base, IGetters, ILegacyGetters {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
         return s.l2SystemContractsUpgradeBatchNumber;
-    }
-
-    /// @return The number of received upgrade approvals from the security council
-    function isApprovedBySecurityCouncil() external view returns (bool) {
-        return s.upgrades.approvedBySecurityCouncil;
     }
 
     /// @return Whether the diamond is frozen or not

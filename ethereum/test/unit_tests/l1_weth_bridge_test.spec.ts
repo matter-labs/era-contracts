@@ -84,6 +84,7 @@ describe('WETH Bridge tests', () => {
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
             dummyAddress,
             await owner.getAddress(),
+            await owner.getAddress(),
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,

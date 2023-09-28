@@ -44,9 +44,9 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor unfreezes
-the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then the
-diamond will be frozen forever.
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or its owner
+unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then
+the diamond will be frozen forever.
 
 #### DiamondInit
 
@@ -56,41 +56,33 @@ diamond constructor and is not saved in the diamond as a facet.
 Implementation detail - function returns a magic value just like it is designed in
 [EIP-1271](https://eips.ethereum.org/EIPS/eip-1271), but the magic value is 32 bytes in size.
 
-#### DiamondCutFacet
-
-These smart contracts manage the freezing/unfreezing and upgrades of the diamond proxy. That being said, the contract
-must never be frozen.
-
-Currently, freezing and unfreezing are implemented as access control functions. It is fully controlled by the governor
-but can be changed later. The governor can call `freezeDiamond` to freeze the diamond and `unfreezeDiamond` to restore
-it.
-
-Another purpose of `DiamondCutFacet` is to upgrade the facets. The upgrading is split into 2-3 phases:
-
-- `proposeTransparentUpgrade`/`proposeShadowUpgrade` - propose an upgrade with visible/hidden parameters.
-- `cancelUpgradeProposal` - cancel the upgrade proposal.
-- `securityCouncilUpgradeApprove` - approve the upgrade by the security council.
-- `executeUpgrade` - finalize the upgrade.
-
-The upgrade itself characterizes by three variables:
-
-- `facetCuts` - a set of changes to the facets (adding new facets, removing facets, and replacing them).
-- pair `(address _initAddress, bytes _calldata)` for initializing the upgrade by making a delegate call to
-  `_initAddress` with `_calldata` inputs.
-
 #### GettersFacet
 
 Separate facet, whose only function is providing `view` and `pure` methods. It also implements
 [diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier.
+This contract must never be frozen.
 
-#### GovernanceFacet
+#### AdminFacet
 
 Controls changing the privileged addresses such as governor and validators or one of the system parameters (L2
-bootloader bytecode hash, verifier address, verifier parameters, etc).
+bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and execution of
+upgrades in the diamond proxy.
 
-At the current stage, the governor has permission to instantly change the key system parameters with `GovernanceFacet`.
-Later such functionality will be removed and changing system parameters will be possible only via Diamond upgrade (see
-_DiamondCutFacet_).
+#### Governance
+
+This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to be scheduled,
+executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating upgrades and changes in all
+zkSync Era governed contracts.
+
+Each upgrade consists of two steps:
+
+- Upgrade Proposal - The governor can schedule upgrades in two different manners:
+    - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
+for the timelock to execute the upgrade.
+    - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
+approval without timelock.
+- Upgrade execution - perform the upgrade that was proposed.
+
 
 #### MailboxFacet
 
@@ -173,16 +165,35 @@ The state transition is divided into three stages:
 - `proveBatches` - validate zk-proof.
 - `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
-When a batch is committed, we process L2 -> L1 logs. Here are the invariants that are expected there:
+Each L2 -> L1 system log will have a key that is part of the following:
+```solidity
+enum SystemLogKey {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BATCH_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+}
+```
 
-- The only L2 -> L1 log from the `L2_SYSTEM_CONTEXT_ADDRESS`, with the `key == l2BatchTimestamp` and
-  `value == l2BatchHash`.
-- Several (or none) logs from the `L2_KNOWN_CODE_STORAGE_ADDRESS` with the `key == bytecodeHash`, where bytecode is
-  marked as a known factory dependency.
-- Several (or none) logs from the `L2_BOOTLOADER_ADDRESS` with the `key == canonicalTxHash` where `canonicalTxHash` is a
-  hash of processed L1 -> L2 transaction.
-- Several (of none) logs from the `L2_TO_L1_MESSENGER` with the `value == hashedMessage` where `hashedMessage` is a hash
-  of an arbitrary-length message that is sent from L2
+When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
+
+- In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
+- There will be a single log for each key that is containted within `SystemLogKey`
+- Three logs from the `L2_TO_L1_MESSENGER` with keys:
+ - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+ - `TOTAL_L2_TO_L1_PUBDATA_KEY`
+ - `STATE_DIFF_HASH_KEY`
+- Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
+  - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
+  - `PREV_BATCH_HASH_KEY`
+- Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
+  - `CHAINED_PRIORITY_TXN_HASH_KEY`
+  - `NUMBER_OF_LAYER_1_TXS_KEY`
+  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY` 
 - None logs from other addresses (may be changed in the future).
 
 #### Bridges
@@ -237,6 +248,16 @@ investigation and mitigation before resuming normal operations.
 
 It is a temporary solution to prevent any significant impact of the validator hot key leakage, while the network is in
 the Alpha stage.
+
+This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`, that
+can be called only by the validator.
+
+When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
+`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
+the time these batches are commited by the validator to enforce a delay between committing and execution of batches. Then, the
+validator can prove the already commited batches regardless of the mentioned timestamp, and again the same calldata (related
+to the `proveBatches` function) will be propogated to the zkSync contract. After, the `delay` is elapsed, the validator
+is allowed to call `executeBatches` to propogate the same calldata to zkSync contract.
 
 #### Allowlist
 

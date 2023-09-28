@@ -62,6 +62,7 @@ describe('Mailbox tests', function () {
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
             dummyAddress,
             dummyAddress,
+            dummyAddress,
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,

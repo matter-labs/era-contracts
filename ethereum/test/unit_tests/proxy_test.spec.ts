@@ -7,8 +7,8 @@ import {
     DiamondProxyFactory,
     DiamondProxyTest,
     DiamondProxyTestFactory,
-    DiamondCutFacet,
-    DiamondCutFacetFactory,
+    AdminFacet,
+    AdminFacetFactory,
     GettersFacet,
     GettersFacetFactory,
     MailboxFacet,
@@ -22,7 +22,7 @@ import { getCallRevertReason } from './utils';
 describe('Diamond proxy tests', function () {
     let proxy: DiamondProxy;
     let diamondInit: DiamondInit;
-    let diamondCutFacet: DiamondCutFacet;
+    let adminFacet: AdminFacet;
     let gettersFacet: GettersFacet;
     let mailboxFacet: MailboxFacet;
     let diamondProxyTest: DiamondProxyTest;
@@ -37,9 +37,9 @@ describe('Diamond proxy tests', function () {
         const diamondInitContract = await diamondInitFactory.deploy();
         diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
 
-        const diamondCutFactory = await hardhat.ethers.getContractFactory('DiamondCutFacet');
-        const diamondCutContract = await diamondCutFactory.deploy();
-        diamondCutFacet = DiamondCutFacetFactory.connect(diamondCutContract.address, diamondCutContract.signer);
+        const adminFactory = await hardhat.ethers.getContractFactory('AdminFacet');
+        const adminContract = await adminFactory.deploy();
+        adminFacet = AdminFacetFactory.connect(adminContract.address, adminContract.signer);
 
         const gettersFacetFactory = await hardhat.ethers.getContractFactory('GettersFacet');
         const gettersFacetContract = await gettersFacetFactory.deploy();
@@ -57,7 +57,7 @@ describe('Diamond proxy tests', function () {
         );
 
         const facetCuts = [
-            facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
+            facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
             facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
             facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
         ];
@@ -69,6 +69,7 @@ describe('Diamond proxy tests', function () {
         };
         const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
             '0x03752D8252d67f99888E741E3fB642803B29B155',
+            governorAddress,
             governorAddress,
             '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
             0,
@@ -100,11 +101,11 @@ describe('Diamond proxy tests', function () {
             expect(isFreezable).equal(false);
         }
 
-        const diamondCutSelectors = getAllSelectors(diamondCutFacet.interface);
+        const diamondCutSelectors = getAllSelectors(adminFacet.interface);
         for (const selector of diamondCutSelectors) {
             const addr = await proxyAsGettersFacet.facetAddress(selector);
             const isFreezable = await proxyAsGettersFacet.isFunctionFreezable(selector);
-            expect(addr).equal(diamondCutFacet.address);
+            expect(addr).equal(adminFacet.address);
             expect(isFreezable).equal(false);
         }
     });
@@ -129,24 +130,18 @@ describe('Diamond proxy tests', function () {
         const diamondProxyTestCalldata = diamondProxyTest.interface.encodeFunctionData('setFreezability', [true]);
         const diamondCutInitData = diamondCut([], diamondProxyTest.address, diamondProxyTestCalldata);
 
-        const diamondCutFacetProposeCalldata = diamondCutFacet.interface.encodeFunctionData(
-            'proposeTransparentUpgrade',
-            [diamondCutInitData, 1]
-        );
-        await proxy.fallback({ data: diamondCutFacetProposeCalldata });
-        const diamondCutFacetExecuteCalldata = diamondCutFacet.interface.encodeFunctionData('executeUpgrade', [
-            diamondCutInitData,
-            ethers.constants.HashZero
+        const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData('executeUpgrade', [
+            diamondCutInitData
         ]);
-        await proxy.fallback({ data: diamondCutFacetExecuteCalldata });
+        await proxy.fallback({ data: adminFacetExecuteCalldata });
 
         expect(await proxyAsGettersFacet.isDiamondStorageFrozen()).equal(true);
     });
 
-    it('should revert on executing a proposal when diamondStorage is frozen', async () => {
+    it('should not revert on executing a proposal when diamondStorage is frozen', async () => {
         const facetCuts = [
             {
-                facet: diamondCutFacet.address,
+                facet: adminFacet.address,
                 selectors: ['0x000000aa'],
                 action: Action.Add,
                 isFreezable: false
@@ -154,18 +149,10 @@ describe('Diamond proxy tests', function () {
         ];
         const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
 
-        const diamondCutFacetProposeCalldata = diamondCutFacet.interface.encodeFunctionData(
-            'proposeTransparentUpgrade',
-            [diamondCutData, 2]
-        );
-        await proxy.fallback({ data: diamondCutFacetProposeCalldata });
-        const diamondCutFacetExecuteCalldata = diamondCutFacet.interface.encodeFunctionData('executeUpgrade', [
-            diamondCutData,
-            ethers.constants.HashZero
+        const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData('executeUpgrade', [
+            diamondCutData
         ]);
-        const revertReason = await getCallRevertReason(proxy.fallback({ data: diamondCutFacetExecuteCalldata }));
-
-        expect(revertReason).equal('f3');
+        await proxy.fallback({ data: adminFacetExecuteCalldata });
     });
 
     it('should revert on calling a freezable faucet when diamondStorage is frozen', async () => {

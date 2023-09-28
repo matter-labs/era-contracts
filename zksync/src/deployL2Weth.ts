@@ -4,7 +4,7 @@ import { Deployer } from '../../ethereum/src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import { getTokens, web3Provider } from '../../ethereum/scripts/utils';
 
-import { getNumberFromEnv, create2DeployFromL1, computeL2Create2Address } from './utils';
+import { getNumberFromEnv, applyL1ToL2Alias, create2DeployFromL1, computeL2Create2Address } from './utils';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -68,14 +68,19 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: deployWallet.address,
                 verbose: true
             });
 
             const zkSync = deployer.zkSyncContract(deployWallet);
 
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
-            const governorAddress = await zkSync.getGovernor();
+            const l1GovernorAddress = await zkSync.getGovernor();
+            // Check whether governor is a smart contract on L1 to apply alias if needed.
+            const l1GovernorCodeSize = ethers.utils.hexDataLength(
+                await deployWallet.provider.getCode(l1GovernorAddress)
+            );
+            const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
+
             const abiCoder = new ethers.utils.AbiCoder();
 
             const l2WethImplAddr = computeL2Create2Address(
@@ -92,7 +97,7 @@ async function main() {
             const l2ERC20BridgeProxyConstructor = ethers.utils.arrayify(
                 abiCoder.encode(
                     ['address', 'address', 'bytes'],
-                    [l2WethImplAddr, governorAddress, proxyInitializationParams]
+                    [l2WethImplAddr, l2GovernorAddress, proxyInitializationParams]
                 )
             );
             const l2WethProxyAddr = computeL2Create2Address(

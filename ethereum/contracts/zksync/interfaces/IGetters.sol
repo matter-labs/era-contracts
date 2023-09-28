@@ -45,23 +45,11 @@ interface IGetters is IBase {
 
     function isDiamondStorageFrozen() external view returns (bool);
 
-    function getSecurityCouncil() external view returns (address);
-
-    function getUpgradeProposalState() external view returns (UpgradeState);
-
-    function getProposedUpgradeHash() external view returns (bytes32);
-
-    function getProposedUpgradeTimestamp() external view returns (uint256);
-
-    function getCurrentProposalId() external view returns (uint256);
-
     function getProtocolVersion() external view returns (uint256);
 
     function getL2SystemContractsUpgradeTxHash() external view returns (bytes32);
 
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
-
-    function isApprovedBySecurityCouncil() external view returns (bool);
 
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 

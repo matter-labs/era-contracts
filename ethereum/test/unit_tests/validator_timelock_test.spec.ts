@@ -157,7 +157,7 @@ describe(`ValidatorTimelock tests`, function () {
     });
 
     it(`Should successfully overwrite the committing timestamp on the reverted batches timestamp`, async () => {
-        const revertedBatchesTimestamp = Number(await validatorTimelock.committedBatchTimestamp(1));
+        const revertedBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(1));
 
         await validatorTimelock
             .connect(validator)
@@ -167,7 +167,7 @@ describe(`ValidatorTimelock tests`, function () {
             .connect(validator)
             .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT);
 
-        const newBatchesTimestamp = Number(await validatorTimelock.committedBatchTimestamp(1));
+        const newBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(1));
 
         expect(newBatchesTimestamp).greaterThanOrEqual(revertedBatchesTimestamp);
     });
