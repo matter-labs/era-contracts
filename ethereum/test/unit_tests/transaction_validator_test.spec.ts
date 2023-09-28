@@ -50,7 +50,7 @@ describe('TransactionValidator tests', function () {
             const result = await getCallRevertReason(
                 tester.validateL1ToL2Transaction(
                     createTestTransaction({
-                        gasLimit: 100000
+                        gasLimit: 200000
                     }),
                     500000
                 )
