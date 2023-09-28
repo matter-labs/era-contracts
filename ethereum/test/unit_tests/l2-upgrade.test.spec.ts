@@ -786,7 +786,7 @@ async function buildCommitBatchInfo(
         newStateRoot: ethers.utils.randomBytes(32),
         numberOfLayer1Txs: 0,
         priorityOperationsHash: EMPTY_STRING_KECCAK,
-        systemLogs: ethers.utils.hexConcat([`0x00000007`].concat(systemLogs)),
+        systemLogs: ethers.utils.hexConcat(systemLogs),
         totalL2ToL1Pubdata: ethers.constants.HashZero,
         bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
         eventsQueueStateHash: ethers.utils.randomBytes(32),
@@ -807,15 +807,13 @@ async function buildCommitBatchInfoWithCustomLogs(
         packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
     );
 
-    const size = systemLogs.length == 7 ? `0x00000007` : `0x00000008`;
-
     return {
         timestamp,
         indexRepeatedStorageChanges: 0,
         newStateRoot: ethers.utils.randomBytes(32),
         numberOfLayer1Txs: 0,
         priorityOperationsHash: EMPTY_STRING_KECCAK,
-        systemLogs: ethers.utils.hexConcat([size].concat(systemLogs)),
+        systemLogs: ethers.utils.hexConcat(systemLogs),
         totalL2ToL1Pubdata: ethers.constants.HashZero,
         bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
         eventsQueueStateHash: ethers.utils.randomBytes(32),
