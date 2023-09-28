@@ -74,9 +74,14 @@ This contract manages operations (calls with preconditions) for governance tasks
 executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating upgrades and changes in all
 zkSync Era governed contracts.
 
-Operations can be proposed as either fully transparent upgrades with on-chain data, or "shadow" upgrades where upgrade data is not
-published on-chain before execution. Proposed operations are subject to a delay before they can be executed, but they can be executed
-instantly with the security council’s permission.
+Each upgrade consists of two steps:
+
+- Upgrade Proposal - The governor can schedule upgrades in two different manners:
+    - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
+for the timelock to execute the upgrade.
+    - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
+approval without timelock.
+- Upgrade execution - perform the upgrade that was proposed.
 
 
 #### MailboxFacet
@@ -229,9 +234,9 @@ This contract consists of four main functions `commitBatches`, `proveBatches`, `
 can be called only by the validator.
 
 When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
-`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these blocks to track
-the time these blocks are commited by the validator to enforce a delay between committing and execution of blocks. Then, the
-validator can prove the already commited blocks regardless of the mentioned timestamp, and again the same calldata (related
+`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
+the time these batches are commited by the validator to enforce a delay between committing and execution of batches. Then, the
+validator can prove the already commited batches regardless of the mentioned timestamp, and again the same calldata (related
 to the `proveBatches` function) will be propogated to the zkSync contract. After, the `delay` is elapsed, the validator
 is allowed to call `executeBatches` to propogate the same calldata to zkSync contract.
 
