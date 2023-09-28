@@ -69,6 +69,7 @@
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-allow-list": "ts-node scripts/initialize-l1-allow-list.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
+    "initialize-governance": "ts-node scripts/initialize-governance.ts",
     "upgrade-1": "ts-node scripts/upgrades/upgrade-1.ts",
     "upgrade-2": "ts-node scripts/upgrades/upgrade-2.ts",
     "upgrade-3": "ts-node scripts/upgrades/upgrade-3.ts",

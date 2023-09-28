@@ -9,7 +9,8 @@ import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
 import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
-import { AllowListFactory } from '../typechain';
+import { AllowListFactory, } from '../typechain';
+import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
 import { hexlify } from 'ethers/lib/utils';
 import {
     readSystemContractsBytecode,
@@ -21,6 +22,7 @@ import {
     getTokens
 } from '../scripts/utils';
 import { deployViaCreate2 } from './deploy-utils';
+import { IGovernanceFactory } from '../typechain/IGovernanceFactory';
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
@@ -116,7 +118,7 @@ export class Deployer {
 
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             this.addresses.ZkSync.Verifier,
-            this.addresses.Governance, // FIXME: change to the real governor
+            this.ownerAddress,
             genesisBatchHash,
             genesisRollupLeafIndex,
             genesisBatchCommitment,
@@ -283,7 +285,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'TransparentUpgradeableProxy',
-            [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.Governance, '0x'],
+            [this.addresses.Bridges.ERC20BridgeImplementation, this.ownerAddress, '0x'],
             create2Salt,
             ethTxOptions
         );
@@ -330,7 +332,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'TransparentUpgradeableProxy',
-            [this.addresses.Bridges.WethBridgeImplementation, this.addresses.Governance, '0x'],
+            [this.addresses.Bridges.WethBridgeImplementation, this.ownerAddress, '0x'],
             create2Salt,
             ethTxOptions
         );
@@ -461,8 +463,16 @@ export class Deployer {
         }
     }
 
+    public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
+        return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    }
+
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
         return SingletonFactoryFactory.connect(this.addresses.Create2Factory, signerOrProvider);
+    }
+
+    public governanceContract(signerOrProvider: Signer | providers.Provider) {
+        return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider) {
