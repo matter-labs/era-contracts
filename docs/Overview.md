@@ -173,16 +173,35 @@ The state transition is divided into three stages:
 - `proveBatches` - validate zk-proof.
 - `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
-When a batch is committed, we process L2 -> L1 logs. Here are the invariants that are expected there:
+Each L2 -> L1 system log will have a key that is part of the following:
+```solidity
+enum SystemLogKey {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BATCH_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+}
+```
 
-- The only L2 -> L1 log from the `L2_SYSTEM_CONTEXT_ADDRESS`, with the `key == l2BatchTimestamp` and
-  `value == l2BatchHash`.
-- Several (or none) logs from the `L2_KNOWN_CODE_STORAGE_ADDRESS` with the `key == bytecodeHash`, where bytecode is
-  marked as a known factory dependency.
-- Several (or none) logs from the `L2_BOOTLOADER_ADDRESS` with the `key == canonicalTxHash` where `canonicalTxHash` is a
-  hash of processed L1 -> L2 transaction.
-- Several (of none) logs from the `L2_TO_L1_MESSENGER` with the `value == hashedMessage` where `hashedMessage` is a hash
-  of an arbitrary-length message that is sent from L2
+When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
+
+- In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
+- There will be a single log for each key that is containted within `SystemLogKey`
+- Three logs from the `L2_TO_L1_MESSENGER` with keys:
+ - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+ - `TOTAL_L2_TO_L1_PUBDATA_KEY`
+ - `STATE_DIFF_HASH_KEY`
+- Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
+  - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
+  - `PREV_BATCH_HASH_KEY`
+- Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
+  - `CHAINED_PRIORITY_TXN_HASH_KEY`
+  - `NUMBER_OF_LAYER_1_TXS_KEY`
+  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY` 
 - None logs from other addresses (may be changed in the future).
 
 #### Bridges
