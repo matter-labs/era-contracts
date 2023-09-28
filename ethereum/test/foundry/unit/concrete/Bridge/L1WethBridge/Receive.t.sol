@@ -4,7 +4,6 @@ pragma solidity ^0.8.17;
 
 import {Vm} from "forge-std/Test.sol";
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 
 contract ReceiveTest is L1WethBridgeTest {
     function test_ReceiveEthFromL1WethAddress() public {

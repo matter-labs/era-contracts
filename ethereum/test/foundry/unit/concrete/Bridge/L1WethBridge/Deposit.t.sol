@@ -4,7 +4,6 @@ pragma solidity ^0.8.17;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {Utils} from "../../Utils/Utils.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 
 contract DepositTest is L1WethBridgeTest {
@@ -34,6 +33,7 @@ contract DepositTest is L1WethBridgeTest {
         );
 
         vm.expectRevert("Amount cannot be zero");
+        // solhint-disable-next-line avoid-low-level-calls
         (bool revertAsExpected, ) = address(bridgeProxy).call(depositCallData);
         assertTrue(revertAsExpected, "expectRevert: call did not revert");
     }

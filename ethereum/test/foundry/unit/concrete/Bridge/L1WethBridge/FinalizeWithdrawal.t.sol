@@ -4,7 +4,6 @@ pragma solidity ^0.8.17;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {IZkSync} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IZkSync.sol";
 
 contract FinalizeWithdrawalTest is L1WethBridgeTest {
     function test_RevertWhen_FinalizingWithdrawalWithWrongMessageLength() public {

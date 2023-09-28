@@ -3,7 +3,6 @@
 pragma solidity ^0.8.17;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
-import {Utils} from "../../Utils/Utils.sol";
 
 contract L2TokenAddressTest is L1WethBridgeTest {
     function test_l1TokenSameAsL1WethAddress() public {
