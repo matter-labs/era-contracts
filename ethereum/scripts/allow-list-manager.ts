@@ -1,7 +1,7 @@
 import * as hardhat from 'hardhat';
 import { Interface } from 'ethers/lib/utils';
 import { Command } from 'commander';
-import { RermissionToCall, AccessMode, print } from './utils';
+import { PermissionToCall, AccessMode, print } from './utils';
 
 // Get the interfaces for all needed contracts
 const allowList = new Interface(hardhat.artifacts.readArtifactSync('IAllowList').abi);
@@ -52,7 +52,7 @@ function functionSelector(functionName: string): string {
     return selectors[0];
 }
 
-function setBatchPermissionToCall(parameters: Array<RermissionToCall>) {
+function setBatchPermissionToCall(parameters: Array<PermissionToCall>) {
     // Extend parameters with the function selector, to check it manually
     const extendedParameters = parameters.map((param) =>
         Object.assign(param, { functionSel: functionSelector(param.functionName) })
@@ -118,7 +118,7 @@ async function main() {
     prepareCalldataProgram
         .command('set-batch-permission-to-call <permission-to-call>')
         .action((permissionToCall: string) => {
-            const parameters: Array<RermissionToCall> = JSON.parse(permissionToCall);
+            const parameters: Array<PermissionToCall> = JSON.parse(permissionToCall);
             setBatchPermissionToCall(parameters);
         });
 
@@ -139,7 +139,7 @@ async function main() {
 
     alphaMainnet.command('add <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<RermissionToCall> = new Array(0);
+        let parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: true, ...permission });
@@ -151,7 +151,7 @@ async function main() {
 
     alphaMainnet.command('remove <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<RermissionToCall> = new Array(0);
+        let parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: false, ...permission });

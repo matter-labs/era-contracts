@@ -6,7 +6,7 @@ import "./IBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 
-interface IGovernance is IBase {
+interface IAdmin is IBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
     function acceptGovernor() external;

@@ -10,12 +10,12 @@ import {IGovernance} from "./IGovernance.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract design is inspired by OpenZeppelin TimelockController and in-house Diamond Proxy upgrade mechanism.
 /// @notice This contract manages operations (calls with preconditions) for governance tasks.
-/// The contract allows for operations to be scheduled, executed, and canceled with 
-/// appropriate permissions and delays. It is used for managing and coordinating upgrades 
+/// The contract allows for operations to be scheduled, executed, and canceled with
+/// appropriate permissions and delays. It is used for managing and coordinating upgrades
 /// and changes in all zkSync Era governed contracts.
 ///
 /// Operations can be proposed as either fully transparent upgrades with on-chain data,
-/// or "shadow" upgrades where upgrade data is not published on-chain before execution. Proposed operations 
+/// or "shadow" upgrades where upgrade data is not published on-chain before execution. Proposed operations
 /// are subject to a delay before they can be executed, but they can be executed instantly
 /// with the security council’s permission.
 contract Governance is IGovernance, Ownable2Step {
@@ -73,7 +73,10 @@ contract Governance is IGovernance, Ownable2Step {
 
     /// @notice Checks that the message sender is an active owner or an active security council.
     modifier onlyOwnerOrSecurityCouncil() {
-        require(msg.sender == owner() || msg.sender == securityCouncil, "Only the owner and security council allowed to call this function");
+        require(
+            msg.sender == owner() || msg.sender == securityCouncil,
+            "Only the owner and security council are allowed to call this function"
+        );
         _;
     }
 

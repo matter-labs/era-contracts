@@ -19,7 +19,7 @@ async function main() {
         .option('--private-key <private-key>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
-        .option('--governor-address <governor-address>')
+        .option('--owner-address <owner-address>')
         .option('--create2-salt <create2-salt>')
         .option('--diamond-upgrade-init <version>')
         .option('--only-verifier')
@@ -32,8 +32,8 @@ async function main() {
                   ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-            const governorAddress = cmd.governorAddress ? cmd.governorAddress : deployWallet.address;
-            console.log(`Using governor address: ${governorAddress}`);
+            const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
+            console.log(`Using owner address: ${ownerAddress}`);
 
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
@@ -45,7 +45,7 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress,
+                ownerAddress,
                 verbose: true
             });
 
@@ -79,8 +79,9 @@ async function main() {
             });
             nonce++;
 
-            await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-            await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);
+            await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
+            await deployer.deployAllowList(create2Salt, { gasPrice, nonce: nonce + 1 });
+            await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 2);
             await deployer.deployBridgeContracts(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying zkSync contracts
             await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
             await deployer.deployValidatorTimelock(create2Salt, { gasPrice });

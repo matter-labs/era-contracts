@@ -58,7 +58,6 @@
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
-    "diamond-upgrade": "ts-node scripts/diamond-upgrade.ts",
     "verify": "hardhat run --network env scripts/verify.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "read-variable": "ts-node scripts/read-variable.ts",

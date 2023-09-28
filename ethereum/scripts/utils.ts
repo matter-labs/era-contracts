@@ -9,7 +9,7 @@ export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-export interface RermissionToCall {
+export interface PermissionToCall {
     caller: string;
     target: string;
     functionName: string;

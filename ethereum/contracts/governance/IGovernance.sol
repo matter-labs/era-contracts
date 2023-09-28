@@ -18,7 +18,7 @@ interface IGovernance {
     /// @dev Represents a call to be made during an operation.
     /// @param target The address to which the call will be made.
     /// @param value The amount of Ether (in wei) to be sent along with the call.
-    /// @param data The call data to be executed on the `target` address.
+    /// @param data The calldata to be executed on the `target` address.
     struct Call {
         address target;
         uint256 value;
@@ -50,7 +50,7 @@ interface IGovernance {
     function scheduleShadow(bytes32 _id, uint256 _delay) external;
 
     function cancel(bytes32 _id) external;
-    
+
     function execute(Operation calldata _operation) external;
 
     function executeInstant(Operation calldata _operation) external;

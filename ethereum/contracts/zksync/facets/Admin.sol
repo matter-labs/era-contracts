@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.13;
 
-import "../interfaces/IGovernance.sol";
+import "../interfaces/IAdmin.sol";
 import "../libraries/Diamond.sol";
 import "./Base.sol";
 
-/// @title Governance Contract controls access rights for contract management.
+/// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
-contract GovernanceFacet is Base, IGovernance {
+contract AdminFacet is Base, IAdmin {
     string public constant override getName = "GovernanceFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
