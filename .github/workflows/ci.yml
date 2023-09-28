@@ -66,7 +66,7 @@ jobs:
             ethereum/cache
             ethereum/typechain
 
-  test:
+  test-hardhat:
     needs: [build, lint]
     runs-on: ubuntu-latest
 
@@ -103,3 +103,46 @@ jobs:
 
       - name: Run tests
         run: yarn test --no-compile
+
+  test-foundry:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ethereum
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - name: "Install Foundry"
+        uses: "foundry-rs/foundry-toolchain@v1"
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.15.1
+          cache: yarn
+          cache-dependency-path: ethereum/yarn.lock
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-${{ github.sha }}
+          path: |
+            ethereum/artifacts
+            ethereum/cache
+            ethereum/typechain
+
+      - name: Run tests
+        run: forge test
