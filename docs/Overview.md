@@ -82,6 +82,7 @@ The upgrade itself characterizes by three variables:
 
 Separate facet, whose only function is providing `view` and `pure` methods. It also implements
 [diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier.
+This contract, similar to `DiamondCutFaucet` must never be frozen.
 
 #### GovernanceFacet
 
@@ -237,6 +238,16 @@ investigation and mitigation before resuming normal operations.
 
 It is a temporary solution to prevent any significant impact of the validator hot key leakage, while the network is in
 the Alpha stage.
+
+This contract consists of four main functions `commitBlocks`, `proveBlocks`, `executeBlocks`, and `revertBlocks`, that
+can be called only by the validator.
+
+When the validator calls `commitBlocks`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
+`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these blocks to track
+the time these blocks are commited by the validator to enforce a delay between committing and execution of blocks. Then, the
+validator can prove the already commited blocks regardless of the mentioned timestamp, and again the same calldata (related
+to the `proveBlocks` function) will be propogated to the zkSync contract. After, the `executionDelay` is elapsed, the validator
+is allowed to call `executeBlocks` to propogate the same calldata to zkSync contract.
 
 #### Allowlist
 
