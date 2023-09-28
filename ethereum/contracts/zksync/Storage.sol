@@ -79,7 +79,7 @@ struct VerifierParams {
 struct AppStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
-    /// @notice Address which will exercise governance over the network i.e. change validator set, conduct upgrades
+    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)
     address governor;
     /// @notice Address that the governor proposed as one that will replace it
     address pendingGovernor;
@@ -139,4 +139,8 @@ struct AppStorage {
     /// @dev Batch number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened
     /// yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
+    /// @dev Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
+    address admin;
+    /// @notice Address that the governor or admin proposed as one that will replace admin role
+    address pendingAdmin;
 }

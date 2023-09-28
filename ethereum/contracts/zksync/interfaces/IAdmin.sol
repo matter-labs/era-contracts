@@ -11,6 +11,10 @@ interface IAdmin is IBase {
 
     function acceptGovernor() external;
 
+    function setPendingAdmin(address _newPendingAdmin) external;
+
+    function acceptAdmin() external;
+
     function setValidator(address _validator, bool _active) external;
 
     function setPorterAvailability(bool _zkPorterIsAvailable) external;
@@ -35,6 +39,13 @@ interface IAdmin is IBase {
 
     /// @notice Governor changed
     event NewGovernor(address indexed oldGovernor, address indexed newGovernor);
+
+    /// @notice pendingAdmin is changed
+    /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
+    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
+
+    /// @notice Admin changed
+    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

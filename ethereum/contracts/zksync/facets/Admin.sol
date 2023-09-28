@@ -12,7 +12,7 @@ import "./Base.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is Base, IAdmin {
-    string public constant override getName = "GovernanceFacet";
+    string public constant override getName = "AdminFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
     /// @notice New governor can accept governor rights by calling `acceptGovernor` function.
@@ -25,7 +25,7 @@ contract AdminFacet is Base, IAdmin {
         emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
     }
 
-    /// @notice Accepts transfer of admin rights. Only pending governor can accept the role.
+    /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
     function acceptGovernor() external {
         address pendingGovernor = s.pendingGovernor;
         require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
@@ -38,10 +38,34 @@ contract AdminFacet is Base, IAdmin {
         emit NewGovernor(previousGovernor, pendingGovernor);
     }
 
+    /// @notice Starts the transfer of admin rights. Only the current governor or admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
+    function setPendingAdmin(address _newPendingAdmin) external onlyGovernorOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = s.pendingAdmin;
+        // Change pending admin
+        s.pendingAdmin = _newPendingAdmin;
+        emit NewPendingGovernor(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external {
+        address pendingAdmin = s.pendingAdmin;
+        require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = s.admin;
+        s.admin = pendingAdmin;
+        delete s.pendingAdmin;
+
+        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, pendingAdmin);
+    }
+
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
     /// @param _active Active flag
-    function setValidator(address _validator, bool _active) external onlyGovernorOrItsOwner {
+    function setValidator(address _validator, bool _active) external onlyGovernorOrAdmin {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
@@ -93,7 +117,7 @@ contract AdminFacet is Base, IAdmin {
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
     /// @dev Both the governor and its owner can unfreeze Diamond Proxy
-    function unfreezeDiamond() external onlyGovernorOrItsOwner {
+    function unfreezeDiamond() external onlyGovernorOrAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen

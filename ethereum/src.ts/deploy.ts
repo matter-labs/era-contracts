@@ -119,6 +119,7 @@ export class Deployer {
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             this.addresses.ZkSync.Verifier,
             this.ownerAddress,
+            this.ownerAddress,
             genesisBatchHash,
             genesisRollupLeafIndex,
             genesisBatchCommitment,
