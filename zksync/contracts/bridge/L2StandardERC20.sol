@@ -2,10 +2,11 @@
 
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
 contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     /// @dev Describes whether there is a specific getter in the token.

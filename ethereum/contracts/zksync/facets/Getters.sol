@@ -11,6 +11,7 @@ import "../interfaces/ILegacyGetters.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the batchchain.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is Base, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;

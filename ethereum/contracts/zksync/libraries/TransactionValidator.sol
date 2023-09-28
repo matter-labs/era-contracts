@@ -9,6 +9,7 @@ import "../Config.sol";
 
 /// @title zkSync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 library TransactionValidator {
     /// @dev Used to validate key properties of an L1->L2 transaction
     /// @param _transaction The transaction to validate

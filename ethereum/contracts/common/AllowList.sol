@@ -8,6 +8,7 @@ import "./interfaces/IAllowList.sol";
 import "./libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The smart contract that stores the permissions to call the function on different contracts.
 /// @dev The contract is fully controlled by the owner, that can grant and revoke any permissions at any time.
 /// @dev The permission list has three different modes:

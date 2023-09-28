@@ -35,6 +35,36 @@ describe('Governance facet tests', function () {
         expect(revertReason).equal('1g');
     });
 
+    it('governor successfully set porter availability', async () => {
+        await governanceTest.setPorterAvailability(true);
+
+        const porterAvailability = await governanceTest.getPorterAvailability();
+        expect(porterAvailability).to.equal(true);
+    });
+
+    it('random account fails to set porter availability', async () => {
+        const revertReason = await getCallRevertReason(
+            governanceTest.connect(randomSigner).setPorterAvailability(false)
+        );
+        expect(revertReason).equal('1g');
+    });
+
+    it('governor successfully set priority transaction max gas limit', async () => {
+        const gasLimit = '12345678';
+        await governanceTest.setPriorityTxMaxGasLimit(gasLimit);
+
+        const newGasLimit = await governanceTest.getPriorityTxMaxGasLimit();
+        expect(newGasLimit).to.equal(gasLimit);
+    });
+
+    it('random account fails to priority transaction max gas limit', async () => {
+        const gasLimit = '123456789';
+        const revertReason = await getCallRevertReason(
+            governanceTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
+        );
+        expect(revertReason).equal('1g');
+    });
+
     describe('change governor', function () {
         let newGovernor: ethers.Signer;
 

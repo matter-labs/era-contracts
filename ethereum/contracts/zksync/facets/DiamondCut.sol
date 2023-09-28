@@ -10,6 +10,7 @@ import "./Base.sol";
 
 /// @title DiamondCutFacet - contract responsible for the management of upgrades.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract DiamondCutFacet is Base, IDiamondCut {
     using UncheckedMath for uint256;
 

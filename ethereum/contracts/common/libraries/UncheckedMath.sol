@@ -2,6 +2,11 @@
 
 pragma solidity ^0.8.13;
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The library for unchecked math.
+ */
 library UncheckedMath {
     function uncheckedInc(uint256 _number) internal pure returns (uint256) {
         unchecked {

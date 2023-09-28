@@ -21,6 +21,7 @@ import "../common/ReentrancyGuard.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.

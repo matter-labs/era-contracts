@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../libraries/Diamond.sol";
+import "../interfaces/IVerifier.sol";
 import "../facets/Base.sol";
 
 interface IOldDiamondCut {

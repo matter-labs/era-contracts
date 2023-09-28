@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 library Merkle {
     using UncheckedMath for uint256;
 
@@ -22,7 +23,7 @@ library Merkle {
         uint256 pathLength = _path.length;
         require(pathLength > 0, "xc");
         require(pathLength < 256, "bt");
-        require(_index < (1 << pathLength), "pz");
+        require(_index < (1 << pathLength), "px");
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; i = i.uncheckedInc()) {

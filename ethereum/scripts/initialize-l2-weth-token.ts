@@ -18,8 +18,9 @@ const openzeppelinTransparentProxyArtifactsPath = path.join(
     '@openzeppelin/contracts/proxy/transparent/'
 );
 
-function readInterface(path: string, fileName: string) {
-    const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
+function readInterface(path: string, fileName: string, solFileName?: string) {
+    solFileName ??= fileName;
+    const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName }.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
     return new ethers.utils.Interface(abi);
 }
 
@@ -27,6 +28,7 @@ const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLO
 const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
     openzeppelinTransparentProxyArtifactsPath,
+    'ITransparentUpgradeableProxy',
     'TransparentUpgradeableProxy'
 );
 
