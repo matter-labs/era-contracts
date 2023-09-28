@@ -242,7 +242,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBatch);
+        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
