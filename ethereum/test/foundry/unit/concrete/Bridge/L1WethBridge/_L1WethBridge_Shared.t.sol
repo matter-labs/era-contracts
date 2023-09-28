@@ -40,6 +40,7 @@ contract L1WethBridgeTest is Test {
             diamondInit.initialize.selector,
             dummyAddress,
             owner,
+            owner,
             0,
             0,
             0,
