@@ -11,6 +11,7 @@ import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zks
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {Utils} from "../Utils/Utils.sol";
 
 // solhint-enable max-line-length
 

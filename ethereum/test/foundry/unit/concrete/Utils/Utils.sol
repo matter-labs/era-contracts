@@ -99,7 +99,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
         selectors[1] = GettersFacet.getGovernor.selector;
         selectors[2] = GettersFacet.getPendingGovernor.selector;
@@ -117,24 +117,19 @@ library Utils {
         selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
         selectors[15] = GettersFacet.getVerifierParams.selector;
         selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
-        selectors[17] = GettersFacet.getSecurityCouncil.selector;
-        selectors[18] = GettersFacet.getUpgradeProposalState.selector;
-        selectors[19] = GettersFacet.getProposedUpgradeHash.selector;
-        selectors[20] = GettersFacet.getProposedUpgradeTimestamp.selector;
-        selectors[21] = GettersFacet.getCurrentProposalId.selector;
-        selectors[22] = GettersFacet.isApprovedBySecurityCouncil.selector;
-        selectors[23] = GettersFacet.getPriorityTxMaxGasLimit.selector;
-        selectors[24] = GettersFacet.getAllowList.selector;
-        selectors[25] = GettersFacet.isEthWithdrawalFinalized.selector;
-        selectors[26] = GettersFacet.facets.selector;
-        selectors[27] = GettersFacet.facetFunctionSelectors.selector;
-        selectors[28] = GettersFacet.facetAddresses.selector;
-        selectors[29] = GettersFacet.facetAddress.selector;
-        selectors[30] = GettersFacet.isFunctionFreezable.selector;
-        selectors[31] = GettersFacet.isFacetFreezable.selector;
-        selectors[32] = GettersFacet.getTotalBatchesCommitted.selector;
-        selectors[33] = GettersFacet.getTotalBatchesVerified.selector;
-        selectors[34] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
+        selectors[18] = GettersFacet.getAllowList.selector;
+        selectors[19] = GettersFacet.isEthWithdrawalFinalized.selector;
+        selectors[20] = GettersFacet.facets.selector;
+        selectors[21] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[22] = GettersFacet.facetAddresses.selector;
+        selectors[23] = GettersFacet.facetAddress.selector;
+        selectors[24] = GettersFacet.isFunctionFreezable.selector;
+        selectors[25] = GettersFacet.isFacetFreezable.selector;
+        selectors[26] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
+        return selectors;
         return selectors;
     }
 
