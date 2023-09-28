@@ -39,11 +39,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _admin The address to be assigned as the admin of the contract.
     /// @param _securityCouncil The address to be assigned as the security council of the contract.
     /// @param _minDelay The initial minimum delay (in seconds) to be set for operations.
-    constructor(
-        address _admin,
-        address _securityCouncil,
-        uint256 _minDelay
-    ) {
+    constructor(address _admin, address _securityCouncil, uint256 _minDelay) {
         require(_admin != address(0), "Admin should be non zero address");
 
         _transferOwnership(_admin);

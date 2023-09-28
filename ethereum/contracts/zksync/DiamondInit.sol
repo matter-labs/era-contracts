@@ -9,6 +9,7 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {Base} from "./facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
 import {VerifierParams} from "./Storage.sol";
+/* solhint-disable max-line-length */
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
 /// @author Matter Labs
