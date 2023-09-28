@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
-import {Utils} from "../Utils/Utils.sol";
+import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
@@ -12,28 +12,30 @@ contract RevertingTest is ExecutorTest {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory correctL2Logs = abi.encodePacked(
-            bytes4(0x00000001),
-            bytes4(0x00000000),
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            bytes32("")
-        );
+        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        correctL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+            .constructL2Log(
+                true,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
 
-        newCommitBlockInfo.timestamp = uint64(currentTimestamp);
-        newCommitBlockInfo.l2Logs = correctL2Logs;
+        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        newCommitBatchInfo.timestamp = uint64(currentTimestamp);
+        newCommitBatchInfo.systemLogs = l2Logs;
 
-        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        commitBlockInfoArray[0] = newCommitBlockInfo;
+        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+        executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        newStoredBlockInfo = IExecutor.StoredBlockInfo({
-            blockNumber: 1,
-            blockHash: entries[0].topics[2],
+        newStoredBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 1,
+            batchHash: entries[0].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
@@ -42,18 +44,18 @@ contract RevertingTest is ExecutorTest {
             commitment: entries[0].topics[3]
         });
 
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = newStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
 
-        executor.proveBlocks(genesisStoredBlockInfo, storedBlockInfoArray, proofInput);
+        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
-    function test_RevertWhen_RevertingMoreBlocksThanAlreadyCommitted() public {
+    function test_RevertWhen_RevertingMoreBatchesThanAlreadyCommitted() public {
         vm.prank(validator);
         vm.expectRevert(bytes.concat("v1"));
-        executor.revertBlocks(10);
+        executor.revertBatches(10);
     }
 
     function test_SuccessfulRevert() public {
@@ -64,7 +66,7 @@ contract RevertingTest is ExecutorTest {
         assertEq(totalBlocksVerifiedBefore, 1, "totalBlocksVerifiedBefore");
 
         vm.prank(validator);
-        executor.revertBlocks(0);
+        executor.revertBatches(0);
 
         uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
         assertEq(totalBlocksCommitted, 0, "totalBlocksCommitted");

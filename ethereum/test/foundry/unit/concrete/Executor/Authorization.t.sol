@@ -6,64 +6,62 @@ import {Utils} from "../Utils/Utils.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
 contract AuthorizationTest is ExecutorTest {
-    IExecutor.StoredBlockInfo private storedBlockInfo;
-    IExecutor.CommitBlockInfo private commitBlockInfo;
+    IExecutor.StoredBatchInfo private storedBatchInfo;
+    IExecutor.CommitBatchInfo private commitBatchInfo;
 
     function setUp() public {
-        storedBlockInfo = IExecutor.StoredBlockInfo({
-            blockNumber: 1,
-            blockHash: Utils.randomBytes32("blockHash"),
+        storedBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: Utils.randomBytes32("batchHash"),
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
+            priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
             l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             timestamp: 0,
             commitment: Utils.randomBytes32("commitment")
         });
 
-        commitBlockInfo = IExecutor.CommitBlockInfo({
-            blockNumber: 0,
+        commitBatchInfo = IExecutor.CommitBatchInfo({
+            batchNumber: 0,
             timestamp: 0,
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
-            priorityOperationsHash: keccak256(""),
-            initialStorageChanges: bytes(""),
-            repeatedStorageChanges: bytes(""),
-            l2Logs: bytes(""),
-            l2ArbitraryLengthMessages: new bytes[](0),
-            factoryDeps: new bytes[](0)
+            priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
+            bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
+            eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            systemLogs: bytes(""),
+            totalL2ToL1Pubdata: bytes("")
         });
     }
 
     function test_RevertWhen_CommitingByUnauthorisedAddress() public {
-        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        commitBlockInfoArray[0] = commitBlockInfo;
+        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        commitBatchInfoArray[0] = commitBatchInfo;
 
         vm.prank(randomSigner);
 
         vm.expectRevert(bytes.concat("1h"));
-        executor.commitBlocks(storedBlockInfo, commitBlockInfoArray);
+        executor.commitBatches(storedBatchInfo, commitBatchInfoArray);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = storedBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = storedBatchInfo;
 
         vm.prank(owner);
 
         vm.expectRevert(bytes.concat("1h"));
-        executor.proveBlocks(storedBlockInfo, storedBlockInfoArray, proofInput);
+        executor.proveBatches(storedBatchInfo, storedBatchInfoArray, proofInput);
     }
 
     function test_RevertWhen_ExecutingByUnauthorizedAddress() public {
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = storedBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = storedBatchInfo;
 
         vm.prank(randomSigner);
 
         vm.expectRevert(bytes.concat("1h"));
-        executor.executeBlocks(storedBlockInfoArray);
+        executor.executeBatches(storedBatchInfoArray);
     }
 }

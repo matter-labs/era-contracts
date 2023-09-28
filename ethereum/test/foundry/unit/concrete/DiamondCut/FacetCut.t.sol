@@ -30,10 +30,10 @@ contract FacetCutTest is DiamondCutTest {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = executorFacet1.commitBlocks.selector;
-        selectors[1] = executorFacet1.proveBlocks.selector;
-        selectors[2] = executorFacet1.executeBlocks.selector;
-        selectors[3] = executorFacet1.revertBlocks.selector;
+        selectors[0] = executorFacet1.commitBatches.selector;
+        selectors[1] = executorFacet1.proveBatches.selector;
+        selectors[2] = executorFacet1.executeBatches.selector;
+        selectors[3] = executorFacet1.revertBatches.selector;
         return selectors;
     }
 

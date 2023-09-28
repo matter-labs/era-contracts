@@ -3,7 +3,7 @@
 pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils} from "../Utils/Utils.sol";
+import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
 import {AllowList} from "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
@@ -18,10 +18,6 @@ import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/i
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 
 contract ExecutorTest is Test {
-    address internal constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
-    address internal constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
-    address internal constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
-
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -30,13 +26,13 @@ contract ExecutorTest is Test {
     ExecutorFacet internal executor;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
-    bytes32 internal newCommittedBlockBlockHash;
+    bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
-    IExecutor.CommitBlockInfo internal newCommitBlockInfo;
-    IExecutor.StoredBlockInfo internal newStoredBlockInfo;
+    IExecutor.CommitBatchInfo internal newCommitBatchInfo;
+    IExecutor.StoredBatchInfo internal newStoredBatchInfo;
 
-    IExecutor.StoredBlockInfo internal genesisStoredBlockInfo;
+    IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     IExecutor.ProofInput internal proofInput;
 
     function getGovernanceSelectors() private view returns (bytes4[] memory) {
@@ -51,10 +47,10 @@ contract ExecutorTest is Test {
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
-        selectors[0] = executor.commitBlocks.selector;
-        selectors[1] = executor.proveBlocks.selector;
-        selectors[2] = executor.executeBlocks.selector;
-        selectors[3] = executor.revertBlocks.selector;
+        selectors[0] = executor.commitBatches.selector;
+        selectors[1] = executor.proveBatches.selector;
+        selectors[2] = executor.executeBatches.selector;
+        selectors[3] = executor.revertBatches.selector;
         return selectors;
     }
 
@@ -72,7 +68,7 @@ contract ExecutorTest is Test {
         selectors[9] = getters.priorityQueueFrontOperation.selector;
         selectors[10] = getters.isValidator.selector;
         selectors[11] = getters.l2LogsRootHash.selector;
-        selectors[12] = getters.storedBlockHash.selector;
+        selectors[12] = getters.storedBatchHash.selector;
         selectors[13] = getters.getL2BootloaderBytecodeHash.selector;
         selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
         selectors[15] = getters.getVerifierParams.selector;
@@ -186,15 +182,15 @@ contract ExecutorTest is Test {
         uint256[] memory serializedProof;
         proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
 
-        genesisStoredBlockInfo = IExecutor.StoredBlockInfo({
-            blockNumber: 0,
-            blockHash: 0,
+        genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: bytes32(""),
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
-            l2LogsTreeRoot: 0,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: 0
+            commitment: bytes32("")
         });
 
         // foundry's default value is 1 for the block's timestamp, it is expected
@@ -202,19 +198,18 @@ contract ExecutorTest is Test {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
-        newCommitBlockInfo = IExecutor.CommitBlockInfo({
-            blockNumber: 1,
+        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(Utils.createSystemLogs()));
+        newCommitBatchInfo = IExecutor.CommitBatchInfo({
+            batchNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
-            l2LogsTreeRoot: 0,
             priorityOperationsHash: keccak256(""),
-            initialStorageChanges: abi.encodePacked(uint256(0x00000000)),
-            repeatedStorageChanges: bytes(""),
-            l2Logs: bytes(""),
-            l2ArbitraryLengthMessages: new bytes[](0),
-            factoryDeps: new bytes[](0)
+            bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
+            eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            systemLogs: l2Logs,
+            totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
         });
     }
 }

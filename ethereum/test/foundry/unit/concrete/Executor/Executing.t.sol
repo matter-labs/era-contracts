@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
-import {Utils} from "../Utils/Utils.sol";
+import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
@@ -17,28 +17,31 @@ contract ExecutingTest is ExecutorTest {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory correctL2Logs = abi.encodePacked(
-            bytes4(0x00000001),
-            bytes4(0x00000000),
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            bytes32("")
-        );
+        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        correctL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+            .constructL2Log(
+                true,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+            );
 
-        newCommitBlockInfo.l2Logs = correctL2Logs;
-        newCommitBlockInfo.timestamp = uint64(currentTimestamp);
+        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
 
-        IExecutor.CommitBlockInfo[] memory commitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        commitBlockInfoArray[0] = newCommitBlockInfo;
+        newCommitBatchInfo.systemLogs = l2Logs;
+        newCommitBatchInfo.timestamp = uint64(currentTimestamp);
+
+        IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        commitBatchInfoArray[0] = newCommitBatchInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(genesisStoredBlockInfo, commitBlockInfoArray);
+        executor.commitBatches(genesisStoredBatchInfo, commitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        newStoredBlockInfo = IExecutor.StoredBlockInfo({
-            blockNumber: 1,
-            blockHash: entries[0].topics[2],
+        newStoredBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 1,
+            batchHash: entries[0].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
@@ -47,141 +50,156 @@ contract ExecutingTest is ExecutorTest {
             commitment: entries[0].topics[3]
         });
 
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = newStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(genesisStoredBlockInfo, storedBlockInfoArray, proofInput);
+        executor.proveBatches(genesisStoredBatchInfo, storedBatchInfoArray, proofInput);
     }
 
-    function test_RevertWhen_ExecutingBlockWithWrongBlockNumber() public {
-        IExecutor.StoredBlockInfo memory wrongNewStoredBlockInfo = newStoredBlockInfo;
-        wrongNewStoredBlockInfo.blockNumber = 10; // Correct is 1
+    function test_RevertWhen_ExecutingBlockWithWrongBatchNumber() public {
+        IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
+        wrongNewStoredBatchInfo.batchNumber = 10; // Correct is 1
 
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("k"));
-        executor.executeBlocks(storedBlockInfoArray);
+        executor.executeBatches(storedBatchInfoArray);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
-        IExecutor.StoredBlockInfo memory wrongNewStoredBlockInfo = newStoredBlockInfo;
-        wrongNewStoredBlockInfo.timestamp = 0; // incorrect timestamp
+        IExecutor.StoredBatchInfo memory wrongNewStoredBatchInfo = newStoredBatchInfo;
+        wrongNewStoredBatchInfo.timestamp = 0; // incorrect timestamp
 
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = wrongNewStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = wrongNewStoredBatchInfo;
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("exe10"));
-        executor.executeBlocks(storedBlockInfoArray);
+        executor.executeBatches(storedBatchInfoArray);
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
         vm.prank(validator);
-        executor.revertBlocks(0);
+        executor.revertBatches(0);
 
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = newStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("n"));
-        executor.executeBlocks(storedBlockInfoArray);
+        executor.executeBatches(storedBatchInfoArray);
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
         vm.prank(validator);
-        executor.revertBlocks(0);
+        executor.revertBatches(0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
-        bytes memory correctL2Logs = abi.encodePacked(
-            bytes4(0x00000002),
-            bytes4(0x00000000),
+        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        correctL2Logs[uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            bytes32(""),
-            bytes4(0x00010000),
+            uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+        correctL2Logs[uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
+            true,
             L2_BOOTLOADER_ADDRESS,
-            arbitraryCanonicalTxHash,
-            uint256(1)
+            uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            chainedPriorityTxHash
+        );
+        correctL2Logs[uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32(uint256(1))
         );
 
-        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
-        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
-        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(genesisStoredBlockInfo, correctNewCommitBlockInfoArray);
+        executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        IExecutor.StoredBlockInfo memory correctNewStoredBlockInfo = newStoredBlockInfo;
-        correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
-        correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewStoredBlockInfo.commitment = entries[0].topics[3];
+        IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
+        correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
+        correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
+        correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBatchInfo.commitment = entries[0].topics[3];
 
-        IExecutor.StoredBlockInfo[] memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(genesisStoredBlockInfo, correctNewStoredBlockInfoArray, proofInput);
+        executor.proveBatches(genesisStoredBatchInfo, correctNewStoredBatchInfoArray, proofInput);
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("s"));
-        executor.executeBlocks(correctNewStoredBlockInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray);
     }
 
     function test_RevertWhen_ExecutingWithUnmatchedPriorityOperationHash() public {
         vm.prank(validator);
-        executor.revertBlocks(0);
+        executor.revertBatches(0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
-        bytes memory correctL2Logs = abi.encodePacked(
-            bytes4(0x00000002),
-            bytes4(0x00000000),
+        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        correctL2Logs[uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-            bytes32(""),
-            bytes4(0x00010000),
-            L2_BOOTLOADER_ADDRESS,
-            arbitraryCanonicalTxHash,
-            uint256(1)
+            uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
+        correctL2Logs[uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            chainedPriorityTxHash
+        );
+        correctL2Logs[uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            bytes32(uint256(1))
+        );
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
-        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
-        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
-
-        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
         vm.prank(validator);
         vm.recordLogs();
-        executor.commitBlocks(genesisStoredBlockInfo, correctNewCommitBlockInfoArray);
+        executor.commitBatches(genesisStoredBatchInfo, correctNewCommitBatchInfoArray);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        IExecutor.StoredBlockInfo memory correctNewStoredBlockInfo = newStoredBlockInfo;
-        correctNewStoredBlockInfo.blockHash = entries[0].topics[2];
-        correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewStoredBlockInfo.commitment = entries[0].topics[3];
+        IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
+        correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
+        correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
+        correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBatchInfo.commitment = entries[0].topics[3];
 
-        IExecutor.StoredBlockInfo[] memory correctNewStoredBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        correctNewStoredBlockInfoArray[0] = correctNewStoredBlockInfo;
+        IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        correctNewStoredBatchInfoArray[0] = correctNewStoredBatchInfo;
 
         vm.prank(validator);
-        executor.proveBlocks(genesisStoredBlockInfo, correctNewStoredBlockInfoArray, proofInput);
+        executor.proveBatches(genesisStoredBatchInfo, correctNewStoredBatchInfoArray, proofInput);
 
         bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
 
@@ -206,10 +224,10 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
-        executor.executeBlocks(correctNewStoredBlockInfoArray);
+        executor.executeBatches(correctNewStoredBatchInfoArray);
     }
 
-    function test_RevertWhen_CommittingBlockWithWrongPreviousBlockHash() public {
+    function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),
@@ -218,28 +236,28 @@ contract ExecutingTest is ExecutorTest {
             bytes32("")
         );
 
-        IExecutor.CommitBlockInfo memory correctNewCommitBlockInfo = newCommitBlockInfo;
-        correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = correctL2Logs;
 
-        IExecutor.CommitBlockInfo[] memory correctNewCommitBlockInfoArray = new IExecutor.CommitBlockInfo[](1);
-        correctNewCommitBlockInfoArray[0] = correctNewCommitBlockInfo;
+        IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
 
-        bytes32 wrongPreviousBlockHash = Utils.randomBytes32("wrongPreviousBlockHash");
+        bytes32 wrongPreviousBatchHash = Utils.randomBytes32("wrongPreviousBatchHash");
 
-        IExecutor.StoredBlockInfo memory genesisBlock = genesisStoredBlockInfo;
-        genesisBlock.blockHash = wrongPreviousBlockHash;
+        IExecutor.StoredBatchInfo memory genesisBlock = genesisStoredBatchInfo;
+        genesisBlock.batchHash = wrongPreviousBatchHash;
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("i"));
-        executor.commitBlocks(genesisBlock, correctNewCommitBlockInfoArray);
+        executor.commitBatches(genesisBlock, correctNewCommitBatchInfoArray);
     }
 
-    function test_ShouldExecuteBlockSuccessfully() public {
-        IExecutor.StoredBlockInfo[] memory storedBlockInfoArray = new IExecutor.StoredBlockInfo[](1);
-        storedBlockInfoArray[0] = newStoredBlockInfo;
+    function test_ShouldExecuteBatchesuccessfully() public {
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
 
         vm.prank(validator);
-        executor.executeBlocks(storedBlockInfoArray);
+        executor.executeBatches(storedBatchInfoArray);
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);

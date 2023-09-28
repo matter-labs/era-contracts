@@ -27,7 +27,7 @@ contract DiamondCutTest is Test {
         selectors[9] = gettersFacet.priorityQueueFrontOperation.selector;
         selectors[10] = gettersFacet.isValidator.selector;
         selectors[11] = gettersFacet.l2LogsRootHash.selector;
-        selectors[12] = gettersFacet.storedBlockHash.selector;
+        selectors[12] = gettersFacet.storedBatchHash.selector;
         selectors[13] = gettersFacet.getL2BootloaderBytecodeHash.selector;
         selectors[14] = gettersFacet.getL2DefaultAccountBytecodeHash.selector;
         selectors[15] = gettersFacet.getVerifierParams.selector;
