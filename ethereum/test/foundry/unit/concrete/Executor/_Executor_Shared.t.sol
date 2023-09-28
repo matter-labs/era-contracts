@@ -12,7 +12,7 @@ import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksyn
 import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {GovernanceFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Governance.sol";
+import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
@@ -22,7 +22,7 @@ contract ExecutorTest is Test {
     address internal validator;
     address internal randomSigner;
     AllowList internal allowList;
-    GovernanceFacet internal governance;
+    AdminFacet internal admin;
     ExecutorFacet internal executor;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
@@ -35,13 +35,18 @@ contract ExecutorTest is Test {
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     IExecutor.ProofInput internal proofInput;
 
-    function getGovernanceSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](5);
-        selectors[0] = governance.setPendingGovernor.selector;
-        selectors[1] = governance.acceptGovernor.selector;
-        selectors[2] = governance.setValidator.selector;
-        selectors[3] = governance.setPorterAvailability.selector;
-        selectors[4] = governance.setPriorityTxMaxGasLimit.selector;
+    function getAdminSelectors() private view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](10);
+        selectors[0] = admin.setPendingGovernor.selector;
+        selectors[1] = admin.acceptGovernor.selector;
+        selectors[2] = admin.setPendingAdmin.selector;
+        selectors[3] = admin.acceptAdmin.selector;
+        selectors[4] = admin.setValidator.selector;
+        selectors[5] = admin.setPorterAvailability.selector;
+        selectors[6] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[7] = admin.executeUpgrade.selector;
+        selectors[8] = admin.freezeDiamond.selector;
+        selectors[9] = admin.unfreezeDiamond.selector;
         return selectors;
     }
 
@@ -55,7 +60,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getGovernor.selector;
         selectors[2] = getters.getPendingGovernor.selector;
@@ -73,24 +78,18 @@ contract ExecutorTest is Test {
         selectors[14] = getters.getL2DefaultAccountBytecodeHash.selector;
         selectors[15] = getters.getVerifierParams.selector;
         selectors[16] = getters.isDiamondStorageFrozen.selector;
-        selectors[17] = getters.getSecurityCouncil.selector;
-        selectors[18] = getters.getUpgradeProposalState.selector;
-        selectors[19] = getters.getProposedUpgradeHash.selector;
-        selectors[20] = getters.getProposedUpgradeTimestamp.selector;
-        selectors[21] = getters.getCurrentProposalId.selector;
-        selectors[22] = getters.isApprovedBySecurityCouncil.selector;
-        selectors[23] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[24] = getters.getAllowList.selector;
-        selectors[25] = getters.isEthWithdrawalFinalized.selector;
-        selectors[26] = getters.facets.selector;
-        selectors[27] = getters.facetFunctionSelectors.selector;
-        selectors[28] = getters.facetAddresses.selector;
-        selectors[29] = getters.facetAddress.selector;
-        selectors[30] = getters.isFunctionFreezable.selector;
-        selectors[31] = getters.isFacetFreezable.selector;
-        selectors[32] = getters.getTotalBatchesCommitted.selector;
-        selectors[33] = getters.getTotalBatchesVerified.selector;
-        selectors[34] = getters.getTotalBatchesExecuted.selector;
+        selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
+        selectors[18] = getters.getAllowList.selector;
+        selectors[19] = getters.isEthWithdrawalFinalized.selector;
+        selectors[20] = getters.facets.selector;
+        selectors[21] = getters.facetFunctionSelectors.selector;
+        selectors[22] = getters.facetAddresses.selector;
+        selectors[23] = getters.facetAddress.selector;
+        selectors[24] = getters.isFunctionFreezable.selector;
+        selectors[25] = getters.isFacetFreezable.selector;
+        selectors[26] = getters.getTotalBatchesCommitted.selector;
+        selectors[27] = getters.getTotalBatchesVerified.selector;
+        selectors[28] = getters.getTotalBatchesExecuted.selector;
         return selectors;
     }
 
@@ -111,7 +110,7 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
 
         executor = new ExecutorFacet();
-        governance = new GovernanceFacet();
+        admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet();
 
@@ -123,6 +122,7 @@ contract ExecutorTest is Test {
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             dummyAddress, //verifier
+            owner,
             owner,
             0,
             0,
@@ -137,10 +137,10 @@ contract ExecutorTest is Test {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(governance),
+            facet: address(admin),
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: getGovernanceSelectors()
+            selectors: getAdminSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(executor),
@@ -176,10 +176,10 @@ contract ExecutorTest is Test {
         executor = ExecutorFacet(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
-        governance = GovernanceFacet(address(diamondProxy));
+        admin = AdminFacet(address(diamondProxy));
 
         vm.prank(owner);
-        governance.setValidator(validator, true);
+        admin.setValidator(validator, true);
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;

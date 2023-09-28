@@ -22,7 +22,8 @@ contract DiamondInit is Base {
 
     /// @notice zkSync contract initialization
     /// @param _verifier address of Verifier contract
-    /// @param _governor address who can manage the contract
+    /// @param _governor address who can manage critical updates in the contract
+    /// @param _admin address who can manage non-critical updates in the contract
     /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
     /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
     /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
@@ -37,6 +38,7 @@ contract DiamondInit is Base {
     function initialize(
         IVerifier _verifier,
         address _governor,
+        address _admin,
         bytes32 _genesisBatchHash,
         uint64 _genesisIndexRepeatedStorageChanges,
         bytes32 _genesisBatchCommitment,
@@ -49,10 +51,12 @@ contract DiamondInit is Base {
     ) external reentrancyGuardInitializer returns (bytes32) {
         require(address(_verifier) != address(0), "vt");
         require(_governor != address(0), "vy");
+        require(_admin != address(0), "hc");
         require(_priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
         s.verifier = _verifier;
         s.governor = _governor;
+        s.admin = _admin;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(

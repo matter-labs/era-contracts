@@ -7,11 +7,10 @@ import {
     AllowList,
     ExecutorFacet,
     ExecutorFacetFactory,
-    DiamondCutFacetFactory,
     GettersFacetFactory,
-    GovernanceFacetFactory,
     GettersFacet,
-    GovernanceFacet,
+    AdminFacet,
+    AdminFacetFactory,
     DefaultUpgradeFactory,
     CustomUpgradeTestFactory
 } from '../../typechain';
@@ -32,16 +31,14 @@ import {
 } from './utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, BytesLike } from 'ethers';
-import { DiamondCutFacet } from '../../typechain';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
 describe('L2 upgrade test', function () {
     let proxyExecutor: ExecutorFacet;
-    let proxyDiamondCut: DiamondCutFacet;
+    let proxyAdmin: AdminFacet;
     let proxyGetters: GettersFacet;
-    let proxyGovernance: GovernanceFacet;
 
     let allowList: AllowList;
     let diamondProxyContract: ethers.Contract;
@@ -65,16 +62,12 @@ describe('L2 upgrade test', function () {
         const gettersContract = await gettersFactory.deploy();
         const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
 
-        const diamondCutFacetFactory = await hardhat.ethers.getContractFactory('DiamondCutFacet');
-        const diamondCutFacetContract = await diamondCutFacetFactory.deploy();
-        const diamondCutFacet = DiamondCutFacetFactory.connect(
-            diamondCutFacetContract.address,
-            diamondCutFacetContract.signer
+        const adminFacetFactory = await hardhat.ethers.getContractFactory('AdminFacet');
+        const adminFacetContract = await adminFacetFactory.deploy();
+        const adminFacet = AdminFacetFactory.connect(
+            adminFacetContract.address,
+            adminFacetContract.signer
         );
-
-        const governanceFactory = await hardhat.ethers.getContractFactory('GovernanceFacet');
-        const governanceContract = await governanceFactory.deploy();
-        const governanceFacet = GovernanceFacetFactory.connect(governanceContract.address, governanceContract.signer);
 
         const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
         const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
@@ -97,6 +90,7 @@ describe('L2 upgrade test', function () {
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
             verifier,
             await owner.getAddress(),
+            await owner.getAddress(),
             ethers.constants.HashZero,
             0,
             ethers.constants.HashZero,
@@ -109,13 +103,12 @@ describe('L2 upgrade test', function () {
         ]);
 
         const facetCuts = [
-            // Should be unfreezable. The function to unfreeze contract is located on the diamond cut facet.
-            // That means if the diamond cut will be freezable, the proxy can NEVER be unfrozen.
-            facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
+            // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
+            // That means if the admin will be freezable, the proxy can NEVER be unfrozen.
+            facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
             // Should be unfreezable. There are getters, that users can expect to be available.
             facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-            facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
-            facetCut(governanceFacet.address, governanceFacet.interface, Action.Add, true)
+            facetCut(executorFacet.address, executorFacet.interface, Action.Add, true)
         ];
 
         const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
@@ -128,10 +121,9 @@ describe('L2 upgrade test', function () {
 
         proxyExecutor = ExecutorFacetFactory.connect(diamondProxyContract.address, owner);
         proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, owner);
-        proxyDiamondCut = DiamondCutFacetFactory.connect(diamondProxyContract.address, owner);
-        proxyGovernance = GovernanceFacetFactory.connect(diamondProxyContract.address, owner);
+        proxyAdmin = AdminFacetFactory.connect(diamondProxyContract.address, owner);
 
-        await (await proxyGovernance.setValidator(await owner.getAddress(), true)).wait();
+        await (await proxyAdmin.setValidator(await owner.getAddress(), true)).wait();
     });
 
     it('Upgrade should work even if not all batches are processed', async () => {
@@ -146,7 +138,7 @@ describe('L2 upgrade test', function () {
         expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.constants.HashZero);
 
         await (
-            await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeUpgrade(proxyGetters, proxyAdmin, {
                 newProtocolVersion: 1,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -162,21 +154,19 @@ describe('L2 upgrade test', function () {
     it('Timestamp should behave correctly', async () => {
         // Upgrade was scheduled for now should work fine
         const timeNow = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+        await executeUpgrade(proxyGetters, proxyAdmin, {
             upgradeTimestamp: ethers.BigNumber.from(timeNow),
             l2ProtocolUpgradeTx: noopUpgradeTransaction
         });
 
         // Upgrade that was scheduled for the future should not work now
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 upgradeTimestamp: ethers.BigNumber.from(timeNow).mul(2),
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
         );
-        expect(revertReason).to.equal('Upgrade is not ready yet');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
+        expect(revertReason).to.equal('Upgrade is not ready yet');        
     });
 
     it('Should require correct tx type for upgrade tx', async () => {
@@ -184,14 +174,12 @@ describe('L2 upgrade test', function () {
             txType: 255
         });
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx
             })
         );
 
         expect(revertReason).to.equal('L2 system upgrade tx type is wrong');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should include the new protocol version as part of nonce', async () => {
@@ -201,15 +189,13 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
         );
 
         expect(revertReason).to.equal('The new protocol version should be included in the L2 system upgrade tx');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should ensure monotonic protocol version', async () => {
@@ -219,15 +205,13 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 0
             })
         );
 
         expect(revertReason).to.equal('New protocol version is not greater than the current one');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate upgrade transaction overhead', async () => {
@@ -237,15 +221,13 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
         );
 
         expect(revertReason).to.equal('my');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate upgrade transaction gas max', async () => {
@@ -255,15 +237,13 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
         );
 
         expect(revertReason).to.equal('ui');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate upgrade transaction cant output more pubdata than processable', async () => {
@@ -274,15 +254,13 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
         );
 
         expect(revertReason).to.equal('uk');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate factory deps', async () => {
@@ -294,7 +272,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: [myFactoryDep],
                 newProtocolVersion: 3
@@ -302,8 +280,6 @@ describe('L2 upgrade test', function () {
         );
 
         expect(revertReason).to.equal('Wrong factory dep hash');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate factory deps length match', async () => {
@@ -314,7 +290,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: [myFactoryDep],
                 newProtocolVersion: 3
@@ -322,8 +298,6 @@ describe('L2 upgrade test', function () {
         );
 
         expect(revertReason).to.equal('Wrong number of factory deps');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     it('Should validate factory deps length isnt too large', async () => {
@@ -336,7 +310,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeUpgrade(proxyGetters, proxyAdmin, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: Array(33).fill(myFactoryDep),
                 newProtocolVersion: 3
@@ -344,8 +318,6 @@ describe('L2 upgrade test', function () {
         );
 
         expect(revertReason).to.equal('Factory deps can be at most 32');
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
     });
 
     let l2UpgradeTxHash: string;
@@ -377,7 +349,7 @@ describe('L2 upgrade test', function () {
             newProtocolVersion: 4
         };
 
-        const upgradeReceipt = await (await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, upgrade)).wait();
+        const upgradeReceipt = await (await executeUpgrade(proxyGetters, proxyAdmin, upgrade)).wait();
 
         const defaultUpgradeFactory = await hardhat.ethers.getContractFactory('DefaultUpgrade');
         const upgradeEvents = upgradeReceipt.logs.map((log) => {
@@ -461,10 +433,8 @@ describe('L2 upgrade test', function () {
             newProtocolVersion: 5
         };
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, upgrade)
+            executeUpgrade(proxyGetters, proxyAdmin, upgrade)
         );
-
-        await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
 
         expect(revertReason).to.equal('Previous upgrade has not been finalized');
     });
@@ -633,7 +603,7 @@ describe('L2 upgrade test', function () {
     it('Should successfully commit a sequential upgrade', async () => {
         expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
         await (
-            await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeUpgrade(proxyGetters, proxyAdmin, {
                 newProtocolVersion: 5,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -674,7 +644,7 @@ describe('L2 upgrade test', function () {
 
     it('Should successfully commit custom upgrade', async () => {
         const upgradeReceipt = await (
-            await executeCustomTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeCustomUpgrade(proxyGetters, proxyAdmin, {
                 newProtocolVersion: 6,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -735,22 +705,6 @@ interface L2ToL1Log {
     sender: string;
     key: string;
     value: string;
-}
-
-function contextLog(timestamp: number, prevBatchHash: BytesLike): L2ToL1Log {
-    return {
-        sender: L2_SYSTEM_CONTEXT_ADDRESS,
-        key: packBatchTimestampAndBatchTimestamp(timestamp, timestamp),
-        value: ethers.utils.hexlify(prevBatchHash)
-    };
-}
-
-function bootloaderLog(txHash: BytesLike): L2ToL1Log {
-    return {
-        sender: L2_BOOTLOADER_ADDRESS,
-        key: ethers.utils.hexlify(txHash),
-        value: ethers.utils.hexlify(BigNumber.from(1))
-    };
 }
 
 function encodeLog(log: L2ToL1Log): string {
@@ -937,9 +891,9 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     };
 }
 
-async function executeTransparentUpgrade(
+async function executeUpgrade(
     proxyGetters: GettersFacet,
-    proxyDiamondCut: DiamondCutFacet,
+    proxyAdmin: AdminFacet,
     partialUpgrade: Partial<ProposedUpgrade>,
     contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -948,7 +902,6 @@ async function executeTransparentUpgrade(
         partialUpgrade.newProtocolVersion = newVersion;
     }
     const upgrade = buildProposeUpgrade(partialUpgrade);
-    const proposalId = (await proxyGetters.getCurrentProposalId()).add(1);
 
     const defaultUpgradeFactory = contractFactory
         ? contractFactory
@@ -961,15 +914,13 @@ async function executeTransparentUpgrade(
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
-    await (await proxyDiamondCut.proposeTransparentUpgrade(diamondCutData, proposalId)).wait();
-
     // This promise will be handled in the tests
-    return proxyDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
+    return proxyAdmin.executeUpgrade(diamondCutData);
 }
 
-async function executeCustomTransparentUpgrade(
+async function executeCustomUpgrade(
     proxyGetters: GettersFacet,
-    proxyDiamondCut: DiamondCutFacet,
+    proxyAdmin: AdminFacet,
     partialUpgrade: Partial<ProposedUpgrade>,
     contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -978,7 +929,6 @@ async function executeCustomTransparentUpgrade(
         partialUpgrade.newProtocolVersion = newVersion;
     }
     const upgrade = buildProposeUpgrade(partialUpgrade);
-    const proposalId = (await proxyGetters.getCurrentProposalId()).add(1);
 
     const upgradeFactory = contractFactory
         ? contractFactory
@@ -991,10 +941,8 @@ async function executeCustomTransparentUpgrade(
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
-    await (await proxyDiamondCut.proposeTransparentUpgrade(diamondCutData, proposalId)).wait();
-
     // This promise will be handled in the tests
-    return proxyDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
+    return proxyAdmin.executeUpgrade(diamondCutData);
 }
 
 async function makeExecutedEqualCommitted(

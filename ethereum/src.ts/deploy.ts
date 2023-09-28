@@ -9,7 +9,8 @@ import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
 import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
-import { AllowListFactory } from '../typechain';
+import { AllowListFactory, } from '../typechain';
+import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
 import { hexlify } from 'ethers/lib/utils';
 import {
     readSystemContractsBytecode,
@@ -21,6 +22,7 @@ import {
     getTokens
 } from '../scripts/utils';
 import { deployViaCreate2 } from './deploy-utils';
+import { IGovernanceFactory } from '../typechain/IGovernanceFactory';
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
@@ -28,9 +30,8 @@ const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContra
 export interface DeployedAddresses {
     ZkSync: {
         MailboxFacet: string;
-        GovernanceFacet: string;
+        AdminFacet: string;
         ExecutorFacet: string;
-        DiamondCutFacet: string;
         GettersFacet: string;
         Verifier: string;
         DiamondInit: string;
@@ -44,6 +45,7 @@ export interface DeployedAddresses {
         WethBridgeImplementation: string;
         WethBridgeProxy: string;
     };
+    Governance: string;
     AllowList: string;
     ValidatorTimeLock: string;
     Create2Factory: string;
@@ -51,7 +53,7 @@ export interface DeployedAddresses {
 
 export interface DeployerConfig {
     deployWallet: Wallet;
-    governorAddress?: string;
+    ownerAddress?: string;
     verbose?: boolean;
 }
 
@@ -59,8 +61,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     return {
         ZkSync: {
             MailboxFacet: getAddressFromEnv('CONTRACTS_MAILBOX_FACET_ADDR'),
-            GovernanceFacet: getAddressFromEnv('CONTRACTS_GOVERNANCE_FACET_ADDR'),
-            DiamondCutFacet: getAddressFromEnv('CONTRACTS_DIAMOND_CUT_FACET_ADDR'),
+            AdminFacet: getAddressFromEnv('CONTRACTS_ADMIN_FACET_ADDR'),
             ExecutorFacet: getAddressFromEnv('CONTRACTS_EXECUTOR_FACET_ADDR'),
             GettersFacet: getAddressFromEnv('CONTRACTS_GETTERS_FACET_ADDR'),
             DiamondInit: getAddressFromEnv('CONTRACTS_DIAMOND_INIT_ADDR'),
@@ -77,7 +78,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
         },
         AllowList: getAddressFromEnv('CONTRACTS_L1_ALLOW_LIST_ADDR'),
         Create2Factory: getAddressFromEnv('CONTRACTS_CREATE2_FACTORY_ADDR'),
-        ValidatorTimeLock: getAddressFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_ADDR')
+        ValidatorTimeLock: getAddressFromEnv('CONTRACTS_VALIDATOR_TIMELOCK_ADDR'),
+        Governance: getAddressFromEnv('CONTRACTS_GOVERNANCE_ADDR')
     };
 }
 
@@ -85,23 +87,22 @@ export class Deployer {
     public addresses: DeployedAddresses;
     private deployWallet: Wallet;
     private verbose: boolean;
-    private governorAddress: string;
+    private ownerAddress: string;
 
     constructor(config: DeployerConfig) {
         this.deployWallet = config.deployWallet;
         this.verbose = config.verbose != null ? config.verbose : false;
         this.addresses = deployedAddressesFromEnv();
-        this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
+        this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
     }
 
     public async initialProxyDiamondCut() {
         const facetCuts = Object.values(
             await getCurrentFacetCutsForAdd(
-                this.addresses.ZkSync.DiamondCutFacet,
+                this.addresses.ZkSync.AdminFacet,
                 this.addresses.ZkSync.GettersFacet,
                 this.addresses.ZkSync.MailboxFacet,
-                this.addresses.ZkSync.ExecutorFacet,
-                this.addresses.ZkSync.GovernanceFacet
+                this.addresses.ZkSync.ExecutorFacet
             )
         );
         const genesisBatchHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
@@ -117,7 +118,8 @@ export class Deployer {
 
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             this.addresses.ZkSync.Verifier,
-            this.governorAddress,
+            this.ownerAddress,
+            this.ownerAddress,
             genesisBatchHash,
             genesisRollupLeafIndex,
             genesisBatchCommitment,
@@ -173,11 +175,28 @@ export class Deployer {
         return result[0];
     }
 
+    public async deployGovernance(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2(
+            'Governance',
+            // TODO: load parameters from config
+            [this.ownerAddress, ethers.constants.AddressZero, 0],
+            create2Salt,
+            ethTxOptions
+        );
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_GOVERNANCE_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.Governance = contractAddress;
+    }
+
     public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'AllowList',
-            [this.governorAddress],
+            [this.ownerAddress],
             create2Salt,
             ethTxOptions
         );
@@ -200,26 +219,15 @@ export class Deployer {
         this.addresses.ZkSync.MailboxFacet = contractAddress;
     }
 
-    public async deployGovernanceFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2('GovernanceFacet', [], create2Salt, ethTxOptions);
+        const contractAddress = await this.deployViaCreate2('AdminFacet', [], create2Salt, ethTxOptions);
 
         if (this.verbose) {
-            console.log(`CONTRACTS_GOVERNANCE_FACET_ADDR=${contractAddress}`);
+            console.log(`CONTRACTS_ADMIN_FACET_ADDR=${contractAddress}`);
         }
 
-        this.addresses.ZkSync.GovernanceFacet = contractAddress;
-    }
-
-    public async deployDiamondCutFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2('DiamondCutFacet', [], create2Salt, ethTxOptions);
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_DIAMOND_CUT_FACET_ADDR=${contractAddress}`);
-        }
-
-        this.addresses.ZkSync.DiamondCutFacet = contractAddress;
+        this.addresses.ZkSync.AdminFacet = contractAddress;
     }
 
     public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -278,7 +286,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'TransparentUpgradeableProxy',
-            [this.addresses.Bridges.ERC20BridgeImplementation, this.governorAddress, '0x'],
+            [this.addresses.Bridges.ERC20BridgeImplementation, this.ownerAddress, '0x'],
             create2Salt,
             ethTxOptions
         );
@@ -325,7 +333,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'TransparentUpgradeableProxy',
-            [this.addresses.Bridges.WethBridgeImplementation, this.governorAddress, '0x'],
+            [this.addresses.Bridges.WethBridgeImplementation, this.ownerAddress, '0x'],
             create2Salt,
             ethTxOptions
         );
@@ -405,13 +413,12 @@ export class Deployer {
         const independentZkSyncDeployPromises = [
             this.deployMailboxFacet(create2Salt, { gasPrice, nonce }),
             this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
-            this.deployDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
-            this.deployGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
-            this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 4 }),
-            this.deployDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 })
+            this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
+            this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
+            this.deployDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 })
         ];
         await Promise.all(independentZkSyncDeployPromises);
-        nonce += 6;
+        nonce += 5;
 
         await this.deployDiamondProxy(create2Salt, { gasPrice, nonce });
     }
@@ -436,7 +443,7 @@ export class Deployer {
         const validatorAddress = getAddressFromEnv('ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR');
         const contractAddress = await this.deployViaCreate2(
             'ValidatorTimelock',
-            [this.governorAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+            [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
             create2Salt,
             ethTxOptions
         );
@@ -457,8 +464,16 @@ export class Deployer {
         }
     }
 
+    public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
+        return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    }
+
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
         return SingletonFactoryFactory.connect(this.addresses.Create2Factory, signerOrProvider);
+    }
+
+    public governanceContract(signerOrProvider: Signer | providers.Provider) {
+        return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
     }
 
     public zkSyncContract(signerOrProvider: Signer | providers.Provider) {

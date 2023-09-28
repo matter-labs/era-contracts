@@ -1,8 +1,10 @@
 import { Command } from 'commander';
-import { Wallet } from 'ethers';
+import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider } from './utils';
+import {
+    web3Provider,
+} from './utils';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,10 +16,12 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 async function main() {
     const program = new Command();
 
+    program.version('0.1.0').name('initialize-governance');
+
     program
         .option('--private-key <private-key>')
+        .option('--owner-address <owner-address>')
         .option('--gas-price <gas-price>')
-        .option('--nonce <nonce>')
         .action(async (cmd) => {
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
@@ -30,21 +34,39 @@ async function main() {
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
-            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);
+            const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
 
             const deployer = new Deployer({
                 deployWallet,
+                ownerAddress,
                 verbose: true
             });
 
+            const governance = deployer.governanceContract(deployWallet);
             const zkSync = deployer.zkSyncContract(deployWallet);
-            const validatorTimelock = deployer.validatorTimelock(deployWallet);
-            const tx = await zkSync.setValidator(validatorTimelock.address, true);
-            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);
-            const receipt = await tx.wait();
+            
+            const erc20Bridge = deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
+            const wethBridge = deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
 
-            console.log(`Validator is set, gasUsed: ${receipt.gasUsed.toString()}`);
+            await (await erc20Bridge.changeAdmin(governance.address)).wait();
+            await (await wethBridge.changeAdmin(governance.address)).wait();
+
+            await (await zkSync.setPendingGovernor(governance.address)).wait();
+
+            const call = {
+                target: zkSync.address,
+                value: 0,
+                data: zkSync.interface.encodeFunctionData('acceptGovernor')
+            }
+
+            const operation = { 
+                calls: [call],
+                predecessor: ethers.constants.HashZero, 
+                salt: ethers.constants.HashZero 
+            };
+
+            await (await governance.scheduleTransparent(operation, 0)).wait();
+            await (await governance.execute(operation)).wait();
         });
 
     await program.parseAsync(process.argv);

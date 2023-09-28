@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.13;
 
-import "../../zksync/facets/Governance.sol";
+import "../../zksync/facets/Admin.sol";
 
-contract GovernanceFacetTest is GovernanceFacet {
+contract AdminFacetTest is AdminFacet {
     constructor() {
         s.governor = msg.sender;
     }

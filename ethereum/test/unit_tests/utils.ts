@@ -131,25 +131,6 @@ export function createSystemLogs() {
     ];
 }
 
-export async function setSecurityCouncil(
-    proxyAsGetters: ethers.Contract,
-    proxyAsDiamondCut: ethers.Contract,
-    securityCouncil: ethers.Signer
-) {
-    const diamondUpgradeSecurityCouncilFactory = await hardhat.ethers.getContractFactory(
-        'DiamondUpgradeSecurityCouncil'
-    );
-    const diamondUpgradeSecurityCouncilContract = await diamondUpgradeSecurityCouncilFactory.deploy();
-    const calldata = diamondUpgradeSecurityCouncilContract.interface.encodeFunctionData('upgrade', [
-        await securityCouncil.getAddress()
-    ]);
-    const diamondCutData = diamondCut([], diamondUpgradeSecurityCouncilContract.address, calldata);
-
-    const nextProposalId = (await proxyAsGetters.getCurrentProposalId()).add(1);
-    await proxyAsDiamondCut.proposeTransparentUpgrade(diamondCutData, nextProposalId);
-    await proxyAsDiamondCut.executeUpgrade(diamondCutData, ethers.constants.HashZero);
-}
-
 export function genesisStoredBatchInfo(): StoredBatchInfo {
     return {
         batchNumber: 0,
