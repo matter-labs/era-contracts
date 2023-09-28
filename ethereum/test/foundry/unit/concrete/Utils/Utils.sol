@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
@@ -93,5 +96,56 @@ library Utils {
             result = abi.encodePacked(result, data[i]);
         }
         return result;
+    }
+
+    function getGettersSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](35);
+        selectors[0] = GettersFacet.getVerifier.selector;
+        selectors[1] = GettersFacet.getGovernor.selector;
+        selectors[2] = GettersFacet.getPendingGovernor.selector;
+        selectors[3] = GettersFacet.getTotalBlocksCommitted.selector;
+        selectors[4] = GettersFacet.getTotalBlocksVerified.selector;
+        selectors[5] = GettersFacet.getTotalBlocksExecuted.selector;
+        selectors[6] = GettersFacet.getTotalPriorityTxs.selector;
+        selectors[7] = GettersFacet.getFirstUnprocessedPriorityTx.selector;
+        selectors[8] = GettersFacet.getPriorityQueueSize.selector;
+        selectors[9] = GettersFacet.priorityQueueFrontOperation.selector;
+        selectors[10] = GettersFacet.isValidator.selector;
+        selectors[11] = GettersFacet.l2LogsRootHash.selector;
+        selectors[12] = GettersFacet.storedBatchHash.selector;
+        selectors[13] = GettersFacet.getL2BootloaderBytecodeHash.selector;
+        selectors[14] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
+        selectors[15] = GettersFacet.getVerifierParams.selector;
+        selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
+        selectors[17] = GettersFacet.getSecurityCouncil.selector;
+        selectors[18] = GettersFacet.getUpgradeProposalState.selector;
+        selectors[19] = GettersFacet.getProposedUpgradeHash.selector;
+        selectors[20] = GettersFacet.getProposedUpgradeTimestamp.selector;
+        selectors[21] = GettersFacet.getCurrentProposalId.selector;
+        selectors[22] = GettersFacet.isApprovedBySecurityCouncil.selector;
+        selectors[23] = GettersFacet.getPriorityTxMaxGasLimit.selector;
+        selectors[24] = GettersFacet.getAllowList.selector;
+        selectors[25] = GettersFacet.isEthWithdrawalFinalized.selector;
+        selectors[26] = GettersFacet.facets.selector;
+        selectors[27] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[28] = GettersFacet.facetAddresses.selector;
+        selectors[29] = GettersFacet.facetAddress.selector;
+        selectors[30] = GettersFacet.isFunctionFreezable.selector;
+        selectors[31] = GettersFacet.isFacetFreezable.selector;
+        selectors[32] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[33] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[34] = GettersFacet.getTotalBatchesExecuted.selector;
+        return selectors;
+    }
+
+    function getMailboxSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](6);
+        selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
+        selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
+        selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[3] = MailboxFacet.finalizeEthWithdrawal.selector;
+        selectors[4] = MailboxFacet.requestL2Transaction.selector;
+        selectors[5] = MailboxFacet.l2TransactionBaseCost.selector;
+        return selectors;
     }
 }

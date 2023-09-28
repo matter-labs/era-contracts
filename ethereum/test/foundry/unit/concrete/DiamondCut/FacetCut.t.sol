@@ -9,6 +9,7 @@ import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksy
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {Utils} from "../Utils/Utils.sol";
 
 // solhint-enable max-line-length
 
@@ -16,17 +17,6 @@ contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
     ExecutorFacet private executorFacet1;
     ExecutorFacet private executorFacet2;
-
-    function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = mailboxFacet.proveL2MessageInclusion.selector;
-        selectors[1] = mailboxFacet.proveL2LogInclusion.selector;
-        selectors[2] = mailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[3] = mailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[4] = mailboxFacet.requestL2Transaction.selector;
-        selectors[5] = mailboxFacet.l2TransactionBaseCost.selector;
-        return selectors;
-    }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
@@ -51,13 +41,13 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(gettersFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getGettersSelectors()
+            selectors: Utils.getGettersSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: address(executorFacet1),
@@ -87,7 +77,7 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -108,7 +98,7 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(0),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -127,7 +117,7 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Replace,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -146,7 +136,7 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -189,13 +179,13 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(0),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -213,19 +203,19 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(0),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -353,19 +343,19 @@ contract FacetCutTest is DiamondCutTest {
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(0),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: address(mailboxFacet),
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: getMailboxSelectors()
+            selectors: Utils.getMailboxSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
