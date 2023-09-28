@@ -4,10 +4,13 @@ pragma solidity ^0.8.13;
 
 import "../interfaces/IAdmin.sol";
 import "../libraries/Diamond.sol";
+import "../../common/libraries/L2ContractHelper.sol";
+import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
 import "./Base.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is Base, IAdmin {
     string public constant override getName = "GovernanceFacet";
 
@@ -17,13 +20,9 @@ contract AdminFacet is Base, IAdmin {
     function setPendingGovernor(address _newPendingGovernor) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
         address oldPendingGovernor = s.pendingGovernor;
-
-        if (oldPendingGovernor != _newPendingGovernor) {
-            // Change pending governor
-            s.pendingGovernor = _newPendingGovernor;
-
-            emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
-        }
+        // Change pending governor
+        s.pendingGovernor = _newPendingGovernor;
+        emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending governor can accept the role.
@@ -31,44 +30,38 @@ contract AdminFacet is Base, IAdmin {
         address pendingGovernor = s.pendingGovernor;
         require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
 
-        if (pendingGovernor != s.governor) {
-            address previousGovernor = s.governor;
-            s.governor = pendingGovernor;
-            delete s.pendingGovernor;
+        address previousGovernor = s.governor;
+        s.governor = pendingGovernor;
+        delete s.pendingGovernor;
 
-            emit NewPendingGovernor(pendingGovernor, address(0));
-            emit NewGovernor(previousGovernor, pendingGovernor);
-        }
+        emit NewPendingGovernor(pendingGovernor, address(0));
+        emit NewGovernor(previousGovernor, pendingGovernor);
     }
 
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external onlyGovernorOrItsOwner {
-        if (s.validators[_validator] != _active) {
-            s.validators[_validator] = _active;
-            emit ValidatorStatusUpdate(_validator, _active);
-        }
+        s.validators[_validator] = _active;
+        emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @notice Change zk porter availability
     /// @param _zkPorterIsAvailable The availability of zk porter shard
     function setPorterAvailability(bool _zkPorterIsAvailable) external onlyGovernor {
-        if (s.zkPorterIsAvailable != _zkPorterIsAvailable) {
-            // Change the porter availability
-            s.zkPorterIsAvailable = _zkPorterIsAvailable;
-            emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
-        }
+        // Change the porter availability
+        s.zkPorterIsAvailable = _zkPorterIsAvailable;
+        emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
+        require(_newPriorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "n5");
+
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
-        if (oldPriorityTxMaxGasLimit != _newPriorityTxMaxGasLimit) {
-            s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
-            emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
-        }
+        s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
+        emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 
     /*//////////////////////////////////////////////////////////////

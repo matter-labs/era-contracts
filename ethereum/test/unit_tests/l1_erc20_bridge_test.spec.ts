@@ -64,7 +64,7 @@ describe(`L1ERC20Bridge tests`, function () {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            10000000
         ]);
 
         const facetCuts = [
@@ -163,7 +163,7 @@ describe(`L1ERC20Bridge tests`, function () {
         expect(revertReason).equal(`nt`);
     });
 
-    it(`Should revert on finalizing a withdrawal with wrong block number`, async () => {
+    it(`Should revert on finalizing a withdrawal with wrong batch number`, async () => {
         const functionSignature = `0x11a2ccc1`;
         const l1Receiver = await randomSigner.getAddress();
         const l2ToL1message = ethers.utils.hexConcat([

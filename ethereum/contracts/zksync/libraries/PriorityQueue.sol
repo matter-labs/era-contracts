@@ -14,6 +14,7 @@ struct PriorityOperation {
 }
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev The library provides the API to interact with the priority queue container
 /// @dev Order of processing operations from queue - FIFO (Fist in - first out)
 library PriorityQueue {

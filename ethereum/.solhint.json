@@ -1,8 +1,17 @@
 {
-    "extends": "solhint:default",
-    "plugins": ["prettier"],
-    "rules": {
-      "prettier/prettier": "error",
-      "no-inline-assembly": false
-    }
+  "extends": "solhint:recommended",
+  "plugins": ["prettier"],
+  "rules": {
+    "prettier/prettier": ["error"],
+    "func-visibility": ["error", { "ignoreConstructors": true }],
+    "compiler-version": ["error", ">=0.8.0"],
+    "max-line-length": ["error", 120],
+    "var-name-mixedcase": "off",
+    "func-name-mixedcase": "off",
+    "no-inline-assembly": "off",
+    "custom-errors": "off",
+    "no-global-import": "off",
+    "no-complex-fallback": "off",
+    "immutable-vars-naming": ["warn", { "immutablesAsConstants": false }]
+  }
 }

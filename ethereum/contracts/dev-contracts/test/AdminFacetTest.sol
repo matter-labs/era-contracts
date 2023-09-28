@@ -9,15 +9,23 @@ contract AdminFacetTest is AdminFacet {
         s.governor = msg.sender;
     }
 
-    function isValidator(address _validator) external view returns (bool) {
-        return s.validators[_validator];
+    function getPorterAvailability() external view returns (bool) {
+        return s.zkPorterIsAvailable;
     }
 
-    function getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+    function isValidator(address _address) external view returns (bool) {
+        return s.validators[_address];
+    }
+
+    function getPriorityTxMaxGasLimit() external view returns (uint256) {
+        return s.priorityTxMaxGasLimit;
     }
 
     function getGovernor() external view returns (address) {
         return s.governor;
+    }
+
+    function getPendingGovernor() external view returns (address) {
+        return s.pendingGovernor;
     }
 }

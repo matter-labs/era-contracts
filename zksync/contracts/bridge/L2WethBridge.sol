@@ -12,6 +12,7 @@ import {L2_ETH_ADDRESS} from "../L2ContractHelper.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev This contract works in conjunction with the L1WethBridge to streamline the process of bridging WETH tokens between L1 and L2.
 /// @dev This contract accepts Ether from the L1 Bridge during deposits, converts it to WETH, and sends it to the user.
 /// @dev For withdrawals, it processes the user's WETH tokens by unwrapping them and transferring the equivalent Ether to the L1 Bridge.
