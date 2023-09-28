@@ -24,10 +24,9 @@ async function main() {
 
     // Contracts without constructor parameters
     for (const address of [
-        addresses.ZkSync.DiamondCutFacet,
         addresses.ZkSync.GettersFacet,
         addresses.ZkSync.DiamondInit,
-        addresses.ZkSync.GovernanceFacet,
+        addresses.ZkSync.AdminFacet,
         addresses.ZkSync.MailboxFacet,
         addresses.ZkSync.ExecutorFacet,
         addresses.ZkSync.Verifier
