@@ -21,7 +21,7 @@ contract RevertingTest is ExecutorTest {
                 Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
             );
 
-        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.systemLogs = l2Logs;
 

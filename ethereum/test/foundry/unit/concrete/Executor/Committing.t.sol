@@ -46,7 +46,7 @@ contract CommittingTest is ExecutorTest {
             );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -69,7 +69,7 @@ contract CommittingTest is ExecutorTest {
             );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.timestamp = uint64(wrongNewBatchTimestamp);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
@@ -93,7 +93,7 @@ contract CommittingTest is ExecutorTest {
             );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.timestamp = wrongNewBatchTimestamp;
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
@@ -116,7 +116,7 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -132,7 +132,7 @@ contract CommittingTest is ExecutorTest {
         delete wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))];
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000006), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -157,7 +157,7 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000008), wrongL2Logs);
+        wrongNewCommitBatchInfo.systemLogs = wrongL2Logs;
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -180,7 +180,7 @@ contract CommittingTest is ExecutorTest {
             );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000008), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -202,7 +202,7 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -223,7 +223,7 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
         wrongNewCommitBatchInfo.numberOfLayer1Txs = 2;
 
         IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
@@ -281,7 +281,7 @@ contract CommittingTest is ExecutorTest {
             wrongL2Logs[i] = Utils.constructL2Log(true, wrongAddress, i, values[i]);
 
             IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-            wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(wrongL2Logs));
+            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
 
             IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
             wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -299,7 +299,7 @@ contract CommittingTest is ExecutorTest {
             delete l2Logs[i];
 
             IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-            wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000006), Utils.encodePacked(l2Logs));
+            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(l2Logs);
 
             IExecutor.CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
             wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
@@ -321,7 +321,7 @@ contract CommittingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = abi.encodePacked(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;

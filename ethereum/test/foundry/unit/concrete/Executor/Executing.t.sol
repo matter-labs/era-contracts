@@ -26,7 +26,7 @@ contract ExecutingTest is ExecutorTest {
                 Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
             );
 
-        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
@@ -121,7 +121,7 @@ contract ExecutingTest is ExecutorTest {
         );
 
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
@@ -177,7 +177,7 @@ contract ExecutingTest is ExecutorTest {
             bytes32(uint256(1))
         );
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(correctL2Logs));
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 

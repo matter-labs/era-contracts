@@ -55,7 +55,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](32);
+        bytes4[] memory selectors = new bytes4[](35);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getGovernor.selector;
         selectors[2] = getters.getPendingGovernor.selector;
@@ -88,6 +88,9 @@ contract ExecutorTest is Test {
         selectors[29] = getters.facetAddress.selector;
         selectors[30] = getters.isFunctionFreezable.selector;
         selectors[31] = getters.isFacetFreezable.selector;
+        selectors[32] = getters.getTotalBatchesCommitted.selector;
+        selectors[33] = getters.getTotalBatchesVerified.selector;
+        selectors[34] = getters.getTotalBatchesExecuted.selector;
         return selectors;
     }
 
@@ -129,7 +132,7 @@ contract ExecutorTest is Test {
             false,
             dummyHash,
             dummyHash,
-            100000000000
+            1000000
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
@@ -198,7 +201,7 @@ contract ExecutorTest is Test {
         vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory l2Logs = bytes.concat(bytes4(0x00000007), Utils.encodePacked(Utils.createSystemLogs()));
+        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs());
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),

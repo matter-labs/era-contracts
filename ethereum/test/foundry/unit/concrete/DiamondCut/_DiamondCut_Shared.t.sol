@@ -14,7 +14,7 @@ contract DiamondCutTest is Test {
     GettersFacet internal gettersFacet;
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](32);
+        bytes4[] memory selectors = new bytes4[](35);
         selectors[0] = gettersFacet.getVerifier.selector;
         selectors[1] = gettersFacet.getGovernor.selector;
         selectors[2] = gettersFacet.getPendingGovernor.selector;
@@ -47,6 +47,9 @@ contract DiamondCutTest is Test {
         selectors[29] = gettersFacet.facetAddress.selector;
         selectors[30] = gettersFacet.isFunctionFreezable.selector;
         selectors[31] = gettersFacet.isFacetFreezable.selector;
+        selectors[32] = gettersFacet.getTotalBatchesCommitted.selector;
+        selectors[33] = gettersFacet.getTotalBatchesVerified.selector;
+        selectors[34] = gettersFacet.getTotalBatchesExecuted.selector;
         return selectors;
     }
 }
