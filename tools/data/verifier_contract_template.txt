@@ -264,6 +264,9 @@ contract Verifier is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             {{commitments}}
+
+            // flag for using recursive part
+            mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
 
