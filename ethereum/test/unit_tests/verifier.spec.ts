@@ -63,8 +63,8 @@ describe('Verifier test', function () {
             '0x0713c1371914ac18d7dced467a8a60eeca0f3d80a2cbd5dcc75abb6cbab39f39'
         ]
     };
-    const PROOF = {
-        publicInputs: ['0xa3dd954bb76c1474c1a04f04870cc75bcaf66ec23c0303c87fb119f9'],
+    const PROOF_generated = {
+        publicInputs: ['0x00000000a3dd954bb76c1474c1a04f04870cc75bcaf66ec23c0303c87fb119f9'],
         serializedProof: [
             '0x162e0e35310fa1265df0051490fad590e875a98b4e7781ce1bb2698887e24070',
             '0x1a3645718b688a382a00b99059f9488daf624d04ceb39b5553f0a1a0d508dde6',
@@ -110,11 +110,11 @@ describe('Verifier test', function () {
             '0x26bee4a0a5c8b76caa6b73172fa7760bd634c28d2c2384335b74f5d18e3933f4',
             '0x106719993b9dacbe46b17f4e896c0c9c116d226c50afe2256dca1e81cd510b5c',
             '0x19b5748fd961f755dd3c713d09014bd12adbb739fa1d2160067a312780a146a2',
-            '0x2d360628289ff943ff6bd1a87bbe4e62abe7fb61ba83effd266f22bdcf31e6f9',
-            '0x26b92a79e563c3f48252cce7feeca2f0f8d33dcb4ef7b0643bf07bd405700aaa',
-            '0x1',
-            '0x2',
         ],
+
+
+
+
         recursiveAggregationInput: [
             '0x8b56378f977f423938bc7e671ee17b732fe77213282eeb669cb5884d424f7440',
             '0xeea6149a262aa6b1e48c805dc66a813be6e7641f03ea4fd9009c1861aa169b0a',
@@ -122,6 +122,68 @@ describe('Verifier test', function () {
             '0xe9a00716e01f52a8a7452f4f88dfe2d118afd791bc037ee8d6b7f0e9578452f7',
         ]
     };
+    const PROOF_from_db = {
+        publicInputs: ['0x00000000a3dd954bb76c1474c1a04f04870cc75bcaf66ec23c0303c87fb119f9'],
+        serializedProof: [
+            '0x211458047a1672a65100bcf634a34dfb63929abd7363c26eba49b6a389a29f6a',
+            '0x24be4b7be154b5c95a7a98c927d0664d09caa694943170acf0fd9cac5ac46a51',
+            '0x1b966d7a0562c762bd90893cee34e5c9b0aee930380507bd04e0b6ac774e2c05',
+            '0x2910fcf08358fd1e604276caefe1f7872c9bfa01660249975c9c2de47074129c',
+            '0x15aa279d9cb60e1ce27370a756cde08931b7031257992357147840fe763a28f5',
+            '0x240101bad50c9d9e9dba0926617f2a09353644f667fb7593a4174777fb2cc61f',
+            '0x195b531c10e520aa5f91caf311f37c3416f73a7a8cf882098da4517f024d5efd',
+            '0x0d6aaba9d1f11342044ef73feb13fcfa73d254ee15938a20ac47a43b3b7e0981',
+            '0x2a273a4f243869e3d292615a9eae22fbd7a95f03159a41ca4bdc8c40ed8770d1',
+            '0x0ca15df7ac7001e31b5c4c7be6656f72690548f127f47e81144496242a4b2897',
+            '0x194d01782d413ceb762af02a231fbdc2bfffa2ed95cc1ffb763d524108dafc9e',
+            '0x2586bccb0c252b882dacb4c4a7bca02abbdb472ee806c79b9849680d89ffe12a',
+            '0x2eb19a3b868bb35443d13a1ed26d3e38e3faa5479544f12ab42a8dea8037289b',
+            '0x2af515e447fdd329fb043688cb820b314ee5b3128ff7efd6554618ec9c8286b8',
+            '0x10d7acba66d9de7149916fa51402dc1be6fa394a4673df15f2ea484bbabb780a',
+            '0x295d662c16e4d3317850e784bec97f27d508dadbb67afe3396360bb1a950bb7e',
+            '0x14d6487319ce188a9d75134b7cb6b6a5ffca01604c39a1b09b8143499caa0b16',
+            '0x1e950fea10bfc135a49b46d2ea277fd5a30e16549b21f32b5e554b68eb9428ef',
+            '0x27bd5bd90de1b0c4c308cb116dc4b8a3654a403323d6537feeb96d933f406584',
+            '0x15489d770c3435ee8fc6fec259d157b1324d43e7d4bdb3626d28d4968587becf',
+            '0x09e7ed10c0cfb7918317178ab7d13f4c170a25f69057b2b145915cdad1a9e9ec',
+            '0x240c7541759522d0f23310eb65318a246df3556f55087ff4bdd6da4eaba7312a',
+            '0x2bd4a7184624c7c6b13e20ced3536a4bbc25d946032a446c81e1a883592ae62d',
+            '0x09f7db482784614a5b24884695993e05692918a7eec423759ded92d9d9d6faaa',
+            '0x03abb9c66028b7e1966a2738b8e1633c88ae00efb350a49906f71e6ad8b22252',
+            '0x2950566ee8fdff515a821365184fa681b3209110889937ea9becdff1241c705f',
+            '0x0a8b6156196c81c62c0a7a6ba76cce9d29234da6801724787ecfc275ad73be48',
+            '0x09e658d0b5ccbda0295b546204e4a8308f42ff74c9f283e38ee30fdbccd92855',
+            '0x0d133e328a68d4d751f3e9d02bfe681ee171573e00c11868f46b621a05999823',
+            '0x240f882b04b58a28d0ed68387e3b9c6a2d7a3b5d25ff86b165af6746c921cb98',
+            '0x2c2ef2d026e2e39668bd9953fcffb3d7252bee5098ed6ed56d0f94bd44308df5',
+            '0x04a308d3d656278a8da6c790660d23a420633f2d041e6dc6f74d42cfa6d77853',
+            '0x0ca49073d5db1fea055ee2d0c59892891e3a21d6b530096f0e68e4089e183d0d',
+            '0x01e6cdc018eacd879d0c66ea2ad788be91baa34bcaef25887e3659d72dcaee71',
+            '0x17c57c620aea02cdfd5c6b6372d45a724fa9a221d4c31e970b10c5a52f60a5e7',
+            '0x02c7aee980f2a1b815c3eea41bd5d907c8d19f675173f6aee95a3159b385045e',
+            '0x28d080c762c6a7a88431321d779dcf96e27d2f6e3a6b24f02c4f054b4b718955',
+            '0x2f5f8b01aedff95d4a26dfa3a65399dd96de4bd045224788510dfb4cc2d5712c',
+            '0x03176a68d8f7b8b3d0349650cc5be405b2cddde5f6b26c5ffeee62476d707ed5',
+            '0x12301d2997b50165f46e147021f0e2808ee66bcf4c2ad80066756bf493d07e67',
+            '0x0895dcfea5b61768f31d4d01700643010db278c37f9376ead1a946e9de10e653',
+            '0x0f2bb77a6b285391e9e6978f76a7a48dfb8aaa10b6da78b305924540c3fef53b',
+            '0x084d517fcd2f5ddb209023dfdacef87313f16c488d4656370ceb53f3c12ea850',
+            '0x07b69b9adf107fba6bf1de55baf1e505b117708fe977231ba096cc06b0f2b243',
+        ],
+
+
+
+
+        recursiveAggregationInput: [
+            '0x8b56378f977f423938bc7e671ee17b732fe77213282eeb669cb5884d424f7440',
+            '0xeea6149a262aa6b1e48c805dc66a813be6e7641f03ea4fd9009c1861aa169b0a',
+            '0x4f767dd4bfe68c96c003880385488a27ecb419429120c18933632f43f834012d',
+            '0xe9a00716e01f52a8a7452f4f88dfe2d118afd791bc037ee8d6b7f0e9578452f7',
+        ]
+    };
+
+    const PROOF = PROOF_generated;
+
     let verifier: VerifierTest;
 
     before(async function () {
@@ -143,6 +205,34 @@ describe('Verifier test', function () {
         let result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
         expect(result, 'proof verification failed').true;
     });
+
+    it('Should verify proof_from_db', async () => {
+        // Call the verifier directly (though the call, not static call) to add the save the consumed gas into the statistic.
+        // Check that proof is verified
+        let result = await verifier.verify(PROOF_from_db.publicInputs, PROOF_from_db.serializedProof, PROOF_from_db.recursiveAggregationInput);
+        expect(result, 'proof verification failed').true;
+    });
+    it('Should verify proof_generated', async () => {
+        // Call the verifier directly (though the call, not static call) to add the save the consumed gas into the statistic.
+        // Check that proof is verified
+        let result = await verifier.verify(PROOF_generated.publicInputs, PROOF_generated.serializedProof, PROOF_generated.recursiveAggregationInput);
+        expect(result, 'proof verification failed').true;
+    });
+    it('Should verify proof_original', async () => {
+        // Call the verifier directly (though the call, not static call) to add the save the consumed gas into the statistic.
+        // Check that proof is verified
+        /*const calldata = verifier.interface.encodeFunctionData('verify', [
+            PROOF2.publicInputs,
+            PROOF2.serializedProof,
+            PROOF2.recursiveAggregationInput
+        ]);
+        await verifier.fallback({ data: calldata });*/
+
+
+        let result = await verifier.verify(PROOF2.publicInputs, PROOF2.serializedProof, PROOF2.recursiveAggregationInput);
+        expect(result, 'proof verification failed').true;
+    });
+
 
     xdescribe('Should verify valid proof with fields values in non standard format', function () {
         it('Public input with dirty bits over Fr mask', async () => {

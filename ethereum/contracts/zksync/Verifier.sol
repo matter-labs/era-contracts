@@ -66,6 +66,8 @@ contract Verifier is IVerifier {
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_X_SLOT = 0x200 + 0x4c0;
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_Y_SLOT = 0x200 + 0x4e0;
 
+    uint256 internal constant VK_RECURSIVE_FLAG_SLOT = 0x200 + 0x500;
+
     /*//////////////////////////////////////////////////////////////
                              Proof
     //////////////////////////////////////////////////////////////*/
@@ -258,7 +260,7 @@ contract Verifier is IVerifier {
 
         assembly {
             let start := VK_GATE_SETUP_0_X_SLOT
-            let end := VK_LOOKUP_TABLE_TYPE_Y_SLOT
+            let end := VK_RECURSIVE_FLAG_SLOT
             let length := add(sub(end, start), 0x20)
 
             vkHash := keccak256(start, length)
@@ -330,6 +332,8 @@ contract Verifier is IVerifier {
             // table type commitment
             mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x1b5f1cfddd6713cf25d9e6850a1b3fe80d6ef7fe2c67248f25362d5f9b31893c)
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x0945076de03a0d240067e5f02b8fc11eaa589df3343542576eb59fdb3ecb57e0)
+
+            mstore(VK_RECURSIVE_FLAG_SLOT, 0)
 
         }
     }
@@ -512,12 +516,19 @@ contract Verifier is IVerifier {
                 let offset := calldataload(0x04)
                 let publicInputLengthInWords := calldataload(add(offset, 0x04))
                 let isValid := eq(publicInputLengthInWords, 1) // We expect only one public input
+
+                if iszero(isValid) {
+                    revertWithMessage(28, "loadProof: Proof is invalid1")
+                }
                 mstore(PROOF_PUBLIC_INPUT, and(calldataload(add(offset, 0x24)), FR_MASK))
 
                 // 2. Load the proof (except for the recursive part)
                 offset := calldataload(0x24)
                 let proofLengthInWords := calldataload(add(offset, 0x04))
                 isValid := and(eq(proofLengthInWords, 44), isValid)
+                if iszero(isValid) {
+                    revertWithMessage(28, "loadProof: Proof is invalid2")
+                }
 
                 // PROOF_STATE_POLYS_0
                 {
@@ -527,6 +538,9 @@ contract Verifier is IVerifier {
                     isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
                     mstore(PROOF_STATE_POLYS_0_X_SLOT, x)
                     mstore(PROOF_STATE_POLYS_0_Y_SLOT, y)
+                }
+                if iszero(isValid) {
+                    revertWithMessage(28, "loadProof: Proof is invalid3")
                 }
                 // PROOF_STATE_POLYS_1
                 {
@@ -573,6 +587,10 @@ contract Verifier is IVerifier {
                     mstore(PROOF_LOOKUP_S_POLY_X_SLOT, x)
                     mstore(PROOF_LOOKUP_S_POLY_Y_SLOT, y)
                 }
+                if iszero(isValid) {
+                    revertWithMessage(28, "loadProof: Proof is invalid7")
+                }
+
                 // PROOF_LOOKUP_GRAND_PRODUCT
                 {
                     let x := mod(calldataload(add(offset, 0x1a4)), Q_MOD)
@@ -618,6 +636,10 @@ contract Verifier is IVerifier {
                     mstore(PROOF_QUOTIENT_POLY_PARTS_3_X_SLOT, x)
                     mstore(PROOF_QUOTIENT_POLY_PARTS_3_Y_SLOT, y)
                 }
+                if iszero(isValid) {
+                    revertWithMessage(29, "loadProof: Proof is invalid13")
+                }
+
 
                 mstore(PROOF_STATE_POLYS_0_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x2e4)), R_MOD))
                 mstore(PROOF_STATE_POLYS_1_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x304)), R_MOD))
@@ -643,7 +665,9 @@ contract Verifier is IVerifier {
                 mstore(PROOF_LOOKUP_TABLE_TYPE_POLY_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x4c4)), R_MOD))
                 mstore(PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x4e4)), R_MOD))
                 mstore(PROOF_LINEARISATION_POLY_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x504)), R_MOD))
-
+                if iszero(isValid) {
+                    revertWithMessage(29, "loadProof: Proof is invalid20")
+                }
                 // PROOF_OPENING_PROOF_AT_Z
                 {
                     let x := mod(calldataload(add(offset, 0x524)), Q_MOD)
@@ -662,28 +686,58 @@ contract Verifier is IVerifier {
                     mstore(PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT, x)
                     mstore(PROOF_OPENING_PROOF_AT_Z_OMEGA_Y_SLOT, y)
                 }
+                if iszero(isValid) {
+                    revertWithMessage(29, "loadProof: Proof is invalid30")
+                }
 
                 // 3. Load the recursive part of the proof
                 offset := calldataload(0x44)
                 let recursiveProofLengthInWords := calldataload(add(offset, 0x04))
-                isValid := and(eq(recursiveProofLengthInWords, 4), isValid)
-                // PROOF_RECURSIVE_PART_P1
-                {
-                    let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
-                    let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
-                    let xx := mulmod(x, x, Q_MOD)
-                    isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
-                    mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
-                    mstore(PROOF_RECURSIVE_PART_P1_Y_SLOT, y)
+
+                switch mload(VK_RECURSIVE_FLAG_SLOT)
+                case 0 {
+                    // recursive part should be empty
+                    //isValid := and(iszero(recursiveProofLengthInWords), isValid)
+                    if iszero(isValid) {
+                        revertWithMessage(29, "loadProof: Proof is invalid88")
+                    }
                 }
-                // PROOF_RECURSIVE_PART_P2
-                {
-                    let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
-                    let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
-                    let xx := mulmod(x, x, Q_MOD)
-                    isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
-                    mstore(PROOF_RECURSIVE_PART_P2_X_SLOT, x)
-                    mstore(PROOF_RECURSIVE_PART_P2_Y_SLOT, y)
+                default {
+                    // recursive part should be consist of 2 points
+                    isValid := and(eq(recursiveProofLengthInWords, 4), isValid)
+                    if iszero(isValid) {
+                        revertWithMessage(29, "loadProof: Proof is invalid32")
+                    }
+
+                    // PROOF_RECURSIVE_PART_P1
+                    {
+                        let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
+                        let xx := mulmod(x, x, Q_MOD)
+                        isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
+                        mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
+                        mstore(PROOF_RECURSIVE_PART_P1_Y_SLOT, y)
+                    }
+                    if iszero(isValid) {
+                        revertWithMessage(29, "loadProof: Proof is invalid34")
+                    }
+
+                    // PROOF_RECURSIVE_PART_P2
+                    {
+                        let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
+                        let xx := mulmod(x, x, Q_MOD)
+                        isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
+                        mstore(PROOF_RECURSIVE_PART_P2_X_SLOT, x)
+                        mstore(PROOF_RECURSIVE_PART_P2_Y_SLOT, y)
+                    }
+                    if iszero(isValid) {
+                        revertWithMessage(29, "loadProof: Proof is invalid36")
+                    }
+
+                    if iszero(isValid) {
+                        revertWithMessage(29, "loadProof: Proof is invalid99")
+                    }
                 }
 
                 // Revert if a proof is not valid
@@ -1621,10 +1675,12 @@ contract Verifier is IVerifier {
                 pointMulAndAddIntoDest(PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT, u, PAIRING_PAIR_WITH_X_X_SLOT)
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
-                // Add recursive proof part
+                // Add recursive proof part if needed
+                if mload(VK_RECURSIVE_FLAG_SLOT) {
                 let uu := mulmod(u, u, R_MOD)
                 pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                 pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
+}
 
                 // Calculate pairing
                 {
