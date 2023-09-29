@@ -6,6 +6,7 @@ import "../../zksync/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierTest is Verifier {
+    /*
     function _loadVerificationKey() internal pure override {
         assembly {
             mstore(VK_GATE_SETUP_0_X_SLOT, 0x08fa9d6f0dd6ac1cbeb94ae20fe7a23df05cb1095df66fb561190e615a4037ef)
@@ -54,5 +55,5 @@ contract VerifierTest is Verifier {
             mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x12cd873a6f18a4a590a846d9ebf61565197edf457efd26bc408eb61b72f37b59)
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x19890cbdac892682e7a5910ca6c238c082130e1c71f33d0c9c901153377770d1)
         }
-    }
+    }*/
 }

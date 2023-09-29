@@ -48,6 +48,7 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
+    "test:verifier": "CONTRACT_TESTS=1 yarn hardhat test test/unit_tests/verifier.spec.ts --network hardhat",
     "test": "CONTRACT_TESTS=1 yarn hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "deploy-no-build": "ts-node scripts/deploy.ts",
