@@ -209,7 +209,7 @@ contract ExecutingTest is GovernanceTest {
         executeOpAndCheck(op);
     }
 
-    function test_ExecutingOperationTwice() public {
+    function test_RevertWhen_ExecutingOperationTwice() public {
         vm.startPrank(owner);
 
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(
@@ -218,8 +218,8 @@ contract ExecutingTest is GovernanceTest {
             "1122"
         );
         governance.scheduleTransparent(op, 0);
-        governance.cancel(governance.hashOperation(op));
-        governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
+        vm.expectRevert(bytes("Operation with this proposal id already exists"));
+        governance.scheduleTransparent(op, 0);
     }
 }
