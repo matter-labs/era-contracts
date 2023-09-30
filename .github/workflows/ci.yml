@@ -103,7 +103,7 @@ jobs:
             zksync/typechain
 
   test-hardhat-l1:
-    needs: [build, lint]
+    needs: [build-l1, lint]
     runs-on: ubuntu-latest
 
     defaults:
@@ -141,7 +141,7 @@ jobs:
         run: yarn test --no-compile
 
   test-foundry-l1:
-    needs: [build, lint]
+    needs: [build-l1, lint]
     runs-on: ubuntu-latest
 
     defaults:
@@ -184,7 +184,7 @@ jobs:
         run: forge test
 
   test-hardhat-l2:
-    needs: [build, lint]
+    needs: [build-l2]
     runs-on: ubuntu-latest
 
     defaults:
