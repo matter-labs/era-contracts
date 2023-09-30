@@ -1,3 +1,4 @@
+import '@nomicfoundation/hardhat-chai-matchers';
 import '@nomiclabs/hardhat-solpp';
 import '@matterlabs/hardhat-zksync-solc';
 import '@nomiclabs/hardhat-ethers';
@@ -20,9 +21,12 @@ export default {
     solidity: {
         version: '0.8.19'
     },
-    defaultNetwork: 'hardhat',
+    defaultNetwork: 'localhost',
     networks: {
-        hardhat: {
+        localhost: {
+            // era-test-node default url
+            url: 'http://127.0.0.1:8011', 
+            ethNetwork: null,
             zksync: true
         },
         zkSyncTestnet: {
