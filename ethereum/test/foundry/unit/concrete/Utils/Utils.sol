@@ -130,7 +130,6 @@ library Utils {
         selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
         return selectors;
-        return selectors;
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
