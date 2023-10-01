@@ -89,7 +89,7 @@ contract Authorization is GovernanceTest {
     }
 
     function test_RevertWhen_UpdateSecurityCouncilBySecurityCouncil() public {
-        vm.prank(owner);
+        vm.prank(securityCouncil);
         vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
         governance.updateSecurityCouncil(address(0));
     }
