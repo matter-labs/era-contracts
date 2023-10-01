@@ -106,7 +106,7 @@ export class Deployer {
             )
         );
         const genesisBatchHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
-        const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
+        const genesisIndexRepeatedStorageChanges = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBatchCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
         const verifierParams = {
             recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
@@ -117,18 +117,20 @@ export class Deployer {
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
-            this.addresses.ZkSync.Verifier,
-            this.ownerAddress,
-            this.ownerAddress,
-            genesisBatchHash,
-            genesisRollupLeafIndex,
-            genesisBatchCommitment,
-            this.addresses.AllowList,
-            verifierParams,
-            false, // isPorterAvailable
-            L2_BOOTLOADER_BYTECODE_HASH,
-            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-            priorityTxMaxGasLimit
+            {
+                verifier: this.addresses.ZkSync.Verifier,
+                governor: this.ownerAddress,
+                admin: this.ownerAddress,
+                genesisBatchHash,
+                genesisIndexRepeatedStorageChanges,
+                genesisBatchCommitment,
+                allowList: this.addresses.AllowList,
+                verifierParams,
+                zkPorterIsAvailable: false,
+                l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
+                l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+                priorityTxMaxGasLimit,
+            }
         ]);
 
         // @ts-ignore
