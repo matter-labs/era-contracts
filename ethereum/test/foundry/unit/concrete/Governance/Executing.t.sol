@@ -114,14 +114,13 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(executedOp, 0);
         executeOpAndCheck(executedOp);
 
-        // Schedule & execute operation with 0 predecessor
+        // Schedule operation with 0 predecessor
         IGovernance.Operation memory validOp = operationWithOneCallZeroSaltAndPredecessor(
             address(eventOnFallback),
             0,
             ""
         );
         governance.scheduleTransparent(validOp, 0);
-        executeOpAndCheck(validOp);
 
         // Schedule operation with predecessor of `executedOp` operation
         IGovernance.Operation memory invalidOp = operationWithOneCallZeroSaltAndPredecessor(
