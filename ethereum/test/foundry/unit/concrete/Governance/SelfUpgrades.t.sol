@@ -26,8 +26,8 @@ contract SeflUpgradesTest is GovernanceTest {
         emit ChangeMinDelay(delayBefore, newDelay);
         governance.execute(op);
         uint256 delayAfter = governance.minDelay();
-        require(delayBefore != delayAfter, "Delays are the same");
-        require(newDelay == delayAfter, "Delay should have been changed");
+        assertTrue(delayBefore != delayAfter);
+        assertTrue(newDelay == delayAfter);
     }
 
     function test_UpgradeSecurityCouncil() public {
@@ -47,7 +47,7 @@ contract SeflUpgradesTest is GovernanceTest {
         emit ChangeSecurityCouncil(securityCouncilBefore, newSecurityCouncil);
         governance.execute(op);
         address securityCouncilAfter = governance.securityCouncil();
-        require(securityCouncilBefore != securityCouncilAfter, "Security councils are the same");
-        require(newSecurityCouncil == securityCouncilAfter, "SC should have been changed");
+        assertTrue(securityCouncilBefore != securityCouncilAfter);
+        assertTrue(newSecurityCouncil == securityCouncilAfter);
     }
 }

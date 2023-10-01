@@ -9,31 +9,31 @@ contract OperationStatusTest is GovernanceTest {
     function test_RandomIdIsNotOperation() public {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperation = governance.isOperation(randomId);
-        require(!isOperation, "Should not be operation");
+        assertFalse(isOperation);
     }
 
     function test_RandomIdIsNotPendingOperation() public {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationPending = governance.isOperationPending(randomId);
-        require(!isOperationPending, "Should not be pending operation");
+        assertFalse(isOperationPending);
     }
 
     function test_RandomIdIsNotReadyOperation() public {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationReady = governance.isOperationReady(randomId);
-        require(!isOperationReady, "Should not be ready operation");
+        assertFalse(isOperationReady);
     }
 
     function test_RandomIdIsNotDoneOperation() public {
         bytes32 randomId = Utils.randomBytes32("randomId");
         bool isOperationDone = governance.isOperationDone(randomId);
-        require(!isOperationDone, "Should not be done operation");
+        assertFalse(isOperationDone);
     }
 
     function test_RandomIdIsHasUnsetStatus() public {
         bytes32 randomId = Utils.randomBytes32("randomId");
         IGovernance.OperationState opState = governance.getOperationState(randomId);
-        require(opState == IGovernance.OperationState.Unset, "Operation status should be Unset");
+        assertTrue(opState == IGovernance.OperationState.Unset);
     }
 
     function test_ScheduledOperationIsOperation() public {
@@ -42,7 +42,7 @@ contract OperationStatusTest is GovernanceTest {
         governance.scheduleShadow(randomId, 1000);
 
         bool isOperation = governance.isOperation(randomId);
-        require(isOperation, "Should be operation");
+        assertTrue(isOperation);
     }
 
     function test_ScheduledOperationIsPendingOperation() public {
@@ -51,7 +51,7 @@ contract OperationStatusTest is GovernanceTest {
         governance.scheduleShadow(randomId, 1000);
 
         bool isOperationPending = governance.isOperationPending(randomId);
-        require(isOperationPending, "Should be pending operation");
+        assertTrue(isOperationPending);
     }
 
     function test_ScheduledOperationIsNotReadyOperation() public {
@@ -60,7 +60,7 @@ contract OperationStatusTest is GovernanceTest {
         governance.scheduleShadow(randomId, 1000);
 
         bool isOperationReady = governance.isOperationReady(randomId);
-        require(!isOperationReady, "Should not be ready operation");
+        assertFalse(isOperationReady);
     }
 
     function test_ScheduledOperationIsNotDone() public {
@@ -69,7 +69,7 @@ contract OperationStatusTest is GovernanceTest {
         governance.scheduleShadow(randomId, 1000);
 
         bool isOperationDone = governance.isOperationDone(randomId);
-        require(!isOperationDone, "Should not be done operation");
+        assertFalse(isOperationDone);
     }
 
     function test_ScheduledOperationHasWaitingStatus() public {
@@ -78,7 +78,7 @@ contract OperationStatusTest is GovernanceTest {
         governance.scheduleShadow(randomId, 1000);
 
         IGovernance.OperationState opState = governance.getOperationState(randomId);
-        require(opState == IGovernance.OperationState.Waiting, "Operation status is not Waiting");
+        assertTrue(opState == IGovernance.OperationState.Waiting);
     }
 
     function test_ScheduledOperationAfterDelayIsOperation() public {
@@ -88,7 +88,7 @@ contract OperationStatusTest is GovernanceTest {
         vm.warp(block.timestamp + 1000);
 
         bool isOperation = governance.isOperation(randomId);
-        require(isOperation, "Should be operation");
+        assertTrue(isOperation);
     }
 
     function test_ScheduledOperationAfterDelayIsPendingOperation() public {
@@ -98,7 +98,7 @@ contract OperationStatusTest is GovernanceTest {
         vm.warp(block.timestamp + 1000);
 
         bool isOperationPending = governance.isOperationPending(randomId);
-        require(isOperationPending, "Should be pending operation");
+        assertTrue(isOperationPending);
     }
 
     function test_ScheduledOperationAfterDelayIsReadyOperation() public {
@@ -108,7 +108,7 @@ contract OperationStatusTest is GovernanceTest {
         vm.warp(block.timestamp + 1000);
 
         bool isOperationReady = governance.isOperationReady(randomId);
-        require(isOperationReady, "Operation should be ready");
+        assertTrue(isOperationReady);
     }
 
     function test_ScheduledOperationAfterDelayIsNotDone() public {
@@ -118,7 +118,7 @@ contract OperationStatusTest is GovernanceTest {
         vm.warp(block.timestamp + 1000);
 
         bool isOperationDone = governance.isOperationDone(randomId);
-        require(!isOperationDone, "Operation should not be done");
+        assertFalse(isOperationDone);
     }
 
     function test_ScheduledOperationAfterDelayHasReadyStatus() public {
@@ -128,7 +128,7 @@ contract OperationStatusTest is GovernanceTest {
         vm.warp(block.timestamp + 1000);
 
         IGovernance.OperationState opState = governance.getOperationState(randomId);
-        require(opState == IGovernance.OperationState.Ready, "Operation status should be Ready");
+        assertTrue(opState == IGovernance.OperationState.Ready);
     }
 
     function test_ProcessedOperationIsOperation() public {
@@ -140,7 +140,7 @@ contract OperationStatusTest is GovernanceTest {
 
         bytes32 opId = governance.hashOperation(op);
         bool isOperation = governance.isOperation(opId);
-        require(isOperation, "Should be operation");
+        assertTrue(isOperation);
     }
 
     function test_ScheduledOperationAfterDelayIsNotPendingOperation() public {
@@ -152,7 +152,7 @@ contract OperationStatusTest is GovernanceTest {
 
         bytes32 opId = governance.hashOperation(op);
         bool isOperationPending = governance.isOperationPending(opId);
-        require(!isOperationPending, "Should not be pending operation");
+        assertFalse(isOperationPending);
     }
 
     function test_ProcessedOperationAfterDelayIsNotReadyOperation() public {
@@ -164,7 +164,7 @@ contract OperationStatusTest is GovernanceTest {
 
         bytes32 opId = governance.hashOperation(op);
         bool isOperationReady = governance.isOperationReady(opId);
-        require(!isOperationReady, "Should be not ready operation");
+        assertFalse(isOperationReady);
     }
 
     function test_ProcessedOperationAfterDelayIsDone() public {
@@ -176,7 +176,7 @@ contract OperationStatusTest is GovernanceTest {
 
         bytes32 opId = governance.hashOperation(op);
         bool isOperationDone = governance.isOperationDone(opId);
-        require(isOperationDone, "Operation should be done");
+        assertTrue(isOperationDone);
     }
 
     function test_ProcessedOperationAfterDelayHasReadyStatus() public {
@@ -188,6 +188,6 @@ contract OperationStatusTest is GovernanceTest {
 
         bytes32 opId = governance.hashOperation(op);
         IGovernance.OperationState opState = governance.getOperationState(opId);
-        require(opState == IGovernance.OperationState.Done, "Operation status should be done");
+        assertTrue(opState == IGovernance.OperationState.Done);
     }
 }
