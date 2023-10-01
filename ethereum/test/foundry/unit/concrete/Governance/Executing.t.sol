@@ -28,7 +28,7 @@ contract ExecutingTest is GovernanceTest {
         bytes32 opId = governance.hashOperation(op);
         vm.startPrank(owner);
         governance.scheduleShadow(opId, 100000);
-        vm.warp(block.timestamp + 100001);
+        vm.warp(block.timestamp + 100000);
         vm.startPrank(securityCouncil);
         executeOpAndCheck(op);
     }
