@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
 
 contract ExecutingTest is GovernanceTest {
+    using stdStorage for StdStorage;
+
     function test_ScheduleTransparentAndExecute() public {
         vm.startPrank(owner);
 
@@ -46,7 +49,7 @@ contract ExecutingTest is GovernanceTest {
         vm.startPrank(owner);
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.scheduleTransparent(op, 10000);
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(op);
     }
 
@@ -60,7 +63,7 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(validOp, 0);
 
         IGovernance.Operation memory invalidOp = operationWithOneCallZeroSaltAndPredecessor(address(0), 0, "");
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(invalidOp);
     }
 
@@ -78,7 +81,7 @@ contract ExecutingTest is GovernanceTest {
             1,
             ""
         );
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(invalidOp);
     }
 
@@ -96,7 +99,7 @@ contract ExecutingTest is GovernanceTest {
             0,
             "00"
         );
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(invalidOp);
     }
 
@@ -129,7 +132,7 @@ contract ExecutingTest is GovernanceTest {
         invalidOp.predecessor = governance.hashOperation(executedOp);
 
         // Failed to execute operation that wasn't scheduled
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(invalidOp);
     }
 
@@ -148,7 +151,7 @@ contract ExecutingTest is GovernanceTest {
             ""
         );
         invalidOp.salt = Utils.randomBytes32("wrongSalt");
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(invalidOp);
     }
 
@@ -162,7 +165,7 @@ contract ExecutingTest is GovernanceTest {
         );
         invalidOp.predecessor = Utils.randomBytes32("randomPredecessor");
         governance.scheduleTransparent(invalidOp, 0);
-        vm.expectRevert(bytes("Predecessor operation not completed"));
+        vm.expectRevert("Predecessor operation not completed");
         governance.execute(invalidOp);
     }
 
@@ -177,8 +180,32 @@ contract ExecutingTest is GovernanceTest {
         governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
 
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(op);
+    }
+
+    function test_RevertWhen_ExecutingNonScheduledOperation() public {
+        vm.startPrank(owner);
+
+        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(
+            address(eventOnFallback),
+            0,
+            "1122"
+        );
+        vm.expectRevert("Operation must be ready before execution");
+        governance.execute(op);
+    }
+
+    function test_RevertWhen_ExecutingInstantNonScheduledOperation() public {
+        vm.startPrank(securityCouncil);
+
+        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(
+            address(eventOnFallback),
+            0,
+            "1122"
+        );
+        vm.expectRevert("Operation must be pending before execution");
+        governance.executeInstant(op);
     }
 
     function test_RevertWhen_ExecutingOperationAfterCanceling() public {
@@ -191,7 +218,7 @@ contract ExecutingTest is GovernanceTest {
         );
         governance.scheduleTransparent(op, 0);
         governance.cancel(governance.hashOperation(op));
-        vm.expectRevert(bytes("Operation must be ready before execution"));
+        vm.expectRevert("Operation must be ready before execution");
         governance.execute(op);
     }
 
@@ -219,20 +246,39 @@ contract ExecutingTest is GovernanceTest {
         );
         governance.scheduleTransparent(op, 0);
         executeOpAndCheck(op);
-        vm.expectRevert(bytes("Operation with this proposal id already exists"));
+        vm.expectRevert("Operation with this proposal id already exists");
         governance.scheduleTransparent(op, 0);
     }
 
     function test_RevertWhen_ExecutingOperationFailed() public {
         vm.startPrank(owner);
 
-        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(
-            address(revertFallback),
-            0,
-            ""
-        );
+        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(revertFallback), 0, "");
         governance.scheduleTransparent(op, 0);
         vm.expectRevert(bytes(""));
         governance.execute(op);
+    }
+
+    function test_CancelExistingOperation() public {
+        vm.startPrank(owner);
+
+        governance.scheduleShadow(bytes32(0), 0);
+        governance.cancel(bytes32(0));
+    }
+
+    function test_RevertWhen_CancelNonExistingOperation() public {
+        vm.startPrank(owner);
+
+        vm.expectRevert("Operation must be pending");
+        governance.cancel(bytes32(0));
+    }
+
+    function test_RevertWhen_ScheduleOperationWithDelayLessThanMinimumOne() public {
+        vm.startPrank(owner);
+        stdstore.target(address(governance)).sig(governance.minDelay.selector).checked_write(1000);
+        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(revertFallback), 0, "");
+
+        vm.expectRevert("Proposed delay is less than minimum delay");
+        governance.scheduleTransparent(op, 0);
     }
 }

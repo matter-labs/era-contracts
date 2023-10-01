@@ -3,7 +3,6 @@
 pragma solidity ^0.8.13;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IGovernance} from "./IGovernance.sol";
 
 /// @author Matter Labs
@@ -153,7 +152,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Both the owner and security council may cancel an operation.
     /// @param _id Proposal id value (see `hashOperation`)
     function cancel(bytes32 _id) external onlyOwnerOrSecurityCouncil {
-        require(isOperationPending(_id));
+        require(isOperationPending(_id), "Operation must be pending");
         delete timestamps[_id];
         emit OperationCancelled(_id);
     }

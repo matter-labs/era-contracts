@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {Governance} from "../../../../../cache/solpp-generated-contracts/governance/Governance.sol";
 import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
 import {EventOnFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/EventOnFallback.sol";
+import {Forwarder} from "../../../../../cache/solpp-generated-contracts/dev-contracts/Forwarder.sol";
+import {RevertFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/RevertFallback.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;
@@ -13,6 +15,8 @@ contract GovernanceTest is Test, EventOnFallback {
     address internal randomSigner;
     Governance internal governance;
     EventOnFallback internal eventOnFallback;
+    Forwarder internal forwarder;
+    RevertFallback internal revertFallback;
 
     constructor() {
         owner = makeAddr("owner");
@@ -21,6 +25,8 @@ contract GovernanceTest is Test, EventOnFallback {
 
         governance = new Governance(owner, securityCouncil, 0);
         eventOnFallback = new EventOnFallback();
+        forwarder = new Forwarder();
+        revertFallback = new RevertFallback();
     }
 
     function setUp() external {

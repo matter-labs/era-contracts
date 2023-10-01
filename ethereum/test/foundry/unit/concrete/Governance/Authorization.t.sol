@@ -7,90 +7,90 @@ import {IGovernance} from "../../../../../cache/solpp-generated-contracts/govern
 contract Authorization is GovernanceTest {
     function test_RevertWhen_SchedulingByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert("Ownable: caller is not the owner");
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.scheduleTransparent(op, 0);
     }
 
     function test_RevertWhen_SchedulingBySecurityCouncil() public {
         vm.prank(securityCouncil);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert("Ownable: caller is not the owner");
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.scheduleTransparent(op, 0);
     }
 
     function test_RevertWhen_SchedulingShadowByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert("Ownable: caller is not the owner");
         governance.scheduleShadow(bytes32(0), 0);
     }
 
     function test_RevertWhen_SchedulingShadowBySecurityCouncil() public {
         vm.prank(securityCouncil);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert("Ownable: caller is not the owner");
         governance.scheduleShadow(bytes32(0), 0);
     }
 
     function test_RevertWhen_ExecutingByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Only the owner and security council are allowed to call this function"));
+        vm.expectRevert("Only the owner and security council are allowed to call this function");
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.execute(op);
     }
 
     function test_RevertWhen_ExecutingInstantByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Only security council allowed to call this function"));
+        vm.expectRevert("Only security council allowed to call this function");
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.executeInstant(op);
     }
 
     function test_RevertWhen_ExecutingInstantByOwner() public {
         vm.prank(owner);
-        vm.expectRevert(bytes("Only security council allowed to call this function"));
+        vm.expectRevert("Only security council allowed to call this function");
         IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(address(eventOnFallback), 0, "");
         governance.executeInstant(op);
     }
 
     function test_RevertWhen_CancelByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Only the owner and security council are allowed to call this function"));
+        vm.expectRevert("Only the owner and security council are allowed to call this function");
         governance.cancel(bytes32(0));
     }
 
     function test_RevertWhen_UpdateDelayByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateDelay(0);
     }
 
     function test_RevertWhen_UpdateDelayByOwner() public {
         vm.prank(owner);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateDelay(0);
     }
 
     function test_RevertWhen_UpdateDelayBySecurityCouncil() public {
         vm.prank(securityCouncil);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateDelay(0);
     }
 
     function test_RevertWhen_UpdateSecurityCouncilByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateSecurityCouncil(address(0));
     }
 
     function test_RevertWhen_UpdateSecurityCouncilByOwner() public {
         vm.prank(owner);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateSecurityCouncil(address(0));
     }
 
     function test_RevertWhen_UpdateSecurityCouncilBySecurityCouncil() public {
         vm.prank(owner);
-        vm.expectRevert(bytes("Only governance contract itself allowed to call this function"));
+        vm.expectRevert("Only governance contract itself allowed to call this function");
         governance.updateSecurityCouncil(address(0));
     }
 }
