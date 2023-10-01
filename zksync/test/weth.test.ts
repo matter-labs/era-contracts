@@ -58,6 +58,15 @@ describe("WETH token & WETH bridge", function () {
       expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18.mul(2));
   });
 
+  it("Should fail depositing with random calldata", async function () {
+      await expect(wallet.sendTransaction({
+          data: ethers.utils.randomBytes(36),
+          to: wethToken.address,
+          value: eth18,
+          gasLimit: 100_000
+      })).to.be.reverted;
+  });
+
   it("Should withdraw WETH to L2 ETH", async function () {
       await wethToken.withdraw(eth18).then(tx => tx.wait());
       expect(await wethToken.balanceOf(wallet.address)).to.equal(eth18);
