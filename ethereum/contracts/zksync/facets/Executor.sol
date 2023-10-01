@@ -338,7 +338,6 @@ contract ExecutorFacet is Base, IExecutor {
             proofPublicInput[i] = _getBatchProofPublicInput(
                 prevBatchCommitment,
                 currentBatchCommitment,
-                _proof,
                 verifierParams
             );
 
@@ -377,7 +376,6 @@ contract ExecutorFacet is Base, IExecutor {
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment,
-        ProofInput calldata _proof,
         VerifierParams memory _verifierParams
     ) internal pure returns (uint256) {
         return
