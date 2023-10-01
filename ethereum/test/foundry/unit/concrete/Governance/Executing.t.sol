@@ -222,4 +222,17 @@ contract ExecutingTest is GovernanceTest {
         vm.expectRevert(bytes("Operation with this proposal id already exists"));
         governance.scheduleTransparent(op, 0);
     }
+
+    function test_RevertWhen_ExecutingOperationFailed() public {
+        vm.startPrank(owner);
+
+        IGovernance.Operation memory op = operationWithOneCallZeroSaltAndPredecessor(
+            address(revertFallback),
+            0,
+            ""
+        );
+        governance.scheduleTransparent(op, 0);
+        vm.expectRevert(bytes(""));
+        governance.execute(op);
+    }
 }
