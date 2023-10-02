@@ -62,7 +62,7 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = $$(
 );
 
 /// @dev Bit mask to apply for verifier public input before verifying.
-uint256 constant INPUT_MASK = $$(~uint256(0) >> 8);
+uint256 constant INPUT_MASK = $$(~uint256(0) >> 32);
 
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant L2_TX_MAX_GAS_LIMIT = $(L2_TX_MAX_GAS_LIMIT);
