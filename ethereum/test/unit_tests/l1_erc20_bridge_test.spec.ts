@@ -50,22 +50,24 @@ describe(`L1ERC20Bridge tests`, function () {
         dummyHash.set([1, 0, 0, 1]);
         const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            dummyAddress,
-            await owner.getAddress(),
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
             {
-                recursionCircuitsSetVksHash: ethers.constants.HashZero,
-                recursionLeafLevelVkHash: ethers.constants.HashZero,
-                recursionNodeLevelVkHash: ethers.constants.HashZero
-            },
-            false,
-            dummyHash,
-            dummyHash,
-            10000000
+                verifier: dummyAddress,
+                governor: await owner.getAddress(),
+                admin: await owner.getAddress(),
+                genesisBatchHash: ethers.constants.HashZero,
+                genesisIndexRepeatedStorageChanges: 0,
+                genesisBatchCommitment: ethers.constants.HashZero,
+                allowList: allowList.address,
+                verifierParams: {
+                    recursionCircuitsSetVksHash: ethers.constants.HashZero,
+                    recursionLeafLevelVkHash: ethers.constants.HashZero,
+                    recursionNodeLevelVkHash: ethers.constants.HashZero
+                },
+                zkPorterIsAvailable: false,
+                l2BootloaderBytecodeHash: dummyHash,
+                l2DefaultAccountBytecodeHash: dummyHash,
+                priorityTxMaxGasLimit: 10000000,
+            }
         ]);
 
         const facetCuts = [

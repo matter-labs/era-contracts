@@ -17,10 +17,8 @@ import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_R
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is Base {
-    /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
-    constructor() reentrancyGuardInitializer {}
-
-    /// @notice zkSync contract initialization
+    /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
+    /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
     /// @param _verifier address of Verifier contract
     /// @param _governor address who can manage critical updates in the contract
     /// @param _admin address who can manage non-critical updates in the contract
@@ -33,50 +31,56 @@ contract DiamondInit is Base {
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
     /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+    struct InitializeData {
+        IVerifier verifier;
+        address governor;
+        address admin;
+        bytes32 genesisBatchHash;
+        uint64 genesisIndexRepeatedStorageChanges;
+        bytes32 genesisBatchCommitment;
+        IAllowList allowList;
+        VerifierParams verifierParams;
+        bool zkPorterIsAvailable;
+        bytes32 l2BootloaderBytecodeHash;
+        bytes32 l2DefaultAccountBytecodeHash;
+        uint256 priorityTxMaxGasLimit;
+    }
+
+    /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
+    constructor() reentrancyGuardInitializer {}
+
+    /// @notice zkSync contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(
-        IVerifier _verifier,
-        address _governor,
-        address _admin,
-        bytes32 _genesisBatchHash,
-        uint64 _genesisIndexRepeatedStorageChanges,
-        bytes32 _genesisBatchCommitment,
-        IAllowList _allowList,
-        VerifierParams calldata _verifierParams,
-        bool _zkPorterIsAvailable,
-        bytes32 _l2BootloaderBytecodeHash,
-        bytes32 _l2DefaultAccountBytecodeHash,
-        uint256 _priorityTxMaxGasLimit
-    ) external reentrancyGuardInitializer returns (bytes32) {
-        require(address(_verifier) != address(0), "vt");
-        require(_governor != address(0), "vy");
-        require(_admin != address(0), "hc");
-        require(_priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
+    function initialize(InitializeData calldata _initalizeData) external reentrancyGuardInitializer returns (bytes32) {
+        require(address(_initalizeData.verifier) != address(0), "vt");
+        require(_initalizeData.governor != address(0), "vy");
+        require(_initalizeData.admin != address(0), "hc");
+        require(_initalizeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
-        s.verifier = _verifier;
-        s.governor = _governor;
-        s.admin = _admin;
+        s.verifier = _initalizeData.verifier;
+        s.governor = _initalizeData.governor;
+        s.admin = _initalizeData.admin;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(
             0,
-            _genesisBatchHash,
-            _genesisIndexRepeatedStorageChanges,
+            _initalizeData.genesisBatchHash,
+            _initalizeData.genesisIndexRepeatedStorageChanges,
             0,
             EMPTY_STRING_KECCAK,
             DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             0,
-            _genesisBatchCommitment
+            _initalizeData.genesisBatchCommitment
         );
 
         s.storedBatchHashes[0] = keccak256(abi.encode(storedBatchZero));
-        s.allowList = _allowList;
-        s.verifierParams = _verifierParams;
-        s.zkPorterIsAvailable = _zkPorterIsAvailable;
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-        s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
+        s.allowList = _initalizeData.allowList;
+        s.verifierParams = _initalizeData.verifierParams;
+        s.zkPorterIsAvailable = _initalizeData.zkPorterIsAvailable;
+        s.l2BootloaderBytecodeHash = _initalizeData.l2BootloaderBytecodeHash;
+        s.l2DefaultAccountBytecodeHash = _initalizeData.l2DefaultAccountBytecodeHash;
+        s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

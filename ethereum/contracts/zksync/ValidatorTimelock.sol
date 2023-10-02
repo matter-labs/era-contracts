@@ -33,7 +33,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     address public immutable zkSyncContract;
 
     /// @dev The mapping of L2 batch number => timestamp when it was committed.
-    LibMap.Uint32Map committedBatchTimestamp;
+    LibMap.Uint32Map internal committedBatchTimestamp;
 
     /// @dev The address that can commit/revert/validate/execute batches.
     address public validator;

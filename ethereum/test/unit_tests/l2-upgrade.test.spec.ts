@@ -88,18 +88,20 @@ describe('L2 upgrade test', function () {
             recursionNodeLevelVkHash: ethers.constants.HashZero
         };
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            verifier,
-            await owner.getAddress(),
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
-            verifierParams,
-            false,
-            dummyHash,
-            dummyHash,
-            10000000
+            {
+                verifier,
+                governor: await owner.getAddress(),
+                admin: await owner.getAddress(),
+                genesisBatchHash: ethers.constants.HashZero,
+                genesisIndexRepeatedStorageChanges: 0,
+                genesisBatchCommitment: ethers.constants.HashZero,
+                allowList: allowList.address,
+                verifierParams,
+                zkPorterIsAvailable: false,
+                l2BootloaderBytecodeHash: dummyHash,
+                l2DefaultAccountBytecodeHash: dummyHash,
+                priorityTxMaxGasLimit: 10000000
+            }
         ]);
 
         const facetCuts = [
