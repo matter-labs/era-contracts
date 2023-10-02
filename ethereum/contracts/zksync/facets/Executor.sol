@@ -12,6 +12,8 @@ import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {VerifierParams} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
+import "hardhat/console.sol";
+
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -430,6 +432,14 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32 metadataHash = keccak256(_batchMetaParameters());
         bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash));
 
+        console.log("pass through");
+        console.logBytes32(passThroughDataHash);
+        console.log("metadata");
+        console.logBytes32(metadataHash);
+
+        console.log("aux");
+        console.logBytes32(auxiliaryOutputHash);
+
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
@@ -444,18 +454,29 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
+        console.log("Meta details");
+        console.log(s.zkPorterIsAvailable);
+        console.logBytes32(s.l2BootloaderBytecodeHash);
+        console.logBytes32(s.l2DefaultAccountBytecodeHash);
+
+
         return abi.encodePacked(s.zkPorterIsAvailable, s.l2BootloaderBytecodeHash, s.l2DefaultAccountBytecodeHash);
     }
 
     function _batchAuxiliaryOutput(CommitBatchInfo calldata _batch, bytes32 _stateDiffHash)
         internal
-        pure
+        view
         returns (bytes memory)
     {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
+        console.log("AUX parts");
+        console.logBytes32(l2ToL1LogsHash);
+        console.logBytes32(_stateDiffHash);
+        console.logBytes32(_batch.bootloaderHeapInitialContentsHash);
+        console.logBytes32(_batch.eventsQueueStateHash);
         return
             abi.encode(
                 l2ToL1LogsHash,
