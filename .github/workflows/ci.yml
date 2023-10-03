@@ -226,4 +226,21 @@ jobs:
       - name: Run tests
         run: yarn hardhat test
 
+  check-verifier-generator:
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+
+      - name: Generete Verifier.sol
+        working-directory: tools
+        run: cargo run
+
+      - name: Compare
+        run: diff tools/data/Verifier.sol ethereum/contracts/zksync/Verifier.sol

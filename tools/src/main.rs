@@ -136,8 +136,8 @@ fn insert_residue_elements_and_commitments(
     vk: &HashMap<String, Value>,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
-    let residue_g2_elements = generate_residue_g2_elements(&vk);
-    let commitments = generate_commitments(&vk);
+    let residue_g2_elements = generate_residue_g2_elements(vk);
+    let commitments = generate_commitments(vk);
 
     let verifier_contract_template =
         template.replace("{{residue_g2_elements}}", &residue_g2_elements);
@@ -178,7 +178,7 @@ fn extract_commitment_slots(items: &[Value], slot_tuple: CommitmentSlot) -> Stri
     items
         .iter()
         .enumerate()
-        .filter_map(|(idx, item)| {
+        .map(|(idx, item)| {
             let map = item.as_object().unwrap();
             let x = map.get("x").unwrap().as_array().unwrap();
             let y = map.get("y").unwrap().as_array().unwrap();
@@ -186,7 +186,7 @@ fn extract_commitment_slots(items: &[Value], slot_tuple: CommitmentSlot) -> Stri
             let mstore_x = format_mstore(&x, &slot_tuple.x.replace("{}", &idx.to_string()));
             let y = convert_list_to_hexadecimal(y);
             let mstore_y = format_mstore(&y, &slot_tuple.y.replace("{}", &idx.to_string()));
-            Some(format!("{}{}", mstore_x, mstore_y))
+            format!("{}{}", mstore_x, mstore_y)
         })
         .collect::<Vec<String>>()
         .join("")
@@ -278,13 +278,13 @@ fn generate_commitments(vk: &HashMap<String, Value>) -> String {
         .map(|(key, comment)| {
             let data = vk.get(*key).unwrap().as_array().unwrap();
             format!(
-                "\n            // {}\n{}",
+                "            // {}\n{}",
                 comment,
                 extract_commitment_slots(data, COMMITMENTS_SLOTS[*key])
             )
         })
         .collect::<Vec<String>>()
-        .join("");
+        .join("\n");
 
     let individual_commitments = individual_commitments_data
         .iter()
@@ -305,14 +305,14 @@ fn generate_residue_g2_elements(vk: &HashMap<String, Value>) -> String {
     let mut residue_g2_elements = String::new();
 
     let vk_non_residues = vk.get("non_residues").unwrap().as_array().unwrap();
-    residue_g2_elements.push_str("\n    // non residues\n");
+    residue_g2_elements.push_str("// non residues\n");
     residue_g2_elements.push_str(&extract_non_residues(
         vk_non_residues,
         NON_RESIDUES["non_residues"],
     ));
 
     let vk_g2_elements = vk.get("g2_elements").unwrap().as_array().unwrap();
-    residue_g2_elements.push_str("\n    // g2 elements\n");
+    residue_g2_elements.push_str("\n    // trusted setup g2 elements\n");
     residue_g2_elements.push_str(&extract_g2_elements(
         vk_g2_elements,
         G2_ELEMENTS["g2_elements"],
