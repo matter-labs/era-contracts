@@ -4,15 +4,19 @@ pragma solidity ^0.8.13;
 
 import "./interfaces/IVerifier.sol";
 
+/* solhint-disable max-line-length */
 /// @author Matter Labs
-/// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of Knowledge (PLONK) verifier.
+/// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
+/// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for zkSync Era circuits.
-/// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the constants below.
+/// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
+/// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
 /// * Original Plonk Article: https://eprint.iacr.org/2019/953.pdf
 /// * Original LookUp Article: https://eprint.iacr.org/2020/315.pdf
 /// * Plonk for zkSync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
+/* solhint-enable max-line-length */
 contract Verifier is IVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
@@ -66,168 +70,170 @@ contract Verifier is IVerifier {
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_X_SLOT = 0x200 + 0x4c0;
     uint256 internal constant VK_LOOKUP_TABLE_TYPE_Y_SLOT = 0x200 + 0x4e0;
 
+    uint256 internal constant VK_RECURSIVE_FLAG_SLOT = 0x200 + 0x500;
+
     /*//////////////////////////////////////////////////////////////
                              Proof
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant PROOF_PUBLIC_INPUT = 0x200 + 0x600 + 0x000;
+    uint256 internal constant PROOF_PUBLIC_INPUT = 0x200 + 0x520 + 0x000;
 
-    uint256 internal constant PROOF_STATE_POLYS_0_X_SLOT = 0x200 + 0x600 + 0x020;
-    uint256 internal constant PROOF_STATE_POLYS_0_Y_SLOT = 0x200 + 0x600 + 0x040;
-    uint256 internal constant PROOF_STATE_POLYS_1_X_SLOT = 0x200 + 0x600 + 0x060;
-    uint256 internal constant PROOF_STATE_POLYS_1_Y_SLOT = 0x200 + 0x600 + 0x080;
-    uint256 internal constant PROOF_STATE_POLYS_2_X_SLOT = 0x200 + 0x600 + 0x0a0;
-    uint256 internal constant PROOF_STATE_POLYS_2_Y_SLOT = 0x200 + 0x600 + 0x0c0;
-    uint256 internal constant PROOF_STATE_POLYS_3_X_SLOT = 0x200 + 0x600 + 0x0e0;
-    uint256 internal constant PROOF_STATE_POLYS_3_Y_SLOT = 0x200 + 0x600 + 0x100;
+    uint256 internal constant PROOF_STATE_POLYS_0_X_SLOT = 0x200 + 0x520 + 0x020;
+    uint256 internal constant PROOF_STATE_POLYS_0_Y_SLOT = 0x200 + 0x520 + 0x040;
+    uint256 internal constant PROOF_STATE_POLYS_1_X_SLOT = 0x200 + 0x520 + 0x060;
+    uint256 internal constant PROOF_STATE_POLYS_1_Y_SLOT = 0x200 + 0x520 + 0x080;
+    uint256 internal constant PROOF_STATE_POLYS_2_X_SLOT = 0x200 + 0x520 + 0x0a0;
+    uint256 internal constant PROOF_STATE_POLYS_2_Y_SLOT = 0x200 + 0x520 + 0x0c0;
+    uint256 internal constant PROOF_STATE_POLYS_3_X_SLOT = 0x200 + 0x520 + 0x0e0;
+    uint256 internal constant PROOF_STATE_POLYS_3_Y_SLOT = 0x200 + 0x520 + 0x100;
 
-    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_X_SLOT = 0x200 + 0x600 + 0x120;
-    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_Y_SLOT = 0x200 + 0x600 + 0x140;
+    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_X_SLOT = 0x200 + 0x520 + 0x120;
+    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_Y_SLOT = 0x200 + 0x520 + 0x140;
 
-    uint256 internal constant PROOF_LOOKUP_S_POLY_X_SLOT = 0x200 + 0x600 + 0x160;
-    uint256 internal constant PROOF_LOOKUP_S_POLY_Y_SLOT = 0x200 + 0x600 + 0x180;
+    uint256 internal constant PROOF_LOOKUP_S_POLY_X_SLOT = 0x200 + 0x520 + 0x160;
+    uint256 internal constant PROOF_LOOKUP_S_POLY_Y_SLOT = 0x200 + 0x520 + 0x180;
 
-    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_X_SLOT = 0x200 + 0x600 + 0x1a0;
-    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_Y_SLOT = 0x200 + 0x600 + 0x1c0;
+    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_X_SLOT = 0x200 + 0x520 + 0x1a0;
+    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_Y_SLOT = 0x200 + 0x520 + 0x1c0;
 
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_0_X_SLOT = 0x200 + 0x600 + 0x1e0;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_0_Y_SLOT = 0x200 + 0x600 + 0x200;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_1_X_SLOT = 0x200 + 0x600 + 0x220;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_1_Y_SLOT = 0x200 + 0x600 + 0x240;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_2_X_SLOT = 0x200 + 0x600 + 0x260;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_2_Y_SLOT = 0x200 + 0x600 + 0x280;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_3_X_SLOT = 0x200 + 0x600 + 0x2a0;
-    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_3_Y_SLOT = 0x200 + 0x600 + 0x2c0;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_0_X_SLOT = 0x200 + 0x520 + 0x1e0;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_0_Y_SLOT = 0x200 + 0x520 + 0x200;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_1_X_SLOT = 0x200 + 0x520 + 0x220;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_1_Y_SLOT = 0x200 + 0x520 + 0x240;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_2_X_SLOT = 0x200 + 0x520 + 0x260;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_2_Y_SLOT = 0x200 + 0x520 + 0x280;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_3_X_SLOT = 0x200 + 0x520 + 0x2a0;
+    uint256 internal constant PROOF_QUOTIENT_POLY_PARTS_3_Y_SLOT = 0x200 + 0x520 + 0x2c0;
 
-    uint256 internal constant PROOF_STATE_POLYS_0_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x2e0;
-    uint256 internal constant PROOF_STATE_POLYS_1_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x300;
-    uint256 internal constant PROOF_STATE_POLYS_2_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x320;
-    uint256 internal constant PROOF_STATE_POLYS_3_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x340;
+    uint256 internal constant PROOF_STATE_POLYS_0_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x2e0;
+    uint256 internal constant PROOF_STATE_POLYS_1_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x300;
+    uint256 internal constant PROOF_STATE_POLYS_2_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x320;
+    uint256 internal constant PROOF_STATE_POLYS_3_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x340;
 
-    uint256 internal constant PROOF_STATE_POLYS_3_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x360;
-    uint256 internal constant PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x380;
+    uint256 internal constant PROOF_STATE_POLYS_3_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x360;
+    uint256 internal constant PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x380;
 
-    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_0_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x3a0;
-    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_1_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x3c0;
-    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_2_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x3e0;
+    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_0_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x3a0;
+    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_1_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x3c0;
+    uint256 internal constant PROOF_COPY_PERMUTATION_POLYS_2_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x3e0;
 
-    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x400;
-    uint256 internal constant PROOF_LOOKUP_S_POLY_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x420;
-    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x440;
-    uint256 internal constant PROOF_LOOKUP_T_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x460;
-    uint256 internal constant PROOF_LOOKUP_T_POLY_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x480;
-    uint256 internal constant PROOF_LOOKUP_SELECTOR_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x4a0;
-    uint256 internal constant PROOF_LOOKUP_TABLE_TYPE_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x4c0;
-    uint256 internal constant PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x4e0;
-    uint256 internal constant PROOF_LINEARISATION_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x500;
+    uint256 internal constant PROOF_COPY_PERMUTATION_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x400;
+    uint256 internal constant PROOF_LOOKUP_S_POLY_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x420;
+    uint256 internal constant PROOF_LOOKUP_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x440;
+    uint256 internal constant PROOF_LOOKUP_T_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x460;
+    uint256 internal constant PROOF_LOOKUP_T_POLY_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x480;
+    uint256 internal constant PROOF_LOOKUP_SELECTOR_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x4a0;
+    uint256 internal constant PROOF_LOOKUP_TABLE_TYPE_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x4c0;
+    uint256 internal constant PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x4e0;
+    uint256 internal constant PROOF_LINEARISATION_POLY_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x500;
 
-    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_X_SLOT = 0x200 + 0x600 + 0x520;
-    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_Y_SLOT = 0x200 + 0x600 + 0x540;
-    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT = 0x200 + 0x600 + 0x560;
-    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_OMEGA_Y_SLOT = 0x200 + 0x600 + 0x580;
+    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_X_SLOT = 0x200 + 0x520 + 0x520;
+    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_Y_SLOT = 0x200 + 0x520 + 0x540;
+    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT = 0x200 + 0x520 + 0x560;
+    uint256 internal constant PROOF_OPENING_PROOF_AT_Z_OMEGA_Y_SLOT = 0x200 + 0x520 + 0x580;
 
-    uint256 internal constant PROOF_RECURSIVE_PART_P1_X_SLOT = 0x200 + 0x600 + 0x5a0;
-    uint256 internal constant PROOF_RECURSIVE_PART_P1_Y_SLOT = 0x200 + 0x600 + 0x5c0;
+    uint256 internal constant PROOF_RECURSIVE_PART_P1_X_SLOT = 0x200 + 0x520 + 0x5a0;
+    uint256 internal constant PROOF_RECURSIVE_PART_P1_Y_SLOT = 0x200 + 0x520 + 0x5c0;
 
-    uint256 internal constant PROOF_RECURSIVE_PART_P2_X_SLOT = 0x200 + 0x600 + 0x5e0;
-    uint256 internal constant PROOF_RECURSIVE_PART_P2_Y_SLOT = 0x200 + 0x600 + 0x600;
+    uint256 internal constant PROOF_RECURSIVE_PART_P2_X_SLOT = 0x200 + 0x520 + 0x5e0;
+    uint256 internal constant PROOF_RECURSIVE_PART_P2_Y_SLOT = 0x200 + 0x520 + 0x600;
 
     /*//////////////////////////////////////////////////////////////
                              Transcript slot
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant TRANSCRIPT_BEGIN_SLOT = 0x200 + 0x600 + 0x620 + 0x00;
-    uint256 internal constant TRANSCRIPT_DST_BYTE_SLOT = 0x200 + 0x600 + 0x620 + 0x03;
-    uint256 internal constant TRANSCRIPT_STATE_0_SLOT = 0x200 + 0x600 + 0x620 + 0x04;
-    uint256 internal constant TRANSCRIPT_STATE_1_SLOT = 0x200 + 0x600 + 0x620 + 0x24;
-    uint256 internal constant TRANSCRIPT_CHALLENGE_SLOT = 0x200 + 0x600 + 0x620 + 0x44;
+    uint256 internal constant TRANSCRIPT_BEGIN_SLOT = 0x200 + 0x520 + 0x620 + 0x00;
+    uint256 internal constant TRANSCRIPT_DST_BYTE_SLOT = 0x200 + 0x520 + 0x620 + 0x03;
+    uint256 internal constant TRANSCRIPT_STATE_0_SLOT = 0x200 + 0x520 + 0x620 + 0x04;
+    uint256 internal constant TRANSCRIPT_STATE_1_SLOT = 0x200 + 0x520 + 0x620 + 0x24;
+    uint256 internal constant TRANSCRIPT_CHALLENGE_SLOT = 0x200 + 0x520 + 0x620 + 0x44;
 
     /*//////////////////////////////////////////////////////////////
                              Partial verifier state
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant STATE_ALPHA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x000;
-    uint256 internal constant STATE_BETA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x020;
-    uint256 internal constant STATE_GAMMA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x040;
-    uint256 internal constant STATE_POWER_OF_ALPHA_2_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x060;
-    uint256 internal constant STATE_POWER_OF_ALPHA_3_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x080;
-    uint256 internal constant STATE_POWER_OF_ALPHA_4_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x0a0;
-    uint256 internal constant STATE_POWER_OF_ALPHA_5_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x0c0;
-    uint256 internal constant STATE_POWER_OF_ALPHA_6_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x0e0;
-    uint256 internal constant STATE_POWER_OF_ALPHA_7_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x100;
-    uint256 internal constant STATE_POWER_OF_ALPHA_8_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x120;
-    uint256 internal constant STATE_ETA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x140;
-    uint256 internal constant STATE_BETA_LOOKUP_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x160;
-    uint256 internal constant STATE_GAMMA_LOOKUP_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x180;
-    uint256 internal constant STATE_BETA_PLUS_ONE_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x1a0;
-    uint256 internal constant STATE_BETA_GAMMA_PLUS_GAMMA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x1c0;
-    uint256 internal constant STATE_V_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x1e0;
-    uint256 internal constant STATE_U_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x200;
-    uint256 internal constant STATE_Z_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x220;
-    uint256 internal constant STATE_Z_MINUS_LAST_OMEGA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x240;
-    uint256 internal constant STATE_L_0_AT_Z_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x260;
-    uint256 internal constant STATE_L_N_MINUS_ONE_AT_Z_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x280;
-    uint256 internal constant STATE_Z_IN_DOMAIN_SIZE = 0x200 + 0x600 + 0x620 + 0x80 + 0x2a0;
+    uint256 internal constant STATE_ALPHA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x000;
+    uint256 internal constant STATE_BETA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x020;
+    uint256 internal constant STATE_GAMMA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x040;
+    uint256 internal constant STATE_POWER_OF_ALPHA_2_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x060;
+    uint256 internal constant STATE_POWER_OF_ALPHA_3_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x080;
+    uint256 internal constant STATE_POWER_OF_ALPHA_4_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x0a0;
+    uint256 internal constant STATE_POWER_OF_ALPHA_5_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x0c0;
+    uint256 internal constant STATE_POWER_OF_ALPHA_6_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x0e0;
+    uint256 internal constant STATE_POWER_OF_ALPHA_7_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x100;
+    uint256 internal constant STATE_POWER_OF_ALPHA_8_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x120;
+    uint256 internal constant STATE_ETA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x140;
+    uint256 internal constant STATE_BETA_LOOKUP_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x160;
+    uint256 internal constant STATE_GAMMA_LOOKUP_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x180;
+    uint256 internal constant STATE_BETA_PLUS_ONE_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x1a0;
+    uint256 internal constant STATE_BETA_GAMMA_PLUS_GAMMA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x1c0;
+    uint256 internal constant STATE_V_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x1e0;
+    uint256 internal constant STATE_U_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x200;
+    uint256 internal constant STATE_Z_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x220;
+    uint256 internal constant STATE_Z_MINUS_LAST_OMEGA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x240;
+    uint256 internal constant STATE_L_0_AT_Z_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x260;
+    uint256 internal constant STATE_L_N_MINUS_ONE_AT_Z_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x280;
+    uint256 internal constant STATE_Z_IN_DOMAIN_SIZE = 0x200 + 0x520 + 0x620 + 0x80 + 0x2a0;
 
     /*//////////////////////////////////////////////////////////////
                              Queries
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant QUERIES_BUFFER_POINT_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x00;
+    uint256 internal constant QUERIES_BUFFER_POINT_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x00;
 
-    uint256 internal constant QUERIES_AT_Z_0_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x40;
-    uint256 internal constant QUERIES_AT_Z_0_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x60;
-    uint256 internal constant QUERIES_AT_Z_1_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x80;
-    uint256 internal constant QUERIES_AT_Z_1_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0xa0;
+    uint256 internal constant QUERIES_AT_Z_0_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x40;
+    uint256 internal constant QUERIES_AT_Z_0_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x60;
+    uint256 internal constant QUERIES_AT_Z_1_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x80;
+    uint256 internal constant QUERIES_AT_Z_1_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0xa0;
 
-    uint256 internal constant QUERIES_T_POLY_AGGREGATED_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0xc0;
-    uint256 internal constant QUERIES_T_POLY_AGGREGATED_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0xe0;
+    uint256 internal constant QUERIES_T_POLY_AGGREGATED_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0xc0;
+    uint256 internal constant QUERIES_T_POLY_AGGREGATED_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0xe0;
 
     /*//////////////////////////////////////////////////////////////
                              Aggregated commitment
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant AGGREGATED_AT_Z_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x00;
-    uint256 internal constant AGGREGATED_AT_Z_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x20;
+    uint256 internal constant AGGREGATED_AT_Z_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x00;
+    uint256 internal constant AGGREGATED_AT_Z_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x20;
 
-    uint256 internal constant AGGREGATED_AT_Z_OMEGA_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x40;
-    uint256 internal constant AGGREGATED_AT_Z_OMEGA_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x60;
+    uint256 internal constant AGGREGATED_AT_Z_OMEGA_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x40;
+    uint256 internal constant AGGREGATED_AT_Z_OMEGA_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x60;
 
-    uint256 internal constant AGGREGATED_OPENING_AT_Z_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x80;
-    uint256 internal constant AGGREGATED_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xa0;
+    uint256 internal constant AGGREGATED_OPENING_AT_Z_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x80;
+    uint256 internal constant AGGREGATED_OPENING_AT_Z_OMEGA_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xa0;
 
     /*//////////////////////////////////////////////////////////////
                              Pairing data
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant PAIRING_BUFFER_POINT_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x00;
-    uint256 internal constant PAIRING_BUFFER_POINT_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x20;
+    uint256 internal constant PAIRING_BUFFER_POINT_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x00;
+    uint256 internal constant PAIRING_BUFFER_POINT_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x20;
 
     uint256 internal constant PAIRING_PAIR_WITH_GENERATOR_X_SLOT =
-        0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x40;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x40;
     uint256 internal constant PAIRING_PAIR_WITH_GENERATOR_Y_SLOT =
-        0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x60;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x60;
 
-    uint256 internal constant PAIRING_PAIR_WITH_X_X_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x80;
-    uint256 internal constant PAIRING_PAIR_WITH_X_Y_SLOT = 0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xa0;
+    uint256 internal constant PAIRING_PAIR_WITH_X_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x80;
+    uint256 internal constant PAIRING_PAIR_WITH_X_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xa0;
 
     /*//////////////////////////////////////////////////////////////
                Slots for scalar multiplication optimizations
     //////////////////////////////////////////////////////////////*/
 
     uint256 internal constant COPY_PERMUTATION_FIRST_AGGREGATED_COMMITMENT_COEFF =
-        0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xc0;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xc0;
     uint256 internal constant LOOKUP_GRAND_PRODUCT_FIRST_AGGREGATED_COMMITMENT_COEFF =
-        0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xe0;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xe0;
     uint256 internal constant LOOKUP_S_FIRST_AGGREGATED_COMMITMENT_COEFF =
-        0x200 + 0x600 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x100;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x100;
 
     /*//////////////////////////////////////////////////////////////
                              Constants
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant OMEGA = 0x1dba8b5bdd64ef6ce29a9039aca3c0e524395c43b9227b96c75090cc6cc7ec97;
-    uint256 internal constant DOMAIN_SIZE = 0x4000000; // 2^26
+    uint256 internal constant OMEGA = 0x1951441010b2b95a6e47a6075066a50a036f5ba978c050f2821df86636c0facb;
+    uint256 internal constant DOMAIN_SIZE = 0x1000000; // 2^24
     uint256 internal constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 internal constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -243,7 +249,7 @@ contract Verifier is IVerifier {
 
         assembly {
             let start := VK_GATE_SETUP_0_X_SLOT
-            let end := VK_LOOKUP_TABLE_TYPE_Y_SLOT
+            let end := VK_RECURSIVE_FLAG_SLOT
             let length := add(sub(end, start), 0x20)
 
             vkHash := keccak256(start, length)
@@ -251,7 +257,8 @@ contract Verifier is IVerifier {
     }
 
     /// @notice Load verification keys to memory in runtime.
-    /// @dev The constants are loaded into memory in a specific layout declared in the constants starting from `VK_` prefix.
+    /// @dev The constants are loaded into memory in a specific layout declared in the constants starting from
+    /// `VK_` prefix.
     /// NOTE: Function may corrupt the memory state if some memory was used before this function was called.
     /// The VK consists of commitments to setup polynomials:
     /// [q_a], [q_b], [q_c], [q_d],                  - main gate setup commitments
@@ -264,6 +271,8 @@ contract Verifier is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             {{commitments}}
+            // flag for using recursive part
+            mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
 
@@ -279,7 +288,8 @@ contract Verifier is IVerifier {
         _loadVerificationKey();
 
         // Begining of the big inline assembly block that makes all the verification work.
-        // Note: We use the custom memory layout, so the return value should be returned from the assembly, not Solidity code.
+        // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
+        // Solidity code.
         assembly {
             /*//////////////////////////////////////////////////////////////
                                     Utils
@@ -416,7 +426,8 @@ contract Verifier is IVerifier {
 
             /// @dev This function loads a zk-SNARK proof, ensures it's properly formatted, and stores it in memory.
             /// It ensures the number of inputs and the elliptic curve point's validity.
-            /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the module bounds.
+            /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the
+            /// module bounds.
             /// The proof consists of:
             /// 1. Public input: (1 field element from F_r)
             ///
@@ -439,7 +450,7 @@ contract Verifier is IVerifier {
             ///     s(x*omega), t(z*omega), table_type(z) - lookup argument polynomial openings
             ///     r(z)                                  - linearisation polynomial opening
             ///
-            /// 4. Recursive proof (2 elliptic curve points over F_q)
+            /// 4. Recursive proof (0 or 2 elliptic curve points over F_q)
             function loadProof() {
                 // 1. Load public input
                 let offset := calldataload(0x04)
@@ -599,24 +610,33 @@ contract Verifier is IVerifier {
                 // 3. Load the recursive part of the proof
                 offset := calldataload(0x44)
                 let recursiveProofLengthInWords := calldataload(add(offset, 0x04))
-                isValid := and(eq(recursiveProofLengthInWords, 4), isValid)
-                // PROOF_RECURSIVE_PART_P1
-                {
-                    let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
-                    let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
-                    let xx := mulmod(x, x, Q_MOD)
-                    isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
-                    mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
-                    mstore(PROOF_RECURSIVE_PART_P1_Y_SLOT, y)
+
+                switch mload(VK_RECURSIVE_FLAG_SLOT)
+                case 0 {
+                    // recursive part should be empty
+                    isValid := and(iszero(recursiveProofLengthInWords), isValid)
                 }
-                // PROOF_RECURSIVE_PART_P2
-                {
-                    let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
-                    let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
-                    let xx := mulmod(x, x, Q_MOD)
-                    isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
-                    mstore(PROOF_RECURSIVE_PART_P2_X_SLOT, x)
-                    mstore(PROOF_RECURSIVE_PART_P2_Y_SLOT, y)
+                default {
+                    // recursive part should be consist of 2 points
+                    isValid := and(eq(recursiveProofLengthInWords, 4), isValid)
+                    // PROOF_RECURSIVE_PART_P1
+                    {
+                        let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
+                        let xx := mulmod(x, x, Q_MOD)
+                        isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
+                        mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
+                        mstore(PROOF_RECURSIVE_PART_P1_Y_SLOT, y)
+                    }
+                    // PROOF_RECURSIVE_PART_P2
+                    {
+                        let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
+                        let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
+                        let xx := mulmod(x, x, Q_MOD)
+                        isValid := and(eq(mulmod(y, y, Q_MOD), addmod(mulmod(x, xx, Q_MOD), 3, Q_MOD)), isValid)
+                        mstore(PROOF_RECURSIVE_PART_P2_X_SLOT, x)
+                        mstore(PROOF_RECURSIVE_PART_P2_Y_SLOT, y)
+                    }
                 }
 
                 // Revert if a proof is not valid
@@ -779,10 +799,14 @@ contract Verifier is IVerifier {
                     mstore(STATE_POWER_OF_ALPHA_8_SLOT, currentAlpha)
                 }
 
-                let stateZ := mload(STATE_Z_SLOT) // z
-                mstore(STATE_L_0_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(0, stateZ)) // L_0(z)
-                mstore(STATE_L_N_MINUS_ONE_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(sub(DOMAIN_SIZE, 1), stateZ)) // L_{n-1}(z)
-                let stateT := mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(PROOF_PUBLIC_INPUT), R_MOD) // L_0(z) * PI
+                // z
+                let stateZ := mload(STATE_Z_SLOT)
+                // L_0(z)
+                mstore(STATE_L_0_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(0, stateZ))
+                // L_{n-1}(z)
+                mstore(STATE_L_N_MINUS_ONE_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(sub(DOMAIN_SIZE, 1), stateZ))
+                // L_0(z) * PI
+                let stateT := mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(PROOF_PUBLIC_INPUT), R_MOD)
 
                 // Compute main gate contribution
                 let result := mulmod(stateT, mload(PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT), R_MOD)
@@ -1039,7 +1063,8 @@ contract Verifier is IVerifier {
                 let l0AtZ := mload(STATE_L_0_AT_Z_SLOT)
                 factor := addmod(factor, mulmod(l0AtZ, mload(STATE_POWER_OF_ALPHA_5_SLOT), R_MOD), R_MOD)
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_perm]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(COPY_PERMUTATION_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
@@ -1108,7 +1133,8 @@ contract Verifier is IVerifier {
                 factor := mulmod(factor, mload(STATE_Z_MINUS_LAST_OMEGA_SLOT), R_MOD)
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [s]
                 mstore(LOOKUP_S_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
 
@@ -1164,7 +1190,8 @@ contract Verifier is IVerifier {
                     R_MOD
                 )
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during computing [F]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during
+                // computing [F]
                 // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_lookup]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(LOOKUP_GRAND_PRODUCT_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
@@ -1178,32 +1205,32 @@ contract Verifier is IVerifier {
             /// We use the formula:
             ///     [D0] = [t_0] + z^n * [t_1] + z^{2n} * [t_2] + z^{3n} * [t_3]
             /// and
-            ///     [D1] = main_gate_selector(z) * (                                         \
-            ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +   | - main gate contribution
-            ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                 |
-            ///                [q_const] + d(z*omega) * [q_{d_next}])                        /
+            ///     [D1] = main_gate_selector(z) * (                                        \
+            ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +  | - main gate contribution
+            ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                |
+            ///                [q_const] + d(z*omega) * [q_{d_next}])                       /
             ///
-            ///            + alpha * [custom_gate_selector] * (                              \
-            ///                (a(z)^2 - b(z))              +                                | - custom gate contribution
-            ///                (b(z)^2 - c(z))    * alpha   +                                |
-            ///                (a(z)*c(z) - d(z)) * alpha^2 )                                /
+            ///            + alpha * [custom_gate_selector] * (                             \
+            ///                (a(z)^2 - b(z))              +                               | - custom gate contribution
+            ///                (b(z)^2 - c(z))    * alpha   +                               |
+            ///                (a(z)*c(z) - d(z)) * alpha^2 )                               /
             ///
-            ///            + alpha^4 * [z_perm] *                                            \
-            ///                (a(z) + beta * z      + gamma) *                              |
-            ///                (b(z) + beta * z * k0 + gamma) *                              |
-            ///                (c(z) + beta * z * k1 + gamma) *                              |
-            ///                (d(z) + beta * z * k2 + gamma)                                | - permutation contribution
-            ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                  |
-            ///                (a(z) + beta * sigma_0(z) + gamma) *                          |
-            ///                (b(z) + beta * sigma_1(z) + gamma) *                          |
-            ///                (c(z) + beta * sigma_2(z) + gamma) *                          |
-            ///            + alpha^5 * L_0(z) * [z_perm]                                     /
+            ///            + alpha^4 * [z_perm] *                                           \
+            ///                (a(z) + beta * z      + gamma) *                             |
+            ///                (b(z) + beta * z * k0 + gamma) *                             |
+            ///                (c(z) + beta * z * k1 + gamma) *                             |
+            ///                (d(z) + beta * z * k2 + gamma)                               | - permutation contribution
+            ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                 |
+            ///                (a(z) + beta * sigma_0(z) + gamma) *                         |
+            ///                (b(z) + beta * sigma_1(z) + gamma) *                         |
+            ///                (c(z) + beta * sigma_2(z) + gamma) *                         |
+            ///            + alpha^5 * L_0(z) * [z_perm]                                    /
             ///
-            ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *   \
-            ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup]  |
-            ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]           | - lookup contribution
-            ///            + alpha^7 * L_0(z) * [z_lookup]                                   |
-            ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                               /
+            ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *  \
+            ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup] |
+            ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]          | - lookup contribution
+            ///            + alpha^7 * L_0(z) * [z_lookup]                                  |
+            ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                              /
             function prepareQueries() {
                 // Calculate [D0]
                 {
@@ -1524,6 +1551,7 @@ contract Verifier is IVerifier {
             /// where [F] and [E] were computed previously
             ///
             /// Also we need to check that e([P1], [x]_2) = e([P2], [1]_2)
+            /// if we have the recursive part of the proof
             /// where [P1] and [P2] are parts of the recursive proof
             ///
             /// We can aggregate both pairings into one for gas optimization:
@@ -1554,10 +1582,12 @@ contract Verifier is IVerifier {
                 pointMulAndAddIntoDest(PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT, u, PAIRING_PAIR_WITH_X_X_SLOT)
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
-                // Add recursive proof part
-                let uu := mulmod(u, u, R_MOD)
-                pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
-                pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
+                // Add recursive proof part if needed
+                if mload(VK_RECURSIVE_FLAG_SLOT) {
+                    let uu := mulmod(u, u, R_MOD)
+                    pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
+                    pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
+                }
 
                 // Calculate pairing
                 {
