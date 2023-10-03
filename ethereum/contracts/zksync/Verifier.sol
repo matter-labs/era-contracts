@@ -232,7 +232,7 @@ contract Verifier is IVerifier {
                              Constants
     //////////////////////////////////////////////////////////////*/
 
-    uint256 internal constant OMEGA = 0x1dba8b5bdd64ef6ce29a9039aca3c0e524395c43b9227b96c75090cc6cc7ec97;
+    uint256 internal constant OMEGA = 0x1951441010b2b95a6e47a6075066a50a036f5ba978c050f2821df86636c0facb;
     uint256 internal constant DOMAIN_SIZE = 0x1000000; // 2^24
     uint256 internal constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 internal constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
