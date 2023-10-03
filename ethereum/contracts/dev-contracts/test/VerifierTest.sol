@@ -6,6 +6,7 @@ import "../../zksync/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierTest is Verifier {
+    /*
     function _loadVerificationKey() internal pure override {
         assembly {
             mstore(VK_GATE_SETUP_0_X_SLOT, 0x08fa9d6f0dd6ac1cbeb94ae20fe7a23df05cb1095df66fb561190e615a4037ef)
@@ -57,4 +58,5 @@ contract VerifierTest is Verifier {
             mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
+     */
 }
