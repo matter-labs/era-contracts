@@ -31,15 +31,6 @@ contract NewChainTest is RegistryTest {
         bridgehead.newProofSystem(proofSystemAddress);
     }
 
-    function getDiamondCutData() internal pure returns (Diamond.DiamondCutData memory) {
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: address(0x3030303030303030),
-                initCalldata: bytes("")
-            });
-    }
-
     function getChainContractAddress() internal returns (address chainContractAddress) {
         vm.mockCall(
             bridgehead.getChainImplementation(),
