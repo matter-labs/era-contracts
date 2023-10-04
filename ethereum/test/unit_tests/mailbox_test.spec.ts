@@ -35,6 +35,9 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
+const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
@@ -76,7 +79,9 @@ describe('Mailbox tests', function () {
             deployWallet,
             governorAddress,
             verbose: false,
-            addresses: addressConfig
+            addresses: addressConfig,
+            bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
+            defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
         });
 
         const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));

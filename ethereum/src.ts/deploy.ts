@@ -26,8 +26,8 @@ import {
 } from '../scripts/utils';
 import { deployViaCreate2 } from './deploy-utils';
 
-const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+let L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+let L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
 
 export interface DeployedAddresses {
     Bridgehead: {
@@ -68,6 +68,8 @@ export interface DeployerConfig {
     governorAddress?: string;
     verbose?: boolean;
     addresses?: DeployedAddresses;
+    bootloaderBytecodeHash?: string;
+    defaultAccountBytecodeHash?: string;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -118,6 +120,8 @@ export class Deployer {
         this.verbose = config.verbose != null ? config.verbose : false;
         this.addresses = config.addresses ? config.addresses : deployedAddressesFromEnv();
         this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
+        L2_BOOTLOADER_BYTECODE_HASH = config.bootloaderBytecodeHash ? config.bootloaderBytecodeHash : L2_BOOTLOADER_BYTECODE_HASH;
+        L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash ? config.defaultAccountBytecodeHash : L2_DEFAULT_ACCOUNT_BYTECODE_HASH;
     }
 
     public async initialProofSystemProxyDiamondCut() {

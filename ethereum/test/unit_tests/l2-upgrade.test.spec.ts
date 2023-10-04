@@ -31,7 +31,6 @@ import {
     L2_BOOTLOADER_ADDRESS,
     packBatchTimestampAndBlockTimestamp
 } from './utils';
-import { readSystemContractsBytecode, hashL2Bytecode, readBlockBootloaderBytecode } from '../../scripts/utils';
 import { hexlify, keccak256 } from 'ethers/lib/utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, Wallet, BytesLike } from 'ethers';
@@ -42,8 +41,8 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
@@ -96,7 +95,9 @@ describe('L2 upgrade test', function () {
             deployWallet,
             governorAddress,
             verbose: false,
-            addresses: addressConfig
+            addresses: addressConfig,
+            bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
+            defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
         });
 
         const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
