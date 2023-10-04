@@ -108,11 +108,18 @@ export class Deployer {
         const genesisBatchHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisIndexRepeatedStorageChanges = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBatchCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
-        const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
-            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
-            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
-        };
+
+        let verifierParams = process.env['CONTRACTS_PROVER_AT_GENESIS'] == "fri" ?
+            {
+                recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH'),
+                recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH'),
+                recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000"
+            } :
+            {
+                recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
+                recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
+                recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
+            };
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
