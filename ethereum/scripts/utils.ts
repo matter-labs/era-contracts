@@ -149,7 +149,7 @@ export type L1Token = {
 };
 
 export function getTokens(network: string): L1Token[] {
-    const configPath = `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+    const configPath = process.env.ZKSYNC_HOME ? `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json` : `./test/test_config/constant/${network}.json`;
     return JSON.parse(
         fs.readFileSync(configPath, {
             encoding: 'utf-8'
