@@ -67,14 +67,6 @@ interface IBridgeheadMailbox is IMailboxEvents {
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
 
-    function requestL2TransactionProof(
-        uint256 _chainId,
-        WritePriorityOpParams memory _params,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps,
-        bool _isFree
-    ) external returns (bytes32 canonicalTxHash);
-
     function l2TransactionBaseCost(
         uint256 _chainId,
         uint256 _gasPrice,
