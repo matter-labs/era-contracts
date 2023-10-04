@@ -131,7 +131,7 @@ class ZkSyncDeployer {
     }
 
     async processBootloader() {
-        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_block.yul/proved_block.yul.zbin'));
+        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin'));
 
         await this.publishBootloader(bootloaderCode);
         await this.checkShouldUpgradeBootloader(bootloaderCode);

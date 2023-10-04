@@ -1,12 +1,15 @@
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice The contract used to emulate EVM's keccak256 opcode.
  * @dev It accepts the data to be hashed, pad it by the specification 
  * and uses `precompileCall` to call the zkEVM built-in precompiles.
  * @dev Thus keccak256 precompile circuit operates over padded data to perform efficient sponge round computation.
  */
 object "Keccak256" {
-    code { }
+    code {
+        return(0, 0)
+    }
     object "Keccak256_deployed" {
         code {
             ////////////////////////////////////////////////////////////////

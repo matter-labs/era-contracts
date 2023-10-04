@@ -107,9 +107,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
         lang: Language.Yul,
         path: ''
     },
-    bytecodeCompressor: {
+    compressor: {
         address: '0x000000000000000000000000000000000000800e',
-        codeName: 'BytecodeCompressor',
+        codeName: 'Compressor',
         lang: Language.Solidity,
     },
     complexUpgrader: {

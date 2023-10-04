@@ -1,12 +1,12 @@
 ---
-name: Bug report
-about: Use this template for reporting issues
+name: Scripts-Related Bug Report
+about: Use this template for reporting script related bugs. For contract bugs, see our security policy.
 title: ''
 labels: bug
 assignees: ''
 ---
 
-### 🐛 Bug Report
+### 🐛 Script Bug Report
 
 #### 📝 Description
 

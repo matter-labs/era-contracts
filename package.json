@@ -10,17 +10,19 @@
     "ethers": "^5.7.0",
     "hardhat": "^2.11.0",
     "preprocess": "^3.2.0",
-    "zksync-web3": "^0.13.0"
+    "zksync-web3": "^0.14.3"
   },
   "devDependencies": {
+    "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
     "@matterlabs/hardhat-zksync-solc": "^0.4.2",
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@typechain/ethers-v5": "^10.0.0",
+    "@typechain/hardhat": "^7.0.0",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^9.1.1",
     "@types/node": "^17.0.34",
     "chai": "^4.3.6",
-    "hardhat-typechain": "^0.3.5",
     "mocha": "^10.0.0",
     "prettier": "^2.3.0",
     "prettier-plugin-solidity": "^1.0.0-alpha.27",
@@ -40,7 +42,7 @@
     ]
   },
   "scripts": {
-    "test": "zk f mocha test/system-contract-test.test.ts",
+    "test": "hardhat test --network zkSyncTestNode",
     "build": "hardhat compile",
     "clean": "hardhat clean",
     "fmt": "prettier --config prettier.js --write contracts/*.sol contracts/**/*.sol",

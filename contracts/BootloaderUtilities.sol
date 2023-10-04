@@ -9,6 +9,7 @@ import "./libraries/EfficientCall.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice A contract that provides some utility methods for the bootloader
  * that is very hard to write in Yul.
  */

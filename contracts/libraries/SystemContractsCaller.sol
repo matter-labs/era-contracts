@@ -61,6 +61,7 @@ enum CalldataForwardingMode {
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice A library that allows calling contracts with the `isSystem` flag.
  * @dev It is needed to call ContractDeployer and NonceHolder.
  */
