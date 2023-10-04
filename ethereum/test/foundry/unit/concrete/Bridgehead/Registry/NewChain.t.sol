@@ -7,7 +7,6 @@ pragma solidity ^0.8.17;
 import {RegistryTest} from "./_Registry_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
 import {IProofForBridgehead} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofForBridgehead.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgeheadChain} from "../../../../../../cache/solpp-generated-contracts/bridgehead/chain-interfaces/IBridgeheadChain.sol";
@@ -29,15 +28,6 @@ contract NewChainTest is RegistryTest {
 
         vm.prank(GOVERNOR);
         bridgehead.newProofSystem(proofSystemAddress);
-    }
-
-    function getDiamondCutData() internal pure returns (Diamond.DiamondCutData memory) {
-        return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: address(0x3030303030303030),
-                initCalldata: bytes("")
-            });
     }
 
     function getChainContractAddress() internal returns (address chainContractAddress) {
