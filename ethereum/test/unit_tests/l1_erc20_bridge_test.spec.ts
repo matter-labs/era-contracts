@@ -50,21 +50,24 @@ describe(`L1ERC20Bridge tests`, function () {
         dummyHash.set([1, 0, 0, 1]);
         const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
         const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            dummyAddress,
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
             {
-                recursionCircuitsSetVksHash: ethers.constants.HashZero,
-                recursionLeafLevelVkHash: ethers.constants.HashZero,
-                recursionNodeLevelVkHash: ethers.constants.HashZero
-            },
-            false,
-            dummyHash,
-            dummyHash,
-            100000000000
+                verifier: dummyAddress,
+                governor: await owner.getAddress(),
+                admin: await owner.getAddress(),
+                genesisBatchHash: ethers.constants.HashZero,
+                genesisIndexRepeatedStorageChanges: 0,
+                genesisBatchCommitment: ethers.constants.HashZero,
+                allowList: allowList.address,
+                verifierParams: {
+                    recursionCircuitsSetVksHash: ethers.constants.HashZero,
+                    recursionLeafLevelVkHash: ethers.constants.HashZero,
+                    recursionNodeLevelVkHash: ethers.constants.HashZero
+                },
+                zkPorterIsAvailable: false,
+                l2BootloaderBytecodeHash: dummyHash,
+                l2DefaultAccountBytecodeHash: dummyHash,
+                priorityTxMaxGasLimit: 10000000,
+            }
         ]);
 
         const facetCuts = [
@@ -163,7 +166,7 @@ describe(`L1ERC20Bridge tests`, function () {
         expect(revertReason).equal(`nt`);
     });
 
-    it(`Should revert on finalizing a withdrawal with wrong block number`, async () => {
+    it(`Should revert on finalizing a withdrawal with wrong batch number`, async () => {
         const functionSignature = `0x11a2ccc1`;
         const l1Receiver = await randomSigner.getAddress();
         const l2ToL1message = ethers.utils.hexConcat([
@@ -190,7 +193,7 @@ describe(`L1ERC20Bridge tests`, function () {
         const revertReason = await getCallRevertReason(
             l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
         );
-        expect(revertReason).equal(`rz`);
+        expect(revertReason).equal(`xc`);
     });
 
     it(`Should revert on finalizing a withdrawal with wrong proof`, async () => {

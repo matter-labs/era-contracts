@@ -4,10 +4,11 @@ import { expect } from 'chai';
 import { ethers } from 'ethers';
 import {
     L1ERC20BridgeTestFactory,
-    TransparentUpgradeableProxyFactory,
-    TransparentUpgradeableProxy,
     L1ERC20Bridge
 } from '../../typechain';
+
+import { ITransparentUpgradeableProxyFactory } from '../../typechain/ITransparentUpgradeableProxyFactory';
+import { ITransparentUpgradeableProxy } from '../../typechain/ITransparentUpgradeableProxy';
 
 // TODO: change to the mainet config
 const L1_ERC20_BRIDGE = '0x927DdFcc55164a59E0F33918D13a2D559bC10ce7';
@@ -29,7 +30,7 @@ describe('L1 ERC20 proxy upgrade fork test', function () {
 
     let governor: ethers.Signer;
     let randomSigner: ethers.Signer;
-    let bridgeProxy: TransparentUpgradeableProxy;
+    let bridgeProxy: ITransparentUpgradeableProxy;
     let newBridgeImplementation: L1ERC20Bridge;
     let oldBridgeImplementationAddress: string;
 
@@ -40,7 +41,7 @@ describe('L1 ERC20 proxy upgrade fork test', function () {
 
         const signers = await hardhat.ethers.getSigners();
         randomSigner = signers[0];
-        bridgeProxy = TransparentUpgradeableProxyFactory.connect(L1_ERC20_BRIDGE, randomSigner);
+        bridgeProxy = ITransparentUpgradeableProxyFactory.connect(L1_ERC20_BRIDGE, randomSigner);
         oldBridgeImplementationAddress = await bridgeProxy.connect(governor).callStatic.implementation();
 
         const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory('L1ERC20BridgeTest');
@@ -76,7 +77,7 @@ describe('L1 ERC20 proxy upgrade fork test', function () {
     });
 
     it('should upgrade second time', async () => {
-        const bridgeAsTransparentProxy = TransparentUpgradeableProxyFactory.connect(bridgeProxy.address, governor);
+        const bridgeAsTransparentProxy = ITransparentUpgradeableProxyFactory.connect(bridgeProxy.address, governor);
         await bridgeAsTransparentProxy.upgradeTo(oldBridgeImplementationAddress);
     });
 

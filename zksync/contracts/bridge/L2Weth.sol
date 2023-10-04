@@ -2,12 +2,13 @@
 
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 
 import "./interfaces/IL2Weth.sol";
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The canonical implementation of the WETH token.
 /// @dev The idea is to replace the legacy WETH9 (which has well-known issues) with something better.
 /// This implementation has the following differences from the WETH9:

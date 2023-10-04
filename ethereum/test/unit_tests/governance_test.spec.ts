@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
-import { GovernanceFacetTest, GovernanceFacetTestFactory } from '../../typechain';
+import { AdminFacetTest, AdminFacetTestFactory, GovernanceFactory } from '../../typechain';
 import { getCallRevertReason } from './utils';
 import * as ethers from 'ethers';
 
@@ -8,29 +8,65 @@ function randomAddress() {
     return ethers.utils.hexlify(ethers.utils.randomBytes(20));
 }
 
-describe('Governance facet tests', function () {
-    let governanceTest: GovernanceFacetTest;
+describe('Admin facet tests', function () {
+    let adminFacetTest: AdminFacetTest;
     let randomSigner: ethers.Signer;
 
     before(async () => {
-        const contractFactory = await hardhat.ethers.getContractFactory('GovernanceFacetTest');
+        const contractFactory = await hardhat.ethers.getContractFactory('AdminFacetTest');
         const contract = await contractFactory.deploy();
-        governanceTest = GovernanceFacetTestFactory.connect(contract.address, contract.signer);
+        adminFacetTest = AdminFacetTestFactory.connect(contract.address, contract.signer);
+
+        const governanceFactory = await hardhat.ethers.getContractFactory('Governance');
+        const governanceContract = await contractFactory.deploy();
+        const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
+        await adminFacetTest.setPendingGovernor(governance.address);
+
         randomSigner = (await hardhat.ethers.getSigners())[1];
     });
 
     it('governor successfully set validator', async () => {
         const validatorAddress = randomAddress();
-        await governanceTest.setValidator(validatorAddress, true);
+        await adminFacetTest.setValidator(validatorAddress, true);
 
-        const isValidator = await governanceTest.isValidator(validatorAddress);
+        const isValidator = await adminFacetTest.isValidator(validatorAddress);
         expect(isValidator).to.equal(true);
     });
 
     it('random account fails to set validator', async () => {
         const validatorAddress = randomAddress();
         const revertReason = await getCallRevertReason(
-            governanceTest.connect(randomSigner).setValidator(validatorAddress, true)
+            adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
+        );
+        expect(revertReason).equal('Only by governor or admin');
+    });
+
+    it('governor successfully set porter availability', async () => {
+        await adminFacetTest.setPorterAvailability(true);
+
+        const porterAvailability = await adminFacetTest.getPorterAvailability();
+        expect(porterAvailability).to.equal(true);
+    });
+
+    it('random account fails to set porter availability', async () => {
+        const revertReason = await getCallRevertReason(
+            adminFacetTest.connect(randomSigner).setPorterAvailability(false)
+        );
+        expect(revertReason).equal('1g');
+    });
+
+    it('governor successfully set priority transaction max gas limit', async () => {
+        const gasLimit = '12345678';
+        await adminFacetTest.setPriorityTxMaxGasLimit(gasLimit);
+
+        const newGasLimit = await adminFacetTest.getPriorityTxMaxGasLimit();
+        expect(newGasLimit).to.equal(gasLimit);
+    });
+
+    it('random account fails to priority transaction max gas limit', async () => {
+        const gasLimit = '123456789';
+        const revertReason = await getCallRevertReason(
+            adminFacetTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
         );
         expect(revertReason).equal('1g');
     });
@@ -44,29 +80,29 @@ describe('Governance facet tests', function () {
 
         it('set pending governor', async () => {
             const proposedGovernor = await randomSigner.getAddress();
-            await governanceTest.setPendingGovernor(proposedGovernor);
+            await adminFacetTest.setPendingGovernor(proposedGovernor);
 
-            const pendingGovernor = await governanceTest.getPendingGovernor();
+            const pendingGovernor = await adminFacetTest.getPendingGovernor();
             expect(pendingGovernor).equal(proposedGovernor);
         });
 
         it('reset pending governor', async () => {
             const proposedGovernor = await newGovernor.getAddress();
-            await governanceTest.setPendingGovernor(proposedGovernor);
+            await adminFacetTest.setPendingGovernor(proposedGovernor);
 
-            const pendingGovernor = await governanceTest.getPendingGovernor();
+            const pendingGovernor = await adminFacetTest.getPendingGovernor();
             expect(pendingGovernor).equal(proposedGovernor);
         });
 
         it('failed to accept governor from not proposed account', async () => {
-            const revertReason = await getCallRevertReason(governanceTest.connect(randomSigner).acceptGovernor());
+            const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).acceptGovernor());
             expect(revertReason).equal('n4');
         });
 
         it('accept governor from proposed account', async () => {
-            await governanceTest.connect(newGovernor).acceptGovernor();
+            await adminFacetTest.connect(newGovernor).acceptGovernor();
 
-            const governor = await governanceTest.getGovernor();
+            const governor = await adminFacetTest.getGovernor();
             expect(governor).equal(await newGovernor.getAddress());
         });
     });

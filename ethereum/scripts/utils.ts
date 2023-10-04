@@ -9,7 +9,7 @@ export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-export interface RermissionToCall {
+export interface PermissionToCall {
     caller: string;
     target: string;
     functionName: string;
@@ -74,7 +74,7 @@ export function applyL1ToL2Alias(address: string): string {
     return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
 }
 
-export function readBlockBootloaderBytecode() {
+export function readBatchBootloaderBytecode() {
     const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
     return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
 }
@@ -139,6 +139,28 @@ export function computeL2Create2Address(
 
 export function print(name: string, data: any) {
     console.log(`${name}:\n`, JSON.stringify(data, null, 4), '\n');
+}
+
+export function getLowerCaseAddress(address: string) {
+    return ethers.utils.getAddress(address).toLowerCase();
+}
+
+export function permissionToCallComparator(first: PermissionToCall, second: PermissionToCall) {
+    if (getLowerCaseAddress(first.caller) < getLowerCaseAddress(second.caller)) {
+        return -1;
+    }
+    if (getLowerCaseAddress(first.caller) > getLowerCaseAddress(second.caller)) {
+        return 1;
+    }
+
+    if (getLowerCaseAddress(first.target) < getLowerCaseAddress(second.target)) {
+        return -1;
+    }
+    if (getLowerCaseAddress(first.target) > getLowerCaseAddress(second.target)) {
+        return 1;
+    }
+
+    return first.functionName.localeCompare(second.functionName);
 }
 
 export type L1Token = {

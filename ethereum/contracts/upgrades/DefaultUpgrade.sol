@@ -5,6 +5,8 @@ pragma solidity ^0.8.13;
 import "../zksync/libraries/Diamond.sol";
 import "./BaseZkSyncUpgrade.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract DefaultUpgrade is BaseZkSyncUpgrade {
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
     /// Typically this function will never be used.

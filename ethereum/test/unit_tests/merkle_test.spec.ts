@@ -63,6 +63,6 @@ describe('Merkle lib tests', function () {
         const revertReason = await getCallRevertReason(
             merkleTest.calculateRoot([ethers.constants.HashZero], bigIndex, ethers.constants.HashZero)
         );
-        expect(revertReason).equal('pz');
+        expect(revertReason).equal('px');
     });
 });

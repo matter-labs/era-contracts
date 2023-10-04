@@ -12,6 +12,12 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.jso
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
+const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
+const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+
+export function applyL1ToL2Alias(address: string): string {
+    return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+}
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
     // For getting the consistent length we first convert the bytecode to UInt8Array
