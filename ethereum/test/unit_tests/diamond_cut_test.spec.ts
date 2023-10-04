@@ -2,8 +2,8 @@ import { expect } from 'chai';
 import * as hardhat from 'hardhat';
 import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
-    MailboxFacet,
-    MailboxFacetFactory,
+    Mailbox as MailboxFacet,
+    MailboxFactory as MailboxFacetFactory,
     DiamondCutTest,
     DiamondCutTestFactory,
     DiamondCutFacet,
@@ -20,8 +20,9 @@ import {
 import { getCallRevertReason } from './utils';
 import * as ethers from 'ethers';
 
-describe('Diamond proxy tests', function () {
+describe('Diamond cut tests', function () {
     let diamondCutTest: DiamondCutTest;
+    let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
     before(async () => {
         const contractFactory = await hardhat.ethers.getContractFactory('DiamondCutTest');
@@ -36,7 +37,7 @@ describe('Diamond proxy tests', function () {
         let executorFacet2: ExecutorFacet;
 
         before(async () => {
-            const mailboxFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
+            const mailboxFactory = await hardhat.ethers.getContractFactory('Mailbox');
             const mailboxContract = await mailboxFactory.deploy();
             mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
@@ -264,20 +265,20 @@ describe('Diamond proxy tests', function () {
                 facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
                 facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, true)
             ];
-            // const dummyVerifierParams = {
-            //     recursionNodeLevelVkHash: ethers.constants.HashZero,
-            //     recursionLeafLevelVkHash: ethers.constants.HashZero,
-            //     recursionCircuitsSetVksHash: ethers.constants.HashZero
-            // };
+            const dummyVerifierParams = {
+                recursionNodeLevelVkHash: ethers.constants.HashZero,
+                recursionLeafLevelVkHash: ethers.constants.HashZero,
+                recursionCircuitsSetVksHash: ethers.constants.HashZero
+            };
+
             const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
-                // '0x03752D8252d67f99888E741E3fB642803B29B155',
+                chainId,
+                '0x0000000000000000000000000000000000000000',
                 governorAddress,
                 '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
-                0,
-                '0x0000000000000000000000000000000000000000000000000000000000000000',
-                '0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55',
-                // dummyVerifierParams,
-                false,
+                '0x0000000000000000000000000000000000000000',
+                '0x0000000000000000000000000000000000000000',
+                dummyVerifierParams,
                 '0x0100000000000000000000000000000000000000000000000000000000000000',
                 '0x0100000000000000000000000000000000000000000000000000000000000000',
                 500000 // priority tx max L2 gas limit
@@ -286,8 +287,8 @@ describe('Diamond proxy tests', function () {
             const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitCalldata);
 
             const proxyFactory = await hardhat.ethers.getContractFactory('DiamondProxy');
-            const chainId = hardhat.network.config.chainId;
-            const proxyContract = await proxyFactory.deploy(chainId, diamondCutData);
+            const ethChainId = hardhat.network.config.chainId;
+            const proxyContract = await proxyFactory.deploy(ethChainId, diamondCutData);
             proxy = DiamondProxyFactory.connect(proxyContract.address, proxyContract.signer);
 
             proxyAsDiamondCut = DiamondCutFacetFactory.connect(proxy.address, governor);
@@ -297,7 +298,7 @@ describe('Diamond proxy tests', function () {
         it('should revert emergency freeze when unauthorized governor', async () => {
             const proxyAsDiamondCutByRandomSigner = DiamondCutFacetFactory.connect(proxy.address, randomSigner);
             const revertReason = await getCallRevertReason(proxyAsDiamondCutByRandomSigner.freezeDiamond());
-            expect(revertReason).equal('1g');
+            expect(revertReason).equal('1g1');
         });
 
         it('should emergency freeze and unfreeze when authorized governor', async () => {

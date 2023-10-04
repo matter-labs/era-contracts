@@ -14,7 +14,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         uint256 _l2TxNumberInBlock
     ) external view override returns (bool) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
         return IBridgeheadChain(chainContract).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
     }
 
@@ -26,7 +25,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
         return IBridgeheadChain(chainContract).proveL2MessageInclusion(_blockNumber, _index, _message, _proof);
     }
 
@@ -38,7 +36,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
         return IBridgeheadChain(chainContract).proveL2LogInclusion(_blockNumber, _index, _log, _proof);
     }
 
@@ -52,7 +49,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         TxStatus _status
     ) external view override returns (bool) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
         return
             IBridgeheadChain(chainContract).proveL1ToL2TransactionStatus(
                 _l2TxHash,
@@ -75,7 +71,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         address _refundRecipient
     ) public payable override returns (bytes32 canonicalTxHash) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-
         canonicalTxHash = IBridgeheadChain(chainContract).requestL2TransactionBridgehead{value: msg.value}(
             msg.sender,
             _contractL2,
@@ -97,7 +92,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         bytes32[] calldata _merkleProof
     ) external override {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-
         return
             IBridgeheadChain(chainContract).finalizeEthWithdrawalBridgehead(
                 msg.sender,
@@ -113,25 +107,17 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
 
     /// @notice Transfer ether from the contract to the receiver
     /// @dev Reverts only if the transfer call failed
-    function withdrawFunds(uint256 _chainId, address _to, uint256 _amount) external onlyChainContract(_chainId) {
+    function withdrawFunds(
+        uint256 _chainId,
+        address _to,
+        uint256 _amount
+    ) external onlyChainContract(_chainId) {
         bool callSuccess;
         // Low-level assembly call, to avoid any memory copying (save gas)
         assembly {
             callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
         }
         require(callSuccess, "pz");
-    }
-
-    function requestL2TransactionProof(
-        uint256 _chainId,
-        WritePriorityOpParams memory _params,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps,
-        bool _isFree
-    ) external override returns (bytes32 canonicalTxHash) {
-        address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
-        return IBridgeheadChain(chainContract).requestL2TransactionProof(_params, _calldata, _factoryDeps, _isFree);
     }
 
     function l2TransactionBaseCost(
@@ -141,7 +127,6 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256) {
         address chainContract = bridgeheadStorage.chainContract[_chainId];
-        require(chainContract != address(0), "r1");
         return IBridgeheadChain(chainContract).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 }

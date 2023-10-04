@@ -15,7 +15,7 @@ import "./chain-interfaces/IExecutor.sol";
 /// @dev The contract overloads all of the 4 methods, that are used in state transition. When the block is committed,
 /// the timestamp is stored for it. Later, when the owner calls the block execution, the contract checks that block
 /// was committed not earlier than X time ago.
-contract ValidatorTimelock is IProofExecutor, Ownable2Step {
+contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Part of the IBase interface. Not used in this contract.
     string public constant getName = "ValidatorTimelock";
 
@@ -26,7 +26,7 @@ contract ValidatorTimelock is IProofExecutor, Ownable2Step {
     event NewValidator(address _oldValidator, address _newValidator);
 
     /// @dev The main zkSync smart contract.
-    address public immutable proofSystemContract;
+    address public immutable diamondProxy;
 
     /// @dev The mapping of L2 block number => timestamp when it was commited.
     mapping(uint256 => uint256) public committedBlockTimestamp;
@@ -37,9 +37,9 @@ contract ValidatorTimelock is IProofExecutor, Ownable2Step {
     /// @dev The delay between committing and executing blocks.
     uint256 public executionDelay;
 
-    constructor(address _initialOwner, address _proofSystemContract, uint256 _executionDelay, address _validator) {
+    constructor(address _initialOwner, address _diamondProxy, uint256 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
-        proofSystemContract = _proofSystemContract;
+        diamondProxy = _diamondProxy;
         executionDelay = _executionDelay;
         validator = _validator;
     }
@@ -111,7 +111,7 @@ contract ValidatorTimelock is IProofExecutor, Ownable2Step {
     /// @dev Call the zkSync contract with the same calldata as this contract was called.
     /// Note: it is called the zkSync contract, not delegatecalled!
     function _propagateToZkSync() internal {
-        address contractAddress = proofSystemContract;
+        address contractAddress = diamondProxy;
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())

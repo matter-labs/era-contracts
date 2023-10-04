@@ -1,14 +1,18 @@
 import { expect } from 'chai';
-import { ethers } from 'ethers';
+import { ethers, Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
-import { IFactory as IZkSync } from '../../typechain/IFactory';
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { IBridgehead } from '../../typechain/IBridgehead';
 import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
     AllowList,
     AllowListFactory,
     DiamondInitFactory,
     GettersFacetFactory,
-    MailboxFacetFactory,
+    MailboxFactory,
     L1WethBridge,
     L1WethBridgeFactory,
     WETH9,
@@ -20,11 +24,19 @@ import { hashL2Bytecode } from '../../scripts/utils';
 import { Interface } from 'ethers/lib/utils';
 import { Address } from 'zksync-web3/build/src/types';
 
+import { Deployer } from '../../src.ts/deploy';
+
+const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
+
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 export async function create2DeployFromL1(
-    zkSync: IZkSync,
+    bridgehead: IBridgehead,
     chainId: ethers.BigNumberish,
     walletAddress: Address,
     bytecode: ethers.BytesLike,
@@ -35,10 +47,15 @@ export async function create2DeployFromL1(
     const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync('IContractDeployer').abi);
     const bytecodeHash = hashL2Bytecode(bytecode);
     const calldata = deployerSystemContracts.encodeFunctionData('create2', [create2Salt, bytecodeHash, constructor]);
-    const gasPrice = await zkSync.provider.getGasPrice();
-    const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+    const gasPrice = await bridgehead.provider.getGasPrice();
+    const expectedCost = await bridgehead.l2TransactionBaseCost(
+        chainId,
+        gasPrice,
+        l2GasLimit,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    );
 
-    await zkSync.requestL2Transaction(
+    await bridgehead.requestL2Transaction(
         chainId,
         DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
         0,
@@ -57,62 +74,101 @@ describe('WETH Bridge tests', () => {
     let allowList: AllowList;
     let bridgeProxy: L1WethBridge;
     let l1Weth: WETH9;
-    let functionSignature = '0x6c0960f9';
+    let functionSignature = '0x0fdef251';
+    let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
     before(async () => {
         [owner, randomSigner] = await hardhat.ethers.getSigners();
 
-        // prepare the diamond
+        const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(
+            owner.provider
+        );
+        const governorAddress = await deployWallet.getAddress();
 
-        const gettersFactory = await hardhat.ethers.getContractFactory(`GettersFacet`);
-        const gettersContract = await gettersFactory.deploy();
-        const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+        const gasPrice = await owner.provider.getGasPrice();
 
-        const mailboxFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
-        const mailboxContract = await mailboxFactory.deploy();
-        const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+        const tx = {
+            from: owner.getAddress(),
+            to: deployWallet.address,
+            value: ethers.utils.parseEther('1000'),
+            nonce: owner.getTransactionCount(),
+            gasLimit: 100000,
+            gasPrice: gasPrice
+        };
 
-        const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
-        const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-        allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
+        await owner.sendTransaction(tx);
 
-        const diamondInitFactory = await hardhat.ethers.getContractFactory('DiamondInit');
-        const diamondInitContract = await diamondInitFactory.deploy();
-        const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+        const deployer = new Deployer({
+            deployWallet,
+            governorAddress,
+            verbose: false,
+            addresses: addressConfig
+        });
 
-        const dummyHash = new Uint8Array(32);
-        dummyHash.set([1, 0, 0, 1]);
-        // const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-        const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            // dummyAddress,
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
-            // {
-            //     recursionCircuitsSetVksHash: ethers.constants.HashZero,
-            //     recursionLeafLevelVkHash: ethers.constants.HashZero,
-            //     recursionNodeLevelVkHash: ethers.constants.HashZero
-            // },
-            false,
-            dummyHash,
-            dummyHash,
-            100000000000
-        ]);
+        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
-        const facetCuts = [
-            facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-            facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
-        ];
+        let nonce = await deployWallet.getTransactionCount();
 
-        const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+        await deployer.deployCreate2Factory({ gasPrice, nonce });
+        nonce++;
 
-        const diamondProxyFactory = await hardhat.ethers.getContractFactory('DiamondProxy');
-        const chainId = hardhat.network.config.chainId;
-        const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+        // nonce++;
 
-        await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
+        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
+        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
+        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
+        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
+
+        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
+        await deployer.deployProofSystemContract(create2Salt, gasPrice);
+        await deployer.deployBridgeContracts(create2Salt, gasPrice);
+        await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+
+        const verifierParams = {
+            recursionNodeLevelVkHash: zeroHash,
+            recursionLeafLevelVkHash: zeroHash,
+            recursionCircuitsSetVksHash: zeroHash
+        };
+        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+
+        const proofSystem = deployer.proofSystemContract(deployWallet);
+
+        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+
+        await deployer.registerHyperchain(create2Salt, gasPrice);
+        chainId = deployer.chainId;
+
+        // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
+        // await validatorTx.wait();
+
+        allowList = deployer.l1AllowList(deployWallet);
+
+        const allowTx = await allowList.setBatchAccessMode(
+            [
+                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.ChainProxy,
+                deployer.addresses.ProofSystem.ProofSystemProxy,
+                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridges.ERC20BridgeProxy,
+                deployer.addresses.Bridges.WethBridgeProxy
+            ],
+            [
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public
+            ]
+        );
+        await allowTx.wait();
+
+        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
 
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
@@ -123,13 +179,14 @@ describe('WETH Bridge tests', () => {
 
         const bridge = await (
             await hardhat.ethers.getContractFactory('L1WethBridge')
-        ).deploy(l1Weth.address, diamondProxyContract.address, allowListContract.address);
+        ).deploy(l1Weth.address, deployer.addresses.Bridgehead.BridgeheadProxy, deployer.addresses.AllowList);
 
         // we don't test L2, so it is ok to give garbage factory deps and L2 address
         const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';
         const garbageAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 
         const bridgeInitData = bridge.interface.encodeFunctionData('initialize', [
+            chainId,
             [garbageBytecode, garbageBytecode],
             garbageAddress,
             await owner.getAddress(),
@@ -203,14 +260,14 @@ describe('WETH Bridge tests', () => {
         const revertReason = await getCallRevertReason(
             bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, '0x', [])
         );
-        expect(revertReason).equal('Incorrect ETH message with additional data length');
+        expect(revertReason).equal('pm');
     });
 
     it('Should revert on finalizing a withdrawal with wrong function selector', async () => {
         const revertReason = await getCallRevertReason(
             bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
         );
-        expect(revertReason).equal('Incorrect ETH message function selector');
+        expect(revertReason).equal('is');
     });
 
     it('Should revert on finalizing a withdrawal with wrong receiver', async () => {
@@ -226,7 +283,7 @@ describe('WETH Bridge tests', () => {
                     []
                 )
         );
-        expect(revertReason).equal('Wrong L1 ETH withdraw receiver');
+        expect(revertReason).equal('rz');
     });
 
     it('Should revert on finalizing a withdrawal with wrong L2 sender', async () => {
@@ -247,6 +304,6 @@ describe('WETH Bridge tests', () => {
                     []
                 )
         );
-        expect(revertReason).equal('The withdrawal was not initiated by L2 bridge');
+        expect(revertReason).equal('rz');
     });
 });

@@ -340,9 +340,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        {
-            require(!isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex], "pw");
-        }
+        require(!isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex], "pw");
 
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBlock: _l2TxNumberInBlock,

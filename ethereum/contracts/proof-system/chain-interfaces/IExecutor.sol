@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 
 import "./IBase.sol";
 
-interface IProofExecutor is IProofChainBase {
+interface IExecutor is IProofChainBase {
     /// @notice Rollup block stored data
     /// @param blockNumber Rollup block number
     /// @param blockHash Hash of L2 block
@@ -59,10 +59,8 @@ interface IProofExecutor is IProofChainBase {
         uint256[] serializedProof;
     }
 
-    function commitBlocks(
-        StoredBlockInfo calldata _lastCommittedBlockData,
-        CommitBlockInfo[] calldata _newBlocksData
-    ) external;
+    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
+        external;
 
     function proveBlocks(
         StoredBlockInfo calldata _prevBlock,

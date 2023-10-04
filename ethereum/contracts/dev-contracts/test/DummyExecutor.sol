@@ -6,7 +6,7 @@ import "../../proof-system/chain-interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
-contract DummyExecutor is IProofExecutor {
+contract DummyExecutor is IExecutor {
     address owner;
 
     // Flags to control if the contract should revert during commit, prove, and execute blocks operations
@@ -52,10 +52,9 @@ contract DummyExecutor is IProofExecutor {
         shouldRevertOnExecuteBlocks = _shouldRevert;
     }
 
-    function commitBlocks(
-        StoredBlockInfo calldata _lastCommittedBlockData,
-        CommitBlockInfo[] calldata _newBlocksData
-    ) external {
+    function commitBlocks(StoredBlockInfo calldata _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
+        external
+    {
         require(!shouldRevertOnCommitBlocks, "DummyExecutor: shouldRevertOnCommitBlocks");
         require(
             _lastCommittedBlockData.blockNumber == getTotalBlocksCommitted,
@@ -81,7 +80,7 @@ contract DummyExecutor is IProofExecutor {
         require(_committedBlocks.length == 1, "DummyExecutor: Can prove only one block");
         require(
             _committedBlocks[0].blockNumber == _prevBlock.blockNumber + 1,
-            "DummyExecutor: Can't prove block out of order"
+            "DummyExecutor 1: Can't prove block out of order"
         );
 
         getTotalBlocksVerified += 1;
@@ -100,7 +99,7 @@ contract DummyExecutor is IProofExecutor {
         getTotalBlocksExecuted += nBlocks;
         require(
             getTotalBlocksExecuted <= getTotalBlocksVerified,
-            "DummyExecutor: Can't execute blocks more than committed and proven currently"
+            "DummyExecutor 2: Can't execute blocks more than committed and proven currently"
         );
     }
 

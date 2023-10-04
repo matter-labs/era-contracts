@@ -41,7 +41,7 @@ export async function deployViaCreate2(
     }
 
     const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
-    const receipt = await tx.wait(2);
+    const receipt = await tx.wait(1);
 
     const gasUsed = receipt.gasUsed;
     log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);

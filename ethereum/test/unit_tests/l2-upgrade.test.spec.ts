@@ -1,5 +1,7 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
 import {
     DiamondInitFactory,
@@ -10,6 +12,9 @@ import {
     DiamondCutFacetFactory,
     GettersFacetFactory,
     GovernanceFacetFactory,
+    BridgeheadChainFactory,
+    BridgeheadChain,
+    DiamondFactory,
     GettersFacet,
     GovernanceFacet,
     DefaultUpgradeFactory,
@@ -26,10 +31,23 @@ import {
     L2_BOOTLOADER_ADDRESS,
     packBatchTimestampAndBlockTimestamp
 } from './utils';
+import { readSystemContractsBytecode, hashL2Bytecode, readBlockBootloaderBytecode } from '../../scripts/utils';
+import { hexlify, keccak256 } from 'ethers/lib/utils';
 import * as ethers from 'ethers';
-import { BigNumber, BigNumberish, BytesLike } from 'ethers';
+import { BigNumber, BigNumberish, Wallet, BytesLike } from 'ethers';
 import { DiamondCutFacet } from '../../typechain';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
+
+import { Deployer } from '../../src.ts/deploy';
+
+const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -49,90 +67,135 @@ describe('L2 upgrade test', function () {
     let verifier: string;
     let verifierParams: VerifierParams;
     const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
+    let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+    let priorityOperationsHash: string;
+    let priorityOpTxHash: string;
 
     before(async () => {
         [owner] = await hardhat.ethers.getSigners();
 
-        const executorFactory = await hardhat.ethers.getContractFactory('ExecutorFacet');
-        const executorContract = await executorFactory.deploy();
-        const executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
+        const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
+            owner.provider
+        );
+        const governorAddress = await deployWallet.getAddress();
 
-        const gettersFactory = await hardhat.ethers.getContractFactory('GettersFacet');
-        const gettersContract = await gettersFactory.deploy();
-        const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+        const gasPrice = await owner.provider.getGasPrice();
 
-        const diamondCutFacetFactory = await hardhat.ethers.getContractFactory('DiamondCutFacet');
-        const diamondCutFacetContract = await diamondCutFacetFactory.deploy();
-        const diamondCutFacet = DiamondCutFacetFactory.connect(
-            diamondCutFacetContract.address,
-            diamondCutFacetContract.signer
+        const tx = {
+            from: owner.getAddress(),
+            to: deployWallet.address,
+            value: ethers.utils.parseEther('1000'),
+            nonce: owner.getTransactionCount(),
+            gasLimit: 100000,
+            gasPrice: gasPrice
+        };
+
+        await owner.sendTransaction(tx);
+
+        const deployer = new Deployer({
+            deployWallet,
+            governorAddress,
+            verbose: false,
+            addresses: addressConfig
+        });
+
+        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+
+        let nonce = await deployWallet.getTransactionCount();
+
+        await deployer.deployCreate2Factory({ gasPrice, nonce });
+        nonce++;
+
+        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+        // nonce++;
+
+        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
+        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
+        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
+        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
+        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
+
+        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
+        await deployer.deployProofSystemContract(create2Salt, gasPrice);
+        await deployer.deployBridgeContracts(create2Salt, gasPrice);
+        await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+
+        const verifierParams = {
+            recursionNodeLevelVkHash: zeroHash,
+            recursionLeafLevelVkHash: zeroHash,
+            recursionCircuitsSetVksHash: zeroHash
+        };
+        verifier = deployer.addresses.ProofSystem.Verifier;
+        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+
+        const proofSystem = deployer.proofSystemContract(deployWallet);
+
+        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+
+        await deployer.registerHyperchain(create2Salt, gasPrice);
+        chainId = deployer.chainId;
+
+        // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
+        // await validatorTx.wait();
+
+        allowList = deployer.l1AllowList(deployWallet);
+
+        const allowTx = await allowList.setBatchAccessMode(
+            [
+                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.ChainProxy,
+                deployer.addresses.ProofSystem.ProofSystemProxy,
+                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridges.ERC20BridgeProxy,
+                deployer.addresses.Bridges.WethBridgeProxy
+            ],
+            [
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public
+            ]
+        );
+        await allowTx.wait();
+
+        proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        proxyGetters = GettersFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        proxyDiamondCut = DiamondCutFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        proxyGovernance = GovernanceFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+
+        await (await proxyGovernance.setValidator(await deployWallet.getAddress(), true)).wait();
+
+        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
+        let bridgeheadChainContract = BridgeheadChainFactory.connect(
+            deployer.addresses.Bridgehead.ChainProxy,
+            deployWallet
         );
 
-        const governanceFactory = await hardhat.ethers.getContractFactory('GovernanceFacet');
-        const governanceContract = await governanceFactory.deploy();
-        const governanceFacet = GovernanceFacetFactory.connect(governanceContract.address, governanceContract.signer);
-
-        const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
-        const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-        allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
-
-        // Note, that while this testsuit is focused on testing MailboxFaucet only,
-        // we still need to initialize its storage via DiamondProxy
-        const diamondInitFactory = await hardhat.ethers.getContractFactory('DiamondInit');
-        const diamondInitContract = await diamondInitFactory.deploy();
-        const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
-
-        const dummyHash = new Uint8Array(32);
-        dummyHash.set([1, 0, 0, 1]);
-        verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-        verifierParams = {
-            recursionCircuitsSetVksHash: ethers.constants.HashZero,
-            recursionLeafLevelVkHash: ethers.constants.HashZero,
-            recursionNodeLevelVkHash: ethers.constants.HashZero
-        };
-        const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            verifier,
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
-            verifierParams,
-            false,
-            dummyHash,
-            dummyHash,
-            100000000000
-        ]);
-
-        const facetCuts = [
-            // Should be unfreezable. The function to unfreeze contract is located on the diamond cut facet.
-            // That means if the diamond cut will be freezable, the proxy can NEVER be unfrozen.
-            facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
-            // Should be unfreezable. There are getters, that users can expect to be available.
-            facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-            facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
-            facetCut(governanceFacet.address, governanceFacet.interface, Action.Add, true)
-        ];
-
-        const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
-
-        const diamondProxyFactory = await hardhat.ethers.getContractFactory('DiamondProxy');
-        const chainId = hardhat.network.config.chainId;
-        diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
-
-        await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
-
-        proxyExecutor = ExecutorFacetFactory.connect(diamondProxyContract.address, owner);
-        proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, owner);
-        proxyDiamondCut = DiamondCutFacetFactory.connect(diamondProxyContract.address, owner);
-        proxyGovernance = GovernanceFacetFactory.connect(diamondProxyContract.address, owner);
-
-        await (await proxyGovernance.setValidator(await owner.getAddress(), true)).wait();
+        let priorityOp = await bridgeheadChainContract.priorityQueueFrontOperation();
+        priorityOpTxHash = priorityOp[0];
+        priorityOperationsHash = keccak256(
+            ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+        );
     });
 
     it('Upgrade should work even if not all blocks are processed', async () => {
+        const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
+        const l2Logs = encodeLogs([
+            contextLog(timestamp, ethers.constants.HashZero),
+            // bootloaderLog(l2UpgradeTxHash),
+            // bootloaderLog(l2UpgradeTxHash)
+            chainIdLog(priorityOpTxHash)
+        ]);
         block1Info = await buildCommitBlockInfo(genesisStoredBlockInfo(), {
-            blockNumber: 1
+            blockNumber: 1,
+            priorityOperationsHash: priorityOperationsHash,
+            numberOfLayer1Txs: 1,
+            l2Logs
         });
 
         const commitReceipt = await (await proxyExecutor.commitBlocks(genesisStoredBlockInfo(), [block1Info])).wait();
@@ -142,7 +205,7 @@ describe('L2 upgrade test', function () {
         expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.constants.HashZero);
 
         await (
-            await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 newProtocolVersion: 1,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -158,14 +221,14 @@ describe('L2 upgrade test', function () {
     it('Timestamp should behave correctly', async () => {
         // Upgrade was scheduled for now should work fine
         const timeNow = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+        await executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
             upgradeTimestamp: ethers.BigNumber.from(timeNow),
             l2ProtocolUpgradeTx: noopUpgradeTransaction
         });
 
         // Upgrade that was scheduled for the future should not work now
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 upgradeTimestamp: ethers.BigNumber.from(timeNow).mul(2),
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -180,7 +243,7 @@ describe('L2 upgrade test', function () {
             txType: 255
         });
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx
             })
         );
@@ -197,7 +260,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
@@ -215,7 +278,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 0
             })
@@ -233,7 +296,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
@@ -251,7 +314,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
@@ -270,7 +333,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 newProtocolVersion: 3
             })
@@ -290,7 +353,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: [myFactoryDep],
                 newProtocolVersion: 3
@@ -310,7 +373,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: [myFactoryDep],
                 newProtocolVersion: 3
@@ -332,7 +395,7 @@ describe('L2 upgrade test', function () {
         });
 
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 l2ProtocolUpgradeTx: wrongTx,
                 factoryDeps: Array(33).fill(myFactoryDep),
                 newProtocolVersion: 3
@@ -373,7 +436,9 @@ describe('L2 upgrade test', function () {
             newProtocolVersion: 4
         };
 
-        const upgradeReceipt = await (await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, upgrade)).wait();
+        const upgradeReceipt = await (
+            await executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, upgrade)
+        ).wait();
 
         const defaultUpgradeFactory = await hardhat.ethers.getContractFactory('DefaultUpgrade');
         const upgradeEvents = upgradeReceipt.logs.map((log) => {
@@ -417,15 +482,11 @@ describe('L2 upgrade test', function () {
         expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
 
         expect(upgradeEvents[3].name).to.eq('NewL2BootloaderBytecodeHash');
-        expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(
-            '0x0100000100000000000000000000000000000000000000000000000000000000'
-        );
+        expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(L2_BOOTLOADER_BYTECODE_HASH);
         expect(upgradeEvents[3].args.newBytecodeHash).to.eq(bootloaderHash);
 
         expect(upgradeEvents[4].name).to.eq('NewL2DefaultAccountBytecodeHash');
-        expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(
-            '0x0100000100000000000000000000000000000000000000000000000000000000'
-        );
+        expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
         expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
     });
 
@@ -457,7 +518,7 @@ describe('L2 upgrade test', function () {
             newProtocolVersion: 5
         };
         const revertReason = await getCallRevertReason(
-            executeTransparentUpgrade(proxyGetters, proxyDiamondCut, upgrade)
+            executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, upgrade)
         );
 
         await proxyDiamondCut.cancelUpgradeProposal(await proxyGetters.getProposedUpgradeHash());
@@ -561,7 +622,7 @@ describe('L2 upgrade test', function () {
     it('Should successfully commit a sequential upgrade', async () => {
         expect(await proxyGetters.getL2SystemContractsUpgradeBlockNumber()).to.equal(0);
         await (
-            await executeTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 newProtocolVersion: 5,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -590,7 +651,7 @@ describe('L2 upgrade test', function () {
 
     it('Should successfully commit custom upgrade', async () => {
         const upgradeReceipt = await (
-            await executeCustomTransparentUpgrade(proxyGetters, proxyDiamondCut, {
+            await executeCustomTransparentUpgrade(chainId, proxyGetters, proxyDiamondCut, {
                 newProtocolVersion: 6,
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
@@ -639,6 +700,8 @@ interface L2ToL1Log {
     sender: string;
     key: string;
     value: string;
+    shardId?: number;
+    isService?: boolean;
 }
 
 function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
@@ -654,6 +717,16 @@ function bootloaderLog(txHash: BytesLike): L2ToL1Log {
         sender: L2_BOOTLOADER_ADDRESS,
         key: ethers.utils.hexlify(txHash),
         value: ethers.utils.hexlify(BigNumber.from(1))
+    };
+}
+
+function chainIdLog(txHash: BytesLike): L2ToL1Log {
+    return {
+        sender: L2_BOOTLOADER_ADDRESS,
+        key: ethers.utils.hexlify(txHash),
+        value: ethers.utils.hexlify(BigNumber.from(1)),
+        isService: true,
+        shardId: 0
     };
 }
 
@@ -809,6 +882,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 }
 
 async function executeTransparentUpgrade(
+    chainId: BigNumberish,
     proxyGetters: GettersFacet,
     proxyDiamondCut: DiamondCutFacet,
     partialUpgrade: Partial<ProposedUpgrade>,
@@ -828,7 +902,7 @@ async function executeTransparentUpgrade(
     const defaultUpgrade = await defaultUpgradeFactory.deploy();
     const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [upgrade]);
+    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [chainId, upgrade]);
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
@@ -839,6 +913,7 @@ async function executeTransparentUpgrade(
 }
 
 async function executeCustomTransparentUpgrade(
+    chainId: BigNumberish,
     proxyGetters: GettersFacet,
     proxyDiamondCut: DiamondCutFacet,
     partialUpgrade: Partial<ProposedUpgrade>,
@@ -858,7 +933,7 @@ async function executeCustomTransparentUpgrade(
     const customUpgrade = await upgradeFactory.deploy();
     const diamondUpgradeInit = CustomUpgradeTestFactory.connect(customUpgrade.address, customUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [upgrade]);
+    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [chainId, upgrade]);
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 

@@ -3,16 +3,18 @@ import * as ethers from 'ethers';
 import * as hardhat from 'hardhat';
 import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
-    DiamondProxy,
-    DiamondProxyFactory,
+    DiamondProxy as DiamondProxy,
+    DiamondProxyFactory as DiamondProxyFactory,
     DiamondProxyTest,
     DiamondProxyTestFactory,
     DiamondCutFacet,
     DiamondCutFacetFactory,
     GettersFacet,
     GettersFacetFactory,
-    MailboxFacet,
-    MailboxFacetFactory,
+    Mailbox as MailboxFacet,
+    MailboxFactory as MailboxFacetFactory,
+    ExecutorFacet,
+    ExecutorFacetFactory,
     DiamondInit,
     DiamondInitFactory,
     TestnetERC20TokenFactory
@@ -24,10 +26,11 @@ describe('Diamond proxy tests', function () {
     let diamondInit: DiamondInit;
     let diamondCutFacet: DiamondCutFacet;
     let gettersFacet: GettersFacet;
-    let mailboxFacet: MailboxFacet;
+    let executorFacet: ExecutorFacet;
     let diamondProxyTest: DiamondProxyTest;
     let governor: ethers.Signer;
     let governorAddress: string;
+    let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
     before(async () => {
         [governor] = await hardhat.ethers.getSigners();
@@ -45,12 +48,13 @@ describe('Diamond proxy tests', function () {
         const gettersFacetContract = await gettersFacetFactory.deploy();
         gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
 
-        const mailboxFacetFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
-        const mailboxFacetContract = await mailboxFacetFactory.deploy();
-        mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
+        const executorFactory = await hardhat.ethers.getContractFactory(`ExecutorFacet`);
+        const executorContract = await executorFactory.deploy();
+        executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
 
         const diamondProxyTestFactory = await hardhat.ethers.getContractFactory('DiamondProxyTest');
         const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
+
         diamondProxyTest = DiamondProxyTestFactory.connect(
             diamondProxyTestContract.address,
             diamondProxyTestContract.signer
@@ -59,23 +63,24 @@ describe('Diamond proxy tests', function () {
         const facetCuts = [
             facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false),
             facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-            facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
+            facetCut(executorFacet.address, executorFacet.interface, Action.Add, true)
+            // facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
         ];
 
-        // const dummyVerifierParams = {
-        //     recursionNodeLevelVkHash: ethers.constants.HashZero,
-        //     recursionLeafLevelVkHash: ethers.constants.HashZero,
-        //     recursionCircuitsSetVksHash: ethers.constants.HashZero
-        // };
+        const dummyVerifierParams = {
+            recursionNodeLevelVkHash: ethers.constants.HashZero,
+            recursionLeafLevelVkHash: ethers.constants.HashZero,
+            recursionCircuitsSetVksHash: ethers.constants.HashZero
+        };
+
         const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
-            // '0x03752D8252d67f99888E741E3fB642803B29B155',
+            chainId,
+            '0x0000000000000000000000000000000000000000',
             governorAddress,
             '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
-            0,
-            '0x0000000000000000000000000000000000000000000000000000000000000000',
-            '0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55',
-            // dummyVerifierParams,
-            false,
+            '0x0000000000000000000000000000000000000000',
+            '0x0000000000000000000000000000000000000000',
+            dummyVerifierParams,
             '0x0100000000000000000000000000000000000000000000000000000000000000',
             '0x0100000000000000000000000000000000000000000000000000000000000000',
             500000 // priority tx max L2 gas limit
@@ -84,8 +89,8 @@ describe('Diamond proxy tests', function () {
         const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitCalldata);
 
         const proxyFactory = await hardhat.ethers.getContractFactory('DiamondProxy');
-        const chainId = hardhat.network.config.chainId;
-        const proxyContract = await proxyFactory.deploy(chainId, diamondCutData);
+        const ethChainId = hardhat.network.config.chainId;
+        const proxyContract = await proxyFactory.deploy(ethChainId, diamondCutData);
         proxy = DiamondProxyFactory.connect(proxyContract.address, proxyContract.signer);
     });
 
@@ -168,13 +173,17 @@ describe('Diamond proxy tests', function () {
         expect(revertReason).equal('f3');
     });
 
-    it('should revert on calling a freezable faucet when diamondStorage is frozen', async () => {
-        const mailboxFacetSelector0 = getAllSelectors(mailboxFacet.interface)[0];
-        const revertReason = await getCallRevertReason(proxy.fallback({ data: mailboxFacetSelector0 }));
+    it('should revert on calling a freezable facet when diamondStorage is frozen', async () => {
+        const executorFacetSelector3 = getAllSelectors(executorFacet.interface)[3];
+        const revertReason = await getCallRevertReason(
+            proxy.fallback({
+                data: executorFacetSelector3 + '0000000000000000000000000000000000000000000000000000000000000000'
+            })
+        );
         expect(revertReason).equal('q1');
     });
 
-    it('should be able to call an unfreezable faucet when diamondStorage is frozen', async () => {
+    it('should be able to call an unfreezable facet when diamondStorage is frozen', async () => {
         const gettersFacetSelector1 = getAllSelectors(gettersFacet.interface)[1];
         await proxy.fallback({ data: gettersFacetSelector1 });
     });

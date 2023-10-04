@@ -12,7 +12,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
-contract ExecutorFacet is ProofChainBase, IProofExecutor {
+contract ExecutorFacet is ProofChainBase, IExecutor {
     using UncheckedMath for uint256;
 
     string public constant override getName = "ExecutorFacet";
@@ -101,10 +101,7 @@ contract ExecutorFacet is ProofChainBase, IProofExecutor {
     }
 
     /// @dev Check that L2 logs are proper and block contain all meta information for them
-    function _processL2Logs(
-        CommitBlockInfo calldata _newBlock,
-        bytes32 _expectedSystemContractUpgradeTxHash
-    )
+    function _processL2Logs(CommitBlockInfo calldata _newBlock, bytes32 _expectedSystemContractUpgradeTxHash)
         internal
         pure
         returns (
@@ -177,10 +174,12 @@ contract ExecutorFacet is ProofChainBase, IProofExecutor {
     /// @notice 1. Checks timestamp.
     /// @notice 2. Process L2 logs.
     /// @notice 3. Store block commitments.
-    function commitBlocks(
-        StoredBlockInfo memory _lastCommittedBlockData,
-        CommitBlockInfo[] calldata _newBlocksData
-    ) external override nonReentrant onlyValidator {
+    function commitBlocks(StoredBlockInfo memory _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
+        external
+        override
+        nonReentrant
+        onlyValidator
+    {
         // Check that we commit blocks after last committed block
         require(
             chainStorage.storedBlockHashes[chainStorage.totalBlocksCommitted] ==

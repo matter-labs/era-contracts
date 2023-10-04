@@ -10,7 +10,7 @@ import "../../chain-interfaces/IGetters.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
-contract GettersFacet is ProofChainBase, IProofGetters {
+contract GettersFacet is ProofChainBase, IGetters {
     using UncheckedMath for uint256;
 
     // using PriorityQueue for PriorityQueue.Queue;

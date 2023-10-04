@@ -41,7 +41,7 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         proofStorage.governor = _governor;
 
         // We need to initialize the state hash because it is used in the commitment of the next block
-        IProofExecutor.StoredBlockInfo memory storedBlockZero = IProofExecutor.StoredBlockInfo(
+        IExecutor.StoredBlockInfo memory storedBlockZero = IExecutor.StoredBlockInfo(
             0,
             _genesisBlockHash,
             _genesisIndexRepeatedStorageChanges,

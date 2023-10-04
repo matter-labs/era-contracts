@@ -6,7 +6,7 @@ import "../common/libraries/Diamond.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs
-contract ProofDiamondProxy {
+contract DiamondProxy {
     constructor(uint256 _chainId, Diamond.DiamondCutData memory _diamondCut) {
         // Check that the contract is deployed on the expected chain.
         // Thus, the contract deployed by the same Create2 factory on the different chain will have different addresses!

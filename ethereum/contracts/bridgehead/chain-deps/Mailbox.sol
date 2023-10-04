@@ -29,16 +29,15 @@ contract Mailbox is IMailbox, ChainBase {
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external onlyBridgehead {
-        return
-            _finalizeEthWithdrawalSender(
-                _sender,
-                _l2BlockNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBlock,
-                _message,
-                _merkleProof
-            );
+    ) external onlyBridgehead knownSenderCanCallFunction(_sender, chainStorage.allowList) {
+        _finalizeEthWithdrawalSender(
+            _sender,
+            _l2BlockNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBlock,
+            _message,
+            _merkleProof
+        );
     }
 
     // this is implemented in the bridghead, does not go through the router.
@@ -51,7 +50,13 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable onlyBridgehead returns (bytes32 canonicalTxHash) {
+    )
+        external
+        payable
+        onlyBridgehead
+        knownSenderCanCallFunction(_sender, chainStorage.allowList)
+        returns (bytes32 canonicalTxHash)
+    {
         canonicalTxHash = _requestL2TransactionSender(
             _sender,
             _contractL2,
@@ -143,7 +148,7 @@ contract Mailbox is IMailbox, ChainBase {
     ) internal view returns (bool) {
         // kl todo is this even needed? as we only add logs in executeblocks.
         // But if it is needed we need to update totalBlocksExecuted
-        // require(_blockNumber <= chainStorage.totalBlocksExecuted, "xx");
+        require(_blockNumber <= chainStorage.totalBlocksExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBlock, _log.sender, _log.key, _log.value)
@@ -211,7 +216,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public override {
+    ) public override knownSenderCanCallFunction(msg.sender, chainStorage.allowList) {
         _finalizeEthWithdrawalSender(
             msg.sender,
             _l2BlockNumber,
@@ -235,7 +240,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public nonReentrant knownSenderCanCallFunction(_sender, chainStorage.allowList) {
+    ) internal nonReentrant {
         require(!chainStorage.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({
@@ -267,7 +272,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) public payable returns (bytes32 canonicalTxHash) {
+    ) public payable knownSenderCanCallFunction(msg.sender, chainStorage.allowList) returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(
             msg.sender,
             _contractL2,
@@ -307,12 +312,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    )
-        internal
-        nonReentrant
-        knownSenderCanCallFunction(_sender, chainStorage.allowList)
-        returns (bytes32 canonicalTxHash)
-    {
+    ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address sender = _sender;
@@ -457,9 +457,11 @@ contract Mailbox is IMailbox, ChainBase {
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(
-        bytes[] calldata _factoryDeps
-    ) internal pure returns (uint256[] memory hashedFactoryDeps) {
+    function _hashFactoryDeps(bytes[] calldata _factoryDeps)
+        internal
+        pure
+        returns (uint256[] memory hashedFactoryDeps)
+    {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
@@ -473,9 +475,11 @@ contract Mailbox is IMailbox, ChainBase {
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(
-        bytes memory _message
-    ) internal pure returns (address l1Receiver, uint256 amount) {
+    function _parseL2WithdrawalMessage(bytes memory _message)
+        internal
+        pure
+        returns (address l1Receiver, uint256 amount)
+    {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`

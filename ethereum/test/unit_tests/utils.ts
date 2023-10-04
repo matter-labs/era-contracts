@@ -31,10 +31,32 @@ export async function getCallRevertReason(promise) {
     try {
         await promise;
     } catch (e) {
+        // KL todo. The error messages are messed up. So we need all these cases.
         try {
-            revertReason = e.reason.match(/reverted with reason string '(.*)'/)?.[1] || e.reason;
+            revertReason = e.reason.match(/reverted with reason string '([^']*)'/)?.[1] || e.reason;
+            if (
+                revertReason === 'cannot estimate gas; transaction may fail or may require manual gas limit' ||
+                revertReason === DEFAULT_REVERT_REASON
+            ) {
+                revertReason = e.error.toString().match(/revert with reason \"([^']*)\"/)[1] || 'PLACEHOLDER_STRING';
+            }
         } catch (_) {
-            throw e;
+            try {
+                if (
+                    revertReason === 'cannot estimate gas; transaction may fail or may require manual gas limit' ||
+                    revertReason === DEFAULT_REVERT_REASON
+                ) {
+                    if (e.error) {
+                        revertReason =
+                            e.error.toString().match(/reverted with reason string '([^']*)'/)[1] || 'PLACEHOLDER_STRING';
+                    } else {
+                        revertReason =
+                            e.toString().match(/reverted with reason string '([^']*)'/)[1] || 'PLACEHOLDER_STRING';
+                    }
+                }
+            } catch (_) {
+                throw e.error.toString().slice(0, 5000) + e.error.toString().slice(-6000);
+            }
         }
     }
     return revertReason;
@@ -66,6 +88,39 @@ export async function requestExecute(
 
     return await mailbox.requestL2Transaction(
         chainId,
+        to,
+        l2Value,
+        calldata,
+        l2GasLimit,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        factoryDeps,
+        refundRecipient,
+        overrides
+    );
+}
+
+// due to gas reasons we call tha Chais's contract directly, instead of the bridgehead.
+export async function requestExecuteDirect(
+    mailbox: ethers.Contract,
+    to: Address,
+    l2Value: ethers.BigNumber,
+    calldata: ethers.BytesLike,
+    l2GasLimit: ethers.BigNumber,
+    factoryDeps: BytesLike[],
+    refundRecipient: string
+) {
+    let overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 29000000 as BigNumberish };
+    overrides.gasPrice = await mailbox.provider.getGasPrice();
+
+    // we call bridgeheadChain direcetly to avoid running out of gas.
+    const baseCost = await mailbox.l2TransactionBaseCost(
+        overrides.gasPrice,
+        ethers.BigNumber.from(100000),
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    );
+    overrides.value = baseCost.add(ethers.BigNumber.from(0));
+
+    return await mailbox.requestL2Transaction(
         to,
         l2Value,
         calldata,

@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 import "../common/libraries/Diamond.sol";
 import "./BaseZkSyncUpgrade.sol";
 
-contract ProofDefaultUpgrade is BaseZkSyncUpgrade {
+contract DefaultUpgrade is BaseZkSyncUpgrade {
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each

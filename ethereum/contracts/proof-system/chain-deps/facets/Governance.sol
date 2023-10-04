@@ -7,7 +7,7 @@ import "./Base.sol";
 
 /// @title Governance Contract controls access rights for contract management.
 /// @author Matter Labs
-contract GovernanceFacet is ProofChainBase, IProofGovernance {
+contract GovernanceFacet is ProofChainBase, IGovernance {
     string public constant override getName = "GovernanceFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.

@@ -1,18 +1,26 @@
 import { expect } from 'chai';
-import { BigNumber, ethers } from 'ethers';
+import { BigNumber, ethers, Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
+import '@openzeppelin/hardhat-upgrades';
+
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
     AllowList,
     AllowListFactory,
-    ProofDiamondInitFactory,
-    ProofExecutorFacet,
-    ProofExecutorFacetFactory,
-    ProofGettersFacet,
-    ProofGettersFacetFactory,
+    DiamondInitFactory,
+    BridgeheadChainFactory,
+    Bridgehead,
+    BridgeheadFactory,
+    ExecutorFacet,
+    ExecutorFacetFactory,
+    GettersFacet,
+    GettersFacetFactory,
     // MailboxFacet,
     // MailboxFacetFactory,
-    ProofGovernanceFacetFactory
+    GovernanceFacetFactory
 } from '../../typechain';
 import {
     AccessMode,
@@ -23,23 +31,34 @@ import {
     L2_TO_L1_MESSENGER,
     genesisStoredBlockInfo,
     getCallRevertReason,
-    packBatchTimestampAndBlockTimestamp
-    // requestExecute
+    packBatchTimestampAndBlockTimestamp,
+    requestExecute
 } from './utils';
+import { Deployer } from '../../src.ts/deploy';
+import { hexlify, keccak256 } from 'ethers/lib/utils';
+
+const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 describe(`Executor tests`, function () {
     let owner: ethers.Signer;
     let validator: ethers.Signer;
     let randomSigner: ethers.Signer;
     let allowList: AllowList;
-    let executor: ProofExecutorFacet;
-    let getters: ProofGettersFacet;
-    // let mailbox: MailboxFacet;
+    let executor: ExecutorFacet;
+    let getters: GettersFacet;
+    let bridgeheadContract: Bridgehead;
     let newCommitedBlockBlockHash: any;
     let newCommitedBlockCommitment: any;
     let currentTimestamp: number;
     let newCommitBlockInfo: any;
     let newStoredBlockInfo: any;
+    let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+    let genesisPriorityTxHash: string;
+    let genesisPriorityChainedHash: string;
 
     const proofInput = {
         recursiveAggregationInput: [],
@@ -49,77 +68,108 @@ describe(`Executor tests`, function () {
     before(async () => {
         [owner, validator, randomSigner] = await hardhat.ethers.getSigners();
 
-        const executorFactory = await hardhat.ethers.getContractFactory(`ProofExecutorFacet`);
-        const executorContract = await executorFactory.deploy();
-        const executorFacet = ProofExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
-
-        const governanceFactory = await hardhat.ethers.getContractFactory(`ProofGovernanceFacet`);
-        const governanceContract = await governanceFactory.deploy();
-        const governanceFacet = ProofGovernanceFacetFactory.connect(
-            governanceContract.address,
-            governanceContract.signer
+        const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic2, "m/44'/60'/0'/0/1").connect(
+            owner.provider
         );
+        const governorAddress = await deployWallet.getAddress();
 
-        const gettersFactory = await hardhat.ethers.getContractFactory(`ProofGettersFacet`);
-        const gettersContract = await gettersFactory.deploy();
-        const gettersFacet = ProofGettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+        const gasPrice = await owner.provider.getGasPrice();
 
-        // const mailboxFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
-        // const mailboxContract = await mailboxFactory.deploy();
-        // const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+        const tx = {
+            from: owner.getAddress(),
+            to: deployWallet.address,
+            value: ethers.utils.parseEther('1000'),
+            nonce: owner.getTransactionCount(),
+            gasLimit: 100000,
+            gasPrice: gasPrice
+        };
 
-        const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
-        const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-        allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
+        await owner.sendTransaction(tx);
 
-        const diamondInitFactory = await hardhat.ethers.getContractFactory('ProofDiamondInit');
-        const diamondInitContract = await diamondInitFactory.deploy();
-        const diamondInit = ProofDiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+        const deployer = new Deployer({
+            deployWallet,
+            governorAddress,
+            verbose: false,
+            addresses: addressConfig
+        });
 
-        const dummyHash = new Uint8Array(32);
-        dummyHash.set([1, 0, 0, 1]);
-        // const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-        const diamondInitData = diamondInit.interface.encodeFunctionData('initialize', [
-            // KL todo: add factory proxy facet address here,
-            // factoryProxyFacet.address,
-            // dummyAddress,
-            await owner.getAddress(),
-            ethers.constants.HashZero,
-            0,
-            ethers.constants.HashZero,
-            allowList.address,
-            // {
-            //     recursionCircuitsSetVksHash: ethers.constants.HashZero,
-            //     recursionLeafLevelVkHash: ethers.constants.HashZero,
-            //     recursionNodeLevelVkHash: ethers.constants.HashZero
-            // },
-            false,
-            dummyHash,
-            dummyHash,
-            100000000000
-        ]);
+        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
-        const facetCuts = [
-            facetCut(governanceFacet.address, governanceFacet.interface, Action.Add, true),
-            facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
-            facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false)
-            // facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true)
-        ];
+        let nonce = await deployWallet.getTransactionCount();
 
-        const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+        await deployer.deployCreate2Factory({ gasPrice, nonce });
+        nonce++;
 
-        const diamondProxyFactory = await hardhat.ethers.getContractFactory('ProofDiamondProxy');
-        const chainId = hardhat.network.config.chainId;
-        const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+        // nonce++;
 
-        await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
+        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
+        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
+        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
+        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
+        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
-        executor = ProofExecutorFacetFactory.connect(diamondProxyContract.address, executorContract.signer);
-        getters = ProofGettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer);
-        // mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
+        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
+        await deployer.deployProofSystemContract(create2Salt, gasPrice);
 
-        const governance = ProofGovernanceFacetFactory.connect(diamondProxyContract.address, owner);
-        await governance.setValidator(await validator.getAddress(), true);
+        const verifierParams = {
+            recursionNodeLevelVkHash: zeroHash,
+            recursionLeafLevelVkHash: zeroHash,
+            recursionCircuitsSetVksHash: zeroHash
+        };
+        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+
+        const proofSystem = deployer.proofSystemContract(deployWallet);
+
+        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+
+        await deployer.registerHyperchain(create2Salt, gasPrice);
+
+        chainId = deployer.chainId;
+
+        const validatorTx = await deployer
+            .proofChainContract(deployWallet)
+            .setValidator(await validator.getAddress(), true);
+        await validatorTx.wait();
+
+        const allowListContract = deployer.l1AllowList(deployWallet);
+        const allowTx = await allowListContract.setBatchAccessMode(
+            [
+                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.ChainProxy,
+                deployer.addresses.ProofSystem.ProofSystemProxy,
+                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridges.ERC20BridgeProxy,
+                deployer.addresses.Bridges.WethBridgeProxy
+            ],
+            [
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public,
+                AccessMode.Public
+            ]
+        );
+        await allowTx.wait();
+
+        executor = ExecutorFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        getters = GettersFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+
+        let bridgeheadChainContract = BridgeheadChainFactory.connect(
+            deployer.addresses.Bridgehead.ChainProxy,
+            deployWallet
+        );
+        bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
+
+        let priorityOp = await bridgeheadChainContract.priorityQueueFrontOperation();
+        genesisPriorityTxHash = priorityOp[0];
+        genesisPriorityChainedHash = keccak256(
+            ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+        );
     });
 
     describe(`Authorization check`, function () {
@@ -152,21 +202,21 @@ describe(`Executor tests`, function () {
             const revertReason = await getCallRevertReason(
                 executor.connect(randomSigner).commitBlocks(storedBlockInfo, [commitBlockInfo])
             );
-            expect(revertReason).equal(`1h`);
+            expect(revertReason).equal(`1h1`);
         });
 
         it(`Should revert on committing by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
                 executor.connect(randomSigner).proveBlocks(storedBlockInfo, [storedBlockInfo], proofInput)
             );
-            expect(revertReason).equal(`1h`);
+            expect(revertReason).equal(`1h1`);
         });
 
         it(`Should revert on executing by unauthorised address`, async () => {
             const revertReason = await getCallRevertReason(
                 executor.connect(randomSigner).executeBlocks([storedBlockInfo])
             );
-            expect(revertReason).equal(`1h`);
+            expect(revertReason).equal(`1h1`);
         });
     });
 
@@ -754,148 +804,184 @@ describe(`Executor tests`, function () {
             expect(revertReason).equal(`n`);
         });
 
-        // it(`Should revert on executing with unavailable prioirty operation hash`, async () => {
-        //     const arbitraryCanonicalTxHash = ethers.utils.randomBytes(32);
-        //     const chainedPriorityTxHash = ethers.utils.keccak256(
-        //         ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
-        //     );
+        it(`Should revert on executing with unavailable prioirty operation hash`, async () => {
+            const arbitraryCanonicalTxHash = ethers.utils.randomBytes(32);
+            const chainedPriorityTxHash = ethers.utils.keccak256(
+                ethers.utils.hexConcat([
+                    ethers.utils.keccak256(ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])),
+                    ethers.utils.hexZeroPad(ethers.utils.hexlify(genesisPriorityTxHash), 32)
+                ])
+            );
 
-        // const correctL2Logs = ethers.utils.hexConcat([
-        //     `0x00000002`,
-        //     `0x00000000`,
-        //     L2_SYSTEM_CONTEXT_ADDRESS,
-        //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-        //     ethers.constants.HashZero,
-        //     `0x00010000`,
-        //     L2_BOOTLOADER_ADDRESS,
-        //     arbitraryCanonicalTxHash,
-        //     ethers.utils.hexZeroPad(`0x01`, 32)
-        // ]);
+            const correctL2Logs = ethers.utils.hexConcat([
+                `0x00000002`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
+                ethers.constants.HashZero,
+                `0x00010000`,
+                L2_BOOTLOADER_ADDRESS,
+                arbitraryCanonicalTxHash,
+                ethers.utils.hexZeroPad(`0x01`, 32),
+                `0x00000000`,
+                L2_BOOTLOADER_ADDRESS,
+                ethers.utils.hexZeroPad(ethers.utils.hexlify(genesisPriorityTxHash), 32),
+                ethers.utils.hexZeroPad(`0x01`, 32)
+            ]);
 
-        //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-        //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        //     correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        //     correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewCommitBlockInfo.numberOfLayer1Txs = 2;
 
-        //     const commitTx = await executor
-        //         .connect(validator)
-        //         .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+            const commitTx = await executor
+                .connect(validator)
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
-        //     const result = await commitTx.wait();
+            const result = await commitTx.wait();
 
-        //     const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-        //     correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
-        //     correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        //     correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        //     correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
+            const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
+            correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
+            correctNewStoredBlockInfo.numberOfLayer1Txs = 2;
+            correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
 
-        //     await executor
-        //         .connect(validator)
-        //         .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
+            await executor
+                .connect(validator)
+                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
 
-        //     const revertReason = await getCallRevertReason(
-        //         executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
-        //     );
-        //     expect(revertReason).equal(`s`);
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
+            );
+            expect(revertReason).equal(`g1`);
 
-        //     await executor.connect(validator).revertBlocks(0);
-        // });
+            await executor.connect(validator).revertBlocks(0);
+        });
 
-        // it(`Should revert on executing with unmatched priorty operation hash`, async () => {
-        //     const arbitraryCanonicalTxHash = ethers.utils.randomBytes(32);
-        //     const chainedPriorityTxHash = ethers.utils.keccak256(
-        //         ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])
-        //     );
+        it(`Should revert on executing with unmatched priorty operation hash`, async () => {
+            const arbitraryCanonicalTxHash = ethers.utils.randomBytes(32);
+            const chainedPriorityTxHash = ethers.utils.keccak256(
+                ethers.utils.hexConcat([
+                    ethers.utils.keccak256(ethers.utils.hexConcat([EMPTY_STRING_KECCAK, arbitraryCanonicalTxHash])),
+                    ethers.utils.hexZeroPad(ethers.utils.hexlify(genesisPriorityTxHash), 32)
+                ])
+            );
 
-        // const correctL2Logs = ethers.utils.hexConcat([
-        //     `0x00000002`,
-        //     `0x00000000`,
-        //     L2_SYSTEM_CONTEXT_ADDRESS,
-        //     packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-        //     ethers.constants.HashZero,
-        //     `0x00010000`,
-        //     L2_BOOTLOADER_ADDRESS,
-        //     arbitraryCanonicalTxHash,
-        //     ethers.utils.hexZeroPad(`0x01`, 32)
-        // ]);
+            const correctL2Logs = ethers.utils.hexConcat([
+                `0x00000002`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
+                ethers.constants.HashZero,
+                `0x00010000`,
+                L2_BOOTLOADER_ADDRESS,
+                arbitraryCanonicalTxHash,
+                ethers.utils.hexZeroPad(`0x01`, 32),
+                `0x00000000`,
+                L2_BOOTLOADER_ADDRESS,
+                ethers.utils.hexZeroPad(ethers.utils.hexlify(genesisPriorityTxHash), 32),
+                ethers.utils.hexZeroPad(`0x01`, 32)
+            ]);
 
-        //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-        //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;
-        //     correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        //     correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
+            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewCommitBlockInfo.numberOfLayer1Txs = 2;
 
-        //     const commitTx = await executor
-        //         .connect(validator)
-        //         .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+            const commitTx = await executor
+                .connect(validator)
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
-        //     const result = await commitTx.wait();
+            const result = await commitTx.wait();
 
-        //     const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
-        //     correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
-        //     correctNewStoredBlockInfo.numberOfLayer1Txs = 1;
-        //     correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
-        //     correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
+            const correctNewStoredBlockInfo = Object.assign({}, newStoredBlockInfo);
+            correctNewStoredBlockInfo.blockHash = result.events[0].args.blockHash;
+            correctNewStoredBlockInfo.numberOfLayer1Txs = 2;
+            correctNewStoredBlockInfo.priorityOperationsHash = chainedPriorityTxHash;
+            correctNewStoredBlockInfo.commitment = result.events[0].args.commitment;
 
-        //     await executor
-        //         .connect(validator)
-        //         .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
+            await executor
+                .connect(validator)
+                .proveBlocks(genesisStoredBlockInfo(), [correctNewStoredBlockInfo], proofInput);
 
-        // //     await requestExecute(
-        // //         mailbox,
-        // //         ethers.constants.AddressZero,
-        // //         ethers.utils.parseEther('10'),
-        // //         '0x',
-        // //         BigNumber.from(1000000),
-        // //         [new Uint8Array(32)],
-        // //         ethers.constants.AddressZero
-        // //     );
+            await requestExecute(
+                chainId,
+                bridgeheadContract,
+                ethers.constants.AddressZero,
+                ethers.utils.parseEther('10'),
+                '0x',
+                BigNumber.from(1000000),
+                [new Uint8Array(32)],
+                ethers.constants.AddressZero
+            );
 
-        //     const revertReason = await getCallRevertReason(
-        //         executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
-        //     );
-        //     expect(revertReason).equal(`x`);
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).executeBlocks([correctNewStoredBlockInfo])
+            );
+            expect(revertReason).equal(`x`);
 
-        //     await executor.connect(validator).revertBlocks(0);
-        // });
+            await executor.connect(validator).revertBlocks(0);
+        });
 
-        // it(`Should fail to commit block with wrong previous blockhash`, async () => {
-        //     const correctL2Logs = ethers.utils.hexConcat([
-        //         `0x00000001`,
-        //         `0x00000000`,
-        //         L2_SYSTEM_CONTEXT_ADDRESS,
-        //         ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
-        //         ethers.constants.HashZero
-        //     ]);
+        it(`Should fail to commit block with wrong previous blockhash`, async () => {
+            const correctL2Logs = ethers.utils.hexConcat([
+                `0x00000001`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                ethers.utils.hexZeroPad(ethers.utils.hexlify(currentTimestamp), 32),
+                ethers.constants.HashZero
+            ]);
 
-        //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-        //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
 
-        //     const block = genesisStoredBlockInfo();
-        //     block.blockHash = '0x' + '1'.repeat(64);
+            const block = genesisStoredBlockInfo();
+            block.blockHash = '0x' + '1'.repeat(64);
 
-        //     const revertReason = await getCallRevertReason(
-        //         executor.connect(validator).commitBlocks(block, [correctNewCommitBlockInfo])
-        //     );
-        //     expect(revertReason).to.equal('i');
-        // });
+            const revertReason = await getCallRevertReason(
+                executor.connect(validator).commitBlocks(block, [correctNewCommitBlockInfo])
+            );
+            expect(revertReason).to.equal('i');
+        });
 
-        // it(`Should execute a block successfully`, async () => {
-        //     const correctL2Logs = ethers.utils.hexConcat([
-        //         `0x00000001`,
-        //         `0x00000000`,
-        //         L2_SYSTEM_CONTEXT_ADDRESS,
-        //         packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
-        //         ethers.constants.HashZero
-        //     ]);
+        it(`Should execute a block successfully`, async () => {
+            const correctL2Logs = ethers.utils.hexConcat([
+                `0x00000001`,
+                `0x00000000`,
+                L2_SYSTEM_CONTEXT_ADDRESS,
+                packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp),
+                ethers.constants.HashZero,
+                `0x00000000`,
+                L2_BOOTLOADER_ADDRESS,
+                ethers.utils.hexlify(genesisPriorityTxHash),
+                ethers.utils.hexlify(BigNumber.from(1))
+            ]);
 
-        //     const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
-        //     correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            const correctNewCommitBlockInfo = Object.assign({}, newCommitBlockInfo);
+            correctNewCommitBlockInfo.l2Logs = correctL2Logs;
+            correctNewCommitBlockInfo.priorityOperationsHash = genesisPriorityChainedHash;
+            correctNewCommitBlockInfo.numberOfLayer1Txs = 1;
 
-        //     await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
-        //     await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
-        //     // await executor.connect(validator).executeBlocks([newStoredBlockInfo]);
+            // await executor.connect(validator).commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
 
-        //     expect(await getters.getTotalBlocksExecuted()).equal(1);
-        // });
+            const commitTx = await executor
+                .connect(validator)
+                .commitBlocks(genesisStoredBlockInfo(), [correctNewCommitBlockInfo]);
+
+            const result = await commitTx.wait();
+
+            newCommitedBlockBlockHash = result.events[0].args.blockHash;
+            newCommitedBlockCommitment = result.events[0].args.commitment;
+
+            newStoredBlockInfo.priorityOperationsHash = genesisPriorityChainedHash;
+            newStoredBlockInfo.numberOfLayer1Txs = 1;
+            newStoredBlockInfo.blockHash = newCommitedBlockBlockHash;
+            newStoredBlockInfo.commitment = newCommitedBlockCommitment;
+
+            await executor.connect(validator).proveBlocks(genesisStoredBlockInfo(), [newStoredBlockInfo], proofInput);
+            await executor.connect(validator).executeBlocks([newStoredBlockInfo]);
+
+            // expect(await getters.getTotalBlocksExecuted()).equal(1);
+        });
     });
 });

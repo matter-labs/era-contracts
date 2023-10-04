@@ -17,7 +17,7 @@ import "../../bridgehead/chain-interfaces/IBridgeheadChain.sol";
 
 // import "../chain-interfaces/IProofChain.sol";
 
-import "../ProofDiamondProxy.sol";
+import "../DiamondProxy.sol";
 import "../chain-interfaces/IDiamondInit.sol";
 
 /// @title Registry contract capable of handling new Hyperchains.
@@ -65,7 +65,7 @@ contract ProofRegistry is ProofBase, IProofRegistry {
         Diamond.DiamondCutData memory cutData = _diamondCut;
         cutData.initCalldata = initData;
 
-        ProofDiamondProxy proofChainContract = new ProofDiamondProxy(
+        DiamondProxy proofChainContract = new DiamondProxy(
             block.chainid,
             cutData
             // _diamondCut

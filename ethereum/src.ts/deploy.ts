@@ -67,6 +67,7 @@ export interface DeployerConfig {
     deployWallet: Wallet;
     governorAddress?: string;
     verbose?: boolean;
+    addresses?: DeployedAddresses;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -110,11 +111,12 @@ export class Deployer {
     private deployWallet: Wallet;
     private verbose: boolean;
     private governorAddress: string;
+    public chainId: number;
 
     constructor(config: DeployerConfig) {
         this.deployWallet = config.deployWallet;
         this.verbose = config.verbose != null ? config.verbose : false;
-        this.addresses = deployedAddressesFromEnv();
+        this.addresses = config.addresses ? config.addresses : deployedAddressesFromEnv();
         this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
     }
 
@@ -128,9 +130,6 @@ export class Deployer {
             )
         );
 
-        // const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
-        // const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
-        // const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
         const verifierParams = {
             recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
             recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
@@ -242,10 +241,13 @@ export class Deployer {
             console.log(`CONTRACTS_BRIDGEHEAD_CHAIN_PROXY_ADMIN_ADDR=${adminAddress}`);
         }
 
-        console.log(
-            `Bridgehead Chain Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
-        );
-
+        if (this.verbose) {
+            console.log(
+                `Bridgehead Chain Proxy deployed, gas used: ${(
+                    await instance.deployTransaction.wait()
+                ).gasUsed.toString()}`
+            );
+        }
         this.addresses.Bridgehead.ChainProxyAdmin = adminAddress;
     }
 
@@ -281,10 +283,11 @@ export class Deployer {
             console.log(`CONTRACTS_BRIDGEHEAD_PROXY_ADMIN_ADDR=${adminAddress}`);
         }
 
-        console.log(
-            `Bridgehead Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
-        );
-
+        if (this.verbose) {
+            console.log(
+                `Bridgehead Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
+            );
+        }
         this.addresses.Bridgehead.BridgeheadProxyAdmin = adminAddress;
     }
 
@@ -331,9 +334,11 @@ export class Deployer {
             console.log(`CONTRACTS_PROOF_SYSTEM_PROXY_ADMIN_ADDR=${adminAddress}`);
         }
 
-        console.log(
-            `ProofSystem Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
-        );
+        if (this.verbose) {
+            console.log(
+                `ProofSystem Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
+            );
+        }
 
         this.addresses.ProofSystem.ProofSystemProxyAdmin = adminAddress;
     }
@@ -520,60 +525,38 @@ export class Deployer {
     public async deployBridgeheadContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        // deploy Bridgehead contract
-        // await this.deployChainImplementation(create2Salt, { gasPrice, nonce: nonce });
         await this.deployBridgeheadChainProxy(create2Salt, { gasPrice, nonce: nonce + 0 });
-        // await this.deployBridgeheadImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
-        // await this.deployBridgeheadProxyAdmin(create2Salt, { gasPrice, nonce: nonce + 3 });
         await this.deployBridgeheadProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     }
 
     public async deployProofSystemContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        // deploy Bridgehead contract
-        // await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 1 });
-        // await this.deployChainImplementation(create2Salt, { gasPrice, nonce: nonce });
-        await this.deployProofDiamond(create2Salt, gasPrice, nonce);
-        // await this.deployBridgeheadImplementation(create2Salt, { gasPrice, nonce: nonce + 2 });
-        // await this.deployBridgeheadProxyAdmin(create2Salt, { gasPrice, nonce: nonce + 3 });
-        await this.deployProofSystemProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+        await this.deployProofDiamond(create2Salt, gasPrice);
+        await this.deployProofSystemProxy(create2Salt, { gasPrice });
         await this.registerProofSystem();
     }
 
     public async deployProofDiamond(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        // deploy Factory contract
-        const independentProofSystemDeployPromises = [
-            this.deployProofExecutorFacet(create2Salt, { gasPrice, nonce: nonce }),
-            this.deployProofDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
-            this.deployProofGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
-            this.deployProofGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
-            this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 }),
-            this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 })
-        ];
-        await Promise.all(independentProofSystemDeployPromises);
-        nonce += 6;
+        await this.deployProofExecutorFacet(create2Salt, { gasPrice, nonce: nonce });
+        await this.deployProofDiamondCutFacet(create2Salt, { gasPrice, nonce: nonce + 1 });
+        await this.deployProofGovernanceFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
+        await this.deployProofGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 });
+        await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 });
+        await this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 });
     }
 
     public async registerProofSystem() {
-        // const gasLimit = 10_000_000;
-
-        // nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
         const bridgehead = this.bridgeheadContract(this.deployWallet);
 
-        const tx = await bridgehead.newProofSystem(
-            this.addresses.ProofSystem.ProofSystemProxy
-            //      {
-            //     gasPrice,
-            //     nonce,
-            //     gasLimit
-            // }
-        );
+        const tx = await bridgehead.newProofSystem(this.addresses.ProofSystem.ProofSystemProxy);
 
         const receipt = await tx.wait();
-        console.log(`Proof System registered, gas used: ${receipt.gasUsed.toString()}`);
+        if (this.verbose) {
+            console.log(`Proof System registered, gas used: ${receipt.gasUsed.toString()}`);
+        }
         // KL todo: ChainId is not a uint256 yet.
     }
 
@@ -618,11 +601,14 @@ export class Deployer {
         this.addresses.Bridgehead.ChainProxy = contractAddress;
         this.addresses.ProofSystem.DiamondProxy = proofContractAddress;
 
-        console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()}`);
-        // KL todo: ChainId is not a uint256 yet.
-        console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
-        console.log(`CONTRACTS_BRIDGEHEAD_CHAIN_PROXY_ADDR=${contractAddress}`);
-        console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${proofContractAddress}`);
+        if (this.verbose) {
+            console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()}`);
+            // KL todo: ChainId is not a uint256 yet.
+            console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
+            console.log(`CONTRACTS_BRIDGEHEAD_CHAIN_PROXY_ADDR=${contractAddress}`);
+            console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${proofContractAddress}`);
+        }
+        this.chainId = parseInt(chainId, 16);
     }
 
     public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {

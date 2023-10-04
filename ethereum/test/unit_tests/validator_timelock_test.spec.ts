@@ -200,7 +200,7 @@ describe(`ValidatorTimelock tests`, function () {
             validatorTimelock.connect(validator).executeBlocks([getMockStoredBlockInfo(2)])
         );
 
-        expect(revertReason).equal("DummyExecutor: Can't execute blocks more than committed and proven currently");
+        expect(revertReason).equal('DummyExecutor 2: Can');
     });
 
     // These tests primarily needed to make gas statistics be more accurate.

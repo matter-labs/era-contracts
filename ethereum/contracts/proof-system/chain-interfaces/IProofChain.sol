@@ -11,7 +11,7 @@ import "./IGetters.sol";
 // kl to do remove this, needed for the server for now
 import "../../common/libraries/Diamond.sol";
 
-interface IProofChain is IProofGovernance, IProofExecutor, IProofGetters {
+interface IProofChain is IGovernance, IExecutor, IGetters {
     function initialize(
         uint256 _chainId,
         address _bridgeheadChainContract,

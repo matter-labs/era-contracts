@@ -32,7 +32,7 @@ describe('Governance facet tests', function () {
         const revertReason = await getCallRevertReason(
             governanceTest.connect(randomSigner).setValidator(validatorAddress, true)
         );
-        expect(revertReason).equal('1g');
+        expect(revertReason).equal('1g1');
     });
 
     describe('change governor', function () {

@@ -9,6 +9,10 @@ contract GovernanceFacetTest is GovernanceFacet {
         chainStorage.governor = msg.sender;
     }
 
+    function isValidator(address _validator) external view returns (bool) {
+        return chainStorage.validators[_validator];
+    }
+
     function getPendingGovernor() external view returns (address) {
         return chainStorage.pendingGovernor;
     }

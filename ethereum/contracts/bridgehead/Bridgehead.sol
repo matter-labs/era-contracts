@@ -15,7 +15,7 @@ contract Bridgehead is BridgeheadGetters, BridgeheadMailbox, Registry {
         IAllowList _allowList,
         uint256 _priorityTxMaxGasLimit
     ) public {
-        require(bridgeheadStorage.chainImplementation == address(0), "r1");
+        require(bridgeheadStorage.chainImplementation == address(0), "bridgehead1");
         bridgeheadStorage.governor = _governor;
         bridgeheadStorage.chainImplementation = _chainImplementation;
         bridgeheadStorage.chainProxyAdmin = _chainProxyAdmin;

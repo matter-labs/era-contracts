@@ -7,7 +7,7 @@ import "../Verifier.sol";
 import "../chain-deps/ProofChainStorage.sol";
 import "./IBase.sol";
 
-interface IProofGovernance is IProofChainBase {
+interface IGovernance is IProofChainBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
     function acceptGovernor() external;

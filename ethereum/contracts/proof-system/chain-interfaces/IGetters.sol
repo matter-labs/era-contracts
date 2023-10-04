@@ -6,7 +6,7 @@ pragma solidity ^0.8.13;
 import {VerifierParams, ProofUpgradeState} from "../chain-deps/ProofChainStorage.sol";
 import "./IBase.sol";
 
-interface IProofGetters is IProofChainBase {
+interface IGetters is IProofChainBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
