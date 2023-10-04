@@ -61,7 +61,6 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = $$(
     defined(COMMIT_TIMESTAMP_APPROXIMATION_DELTA) ? COMMIT_TIMESTAMP_APPROXIMATION_DELTA : "365 days"
 );
 
-
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
