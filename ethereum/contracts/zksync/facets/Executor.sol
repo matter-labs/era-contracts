@@ -10,7 +10,7 @@ import "../libraries/PriorityQueue.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../../common/libraries/UnsafeBytes.sol";
 import "../../common/libraries/L2ContractHelper.sol";
-import "../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
@@ -18,14 +18,16 @@ contract ExecutorFacet is Base, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
+    string public constant override getName = "ExecutorFacet";
+
     /// @dev Process one block commit using the previous block StoredBlockInfo
     /// @dev returns new block StoredBlockInfo
     /// @notice Does not change storage
-    function _commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo calldata _newBlock)
-        internal
-        view
-        returns (StoredBlockInfo memory)
-    {
+    function _commitOneBlock(
+        StoredBlockInfo memory _previousBlock,
+        CommitBlockInfo calldata _newBlock,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    ) internal view returns (StoredBlockInfo memory) {
         require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "f"); // only commit next block
 
         // Check that block contain all meta information for L2 logs.
@@ -35,7 +37,7 @@ contract ExecutorFacet is Base, IExecutor {
             bytes32 expectedPriorityOperationsHash,
             bytes32 previousBlockHash,
             uint256 l2BlockTimestamp
-        ) = _processL2Logs(_newBlock);
+        ) = _processL2Logs(_newBlock, _expectedSystemContractUpgradeTxHash);
 
         require(_previousBlock.blockHash == previousBlockHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -81,7 +83,7 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @dev Check that L2 logs are proper and block contain all meta information for them
-    function _processL2Logs(CommitBlockInfo calldata _newBlock)
+    function _processL2Logs(CommitBlockInfo calldata _newBlock, bytes32 _expectedSystemContractUpgradeTxHash)
         internal
         pure
         returns (
@@ -93,7 +95,6 @@ contract ExecutorFacet is Base, IExecutor {
     {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBlock.l2Logs[4:];
-        bytes[] calldata l2Messages = _newBlock.l2ArbitraryLengthMessages;
         uint256 currentMessage;
         // Auxiliary variable that is needed to enforce that `previousBlockHash` and `blockTimestamp` was read exactly one time
         bool isSystemContextLogProcessed;
@@ -109,15 +110,20 @@ contract ExecutorFacet is Base, IExecutor {
             // show preimage for hashed message stored in log
             if (logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 (bytes32 hashedMessage, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 56);
-                require(keccak256(l2Messages[currentMessage]) == hashedMessage, "k2");
+                require(keccak256(_newBlock.l2ArbitraryLengthMessages[currentMessage]) == hashedMessage, "k2");
 
                 currentMessage = currentMessage.uncheckedInc();
             } else if (logSender == L2_BOOTLOADER_ADDRESS) {
                 (bytes32 canonicalTxHash, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + 24);
-                chainedPriorityTxsHash = keccak256(abi.encode(chainedPriorityTxsHash, canonicalTxHash));
 
-                // Overflow is not realistic
-                numberOfLayer1Txs = numberOfLayer1Txs.uncheckedInc();
+                if (_expectedSystemContractUpgradeTxHash != bytes32(0)) {
+                    require(_expectedSystemContractUpgradeTxHash == canonicalTxHash, "bz");
+                    _expectedSystemContractUpgradeTxHash = bytes32(0);
+                } else {
+                    chainedPriorityTxsHash = keccak256(abi.encode(chainedPriorityTxsHash, canonicalTxHash));
+                    // Overflow is not realistic
+                    numberOfLayer1Txs = numberOfLayer1Txs.uncheckedInc();
+                }
             } else if (logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
                 // Make sure that the system context log wasn't processed yet, to
                 // avoid accident double reading `blockTimestamp` and `previousBlockHash`
@@ -131,13 +137,19 @@ contract ExecutorFacet is Base, IExecutor {
                 require(bytecodeHash == L2ContractHelper.hashL2Bytecode(factoryDeps[currentBytecode]), "k3");
 
                 currentBytecode = currentBytecode.uncheckedInc();
+            } else {
+                // Only some system contracts could send raw logs from L2 to L1, double check that invariant holds here.
+                revert("ne");
             }
         }
         // To check that only relevant preimages have been included in the calldata
         require(currentBytecode == factoryDeps.length, "ym");
-        require(currentMessage == l2Messages.length, "pl");
+        require(currentMessage == _newBlock.l2ArbitraryLengthMessages.length, "pl");
         // `blockTimestamp` and `previousBlockHash` wasn't read from L2 logs
         require(isSystemContextLogProcessed, "by");
+
+        // Making sure that the system contract upgrade was included if needed
+        require(_expectedSystemContractUpgradeTxHash == bytes32(0), "bw");
     }
 
     /// @notice Commit block
@@ -152,20 +164,78 @@ contract ExecutorFacet is Base, IExecutor {
     {
         // Check that we commit blocks after last committed block
         require(s.storedBlockHashes[s.totalBlocksCommitted] == _hashStoredBlockInfo(_lastCommittedBlockData), "i"); // incorrect previous block data
+        require(_newBlocksData.length > 0, "No blocks to commit");
 
-        uint256 blocksLength = _newBlocksData.length;
-        for (uint256 i = 0; i < blocksLength; i = i.uncheckedInc()) {
-            _lastCommittedBlockData = _commitOneBlock(_lastCommittedBlockData, _newBlocksData[i]);
+        bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
+        if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBlockNumber != 0) {
+            _commitBlocksWithoutSystemContractsUpgrade(_lastCommittedBlockData, _newBlocksData);
+        } else {
+            _commitBlocksWithSystemContractsUpgrade(
+                _lastCommittedBlockData,
+                _newBlocksData,
+                systemContractsUpgradeTxHash
+            );
+        }
+
+        s.totalBlocksCommitted = s.totalBlocksCommitted + _newBlocksData.length;
+    }
+
+    /// @dev Commits new blocks without any system contracts upgrade.
+    /// @param _lastCommittedBlockData The data of the last committed block.
+    /// @param _newBlocksData An array of block data that needs to be committed.
+    function _commitBlocksWithoutSystemContractsUpgrade(
+        StoredBlockInfo memory _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) internal {
+        for (uint256 i = 0; i < _newBlocksData.length; i = i.uncheckedInc()) {
+            _lastCommittedBlockData = _commitOneBlock(_lastCommittedBlockData, _newBlocksData[i], bytes32(0));
+
             s.storedBlockHashes[_lastCommittedBlockData.blockNumber] = _hashStoredBlockInfo(_lastCommittedBlockData);
-
             emit BlockCommit(
                 _lastCommittedBlockData.blockNumber,
                 _lastCommittedBlockData.blockHash,
                 _lastCommittedBlockData.commitment
             );
         }
+    }
 
-        s.totalBlocksCommitted = s.totalBlocksCommitted + blocksLength;
+    /// @dev Commits new blocks with a system contracts upgrade transaction.
+    /// @param _lastCommittedBlockData The data of the last committed block.
+    /// @param _newBlocksData An array of block data that needs to be committed.
+    /// @param _systemContractUpgradeTxHash The transaction hash of the system contract upgrade.
+    function _commitBlocksWithSystemContractsUpgrade(
+        StoredBlockInfo memory _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData,
+        bytes32 _systemContractUpgradeTxHash
+    ) internal {
+        // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
+        // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
+        // carried out within the first block committed after the upgrade.
+
+        // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBlockNumber is 0 when this function is called,
+        // this check is added just in case. Since it is a hot read, it does not encure noticable gas cost.
+        require(s.l2SystemContractsUpgradeBlockNumber == 0, "ik");
+
+        // Save the block number where the upgrade transaction was executed.
+        s.l2SystemContractsUpgradeBlockNumber = _newBlocksData[0].blockNumber;
+
+        for (uint256 i = 0; i < _newBlocksData.length; i = i.uncheckedInc()) {
+            // The upgrade transaction must only be included in the first block.
+            bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
+            _lastCommittedBlockData = _commitOneBlock(
+                _lastCommittedBlockData,
+                _newBlocksData[i],
+                expectedUpgradeTxHash
+            );
+
+            s.storedBlockHashes[_lastCommittedBlockData.blockNumber] = _hashStoredBlockInfo(_lastCommittedBlockData);
+            emit BlockCommit(
+                _lastCommittedBlockData.blockNumber,
+                _lastCommittedBlockData.blockHash,
+                _lastCommittedBlockData.commitment
+            );
+        }
     }
 
     /// @dev Pops the priority operations from the priority queue and returns a rolling hash of operations
@@ -207,8 +277,15 @@ contract ExecutorFacet is Base, IExecutor {
             emit BlockExecution(_blocksData[i].blockNumber, _blocksData[i].blockHash, _blocksData[i].commitment);
         }
 
-        s.totalBlocksExecuted = s.totalBlocksExecuted + nBlocks;
-        require(s.totalBlocksExecuted <= s.totalBlocksVerified, "n"); // Can't execute blocks more than committed and proven currently.
+        uint256 newTotalBlocksExecuted = s.totalBlocksExecuted + nBlocks;
+        s.totalBlocksExecuted = newTotalBlocksExecuted;
+        require(newTotalBlocksExecuted <= s.totalBlocksVerified, "n"); // Can't execute blocks more than committed and proven currently.
+
+        uint256 blockWhenUpgradeHappened = s.l2SystemContractsUpgradeBlockNumber;
+        if (blockWhenUpgradeHappened != 0 && blockWhenUpgradeHappened <= newTotalBlocksExecuted) {
+            delete s.l2SystemContractsUpgradeTxHash;
+            delete s.l2SystemContractsUpgradeBlockNumber;
+        }
     }
 
     /// @notice Blocks commitment verification.
@@ -347,6 +424,12 @@ contract ExecutorFacet is Base, IExecutor {
             s.totalBlocksVerified = newTotalBlocksCommitted;
         }
         s.totalBlocksCommitted = newTotalBlocksCommitted;
+
+        // Reset the block number of the executed system contracts upgrade transaction if the block
+        // where the system contracts upgrade was committed is among the reverted blocks.
+        if (s.l2SystemContractsUpgradeBlockNumber > newTotalBlocksCommitted) {
+            delete s.l2SystemContractsUpgradeBlockNumber;
+        }
 
         emit BlocksRevert(s.totalBlocksCommitted, s.totalBlocksVerified, s.totalBlocksExecuted);
     }

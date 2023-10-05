@@ -2,7 +2,9 @@
 
 pragma solidity ^0.8.13;
 
-interface IExecutor {
+import "./IBase.sol";
+
+interface IExecutor is IBase {
     /// @notice Rollup block stored data
     /// @param blockNumber Rollup block number
     /// @param blockHash Hash of L2 block

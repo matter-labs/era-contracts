@@ -276,7 +276,7 @@ Thus:
 ### Deposit Limitation
 
 The amount of deposit can be limited. This limitation is applied on an account level and is not time-based. In other
-words, each account can not deposit more than the cap defined. The tokens and the cap can be set through governance
+words, each account cannot deposit more than the cap defined. The tokens and the cap can be set through governance
 transactions. Moreover, there is an allow listing mechanism as well (only some allow listed accounts can call some
 specific functions). So, the combination of deposit limitation and allow listing leads to limiting the deposit of the
 allow listed account to be less than the defined cap.

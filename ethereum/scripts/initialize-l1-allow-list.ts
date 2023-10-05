@@ -38,11 +38,16 @@ async function main() {
             const deployer = new Deployer({ deployWallet: wallet });
 
             const allowListContract = deployer.l1AllowList(wallet);
-            await allowListContract.setBatchAccessMode(
-                [deployer.addresses.ZkSync.DiamondProxy, deployer.addresses.Bridges.ERC20BridgeProxy],
-                [AccessMode.Public, AccessMode.Public],
+            const tx = await allowListContract.setBatchAccessMode(
+                [
+                    deployer.addresses.ZkSync.DiamondProxy,
+                    deployer.addresses.Bridges.ERC20BridgeProxy,
+                    deployer.addresses.Bridges.WethBridgeProxy
+                ],
+                [AccessMode.Public, AccessMode.Public, AccessMode.Public],
                 { nonce }
             );
+            await tx.wait();
         });
 
     await program.parseAsync(process.argv);

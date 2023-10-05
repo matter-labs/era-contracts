@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 import "../../zksync/interfaces/IZkSync.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
-import "../../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 import "../../common/interfaces/IL2ContractDeployer.sol";
 
 /// @author Matter Labs
@@ -21,6 +21,7 @@ library BridgeInitializationHelper {
 
     /// @notice Requests L2 transaction that will deploy a contract with a given bytecode hash and constructor data.
     /// NOTE: it is always used to deploy via create2 with ZERO salt
+    /// @param _zkSync The address of the zkSync contract
     /// @param _deployTransactionFee The fee that will be paid for the L1 -> L2 transaction
     /// @param _bytecodeHash The hash of the bytecode of the contract to be deployed
     /// @param _constructorData The data to be passed to the contract constructor

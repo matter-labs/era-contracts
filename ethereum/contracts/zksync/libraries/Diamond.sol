@@ -42,7 +42,7 @@ library Diamond {
     /// @notice The structure that holds all diamond proxy associated parameters
     /// @dev According to the EIP-2535 should be stored on a special storage key - `DIAMOND_STORAGE_POSITION`
     /// @param selectorToFacet A mapping from the selector to the facet address and its meta information
-    /// @param facetToSelectors A mapping from facet address to its selector with meta information
+    /// @param facetToSelectors A mapping from facet address to its selectors with meta information
     /// @param facets The array of all unique facet addresses that belong to the diamond proxy
     /// @param isFrozen Denotes whether the diamond proxy is frozen and all freezable facets are not accessible
     struct DiamondStorage {
@@ -285,7 +285,16 @@ library Diamond {
         } else {
             // Do not check whether `_init` is a contract since later we check that it returns data.
             (bool success, bytes memory data) = _init.delegatecall(_calldata);
-            require(success, "I"); // delegatecall failed
+            if (!success) {
+                // If the returndata is too small, we still want to produce some meaningful error
+                if (data.length <= 4) {
+                    revert("I"); // delegatecall failed
+                }
+
+                assembly {
+                    revert(add(data, 0x20), mload(data))
+                }
+            }
 
             // Check that called contract returns magic value to make sure that contract logic
             // supposed to be used as diamond cut initializer.

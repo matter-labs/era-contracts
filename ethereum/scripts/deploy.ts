@@ -22,6 +22,7 @@ async function main() {
         .option('--governor-address <governor-address>')
         .option('--create2-salt <create2-salt>')
         .option('--diamond-upgrade-init <version>')
+        .option('--only-verifier')
         .action(async (cmd) => {
             const deployWallet = cmd.privateKey
                 ? new Wallet(cmd.privateKey, provider)
@@ -52,6 +53,14 @@ async function main() {
             if (process.env.CHAIN_ETH_NETWORK === 'localhost') {
                 await deployer.deployCreate2Factory({ gasPrice, nonce });
                 nonce++;
+
+                await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
+                nonce++;
+            }
+
+            if (cmd.onlyVerifier) {
+                await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+                return;
             }
 
             // Deploy diamond upgrade init contract if needed
@@ -63,6 +72,12 @@ async function main() {
                 });
                 nonce++;
             }
+
+            await deployer.deployDefaultUpgrade(create2Salt, {
+                gasPrice,
+                nonce
+            });
+            nonce++;
 
             await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
             await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);

@@ -112,7 +112,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('po');
+        expect(revertReason).equal('bl');
     });
 
     it('Should not accept bytecode of even length in words', async () => {

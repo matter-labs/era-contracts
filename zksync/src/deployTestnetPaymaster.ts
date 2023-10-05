@@ -34,7 +34,9 @@ async function main() {
         const paymasterAddress = computeL2Create2Address(deployWallet, testnetPaymasterBytecode, '0x', create2Salt);
 
         // TODO: request from API how many L2 gas needs for the transaction.
-        await create2DeployFromL1(deployWallet, testnetPaymasterBytecode, '0x', create2Salt, priorityTxMaxGasLimit);
+        await (
+            await create2DeployFromL1(deployWallet, testnetPaymasterBytecode, '0x', create2Salt, priorityTxMaxGasLimit)
+        ).wait();
 
         console.log(`CONTRACTS_L2_TESTNET_PAYMASTER_ADDR=${paymasterAddress}`);
     });
