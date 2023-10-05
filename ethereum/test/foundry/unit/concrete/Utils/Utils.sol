@@ -2,11 +2,10 @@
 pragma solidity ^0.8.17;
 
 library Utils {
-    function packBatchTimestampAndBlockTimestamp(uint256 batchTimestamp, uint256 blockTimestamp)
-        public
-        pure
-        returns (bytes32)
-    {
+    function packBatchTimestampAndBlockTimestamp(
+        uint256 batchTimestamp,
+        uint256 blockTimestamp
+    ) public pure returns (bytes32) {
         uint256 packedNum = (batchTimestamp << 128) | blockTimestamp;
         return bytes32(packedNum);
     }

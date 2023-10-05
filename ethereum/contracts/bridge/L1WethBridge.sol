@@ -347,11 +347,10 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
     /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken
     /// contract
-    function _parseL2EthWithdrawalMessage(uint256 _chainId, bytes memory _message)
-        internal
-        view
-        returns (address l1WethReceiver, uint256 ethAmount)
-    {
+    function _parseL2EthWithdrawalMessage(
+        uint256 _chainId,
+        bytes memory _message
+    ) internal view returns (address l1WethReceiver, uint256 ethAmount) {
         // Check that the message length is correct.
         // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
         // It should be equal to the length of the function signature + eth receiver address + uint256 amount +

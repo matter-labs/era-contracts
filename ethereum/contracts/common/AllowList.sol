@@ -35,11 +35,7 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @param _caller The caller address, who is granted access
     /// @param _target The address of the smart contract which is called
     /// @param _functionSig The function signature (selector), access to which need to check
-    function canCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool) {
+    function canCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool) {
         AccessMode accessMode = getAccessMode[_target];
         return
             accessMode == AccessMode.Public ||
@@ -116,12 +112,7 @@ contract AllowList is IAllowList, Ownable2Step {
     }
 
     /// @dev Changes permission to call and emits the event if the permission was changed
-    function _setPermissionToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig,
-        bool _enable
-    ) internal {
+    function _setPermissionToCall(address _caller, address _target, bytes4 _functionSig, bool _enable) internal {
         bool currentPermission = hasSpecialAccessToCall[_caller][_target][_functionSig];
 
         if (currentPermission != _enable) {
@@ -134,11 +125,7 @@ contract AllowList is IAllowList, Ownable2Step {
     /// @param _l1Token The address of L1 token
     /// @param _depositLimitation deposit limitation is active or not
     /// @param _depositCap The maximum amount that can be deposited.
-    function setDepositLimit(
-        address _l1Token,
-        bool _depositLimitation,
-        uint256 _depositCap
-    ) external onlyOwner {
+    function setDepositLimit(address _l1Token, bool _depositLimitation, uint256 _depositCap) external onlyOwner {
         tokenDeposit[_l1Token].depositLimitation = _depositLimitation;
         tokenDeposit[_l1Token].depositCap = _depositCap;
     }

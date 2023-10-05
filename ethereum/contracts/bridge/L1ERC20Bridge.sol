@@ -300,11 +300,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFunds(
-        address _from,
-        IERC20 _token,
-        uint256 _amount
-    ) internal returns (uint256) {
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
@@ -426,15 +422,9 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(bytes memory _l2ToL1message)
-        internal
-        pure
-        returns (
-            address l1Receiver,
-            address l1Token,
-            uint256 amount
-        )
-    {
+    function _parseL2WithdrawalMessage(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Receiver, address l1Token, uint256 amount) {
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
         // 76 (bytes).
@@ -449,12 +439,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Verify the deposit limit is reached to its cap or not
-    function _verifyDepositLimit(
-        address _l1Token,
-        address _depositor,
-        uint256 _amount,
-        bool _claiming
-    ) internal {
+    function _verifyDepositLimit(address _l1Token, address _depositor, uint256 _amount, bool _claiming) internal {
         IAllowList.Deposit memory limitData = IAllowList(allowList).getTokenDepositLimitData(_l1Token);
         if (!limitData.depositLimitation) return; // no deposit limitation is placed for this token
 

@@ -58,10 +58,10 @@ contract ProofSystem is ProofGetters, ProofRegistry {
         proofStorage.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
     }
 
-    function setParams(VerifierParams calldata _verifierParams, Diamond.DiamondCutData calldata _cutData)
-        external
-        onlyGovernor
-    {
+    function setParams(
+        VerifierParams calldata _verifierParams,
+        Diamond.DiamondCutData calldata _cutData
+    ) external onlyGovernor {
         proofStorage.verifierParams = _verifierParams;
         proofStorage.cutHash = keccak256(abi.encode(_cutData));
     }
