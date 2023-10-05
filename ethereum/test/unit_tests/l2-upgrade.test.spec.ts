@@ -23,7 +23,8 @@ import {
     StoredBlockInfo,
     CommitBlockInfo,
     L2_SYSTEM_CONTEXT_ADDRESS,
-    L2_BOOTLOADER_ADDRESS
+    L2_BOOTLOADER_ADDRESS,
+    packBatchTimestampAndBlockTimestamp
 } from './utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, BytesLike } from 'ethers';
@@ -640,10 +641,10 @@ interface L2ToL1Log {
     value: string;
 }
 
-function contextLog(timestamp: BigNumberish, prevBlockHash: BytesLike): L2ToL1Log {
+function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
     return {
         sender: L2_SYSTEM_CONTEXT_ADDRESS,
-        key: ethers.utils.hexlify(timestamp),
+        key: packBatchTimestampAndBlockTimestamp(timestamp, timestamp),
         value: ethers.utils.hexlify(prevBlockHash)
     };
 }

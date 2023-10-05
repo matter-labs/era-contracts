@@ -43,6 +43,7 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
             await erc20.mint(testWallet.address, parseEther('3000000000'));
         }
     }
+
     token.address = erc20.address;
 
     // Remove the unneeded field
