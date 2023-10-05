@@ -1,11 +1,8 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
 import * as fs from 'fs';
-import * as path from 'path';
-import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
+import { diamondCut } from '../../src.ts/diamondCut';
 import {
-    DiamondInitFactory,
-    AllowListFactory,
     AllowList,
     ExecutorFacet,
     ExecutorFacetFactory,
@@ -13,8 +10,6 @@ import {
     GettersFacetFactory,
     GovernanceFacetFactory,
     BridgeheadChainFactory,
-    BridgeheadChain,
-    DiamondFactory,
     GettersFacet,
     GovernanceFacet,
     DefaultUpgradeFactory,
@@ -31,7 +26,7 @@ import {
     L2_BOOTLOADER_ADDRESS,
     packBatchTimestampAndBlockTimestamp
 } from './utils';
-import { hexlify, keccak256 } from 'ethers/lib/utils';
+import { keccak256 } from 'ethers/lib/utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, Wallet, BytesLike } from 'ethers';
 import { DiamondCutFacet } from '../../typechain';
@@ -41,10 +36,10 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath ='./test/test_config/constant';
+const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
@@ -57,14 +52,12 @@ describe('L2 upgrade test', function () {
     let proxyGovernance: GovernanceFacet;
 
     let allowList: AllowList;
-    let diamondProxyContract: ethers.Contract;
     let owner: ethers.Signer;
 
     let block1Info: CommitBlockInfo;
     let storedBlock1Info: StoredBlockInfo;
 
     let verifier: string;
-    let verifierParams: VerifierParams;
     const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
     let priorityOperationsHash: string;

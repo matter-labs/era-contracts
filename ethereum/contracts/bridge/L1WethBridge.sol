@@ -46,24 +46,39 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList public immutable allowList;
 
-    /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehead public immutable zkSync;
+    /// @dev bridgehead smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
+    IBridgehead public immutable bridgehead;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
-    address public l2Bridge;
+    address public __DEPRECATED_l2Bridge;
 
     /// @dev The address of the WETH on L2
     address public l2WethAddress;
 
-    /// @dev A mapping L2 block number => message number => flag
-    /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
+    mapping(uint256 => mapping(uint256 => bool)) public __DEPRECATED_isWithdrawalFinalized;
+
+    /// @dev The address of deployed L2 WETH bridge counterpart
+    mapping(uint256 => address) public l2Bridge;
+
+    /// @dev A mapping L2 chainId => block number => message number => flag
+    /// @dev Used to indicate that L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
+
+    /// @dev L1 address that governs the L2 bridges. (if EOA then L1toL2 alias is applied)
+    address public l2Governor;
+
+    /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge
+    bytes32 public factoryDepsHash;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address payable _l1WethAddress, IBridgehead _zkSync, IAllowList _allowList) reentrancyGuardInitializer {
+    constructor(
+        address payable _l1WethAddress,
+        IBridgehead _bridgehead,
+        IAllowList _allowList
+    ) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
-        zkSync = _zkSync;
+        bridgehead = _bridgehead;
         allowList = _allowList;
     }
 
@@ -74,37 +89,53 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
+    function initialize(
+        // kl todo we need to split initialize and initialize chain
+        bytes[] calldata _factoryDeps,
+        address _l2WethAddress,
+        address _governor
+    ) external reentrancyGuardInitializer {
+        require(_l2WethAddress != address(0), "L2 WETH address cannot be zero");
+        require(_governor != address(0), "Governor address cannot be zero");
+        require(_factoryDeps.length == 2, "Invalid factory deps length provided");
+
+        l2WethAddress = _l2WethAddress;
+        l2Governor = _governor;
+
+        factoryDepsHash = keccak256(abi.encode(_factoryDeps));
+    }
+
+    /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
+    /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
+    /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
+    /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
+    /// implementation and proxy upon initialization
+    /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2
     /// bridge implementation
     /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
     /// proxy
-    function initialize(
+    function initializeChain(
         // kl todo we need to split initialize and initialize chain
         uint256 _chainId,
         bytes[] calldata _factoryDeps,
-        address _l2WethAddress,
-        address _governor,
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
-    ) external payable reentrancyGuardInitializer {
-        require(_l2WethAddress != address(0), "L2 WETH address cannot be zero");
-        require(_governor != address(0), "Governor address cannot be zero");
-        require(_factoryDeps.length == 2, "Invalid factory deps length provided");
+    ) external payable {
         require(
             msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee,
             "Miscalculated deploy transactions fees"
         );
-
-        l2WethAddress = _l2WethAddress;
+        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "Incorrect factory deps provided");
+        require(_factoryDeps.length == 2, "Invalid factory deps length provided");
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2WethBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
 
         // Deploy L2 bridge implementation contract
-        // KL todo remove chainId, make it L2 independent
         address wethBridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            zkSync,
+            bridgehead,
             _deployBridgeImplementationFee,
             l2WethBridgeImplementationBytecodeHash,
             "", // Empty constructor data
@@ -117,19 +148,19 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, _l2WethAddress)
+                (address(this), l1WethAddress, l2Governor)
             );
             l2WethBridgeProxyConstructorData = abi.encode(
                 wethBridgeImplementationAddr,
-                _governor,
+                l2Governor,
                 proxyInitializationParams
             );
         }
 
         // Deploy L2 bridge proxy contract
-        l2Bridge = BridgeInitializationHelper.requestDeployTransaction(
+        l2Bridge[_chainId] = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            zkSync,
+            bridgehead,
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
             l2WethBridgeProxyConstructorData,
@@ -188,18 +219,36 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         if (_refundRecipient == address(0)) {
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
-        txHash = zkSync.requestL2Transaction{value: _amount + msg.value}(
+        txHash = _depositSendTx(
             _chainId,
-            l2Bridge,
             _amount,
             l2TxCalldata,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
-            new bytes[](0),
             refundRecipient
         );
 
         emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+    }
+
+    function _depositSendTx(
+        uint256 _chainId,
+        uint256 _amount,
+        bytes memory _l2TxCalldata,
+        uint256 _l2TxGasLimit,
+        uint256 _l2TxGasPerPubdataByte,
+        address _refundRecipient
+    ) internal returns (bytes32 txHash) {
+        txHash = bridgehead.requestL2Transaction{value: _amount + msg.value}(
+            _chainId,
+            l2Bridge[_chainId],
+            _amount,
+            _l2TxCalldata,
+            _l2TxGasLimit,
+            _l2TxGasPerPubdataByte,
+            new bytes[](0),
+            _refundRecipient
+        );
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 WETH bridge contract
@@ -254,7 +303,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         }
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBlock);
+        bool alreadyFinalised = bridgehead.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBlock);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
@@ -263,7 +312,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
                 data: _message
             });
             {
-                bool success = zkSync.proveL2MessageInclusion(
+                bool success = bridgehead.proveL2MessageInclusion(
                     _chainId,
                     _l2BlockNumber,
                     _l2MessageIndex,
@@ -274,7 +323,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             }
         } else {
             // Finalize the withdrawal if it is not yet done.
-            zkSync.finalizeEthWithdrawal(
+            bridgehead.finalizeEthWithdrawal(
                 _chainId,
                 _l2BlockNumber,
                 _l2MessageIndex,
@@ -284,7 +333,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             );
         }
 
-        (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
+        (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_chainId, _message);
 
         // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
         IWETH9(l1WethAddress).deposit{value: amount}();
@@ -299,6 +348,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken
     /// contract
     function _parseL2EthWithdrawalMessage(
+        uint256 _chainId,
         bytes memory _message
     ) internal view returns (address l1WethReceiver, uint256 ethAmount) {
         // Check that the message length is correct.
@@ -321,14 +371,14 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         address l2Sender;
         (l2Sender, offset) = UnsafeBytes.readAddress(_message, offset);
-        require(l2Sender == l2Bridge, "The withdrawal was not initiated by L2 bridge");
+        require(l2Sender == l2Bridge[_chainId], "The withdrawal was not initiated by L2 bridge");
 
         // Parse additional data
         (l1WethReceiver, offset) = UnsafeBytes.readAddress(_message, offset);
     }
 
     /// @return l2Token Address of an L2 token counterpart.
-    function l2TokenAddress(address _l1Token) public view override returns (address l2Token) {
+    function l2TokenAddress(address _l1Token, uint256 chainId) public view override returns (address l2Token) {
         l2Token = _l1Token == l1WethAddress ? l2WethAddress : address(0);
     }
 
@@ -336,8 +386,8 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     receive() external payable {
         // Expected to receive ether in two cases:
         // 1. l1 WETH sends ether on `withdraw`
-        // 2. zkSync contract withdraw funds in `finalizeEthWithdrawal`
-        require(msg.sender == l1WethAddress || msg.sender == address(zkSync), "pn");
+        // 2. bridgehead contract withdraw funds in `finalizeEthWithdrawal`
+        require(msg.sender == l1WethAddress || msg.sender == address(bridgehead), "pn");
         emit EthReceived(msg.value);
     }
 }

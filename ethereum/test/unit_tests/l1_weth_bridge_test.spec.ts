@@ -3,21 +3,9 @@ import { ethers, Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
 
 import * as fs from 'fs';
-import * as path from 'path';
 
 import { IBridgehead } from '../../typechain/IBridgehead';
-import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
-import {
-    AllowList,
-    AllowListFactory,
-    DiamondInitFactory,
-    GettersFacetFactory,
-    MailboxFactory,
-    L1WethBridge,
-    L1WethBridgeFactory,
-    WETH9,
-    WETH9Factory
-} from '../../typechain';
+import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from '../../typechain';
 import { AccessMode, getCallRevertReason } from './utils';
 import { hashL2Bytecode } from '../../scripts/utils';
 
@@ -28,10 +16,10 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath ='./test/test_config/constant';
+const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
@@ -191,18 +179,23 @@ describe('WETH Bridge tests', () => {
         const garbageAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 
         const bridgeInitData = bridge.interface.encodeFunctionData('initialize', [
-            chainId,
             [garbageBytecode, garbageBytecode],
             garbageAddress,
-            await owner.getAddress(),
-            ethers.constants.WeiPerEther,
-            ethers.constants.WeiPerEther
+            await owner.getAddress()
         ]);
+
         const _bridgeProxy = await (
             await hardhat.ethers.getContractFactory('ERC1967Proxy')
-        ).deploy(bridge.address, bridgeInitData, { value: ethers.constants.WeiPerEther.mul(2) });
+        ).deploy(bridge.address, bridgeInitData);
 
         bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
+        await bridgeProxy.initializeChain(
+            chainId,
+            [garbageBytecode, garbageBytecode],
+            ethers.constants.WeiPerEther,
+            ethers.constants.WeiPerEther,
+            { value: ethers.constants.WeiPerEther.mul(2) }
+        );
     });
 
     it('Should not allow an un-whitelisted address to deposit', async () => {

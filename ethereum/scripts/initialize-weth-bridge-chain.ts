@@ -1,8 +1,14 @@
 import { Command } from 'commander';
-import { ethers, Wallet } from 'ethers';
+import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider, applyL1ToL2Alias, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import {
+    web3Provider,
+    getNumberFromEnv,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
+    L2_WETH_BRIDGE_PROXY_BYTECODE
+} from './utils';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,29 +17,12 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, 'contracts/zksync/artifacts-zk/');
-const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
-
-const openzeppelinTransparentProxyArtifactsPath = path.join(
-    contractArtifactsPath,
-    '@openzeppelin/contracts/proxy/transparent/'
-);
-
-function readBytecode(path: string, fileName: string) {
-    return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).bytecode;
-}
-
-const L2_WETH_BRIDGE_PROXY_BYTECODE = readBytecode(
-    openzeppelinTransparentProxyArtifactsPath,
-    'TransparentUpgradeableProxy'
-);
-const L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, 'L2WethBridge');
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT');
 
 async function main() {
     const program = new Command();
 
-    program.version('0.1.0').name('initialize-weth-bridges');
+    program.version('0.1.0').name('initialize-weth-bridges-chain');
 
     program
         .option('--private-key <private-key>')
@@ -56,37 +45,26 @@ async function main() {
             const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
             console.log(`Using deployer nonce: ${nonce}`);
 
-            const l2WethAddress = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
-
             const deployer = new Deployer({
                 deployWallet,
                 governorAddress: deployWallet.address,
                 verbose: true
             });
 
-            const factory = deployer.bridgeheadContract(deployWallet);
+            const bridgehead = deployer.bridgeheadContract(deployWallet);
             const l1WethBridge = deployer.defaultWethBridge(deployWallet);
 
-            const l1GovernorAddress = await factory.getGovernor();
-            // Check whether governor is a smart contract on L1 to apply alias if needed.
-            const l1GovernorCodeSize = ethers.utils.hexDataLength(
-                await deployWallet.provider.getCode(l1GovernorAddress)
-            );
-            const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
-
             // There will be two deployments done during the initial initialization
-            const requiredValueToInitializeBridge = await factory.l2TransactionBaseCost(
+            const requiredValueToInitializeBridge = await bridgehead.l2TransactionBaseCost(
                 chainId,
                 gasPrice,
                 DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
 
-            const tx = await l1WethBridge.initialize(
+            const tx = await l1WethBridge.initializeChain(
                 chainId,
                 [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-                l2WethAddress,
-                l2GovernorAddress,
                 requiredValueToInitializeBridge,
                 requiredValueToInitializeBridge,
                 {
@@ -99,7 +77,7 @@ async function main() {
             const receipt = await tx.wait();
 
             console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);
-            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
+            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge(chainId)}`);
         });
 
     await program.parseAsync(process.argv);

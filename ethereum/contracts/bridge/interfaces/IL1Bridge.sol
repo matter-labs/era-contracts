@@ -52,7 +52,7 @@ interface IL1Bridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function l2TokenAddress(address _l1Token) external view returns (address);
+    function l2TokenAddress(address _l1Token, uint256 chainId) external view returns (address);
 
-    function l2Bridge() external view returns (address);
+    function l2Bridge(uint256 chainId) external view returns (address);
 }

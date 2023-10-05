@@ -26,8 +26,8 @@ import {
 } from '../scripts/utils';
 import { deployViaCreate2 } from './deploy-utils';
 
-let L2_BOOTLOADER_BYTECODE_HASH : string;
-let L2_DEFAULT_ACCOUNT_BYTECODE_HASH : string;
+let L2_BOOTLOADER_BYTECODE_HASH: string;
+let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 
 export interface DeployedAddresses {
     Bridgehead: {
@@ -120,8 +120,12 @@ export class Deployer {
         this.verbose = config.verbose != null ? config.verbose : false;
         this.addresses = config.addresses ? config.addresses : deployedAddressesFromEnv();
         this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
-        L2_BOOTLOADER_BYTECODE_HASH = config.bootloaderBytecodeHash ? config.bootloaderBytecodeHash : hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
-        L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash ? config.defaultAccountBytecodeHash : hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
+        L2_BOOTLOADER_BYTECODE_HASH = config.bootloaderBytecodeHash
+            ? config.bootloaderBytecodeHash
+            : hexlify(hashL2Bytecode(readBlockBootloaderBytecode()));
+        L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
+            ? config.defaultAccountBytecodeHash
+            : hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
     }
 
     public async initialProofSystemProxyDiamondCut() {
@@ -536,7 +540,7 @@ export class Deployer {
     public async deployProofSystemContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        await this.deployProofDiamond(create2Salt, gasPrice);
+        await this.deployProofDiamond(create2Salt, gasPrice, nonce);
         await this.deployProofSystemProxy(create2Salt, { gasPrice });
         await this.registerProofSystem();
     }

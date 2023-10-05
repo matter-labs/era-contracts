@@ -13,6 +13,6 @@ contract L1ERC20BridgeTest is L1ERC20Bridge {
     }
 
     function getBridgehead() public view returns (IBridgehead) {
-        return zkSync;
+        return bridgehead;
     }
 }

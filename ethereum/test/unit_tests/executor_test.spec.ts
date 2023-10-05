@@ -4,23 +4,15 @@ import * as hardhat from 'hardhat';
 import '@openzeppelin/hardhat-upgrades';
 
 import * as fs from 'fs';
-import * as path from 'path';
 
-import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
-    AllowList,
-    AllowListFactory,
-    DiamondInitFactory,
     BridgeheadChainFactory,
     Bridgehead,
     BridgeheadFactory,
     ExecutorFacet,
     ExecutorFacetFactory,
     GettersFacet,
-    GettersFacetFactory,
-    // MailboxFacet,
-    // MailboxFacetFactory,
-    GovernanceFacetFactory
+    GettersFacetFactory
 } from '../../typechain';
 import {
     AccessMode,
@@ -35,14 +27,14 @@ import {
     requestExecute
 } from './utils';
 import { Deployer } from '../../src.ts/deploy';
-import { hexlify, keccak256 } from 'ethers/lib/utils';
+import { keccak256 } from 'ethers/lib/utils';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath ='./test/test_config/constant';
+const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
@@ -50,7 +42,6 @@ describe(`Executor tests`, function () {
     let owner: ethers.Signer;
     let validator: ethers.Signer;
     let randomSigner: ethers.Signer;
-    let allowList: AllowList;
     let executor: ExecutorFacet;
     let getters: GettersFacet;
     let bridgeheadContract: Bridgehead;

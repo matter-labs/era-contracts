@@ -11,8 +11,6 @@ import {
     DiamondCutFacetFactory,
     GettersFacet,
     GettersFacetFactory,
-    Mailbox as MailboxFacet,
-    MailboxFactory as MailboxFacetFactory,
     ExecutorFacet,
     ExecutorFacetFactory,
     DiamondInit,

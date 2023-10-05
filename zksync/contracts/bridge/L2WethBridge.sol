@@ -3,11 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IL2Weth.sol";
 import "./interfaces/IL2StandardToken.sol";
 
+import "./L2Weth.sol";
 import {L2_ETH_ADDRESS} from "../L2ContractHelper.sol";
 import "../vendor/AddressAliasHelper.sol";
 
@@ -39,20 +41,27 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @notice Initializes the contract with parameters needed for its functionality.
     /// @param _l1Bridge The address of the L1 Bridge contract.
     /// @param _l1WethAddress The address of the L1 WETH token.
-    /// @param _l2WethAddress The address of the L2 WETH token.
+    /// @param _governor The address of the L1 governor aliased.
     /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,
-        address _l2WethAddress
+        address _governor
     ) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
         require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
-        require(_l2WethAddress != address(0), "L2 WETH token address cannot be zero");
 
         l1Bridge = _l1Bridge;
         l1WethAddress = _l1WethAddress;
-        l2WethAddress = _l2WethAddress;
+
+        address l2WethImplementation = address(new L2Weth{salt: bytes32(0)}());
+        bytes memory initData = abi.encodeWithSelector(L2Weth.initialize.selector, "Wrapped Ether", "WETH");
+        TransparentUpgradeableProxy l2Weth = new TransparentUpgradeableProxy{salt: bytes32(0)}(
+            l2WethImplementation,
+            _governor,
+            initData
+        );
+        l2WethAddress = address(l2Weth);
     }
 
     /// @notice Initiate the withdrawal of WETH from L2 to L1 by sending a message to L1 and calling withdraw on L2EthToken contract

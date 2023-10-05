@@ -1,22 +1,8 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
-import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
-import {
-    BridgeheadMailbox,
-    BridgeheadMailboxFactory,
-    BridgeheadFactory,
-    BridgeheadChainFactory,
-    DiamondInitFactory,
-    AllowListFactory,
-    AllowList,
-    Forwarder,
-    ForwarderFactory,
-    DiamondCutTestFactory,
-    DiamondFactory
-} from '../../typechain';
+import { BridgeheadFactory, BridgeheadChainFactory, AllowList, Forwarder, ForwarderFactory } from '../../typechain';
 
 import * as fs from 'fs';
-import * as path from 'path';
 
 import {
     DEFAULT_REVERT_REASON,
@@ -26,8 +12,7 @@ import {
     requestExecute,
     requestExecuteDirect
 } from './utils';
-import { Wallet, BigNumberish, BytesLike } from 'ethers';
-import { Address } from 'zksync-web3/build/src/types';
+import { Wallet } from 'ethers';
 
 import * as ethers from 'ethers';
 
@@ -35,10 +20,10 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath ='./test/test_config/constant';
+const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
@@ -46,7 +31,6 @@ describe('Mailbox tests', function () {
     let allowList: AllowList;
     let bridgeheadContract: ethers.Contract;
     let bridgeheadChainContract: ethers.Contract;
-    let diamondProxyContract: ethers.Contract;
     let owner: ethers.Signer;
     let randomSigner: ethers.Signer;
     const MAX_CODE_LEN_WORDS = (1 << 16) - 1;

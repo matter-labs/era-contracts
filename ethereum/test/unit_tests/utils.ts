@@ -48,7 +48,8 @@ export async function getCallRevertReason(promise) {
                 ) {
                     if (e.error) {
                         revertReason =
-                            e.error.toString().match(/reverted with reason string '([^']*)'/)[1] || 'PLACEHOLDER_STRING';
+                            e.error.toString().match(/reverted with reason string '([^']*)'/)[1] ||
+                            'PLACEHOLDER_STRING';
                     } else {
                         revertReason =
                             e.toString().match(/reverted with reason string '([^']*)'/)[1] || 'PLACEHOLDER_STRING';

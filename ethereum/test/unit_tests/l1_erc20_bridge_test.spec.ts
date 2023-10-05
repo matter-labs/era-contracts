@@ -3,23 +3,9 @@ import { BigNumberish, ethers, Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
 
 import * as fs from 'fs';
-import * as path from 'path';
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from 'zksync-web3/build/src/utils';
-// import { IZkSync as IBridgehead, IZkSyncFactory as IDiamondFactory } from 'zksync-web3/build/typechain';
-import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
-import {
-    AllowList,
-    AllowListFactory,
-    // BridgeheadFactory,
-    TestnetERC20Token,
-    TestnetERC20TokenFactory,
-    GettersFacetFactory,
-    MailboxFactory as MailboxFacetFactory,
-    DiamondInitFactory,
-    BridgeheadFactory,
-    Bridgehead
-} from '../../typechain';
+import { AllowList, TestnetERC20Token, TestnetERC20TokenFactory, BridgeheadFactory, Bridgehead } from '../../typechain';
 import { IL1Bridge } from '../../typechain/IL1Bridge';
 import { IL1BridgeFactory } from '../../typechain/IL1BridgeFactory';
 import { AccessMode, getCallRevertReason } from './utils';
@@ -28,10 +14,10 @@ import { Deployer } from '../../src.ts/deploy';
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000" ;
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath ='./test/test_config/constant';
+const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
