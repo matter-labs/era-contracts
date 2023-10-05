@@ -37,7 +37,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing blocks.
     uint256 public executionDelay;
 
-    constructor(address _initialOwner, address _diamondProxy, uint256 _executionDelay, address _validator) {
+    constructor(
+        address _initialOwner,
+        address _diamondProxy,
+        uint256 _executionDelay,
+        address _validator
+    ) {
         _transferOwnership(_initialOwner);
         diamondProxy = _diamondProxy;
         executionDelay = _executionDelay;
