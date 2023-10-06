@@ -97,6 +97,10 @@ let params = {
     RIGHT_PADDED_POST_TRANSACTION_SELECTOR: getPaddedSelector('IPaymaster', 'postTransaction'),
     RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector('SystemContext', 'setTxOrigin'),
     RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector('SystemContext', 'setGasPrice'),
+    RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'incrementTxNumberInBatch'),
+    RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'resetTxNumberInBatch'),
+    RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector('L1Messenger', 'sendL2ToL1Log'),
+    PUBLISH_PUBDATA_SELECTOR: getSelector('L1Messenger', 'publishPubdataAndClearState'),
     RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector('SystemContext', 'setNewBatch'),
     RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector('SystemContext', 'unsafeOverrideBatch'),
     // Error
@@ -111,16 +115,25 @@ let params = {
     PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector('L2EthToken', 'transferFromTo'),
     SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector('IAccount', 'validateTransaction'),
     SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector('IPaymaster', 'validateAndPayForPaymasterTransaction'),
-    PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector('BytecodeCompressor', 'publishCompressedBytecode'),
+    PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector('Compressor', 'publishCompressedBytecode'),
     GET_MARKER_PADDED_SELECTOR: getPaddedSelector('KnownCodesStorage', 'getMarker'),
     RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'setL2Block'),
     RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'appendTransactionToCurrentL2Block'),
-    RIGHT_PADDED_PUBLISH_BATCH_DATA_TO_L1_SELECTOR: getPaddedSelector('SystemContext', 'publishBatchDataToL1'),
+    RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector('SystemContext', 'publishTimestampDataToL1'),
     COMPRESSED_BYTECODES_SLOTS: 32768,
     ENSURE_RETURNED_MAGIC: 1,
     FORBID_ZERO_GAS_PER_PUBDATA: 1,
     SYSTEM_CONTEXT_EXPECTED_CODE_HASH: getSystemContextExpectedHash(),
     UPGRADE_SYSTEM_CONTEXT_CALLDATA: upgradeSystemContextCalldata(),
+    // One of "worst case" scenarios for the number of state diffs in a batch is when 120kb of pubdata is spent 
+    // on repeated writes, that are all zeroed out. In this case, the number of diffs is 120k / 5 = 24k. This means that they will have
+    // accoomdate 6528000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with 
+    // roughly 6650000 bytes needed for calldata. 207813 slots are needed to accomodate this amount of data.
+    // We round up to 208000 slots just in case.
+    //
+    // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the 
+    // operator to ensure that it can form the correct calldata for the L1Messenger.
+    OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 208000,
     ...SYSTEM_PARAMS
 };
 

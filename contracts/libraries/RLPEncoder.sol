@@ -2,6 +2,11 @@
 
 pragma solidity ^0.8.0;
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice This library provides RLP encoding functionality.
+*/
 library RLPEncoder {
     function encodeAddress(address _val) internal pure returns (bytes memory encoded) {
         // The size is equal to 20 bytes of the address itself + 1 for encoding bytes length in RLP.

@@ -3,16 +3,17 @@
 pragma solidity ^0.8.0;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
-import "./interfaces/IContractDeployer.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
-import "./libraries/Utils.sol";
-import "./libraries/EfficientCall.sol";
+import {Utils} from "./libraries/Utils.sol";
+import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import "./interfaces/ISystemContract.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice System smart contract that is responsible for deploying other smart contracts on zkSync.
  * @dev The contract is responsible for generating the address of the deployed smart contract,
  * incrementing the deployment nonce and making sure that the constructor is never called twice in a contract.
@@ -236,7 +237,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
         require(
-            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT), 
+            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT),
             "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
         );
 

@@ -1,13 +1,14 @@
 import '@nomiclabs/hardhat-solpp';
-import 'hardhat-typechain';
+import '@typechain/hardhat';
 import '@nomiclabs/hardhat-ethers';
 import '@matterlabs/hardhat-zksync-solc';
+import '@matterlabs/hardhat-zksync-chai-matchers';
 
 const systemConfig = require('./SystemConfig.json');
 
 export default {
     zksolc: {
-        version: '1.3.11',
+        version: '1.3.14',
         compilerSource: 'binary',
         settings: {
             isSystem: true
@@ -18,7 +19,14 @@ export default {
         ethNetwork: 'http://localhost:8545'
     },
     solidity: {
-        version: '0.8.17'
+        version: '0.8.17',
+        settings: {
+            optimizer: {
+              enabled: true,
+              runs: 200
+            },
+            viaIR: true
+        }
     },
     solpp: {
         defs: (() => {
@@ -31,6 +39,11 @@ export default {
     },
     networks: {
         hardhat: {
+            zksync: true
+        },
+        zkSyncTestNode: {
+            url: 'http://127.0.0.1:8011',
+            ethNetwork: '',
             zksync: true
         }
     }

@@ -1,0 +1,17 @@
+name: "Rust CI"
+on:
+  pull_request:
+
+jobs:
+  build:
+    name: Build contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          node-version: 18.18.0
+      - run: yarn
+      - run: yarn build
+      - run: yarn preprocess
+      - run: yarn compile-yul
+

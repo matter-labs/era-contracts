@@ -9,6 +9,7 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice A contract used for managing nonces for accounts. Together with bootloader,
  * this contract ensures that the pair (sender, nonce) is always unique, ensuring
  * unique transaction hashes.

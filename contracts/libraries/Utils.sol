@@ -5,6 +5,7 @@ import "./EfficientCall.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @dev Common utilities used in zkSync system contracts
  */
 library Utils {

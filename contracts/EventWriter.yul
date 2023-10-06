@@ -1,11 +1,14 @@
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice The contract responsible for decoding and writing events using low-level instructions.
  * @dev The metadata and topics are passed via registers, and the first accessible register contains their number.
  * The rest of the data is passed via calldata without copying.
  */
 object "EventWriter" {
-    code { }
+    code {
+        return(0, 0)
+    }
     object "EventWriter_deployed" {
         code {
             ////////////////////////////////////////////////////////////////

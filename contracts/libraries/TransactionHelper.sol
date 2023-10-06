@@ -72,6 +72,7 @@ struct Transaction {
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Library is used to help custom accounts to work with common methods for the Transaction type.
  */
 library TransactionHelper {
