@@ -43,4 +43,11 @@ abstract contract ISystemContract {
         require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Callable only by the bootloader");
         _;
     }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the L1 force deployer.
+    modifier onlyCallFromForceDeployer() {
+        require(msg.sender == FORCE_DEPLOYER);
+        _;
+    }
 }
