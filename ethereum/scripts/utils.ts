@@ -13,7 +13,7 @@ const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, 'cont
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
 const openzeppelinTransparentProxyArtifactsPath = path.join(
     contractArtifactsPath,
-    '@openzeppelin/contracts/proxy/transparent/'
+    '@openzeppelin/contracts/proxy/transparent'
 );
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, '@openzeppelin/contracts/proxy/beacon');
 
