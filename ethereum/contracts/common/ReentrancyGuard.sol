@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 /**
+ * @custom:security-contact security@matterlabs.dev
  * @dev Contract module that helps prevent reentrant calls to a function.
  *
  * Inheriting from `ReentrancyGuard` will make the {nonReentrant} modifier

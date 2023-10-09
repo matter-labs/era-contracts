@@ -50,19 +50,18 @@ export function getAllSelectors(contractInterface: Interface) {
 }
 
 export async function getCurrentFacetCutsForAdd(
-    diamondCutFacetAddress: string,
+    adminAddress: string,
     gettersAddress: string,
     executorAddress: string,
-    governanceAddress: string
 ) {
     const facetsCuts = {};
     // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
     // And for some facets there are should be possibility to freeze them by the governor if we found a bug inside.
-    if (diamondCutFacetAddress) {
-        // Should be unfreezable. The function to unfreeze contract is located on the diamond cut facet.
-        // That means if the diamond cut will be freezable, the proxy can NEVER be unfrozen.
-        const diamondCutFacet = await hardhat.ethers.getContractAt('DiamondCutFacet', diamondCutFacetAddress);
-        facetsCuts['DiamondCutFacet'] = facetCut(diamondCutFacet.address, diamondCutFacet.interface, Action.Add, false);
+    if (adminAddress) {
+        // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
+        // That means if the admin facet will be freezable, the proxy can NEVER be unfrozen.
+        const adminFacet = await hardhat.ethers.getContractAt('AdminFacet', adminAddress);
+        facetsCuts['AdminFacet'] = facetCut(adminFacet.address, adminFacet.interface, Action.Add, false);
     }
     if (gettersAddress) {
         // Should be unfreezable. There are getters, that users can expect to be available.
@@ -74,10 +73,7 @@ export async function getCurrentFacetCutsForAdd(
         const executor = await hardhat.ethers.getContractAt('ExecutorFacet', executorAddress);
         facetsCuts['ExecutorFacet'] = facetCut(executor.address, executor.interface, Action.Add, true);
     }
-    if (governanceAddress) {
-        const governance = await hardhat.ethers.getContractAt('GovernanceFacet', governanceAddress);
-        facetsCuts['GovernanceFacet'] = facetCut(governance.address, governance.interface, Action.Add, true);
-    }
+
     return facetsCuts;
 }
 
@@ -104,16 +100,14 @@ export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddres
 export async function getFacetCutsForUpgrade(
     wallet: Wallet,
     zkSyncAddress: string,
-    diamondCutFacetAddress: string,
+    adminAddress: string,
     gettersAddress: string,
     executorAddress: string,
-    governanceAddress: string
 ) {
     const newFacetCuts = await getCurrentFacetCutsForAdd(
-        diamondCutFacetAddress,
+        adminAddress,
         gettersAddress,
         executorAddress,
-        governanceAddress
     );
     const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, Object.keys(newFacetCuts));
     return [...oldFacetCuts, ...Object.values(newFacetCuts)];

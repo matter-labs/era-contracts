@@ -2,39 +2,58 @@
 
 pragma solidity ^0.8.13;
 
-import "./ChainBase.sol";
-import "../libraries/Merkle.sol";
-import "../libraries/PriorityQueue.sol";
-import "../libraries/TransactionValidator.sol";
-import "../../common/Config.sol";
-import "../../common/libraries/UncheckedMath.sol";
-import "../../common/libraries/UnsafeBytes.sol";
-import "../../common/libraries/L2ContractHelper.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
-import "../../vendor/AddressAliasHelper.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../chain-interfaces/IMailbox.sol";
+import {ChainBase} from "./ChainBase.sol";
+import {Merkle} from"../libraries/Merkle.sol";
+import {PriorityQueue, PriorityOperation} from  "../libraries/PriorityQueue.sol";
+import {TransactionValidator} from "../libraries/TransactionValidator.sol";
+import {
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    FAIR_L2_GAS_PRICE,
+    L1_GAS_PER_PUBDATA_BYTE,
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    PRIORITY_OPERATION_L2_TX_TYPE,
+    PRIORITY_EXPIRATION,
+    MAX_NEW_FACTORY_DEPS
+} from "../../common/Config.sol";
+import {UncheckedMath} from"../../common/libraries/UncheckedMath.sol";
+import {UnsafeBytes} from"../../common/libraries/UnsafeBytes.sol";
+import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
+} from "../../common/L2ContractAddresses.sol";
+import {L2Message, L2Log} from "../Storage.sol";
+
+import {IAllowList} from "../../common/interfaces/IAllowList.sol";
+
+import {IMailbox, TxStatus} from "../chain-interfaces/IMailbox.sol";
 import "../bridgehead-interfaces/IBridgehead.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract Mailbox is IMailbox, ChainBase {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
     function finalizeEthWithdrawalBridgehead(
         address _sender,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external onlyBridgehead knownSenderCanCallFunction(_sender, chainStorage.allowList) {
         _finalizeEthWithdrawalSender(
             _sender,
-            _l2BlockNumber,
+            _l2BatchNumber,
             _l2MessageIndex,
-            _l2TxNumberInBlock,
+            _l2TxNumberInBatch,
             _message,
             _merkleProof
         );
@@ -71,55 +90,55 @@ contract Mailbox is IMailbox, ChainBase {
 
     //////////////////
 
-    /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 block number
-    /// @param _blockNumber The executed L2 block number in which the message appeared
+    /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
+    /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 block where the message was sent
+    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
     /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
     /// @return Whether the proof is valid
     function proveL2MessageInclusion(
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Message memory _message,
         bytes32[] calldata _proof
-    ) public view returns (bool) {
-        return _proveL2LogInclusion(_blockNumber, _index, _L2MessageToLog(_message), _proof);
+    ) external view returns (bool) {
+        return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
     }
 
-    /// @notice Prove that a specific L2 log was sent in a specific L2 block
-    /// @param _blockNumber The executed L2 block number in which the log appeared
+    /// @notice Prove that a specific L2 log was sent in a specific L2 batch
+    /// @param _batchNumber The executed L2 batch number in which the log appeared
     /// @param _index The position of the l2log in the L2 logs Merkle tree
     /// @param _log Information about the sent log
     /// @param _proof Merkle proof for inclusion of the L2 log
-    /// @return Whether the proof is correct and L2 log is included in block
+    /// @return Whether the proof is correct and L2 log is included in batch
     function proveL2LogInclusion(
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
-    ) public view returns (bool) {
-        return _proveL2LogInclusion(_blockNumber, _index, _log, _proof);
+    ) external view returns (bool) {
+        return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
     /// @notice Prove that the L1 -> L2 transaction was processed with the specified status.
     /// @param _l2TxHash The L2 canonical transaction hash
-    /// @param _l2BlockNumber The L2 block number where the transaction was processed
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
     /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
     /// @return Whether the proof is correct and the transaction was actually executed with provided status
     /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) public view override returns (bool) {
+    ) external view override returns (bool) {
         // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
-        // Thus, we can verify that the L1 -> L2 transaction was included in the L2 block with specified status.
+        // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
         //
         // The semantics of such L2 -> L1 log is always:
         // - sender = L2_BOOTLOADER_ADDRESS
@@ -127,41 +146,42 @@ contract Mailbox is IMailbox, ChainBase {
         // - value = status of the processing transaction (1 - success & 0 - fail)
         // - isService = true (just a conventional value)
         // - l2ShardId = 0 (means that L1 -> L2 transaction was processed in a rollup shard, other shards are not available yet anyway)
-        // - txNumberInBlock = number of transaction in the block
+        // - txNumberInBatch = number of transaction in the batch
         L2Log memory l2Log = L2Log({
             l2ShardId: 0,
             isService: true,
-            txNumberInBlock: _l2TxNumberInBlock,
+            txNumberInBatch: _l2TxNumberInBatch,
             sender: L2_BOOTLOADER_ADDRESS,
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
-        return _proveL2LogInclusion(_l2BlockNumber, _l2MessageIndex, l2Log, _merkleProof);
+        return _proveL2LogInclusion(_l2BatchNumber, _l2MessageIndex, l2Log, _merkleProof);
     }
 
-    /// @dev Prove that a specific L2 log was sent in a specific L2 block number
+    /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
         // kl todo is this even needed? as we only add logs in executeblocks.
-        // But if it is needed we need to update totalBlocksExecuted
-        require(_blockNumber <= chainStorage.totalBlocksExecuted, "xx");
+        // But if it is needed we need to update totalBatchsExecuted
+        require(_batchNumber <= chainStorage.totalBatchsExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
-            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBlock, _log.sender, _log.key, _log.value)
+            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
         // Check that hashed log is not the default one,
         // otherwise it means that the value is out of range of sent L2 -> L1 logs
         require(hashedLog != L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, "tw");
-        // Check that the proof length is exactly the same as tree height, to prevent
-        // any shorter/longer paths attack on the Merkle path validation
-        require(_proof.length == L2_TO_L1_LOG_MERKLE_TREE_HEIGHT, "rz");
+
+        // It is ok to not check length of `_proof` array, as length
+        // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
+        // equal to the length of other nodes preimages (which are `2 * 32`)
 
         bytes32 calculatedRootHash = Merkle.calculateRoot(_proof, _index, hashedLog);
-        bytes32 actualRootHash = chainStorage.l2LogsRootHashes[_blockNumber];
+        bytes32 actualRootHash = chainStorage.l2LogsRootHashes[_batchNumber];
 
         return actualRootHash == calculatedRootHash;
     }
@@ -172,7 +192,7 @@ contract Mailbox is IMailbox, ChainBase {
             L2Log({
                 l2ShardId: 0,
                 isService: true,
-                txNumberInBlock: _message.txNumberInBlock,
+                txNumberInBatch: _message.txNumberInBatch,
                 sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
                 key: bytes32(uint256(uint160(_message.sender))),
                 value: keccak256(_message.data)
@@ -188,7 +208,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) public pure returns (uint256) {
+    ) external pure returns (uint256) {
         uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
         return l2GasPrice * _l2GasLimit;
     }
@@ -205,46 +225,46 @@ contract Mailbox is IMailbox, ChainBase {
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the withdrawal was processed
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeEthWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public override knownSenderCanCallFunction(msg.sender, chainStorage.allowList) {
+    ) external override knownSenderCanCallFunction(msg.sender, chainStorage.allowList) {
         _finalizeEthWithdrawalSender(
             msg.sender,
-            _l2BlockNumber,
+            _l2BatchNumber,
             _l2MessageIndex,
-            _l2TxNumberInBlock,
+            _l2TxNumberInBatch,
             _message,
             _merkleProof
         );
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the withdrawal was processed
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function _finalizeEthWithdrawalSender(
         address _sender,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant {
-        require(!chainStorage.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "jj");
+        require(!chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({
-            txNumberInBlock: _l2TxNumberInBlock,
+            txNumberInBatch: _l2TxNumberInBatch,
             sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
             data: _message
         });
@@ -252,12 +272,12 @@ contract Mailbox is IMailbox, ChainBase {
         (address _l1WithdrawReceiver, uint256 _amount) = _parseL2WithdrawalMessage(_message);
 
         {
-            bool proofValid = proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
+            bool proofValid = proveL2MessageInclusion(_l2BatchNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
             require(proofValid, "pi"); // Failed to verify that withdrawal was actually initialized on L2
         }
 
         {
-            chainStorage.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
+            chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
         }
         IBridgehead(chainStorage.bridgehead).withdrawFunds(chainStorage.chainId, _l1WithdrawReceiver, _amount);
 
@@ -272,7 +292,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) public payable knownSenderCanCallFunction(msg.sender, chainStorage.allowList) returns (bytes32 canonicalTxHash) {
+    ) external payable knownSenderCanCallFunction(msg.sender, chainStorage.allowList) returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(
             msg.sender,
             _contractL2,
@@ -357,7 +377,7 @@ contract Mailbox is IMailbox, ChainBase {
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps,
         bool _isFree
-    ) public onlyProofSystem returns (bytes32 canonicalTxHash) {
+    ) external onlyProofSystem returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2Transaction(_params, _calldata, _factoryDeps, _isFree);
     }
 

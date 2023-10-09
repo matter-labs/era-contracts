@@ -19,7 +19,6 @@ async function main() {
         .option('--private-key <private-key>')
         .option('--gas-price <gas-price>')
         .option('--nonce <nonce>')
-        .option('--governor-address <governor-address>')
         .option('--create2-salt <create2-salt>')
         .action(async (cmd) => {
             const deployWallet = cmd.privateKey
@@ -29,9 +28,6 @@ async function main() {
                       "m/44'/60'/0'/0/0"
                   ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
-
-            const governorAddress = cmd.governorAddress ? cmd.governorAddress : deployWallet.address;
-            console.log(`Using governor address: ${governorAddress}`);
 
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
@@ -43,7 +39,6 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress,
                 verbose: true
             });
 

@@ -24,13 +24,11 @@ async function main() {
 
     // Contracts without constructor parameters
     for (const address of [
-        addresses.ProofSystem.DiamondCutFacet,
         addresses.ProofSystem.GettersFacet,
         addresses.ProofSystem.DiamondInit,
         addresses.ProofSystem.GovernanceFacet,
         addresses.ProofSystem.ExecutorFacet,
         addresses.ProofSystem.Verifier
-        // kl todo add bridgehead here
     ]) {
         const promise = verifyPromise(address);
         promises.push(promise);

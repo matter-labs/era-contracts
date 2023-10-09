@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import "./interfaces/IAllowList.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 abstract contract AllowListed {
     modifier senderCanCallFunction(IAllowList _allowList) {
         // Preventing the stack too deep error

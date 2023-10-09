@@ -207,7 +207,6 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: deployWallet.address,
                 verbose: true
             });
             deployer.chainId = parseInt(chainId) || 270;

@@ -47,7 +47,6 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: deployWallet.address,
                 verbose: true
             });
 

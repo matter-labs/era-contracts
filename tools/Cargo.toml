@@ -9,3 +9,5 @@ serde_json = "1.0"
 lazy_static = "1.4"
 structopt = "0.3.26"
 handlebars = "4.4.0"
+
+[workspace]

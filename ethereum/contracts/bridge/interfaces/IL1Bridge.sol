@@ -18,7 +18,7 @@ interface IL1Bridge {
 
     function isWithdrawalFinalized(
         uint256 chainId,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool);
 
@@ -37,17 +37,17 @@ interface IL1Bridge {
         address _depositSender,
         address _l1Token,
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external;
 
     function finalizeWithdrawal(
         uint256 _chainId,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;

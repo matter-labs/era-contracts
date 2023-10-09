@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The helper library for managing the EIP-2535 diamond proxy.
 library Diamond {
     using UncheckedMath for uint256;

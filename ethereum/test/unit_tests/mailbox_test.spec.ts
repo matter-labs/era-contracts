@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
-import { BridgeheadFactory, BridgeheadChainFactory, AllowList, Forwarder, ForwarderFactory } from '../../typechain';
+import { BridgeheadFactory, BridgeheadChainFactory, AllowList, Forwarder, ForwarderFactory, MockExecutorFacet,
+    MockExecutorFacetFactory, } from '../../typechain';
 
 import * as fs from 'fs';
 
@@ -17,6 +18,8 @@ import { Wallet } from 'ethers';
 import * as ethers from 'ethers';
 
 import { Deployer } from '../../src.ts/deploy';
+import { facetCut, Action } from '../../src.ts/diamondCut';
+
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
@@ -31,6 +34,7 @@ describe('Mailbox tests', function () {
     let allowList: AllowList;
     let bridgeheadContract: ethers.Contract;
     let bridgeheadChainContract: ethers.Contract;
+    let proxyAsMockExecutor: MockExecutorFacet;
     let owner: ethers.Signer;
     let randomSigner: ethers.Signer;
     const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
@@ -44,7 +48,7 @@ describe('Mailbox tests', function () {
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
             owner.provider
         );
-        const governorAddress = await deployWallet.getAddress();
+        const ownerAddress = await deployWallet.getAddress();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -61,7 +65,7 @@ describe('Mailbox tests', function () {
 
         const deployer = new Deployer({
             deployWallet,
-            governorAddress,
+            ownerAddress,
             verbose: false,
             addresses: addressConfig,
             bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -97,13 +101,18 @@ describe('Mailbox tests', function () {
             recursionLeafLevelVkHash: zeroHash,
             recursionCircuitsSetVksHash: zeroHash
         };
+
+        const mockExecutorFactory = await hardhat.ethers.getContractFactory('MockExecutorFacet');
+        const mockExecutorContract = await mockExecutorFactory.deploy();
+
         const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+        initialDiamondCut.facetCuts.push(facetCut(mockExecutorContract.getAddress(), mockExecutorContract.interface, Action.Add, true));
 
         const proofSystem = deployer.proofSystemContract(deployWallet);
 
         await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
-        await deployer.registerHyperchain(create2Salt, gasPrice);
+        await deployer.registerHyperchain(create2Salt,  initialDiamondCut,gasPrice);
         chainId = deployer.chainId;
 
         // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
@@ -135,6 +144,11 @@ describe('Mailbox tests', function () {
         bridgeheadChainContract = BridgeheadChainFactory.connect(
             deployer.addresses.Bridgehead.ChainProxy,
             deployWallet
+        );
+
+        proxyAsMockExecutor = MockExecutorFacetFactory.connect(
+            deployer.addresses.ProofSystem.DiamondProxy,
+            mockExecutorContract.signer
         );
 
         const forwarderFactory = await hardhat.ethers.getContractFactory('Forwarder');
@@ -173,7 +187,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('bl');
+        expect(revertReason).equal('pq');
     });
 
     it('Should not accept bytecode of even length in words', async () => {
@@ -190,7 +204,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('pr');
+        expect(revertReason).equal('ps');
     });
 
     it('Should not accept bytecode that is too long', async () => {
@@ -278,6 +292,60 @@ describe('Mailbox tests', function () {
             );
 
             expect(revertReason).equal(`d2`);
+        });
+    });
+
+    describe(`finalizeEthWithdrawal`, function () {
+        const BLOCK_NUMBER = 1;
+        const MESSAGE_INDEX = 0;
+        const TX_NUMBER_IN_BLOCK = 0;
+        const L1_RECEIVER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+        const AMOUNT = 1;
+        const MESSAGE =
+            '0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
+        // MESSAGE_HASH = 0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52
+        // HASHED_LOG = 0x110c937a27f7372384781fe744c2e971daa9556b1810f2edea90fb8b507f84b1
+        const L2_LOGS_TREE_ROOT = '0xfa6b5a02c911a05e9dfe9e03f6dedb9cd30795bbac2aaf5bdd2632d2671a7e3d';
+        const MERKLE_PROOF = [
+            '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba',
+            '0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0',
+            '0xe3697c7f33c31a9b0f0aeb8542287d0d21e8c4cf82163d0c44c7a98aa11aa111',
+            '0x199cc5812543ddceeddd0fc82807646a4899444240db2c0d2f20c3cceb5f51fa',
+            '0xe4733f281f18ba3ea8775dd62d2fcd84011c8c938f16ea5790fd29a03bf8db89',
+            '0x1798a1fd9c8fbb818c98cff190daa7cc10b6e5ac9716b4a2649f7c2ebcef2272',
+            '0x66d7c5983afe44cf15ea8cf565b34c6c31ff0cb4dd744524f7842b942d08770d',
+            '0xb04e5ee349086985f74b73971ce9dfe76bbed95c84906c5dffd96504e1e5396c',
+            '0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db'
+        ];
+
+        before(async () => {
+            await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
+        });
+
+        it(`Reverts when proof is invalid`, async () => {
+            let invalidProof = [...MERKLE_PROOF];
+            invalidProof[0] = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb';
+
+            const revertReason = await getCallRevertReason(
+                bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
+            );
+            expect(revertReason).equal(`pi`);
+        });
+
+        it(`Successful withdrawal`, async () => {
+            const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
+
+            await bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
+
+            const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
+            expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
+        });
+
+        it(`Reverts when withdrawal is already finalized`, async () => {
+            const revertReason = await getCallRevertReason(
+                bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+            );
+            expect(revertReason).equal(`jj`);
         });
     });
 

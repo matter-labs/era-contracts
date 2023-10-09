@@ -15,6 +15,7 @@ import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens.
 contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.

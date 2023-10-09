@@ -34,8 +34,9 @@ contract ProofChainBase is ReentrancyGuard, AllowListed {
     //     _;
     // }
 
-    modifier onlySecurityCouncil() {
-        require(msg.sender == chainStorage.upgrades.securityCouncil, "a9"); // not a security council
+    /// @notice Checks that the message sender is an active governor or admin
+    modifier onlyGovernorOrAdmin() {
+        require(msg.sender == chainStorage.governor || msg.sender == chainStorage.admin, "Only by governor or admin");
         _;
     }
 }

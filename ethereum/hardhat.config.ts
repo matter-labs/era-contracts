@@ -115,6 +115,5 @@ export default {
     }
 };
 
-task('solpp', 'Preprocess Solidity source files').setAction(async (_, hre) =>
-    hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS)
-);
+task('solpp', 'Preprocess Solidity source files')
+    .setAction(async (_, hre) => hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS));

@@ -22,6 +22,7 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev This contract is designed to streamline and enhance the user experience
 /// for bridging WETH tokens between L1 and L2 networks. The primary goal of this bridge is to
 /// simplify the process by minimizing the number of transactions required, thus improving
@@ -55,12 +56,14 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev The address of the WETH on L2
     address public l2WethAddress;
 
+    /// @dev A mapping L2 batch number => message number => flag
+    /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => bool)) public __DEPRECATED_isWithdrawalFinalized;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
     mapping(uint256 => address) public l2Bridge;
 
-    /// @dev A mapping L2 chainId => block number => message number => flag
+    /// @dev A mapping L2 chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
@@ -272,49 +275,49 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         address, // _depositSender,
         address, // _l1Token,
         bytes32, // _l2TxHash
-        uint256, // _l2BlockNumber,
+        uint256, // _l2BatchNumber,
         uint256, // _l2MessageIndex,
-        uint16, // _l2TxNumberInBlock,
+        uint16, // _l2TxNumberInBatch,
         bytes32[] calldata // _merkleProof
     ) external pure {
         revert("Method not supported. Failed deposit funds are sent to the L2 refund recipient address.");
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the ETH (WETH) withdrawal was processed
+    /// @param _l2BatchNumber The L2 batch number where the ETH (WETH) withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the ETH
     /// withdrawal message containing additional data about WETH withdrawal
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the ETH withdrawal log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the ETH withdrawal log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
         uint256 _chainId,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
         {
             require(
-                !isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex],
+                !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
                 "Withdrawal is already finalized"
             );
         }
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = bridgehead.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBlock);
+        bool alreadyFinalised = bridgehead.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBatch);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
-                txNumberInBlock: _l2TxNumberInBlock,
+                txNumberInBatch: _l2TxNumberInBatch,
                 sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
                 data: _message
             });
             {
                 bool success = bridgehead.proveL2MessageInclusion(
                     _chainId,
-                    _l2BlockNumber,
+                    _l2BatchNumber,
                     _l2MessageIndex,
                     l2ToL1Message,
                     _merkleProof
@@ -325,9 +328,9 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             // Finalize the withdrawal if it is not yet done.
             bridgehead.finalizeEthWithdrawal(
                 _chainId,
-                _l2BlockNumber,
+                _l2BatchNumber,
                 _l2MessageIndex,
-                _l2TxNumberInBlock,
+                _l2TxNumberInBatch,
                 _message,
                 _merkleProof
             );
@@ -340,7 +343,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         // Transfer WETH tokens from the smart contract address to the withdrawal receiver
         IERC20(l1WethAddress).safeTransfer(l1WethWithdrawReceiver, amount);
 
-        isWithdrawalFinalized[_chainId][_l2BlockNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
     }
