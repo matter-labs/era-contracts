@@ -2,20 +2,22 @@
 
 pragma solidity ^0.8.13;
 
-import "./IChainBase.sol";
+import "./IBase.sol";
 import "../../common/Messaging.sol";
 import "./IMailboxEvents.sol";
 
-interface IMailbox is IMailboxEvents, IChainBase {
+interface IMailbox is IMailboxEvents, IProofChainBase {
+    function isEthWithdrawalFinalized(uint256 _batchNumber, uint256 _index) external view returns (bool);
+
     function proveL2MessageInclusion(
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view returns (bool);
 
     function proveL2LogInclusion(
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
@@ -23,26 +25,26 @@ interface IMailbox is IMailboxEvents, IChainBase {
 
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view returns (bool);
 
     function finalizeEthWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
 
     function finalizeEthWithdrawalBridgehead(
         address _sender,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
@@ -58,6 +60,7 @@ interface IMailbox is IMailboxEvents, IChainBase {
     ) external payable returns (bytes32 canonicalTxHash);
 
     function requestL2TransactionBridgehead(
+        uint256 _msgValue,
         address sender,
         address _contractL2,
         uint256 _l2Value,

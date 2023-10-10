@@ -3,7 +3,6 @@ import { expect } from 'chai';
 import { facetCut, Action, getAllSelectors } from '../../src.ts/diamondCut';
 
 import { IDiamondCutFactory } from '../../typechain/IDiamondCutFactory';
-import { IDiamondCut } from '../../typechain/IDiamondCut';
 import { IExecutorFactory } from '../../typechain/IExecutorFactory';
 import { IExecutor } from '../../typechain/IExecutor';
 import { IGettersFactory } from '../../typechain/IGettersFactory';

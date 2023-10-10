@@ -4,22 +4,18 @@
 pragma solidity ^0.8.13;
 
 import "../../common/interfaces/IAllowList.sol";
-import "../../proof-system/proof-system-interfaces/IProofForBridgehead.sol";
+import "../../proof-system/proof-system-interfaces/IProofSystem.sol";
 
 struct BridgeheadStorage {
     address governor;
     IAllowList allowList;
     /// @notice the location of the
-    address chainImplementation;
-    address chainProxyAdmin;
-    uint256 priorityTxMaxGasLimit;
-    /// @notice The proof systems
-    uint256 totalProofSystems;
-    mapping(address => bool) proofSystem;
-    /// @notice number of chains
-    uint256 totalChains;
+    // address chainImplementation;
+    // address chainProxyAdmin;
     /// implementation contract
-    mapping(uint256 => address) chainContract;
+    // mapping(uint256 => address) chainContract;
     /// @notice The proofSystem Contract of each chainID
-    mapping(uint256 => address) chainProofSystem;
+    mapping(uint256 => address) proofSystem;
+    /// @notice
+    mapping(address => bool) proofSystemIsRegistered;
 }

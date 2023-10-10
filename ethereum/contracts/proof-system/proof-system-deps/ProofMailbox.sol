@@ -3,18 +3,19 @@
 pragma solidity ^0.8.13;
 
 // import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
-import "./BridgeheadBase.sol";
-import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
-import "../../proof-system/proof-system-interfaces/IProofSystem.sol";
+import "./ProofBase.sol";
+import "../proof-system-interfaces/IProofMailbox.sol";
+import "../chain-interfaces/IMailbox.sol";
+import "../../bridgehead/bridgehead-interfaces/IBridgeheadMailbox.sol";
 
-contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
+contract ProofMailbox is ProofBase, IProofMailbox {
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,
         uint256 _l2TxNumberInBlock
     ) external view override returns (bool) {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        return IProofSystem(proofSystem).isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBlock);
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
+        return IMailbox(proofChainContract).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
     }
 
     function proveL2MessageInclusion(
@@ -24,9 +25,8 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        return
-            IProofSystem(proofSystem).proveL2MessageInclusion(_chainId, _blockNumber, _index, _message, _proof);
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
+        return IMailbox(proofChainContract).proveL2MessageInclusion(_blockNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(
@@ -36,8 +36,8 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        return IProofSystem(proofSystem).proveL2LogInclusion(_chainId, _blockNumber, _index, _log, _proof);
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
+        return IMailbox(proofChainContract).proveL2LogInclusion(_blockNumber, _index, _log, _proof);
     }
 
     function proveL1ToL2TransactionStatus(
@@ -49,10 +49,9 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
         return
-            IProofSystem(proofSystem).proveL1ToL2TransactionStatus(
-                _chainId,
+            IMailbox(proofChainContract).proveL1ToL2TransactionStatus(
                 _l2TxHash,
                 _l2BlockNumber,
                 _l2MessageIndex,
@@ -62,26 +61,10 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
             );
     }
 
-    function l2TransactionBaseCost(
+    function requestL2TransactionBridgehead(
         uint256 _chainId,
-        uint256 _gasPrice,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
-        require(address(1) != address(0), "zero addres");
-
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        return
-            IProofSystem(proofSystem).l2TransactionBaseCost(
-                _chainId,
-                _gasPrice,
-                _l2GasLimit,
-                _l2GasPerPubdataByteLimit
-            );
-    }
-
-    function requestL2Transaction(
-        uint256 _chainId,
+        uint256 _msgValue,
+        address _msgSender,
         address _contractL2,
         uint256 _l2Value,
         bytes calldata _calldata,
@@ -89,12 +72,11 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) public payable override returns (bytes32 canonicalTxHash) {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        canonicalTxHash = IProofSystem(proofSystem).requestL2TransactionBridgehead(
-            _chainId,
-            msg.value,
-            msg.sender,
+    ) public payable override onlyBridgehead returns (bytes32 canonicalTxHash) {
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
+        canonicalTxHash = IMailbox(proofChainContract).requestL2TransactionBridgehead(
+            _msgValue,
+            _msgSender,
             _contractL2,
             _l2Value,
             _calldata,
@@ -105,18 +87,18 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         );
     }
 
-    function finalizeEthWithdrawal(
+    function finalizeEthWithdrawalBridgehead(
         uint256 _chainId,
+        address _msgSender,
         uint256 _l2BlockNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBlock,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override {
-        address proofSystem = bridgeheadStorage.proofSystem[_chainId];
+    ) external override onlyBridgehead {
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
         return
-            IProofSystem(proofSystem).finalizeEthWithdrawalBridgehead(
-                _chainId,
+            IMailbox(proofChainContract).finalizeEthWithdrawalBridgehead(
                 msg.sender,
                 _l2BlockNumber,
                 _l2MessageIndex,
@@ -126,7 +108,9 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
             );
     }
 
-    function deposit(uint256 _chainId) external payable onlyProofSystem(_chainId) {}
+    function deposit(uint256 _chainId) external payable onlyChain(_chainId) {
+        IBridgeheadMailbox(proofStorage.bridgehead).deposit{value: msg.value}(_chainId);
+    }
 
     /// @notice Transfer ether from the contract to the receiver
     /// @dev Reverts only if the transfer call failed
@@ -134,12 +118,17 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
         uint256 _chainId,
         address _to,
         uint256 _amount
-    ) external onlyProofSystem(_chainId) {
-        bool callSuccess;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
-        }
-        require(callSuccess, "pz");
+    ) external onlyChain(_chainId) {
+        IBridgeheadMailbox(proofStorage.bridgehead).withdrawFunds(_chainId, _to, _amount);
+    }
+
+    function l2TransactionBaseCost(
+        uint256 _chainId,
+        uint256 _gasPrice,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit
+    ) external view returns (uint256) {
+        address proofChainContract = proofStorage.proofChainContract[_chainId];
+        return IMailbox(proofChainContract).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 }

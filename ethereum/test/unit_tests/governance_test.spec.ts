@@ -52,7 +52,7 @@ describe('Admin facet tests', function () {
         const revertReason = await getCallRevertReason(
             adminFacetTest.connect(randomSigner).setPorterAvailability(false)
         );
-        expect(revertReason).equal('1g');
+        expect(revertReason).equal('1g1');
     });
 
     it('governor successfully set priority transaction max gas limit', async () => {

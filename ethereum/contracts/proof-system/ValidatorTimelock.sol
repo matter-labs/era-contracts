@@ -116,15 +116,16 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp.get(_newBatchesData[i].batchNumber);
 
-            // Note: if the `commitBatchTimestamp` is zero, that means either:
-            // * The block was committed, but not though this contract.
-            // * The block wasn't committed at all, so execution will fail in the zkSync contract.
-            // We allow executing such blocks.
+                // Note: if the `commitBatchTimestamp` is zero, that means either:
+                // * The block was committed, but not though this contract.
+                // * The block wasn't committed at all, so execution will fail in the zkSync contract.
+                // We allow executing such blocks.
 
-            require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
+                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
+            }
+
+            _propagateToZkSync();
         }
-
-        _propagateToZkSync();
     }
 
     /// @dev Call the zkSync contract with the same calldata as this contract was called.

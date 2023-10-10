@@ -4,7 +4,7 @@ import '@openzeppelin/hardhat-upgrades';
 
 import { BigNumberish, ethers, providers, Signer, Wallet } from 'ethers';
 import { Interface } from 'ethers/lib/utils';
-import { diamondCut, FacetCut } from './diamondCut';
+import { diamondCut, DiamondCut, FacetCut, InitializeData } from './diamondCut';
 import { IBridgeheadFactory } from '../typechain/IBridgeheadFactory';
 import { IProofSystemFactory } from '../typechain/IProofSystemFactory';
 import { IProofChainFactory } from '../typechain/IProofChainFactory';
@@ -13,8 +13,8 @@ import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
 import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
-import { AllowListFactory, } from '../typechain';
-import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
+import { AllowListFactory } from '../typechain';
+import { TransparentUpgradeableProxyFactory } from '../typechain/TransparentUpgradeableProxyFactory';
 import { hexlify } from 'ethers/lib/utils';
 import {
     readSystemContractsBytecode,
@@ -46,6 +46,7 @@ export interface DeployedAddresses {
         ProofSystemProxyAdmin: string;
         Verifier: string;
         AdminFacet: string;
+        MailboxFacet: string;
         ExecutorFacet: string;
         GettersFacet: string;
         DiamondInit: string;
@@ -90,6 +91,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             ProofSystemProxyAdmin: getAddressFromEnv('CONTRACTS_PROOF_SYSTEM_PROXY_ADMIN_ADDR'),
             Verifier: getAddressFromEnv('CONTRACTS_VERIFIER_ADDR'),
             AdminFacet: getAddressFromEnv('CONTRACTS_ADMIN_FACET_ADDR'),
+            MailboxFacet: getAddressFromEnv('CONTRACTS_MAILBOX_FACET_ADDR'),
             ExecutorFacet: getAddressFromEnv('CONTRACTS_EXECUTOR_FACET_ADDR'),
             GettersFacet: getAddressFromEnv('CONTRACTS_GETTERS_FACET_ADDR'),
             DiamondInit: getAddressFromEnv('CONTRACTS_DIAMOND_INIT_ADDR'),
@@ -135,7 +137,8 @@ export class Deployer {
             await getCurrentFacetCutsForAdd(
                 this.addresses.ProofSystem.AdminFacet,
                 this.addresses.ProofSystem.GettersFacet,
-                this.addresses.ProofSystem.ExecutorFacet,
+                this.addresses.ProofSystem.MailboxFacet,
+                this.addresses.ProofSystem.ExecutorFacet
             )
         );
 
@@ -149,7 +152,7 @@ export class Deployer {
 
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
             // these are set in the contract
-            '0x0000000000000000000000000000000000001234',
+            '0x0000000000000000000000000000000000000000000000000000000000000000',
             '0x0000000000000000000000000000000000002234',
             '0x0000000000000000000000000000000000003234',
             '0x0000000000000000000000000000000000000000000000000000000000000000',
@@ -247,8 +250,7 @@ export class Deployer {
             0,
             hardhat.ethers.constants.AddressZero,
             addressOne,
-            this.addresses.AllowList,
-            0
+            this.addresses.AllowList
         ]);
 
         await instance.deployed();
@@ -283,10 +285,7 @@ export class Deployer {
         const Bridgehead = await hardhat.ethers.getContractFactory('Bridgehead');
         const instance = await hardhat.upgrades.deployProxy(Bridgehead, [
             this.ownerAddress,
-            this.addresses.Bridgehead.ChainImplementation,
-            this.addresses.Bridgehead.ChainProxyAdmin,
-            this.addresses.AllowList,
-            process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT
+            this.addresses.AllowList
         ]);
         await instance.deployed();
 
@@ -328,16 +327,19 @@ export class Deployer {
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 
         const instance = await hardhat.upgrades.deployProxy(ProofSystem, [
-            this.addresses.Bridgehead.BridgeheadProxy,
-            this.addresses.ProofSystem.Verifier,
-            this.ownerAddress,
-            genesisBlockHash,
-            genesisRollupLeafIndex,
-            genesisBlockCommitment,
-            this.addresses.AllowList,
-            L2_BOOTLOADER_BYTECODE_HASH,
-            L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-            priorityTxMaxGasLimit
+            {
+                bridgehead: this.addresses.Bridgehead.BridgeheadProxy,
+                verifier: this.addresses.ProofSystem.Verifier,
+                governor: this.ownerAddress,
+                admin: this.ownerAddress,
+                genesisBatchHash: genesisBlockHash,
+                genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+                genesisBatchCommitment: genesisBlockCommitment,
+                allowList: this.addresses.AllowList,
+                l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
+                l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+                priorityTxMaxGasLimit
+            } as InitializeData
         ]);
         await instance.deployed();
 
@@ -380,7 +382,18 @@ export class Deployer {
         this.addresses.ProofSystem.AdminFacet = contractAddress;
     }
 
-    public async deployProofExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+        ethTxOptions.gasLimit ??= 10_000_000;
+        const contractAddress = await this.deployViaCreate2('MailboxFacet', [], create2Salt, ethTxOptions);
+
+        if (this.verbose) {
+            console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
+        }
+
+        this.addresses.ProofSystem.MailboxFacet = contractAddress;
+    }
+
+    public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2('ExecutorFacet', [], create2Salt, ethTxOptions);
 
@@ -391,7 +404,7 @@ export class Deployer {
         this.addresses.ProofSystem.ExecutorFacet = contractAddress;
     }
 
-    public async deployProofGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    public async deployGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2('GettersFacet', [], create2Salt, ethTxOptions);
 
@@ -555,11 +568,12 @@ export class Deployer {
     public async deployProofDiamond(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-        await this.deployProofExecutorFacet(create2Salt, { gasPrice, nonce: nonce });
+        await this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce });
         await this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 1 });
-        await this.deployProofGettersFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
-        await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 3 });
-        await this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
+        await this.deployMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
+        await this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 });
+        await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 });
+        await this.deployProofDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 });
     }
 
     public async registerProofSystem() {
@@ -574,7 +588,7 @@ export class Deployer {
         // KL todo: ChainId is not a uint256 yet.
     }
 
-    public async registerHyperchain(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+    public async registerHyperchain(create2Salt: string, diamondCut?: DiamondCut, gasPrice?: BigNumberish, nonce?) {
         const gasLimit = 10_000_000;
 
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -586,7 +600,7 @@ export class Deployer {
         const inputChainId = 0;
         const governor = this.ownerAddress;
         const allowList = this.addresses.AllowList;
-        const initialDiamondCut = await this.initialProofSystemProxyDiamondCut();
+        const initialDiamondCut = diamondCut ? diamondCut : await this.initialProofSystemProxyDiamondCut();
 
         const tx = await bridgehead.newChain(
             inputChainId,
@@ -600,26 +614,18 @@ export class Deployer {
         const chainId = receipt.logs.find((log) => log.topics[0] == bridgehead.interface.getEventTopic('NewChain'))
             .topics[1];
 
-        const contractAddress =
-            '0x' +
-            receipt.logs
-                .find((log) => log.topics[0] == bridgehead.interface.getEventTopic('NewChain'))
-                .topics[2].slice(26);
-
         const proofContractAddress =
             '0x' +
             receipt.logs
                 .find((log) => log.topics[0] == proofSystem.interface.getEventTopic('NewProofChain'))
                 .topics[2].slice(26);
 
-        this.addresses.Bridgehead.ChainProxy = contractAddress;
         this.addresses.ProofSystem.DiamondProxy = proofContractAddress;
 
         if (this.verbose) {
             console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()}`);
             // KL todo: ChainId is not a uint256 yet.
             console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
-            console.log(`CONTRACTS_BRIDGEHEAD_CHAIN_PROXY_ADDR=${contractAddress}`);
             console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${proofContractAddress}`);
         }
         this.chainId = parseInt(chainId, 16);
@@ -667,7 +673,7 @@ export class Deployer {
     }
 
     public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-        return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+        return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
     }
 
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

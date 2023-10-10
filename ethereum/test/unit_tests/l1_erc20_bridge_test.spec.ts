@@ -39,7 +39,7 @@ describe(`L1ERC20Bridge tests`, function () {
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
             owner.provider
         );
-        const governorAddress = await deployWallet.getAddress();
+        const ownerAddress = await deployWallet.getAddress();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -56,7 +56,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
         const deployer = new Deployer({
             deployWallet,
-            governorAddress,
+            ownerAddress,
             verbose: false,
             addresses: addressConfig,
             bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -98,7 +98,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
         await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
-        await deployer.registerHyperchain(create2Salt, gasPrice);
+        await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
 
         // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
@@ -201,16 +201,18 @@ describe(`L1ERC20Bridge tests`, function () {
 
     it(`Should revert on finalizing a withdrawal with wrong message length`, async () => {
         const revertReason = await getCallRevertReason(
-            l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, '0x', [])
+            l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, '0x', [ethers.constants.HashZero])
         );
-        expect(revertReason).equal(`rz`);
+        expect(revertReason).equal(`nq`);
     });
 
     it(`Should revert on finalizing a withdrawal with wrong function signature`, async () => {
         const revertReason = await getCallRevertReason(
-            l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [])
+            l1ERC20Bridge
+                .connect(randomSigner)
+                .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
         );
-        expect(revertReason).equal(`rz`);
+        expect(revertReason).equal(`nq`);
     });
 
     it(`Should revert on finalizing a withdrawal with wrong batch number`, async () => {

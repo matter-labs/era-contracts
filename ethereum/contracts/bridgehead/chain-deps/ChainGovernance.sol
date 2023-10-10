@@ -48,18 +48,4 @@ contract ChainGovernance is IChainGovernance, ChainBase {
             emit NewAllowList(address(oldAllowList), address(_newAllowList));
         }
     }
-
-    /// @notice Change the max L2 gas limit for L1 -> L2 transactions
-    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
-        uint256 oldPriorityTxMaxGasLimit = chainStorage.priorityTxMaxGasLimit;
-        if (oldPriorityTxMaxGasLimit != _newPriorityTxMaxGasLimit) {
-            chainStorage.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
-            emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
-        }
-    }
-
-    function setProofChainContract(address _proofChainContract) external onlyProofSystem {
-        chainStorage.proofChainContract = _proofChainContract;
-    }
 }

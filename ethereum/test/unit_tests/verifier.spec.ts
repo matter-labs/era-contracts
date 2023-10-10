@@ -54,7 +54,7 @@ describe('Verifier test', function () {
             '0x248b030bbfab25516cca23e7937d4b3b46967292ef6dfd3df25fcfe289d53fac',
             '0x26bee4a0a5c8b76caa6b73172fa7760bd634c28d2c2384335b74f5d18e3933f4',
             '0x106719993b9dacbe46b17f4e896c0c9c116d226c50afe2256dca1e81cd510b5c',
-            '0x19b5748fd961f755dd3c713d09014bd12adbb739fa1d2160067a312780a146a2',
+            '0x19b5748fd961f755dd3c713d09014bd12adbb739fa1d2160067a312780a146a2'
         ],
         recursiveAggregationInput: []
     };
@@ -257,7 +257,7 @@ describe('Verifier with recursive part test', function () {
             '0x248b030bbfab25516cca23e7937d4b3b46967292ef6dfd3df25fcfe289d53fac',
             '0x26bee4a0a5c8b76caa6b73172fa7760bd634c28d2c2384335b74f5d18e3933f4',
             '0x106719993b9dacbe46b17f4e896c0c9c116d226c50afe2256dca1e81cd510b5c',
-            '0x19b5748fd961f755dd3c713d09014bd12adbb739fa1d2160067a312780a146a2',
+            '0x19b5748fd961f755dd3c713d09014bd12adbb739fa1d2160067a312780a146a2'
         ],
         recursiveAggregationInput: [
             '0x04fdf01a2faedb9e3a620bc1cd8ceb4b0adac04631bdfa9e7e9fc15e35693cc0',

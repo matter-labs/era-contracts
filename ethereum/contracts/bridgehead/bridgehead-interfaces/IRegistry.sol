@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "./IBridgeheadBase.sol";
-import "../../proof-system/proof-system-interfaces/IProofForBridgehead.sol";
+import "../../proof-system/proof-system-interfaces/IProofSystem.sol";
 import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 
@@ -19,10 +19,5 @@ interface IRegistry is IBridgeheadBase {
     function newProofSystem(address _proofSystem) external;
 
     // KL todo: chainId not uin256
-    event NewChain(
-        uint16 indexed chainId,
-        address indexed chainContract,
-        address proofSystem,
-        address indexed chainGovernance
-    );
+    event NewChain(uint16 indexed chainId, address proofSystem, address indexed chainGovernance);
 }

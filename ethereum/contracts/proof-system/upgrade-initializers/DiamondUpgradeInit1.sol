@@ -2,14 +2,14 @@
 
 pragma solidity ^0.8.13;
 
-import "../chain-deps/Mailbox.sol";
+import "../chain-deps/facets/Mailbox.sol";
 import "../../common/libraries/Diamond.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import "../../common/L2ContractAddresses.sol";
-import "../Config.sol";
+import "../../common/Config.sol";
 
 /// @author Matter Labs
-contract DiamondUpgradeInit1 is Mailbox {
+contract DiamondUpgradeInit1 is MailboxFacet{
     /// @dev Request priority operation on behalf of force deployer address to the deployer system contract
     /// @return The message indicating the successful force deployment of contract on L2
     function forceDeployL2Contract(
@@ -26,7 +26,7 @@ contract DiamondUpgradeInit1 is Mailbox {
         params.l2GasPricePerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         params.refundRecipient = address(0);
 
-        _requestL2Transaction(params, _forceDeployCalldata, _factoryDeps, true);
+        _requestL2Transaction(0, params, _forceDeployCalldata, _factoryDeps, true);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

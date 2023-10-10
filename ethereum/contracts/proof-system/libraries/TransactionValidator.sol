@@ -4,8 +4,9 @@ pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
-import "../Config.sol";
+// import "../proof-system-interfaces/IProofMailbox.sol";
+import "../../common/Config.sol";
+import "../../common/Messaging.sol";
 
 /// @title zkSync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
@@ -56,7 +57,7 @@ library TransactionValidator {
         require(_transaction.reserved[2] == 0, "ug");
         require(_transaction.reserved[3] == 0, "uo");
         require(_transaction.signature.length == 0, "uh");
-        require(_transaction.paymasterInput.length == 0, "ul");
+        require(_transaction.paymasterInput.length == 0, "ul1");
         require(_transaction.reservedDynamic.length == 0, "um");
     }
 

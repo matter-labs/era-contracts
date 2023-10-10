@@ -15,7 +15,7 @@ enum TxStatus {
 /// All other values are not used but are reserved for the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
 /// This field is required formally but does not have any special meaning
-/// @param txNumberInBlock The L2 transaction number in a block, in which the log was sent
+/// @param txNumberInBatch The L2 transaction number in a Batch, in which the log was sent
 /// @param sender The L2 address which sent the log
 /// @param key The 32 bytes of information that was sent in the log
 /// @param value The 32 bytes of information that was sent in the log
@@ -23,7 +23,7 @@ enum TxStatus {
 struct L2Log {
     uint8 l2ShardId;
     bool isService;
-    uint16 txNumberInBlock;
+    uint16 txNumberInBatch;
     address sender;
     bytes32 key;
     bytes32 value;
@@ -31,11 +31,11 @@ struct L2Log {
 
 /// @dev An arbitrary length message passed from L2
 /// @notice Under the hood it is `L2Log` sent from the special system L2 contract
-/// @param txNumberInBlock The L2 transaction number in a block, in which the message was sent
+/// @param txNumberInBatch The L2 transaction number in a Batch, in which the message was sent
 /// @param sender The address of the L2 account from which the message was passed
 /// @param data An arbitrary length message
 struct L2Message {
-    uint16 txNumberInBlock;
+    uint16 txNumberInBatch;
     address sender;
     bytes data;
 }
@@ -79,9 +79,9 @@ struct WritePriorityOpParams {
 /// @param gasPerPubdataByteLimit Maximum number of L2 gas that will cost one byte of pubdata
 /// (every piece of data that will be stored on L1 as calldata)
 /// @param maxFeePerGas The absolute maximum sender willing to pay per unit of L2 gas to get
-/// the transaction included in a block. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
+/// the transaction included in a Batch. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
 /// @param maxPriorityFeePerGas The additional fee that is paid directly to the validator
-/// to incentivize them to include the transaction in a block. Analog to the EIP-1559
+/// to incentivize them to include the transaction in a Batch. Analog to the EIP-1559
 /// `maxPriorityFeePerGas` on an L1 transactions
 /// @param paymaster The address of the EIP-4337 paymaster, that will pay fees for the
 /// transaction. `uint256` type for possible address format changes and maintaining backward compatibility

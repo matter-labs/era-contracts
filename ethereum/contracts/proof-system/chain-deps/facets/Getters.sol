@@ -4,19 +4,17 @@ pragma solidity ^0.8.13;
 
 import "./Base.sol";
 import "../../../common/libraries/Diamond.sol";
-// import "../../bridgehead/libraries/PriorityQueue.sol";
+import "../../../proof-system/libraries/PriorityQueue.sol";
 import "../../../common/libraries/UncheckedMath.sol";
 import "../../chain-interfaces/IGetters.sol";
 import "../../chain-interfaces/ILegacyGetters.sol";
-
 
 /// @title Getters Contract implements functions for getting contract state from outside the batchchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
-
-    // using PriorityQueue for PriorityQueue.Queue;
+    using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "GettersFacet";
 
@@ -46,40 +44,40 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
 
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256) {
-        return s.totalBatchesCommitted;
+        return chainStorage.totalBatchesCommitted;
     }
 
     /// @return The total number of batches that were committed & verified
     function getTotalBatchesVerified() external view returns (uint256) {
-        return s.totalBatchesVerified;
+        return chainStorage.totalBatchesVerified;
     }
 
     /// @return The total number of batches that were committed & verified & executed
     function getTotalBatchesExecuted() external view returns (uint256) {
-        return s.totalBatchesExecuted;
+        return chainStorage.totalBatchesExecuted;
     }
 
-    // /// @return The total number of priority operations that were added to the priority queue, including all processed ones
-    // function getTotalPriorityTxs() external view returns (uint256) {
-    //     return chainStorage.priorityQueue.getTotalPriorityTxs();
-    // }
+    /// @return The total number of priority operations that were added to the priority queue, including all processed ones
+    function getTotalPriorityTxs() external view returns (uint256) {
+        return chainStorage.priorityQueue.getTotalPriorityTxs();
+    }
 
-    // /// @notice Returns zero if and only if no operations were processed from the queue
-    // /// @notice Reverts if there are no unprocessed priority transactions
-    // /// @return Index of the oldest priority operation that wasn't processed yet
-    // function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-    //     return chainStorage.priorityQueue.getFirstUnprocessedPriorityTx();
-    // }
+    /// @notice Returns zero if and only if no operations were processed from the queue
+    /// @notice Reverts if there are no unprocessed priority transactions
+    /// @return Index of the oldest priority operation that wasn't processed yet
+    function getFirstUnprocessedPriorityTx() external view returns (uint256) {
+        return chainStorage.priorityQueue.getFirstUnprocessedPriorityTx();
+    }
 
-    // /// @return The number of priority operations currently in the queue
-    // function getPriorityQueueSize() external view returns (uint256) {
-    //     return chainStorage.priorityQueue.getSize();
-    // }
+    /// @return The number of priority operations currently in the queue
+    function getPriorityQueueSize() external view returns (uint256) {
+        return chainStorage.priorityQueue.getSize();
+    }
 
-    // /// @return The first unprocessed priority operation from the queue
-    // function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
-    //     return chainStorage.priorityQueue.front();
-    // }
+    /// @return The first unprocessed priority operation from the queue
+    function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
+        return chainStorage.priorityQueue.front();
+    }
 
     /// @return Whether the address has a validator access
     function isValidator(address _address) external view returns (bool) {
@@ -89,7 +87,7 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     /// @notice For unfinalized (non executed) blocks may change
     /// @dev returns zero for non-committed blocks
     /// @return The hash of committed L2 block.
-    function storedBlockHash(uint256 _blockNumber) external view returns (bytes32) {
+    function storedBatchHash(uint256 _blockNumber) external view returns (bytes32) {
         return chainStorage.storedBatchHashes[_blockNumber];
     }
 
@@ -148,8 +146,8 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     /// - No upgrade transaction has ever been processed.
     /// - The upgrade transaction has been processed and the batch with such transaction has been
     /// executed (i.e. finalized).
-    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
-        return chainStorage.l2SystemContractsUpgradeBlockNumber;
+    function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
+        return chainStorage.l2SystemContractsUpgradeBatchNumber;
     }
 
     // /// @return The number of received upgrade approvals from the security council
@@ -237,19 +235,19 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     /// @return The total number of batches that were committed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
     function getTotalBlocksCommitted() external view returns (uint256) {
-        return s.totalBatchesCommitted;
+        return chainStorage.totalBatchesCommitted;
     }
 
     /// @return The total number of batches that were committed & verified
     /// @dev It is a *deprecated* method, please use `getTotalBatchesVerified` instead.
     function getTotalBlocksVerified() external view returns (uint256) {
-        return s.totalBatchesVerified;
+        return chainStorage.totalBatchesVerified;
     }
 
     /// @return The total number of batches that were committed & verified & executed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesExecuted` instead.
     function getTotalBlocksExecuted() external view returns (uint256) {
-        return s.totalBatchesExecuted;
+        return chainStorage.totalBatchesExecuted;
     }
 
     /// @notice For unfinalized (non executed) batches may change
@@ -257,7 +255,7 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     /// @dev returns zero for non-committed batches
     /// @return The hash of committed L2 batch.
     function storedBlockHash(uint256 _batchNumber) external view returns (bytes32) {
-        return s.storedBatchHashes[_batchNumber];
+        return chainStorage.storedBatchHashes[_batchNumber];
     }
 
     /// @return The L2 batch number in which the upgrade transaction was processed.
@@ -267,6 +265,6 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     /// - The upgrade transaction has been processed and the batch with such transaction has been
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
-        return s.l2SystemContractsUpgradeBatchNumber;
+        return chainStorage.l2SystemContractsUpgradeBatchNumber;
     }
 }

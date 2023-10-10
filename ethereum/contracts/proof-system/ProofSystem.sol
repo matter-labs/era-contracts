@@ -4,53 +4,26 @@
 pragma solidity ^0.8.13;
 
 import "./proof-system-deps/ProofRegistry.sol";
+import "./proof-system-deps/ProofMailbox.sol";
 import "./proof-system-deps/ProofGetters.sol";
-import "./Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 
 import {IAllowList} from "../common/interfaces/IAllowList.sol";
 import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {Diamond} from "../common/libraries/Diamond.sol";
-import {Base} from "./chain-deps/facets/Base.sol";
+import {ProofChainBase} from "./chain-deps/facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
-import {VerifierParams} from "./Storage.sol";
+import {VerifierParams} from "./chain-deps/ProofChainStorage.sol";
+import {InitializeData} from "./proof-system-interfaces/IProofSystem.sol";
+
 /* solhint-disable max-line-length */
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
-contract DiamondInit is Base {
-
-    /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
-    /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
-    /// @param _verifier address of Verifier contract
-    /// @param _governor address who can manage critical updates in the contract
-    /// @param _admin address who can manage non-critical updates in the contract
-    /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
-    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
-    /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
-    /// @param _allowList The address of the allow list smart contract
-    /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
-    struct InitializeData {
-        address _bridgehead;
-        address verifier;
-        address governor;
-        address admin;
-        bytes32 genesisBatchHash;
-        uint64 genesisIndexRepeatedStorageChanges;
-        bytes32 genesisBatchCommitment;
-        IAllowList allowList;
-        bytes32 l2BootloaderBytecodeHash;
-        bytes32 l2DefaultAccountBytecodeHash;
-        uint256 priorityTxMaxGasLimit;
-    }
-
-    constructor() reentrancyGuardInitializer {}
-
+contract ProofSystem is ProofBase, ProofGetters, ProofRegistry, ProofMailbox {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     /// @notice zkSync contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
@@ -61,6 +34,7 @@ contract DiamondInit is Base {
         require(_initalizeData.admin != address(0), "hc");
         require(_initalizeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
+        proofStorage.bridgehead = _initalizeData.bridgehead;
         proofStorage.verifier = _initalizeData.verifier;
         proofStorage.governor = _initalizeData.governor;
         proofStorage.admin = _initalizeData.admin;
@@ -80,7 +54,7 @@ contract DiamondInit is Base {
         proofStorage.allowList = _initalizeData.allowList;
 
         proofStorage.allowList = _initalizeData.allowList;
-        proofStorage.verifierParams = _initalizeData.verifierParams;
+        // proofStorage.verifierParams = _initalizeData.verifierParams;
         proofStorage.l2BootloaderBytecodeHash = _initalizeData.l2BootloaderBytecodeHash;
         proofStorage.l2DefaultAccountBytecodeHash = _initalizeData.l2DefaultAccountBytecodeHash;
         proofStorage.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;

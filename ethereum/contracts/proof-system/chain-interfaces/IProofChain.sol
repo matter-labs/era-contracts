@@ -3,15 +3,15 @@
 pragma solidity ^0.8.13;
 
 // import "./IBridgeheadMailbox.sol";
-import "./IGovernance.sol";
+import "./IAdmin.sol";
 import "./IExecutor.sol";
-import "./IDiamondCut.sol";
 import "./IGetters.sol";
+import "./IMailbox.sol";
 
 // kl to do remove this, needed for the server for now
 import "../../common/libraries/Diamond.sol";
 
-interface IProofChain is IGovernance, IExecutor, IGetters {
+interface IProofChain is IAdmin, IExecutor, IGetters, IMailbox {
     function initialize(
         uint256 _chainId,
         address _bridgeheadChainContract,
@@ -21,7 +21,7 @@ interface IProofChain is IGovernance, IExecutor, IGetters {
         VerifierParams calldata _verifierParams,
         bytes32 _l2BootloaderBytecodeHash,
         bytes32 _l2DefaultAccountBytecodeHash,
-        bytes32 _blockHashZero,
+        bytes32 _storedBatchZero,
         uint256 _priorityTxMaxGasLimit
     ) external;
 

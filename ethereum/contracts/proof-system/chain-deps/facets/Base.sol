@@ -7,8 +7,11 @@ import "../../../common/ReentrancyGuard.sol";
 import "../../../common/AllowListed.sol";
 import "../../../bridgehead/chain-interfaces/IBridgeheadChain.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract ProofChainBase is ReentrancyGuard, AllowListed {
     ProofChainStorage internal chainStorage;
 
@@ -25,7 +28,12 @@ contract ProofChainBase is ReentrancyGuard, AllowListed {
     }
 
     modifier onlyBridgeheadChain() {
-        require(msg.sender == address(chainStorage.bridgeheadChainContract), "1i"); // message not sent by bridgehead
+        require(msg.sender == address(chainStorage.bridgeheadChainContract), "1ii"); // message not sent by bridgehead
+        _;
+    }
+
+    modifier onlyProofSystem() {
+        require(msg.sender == address(chainStorage.proofSystem), "1ij"); // message not sent by bridgehead
         _;
     }
 

@@ -1,7 +1,18 @@
 import { expect } from 'chai';
 import * as hardhat from 'hardhat';
-import { BridgeheadFactory, BridgeheadChainFactory, AllowList, Forwarder, ForwarderFactory, MockExecutorFacet,
-    MockExecutorFacetFactory, } from '../../typechain';
+import {
+    BridgeheadFactory,
+    BridgeheadChainFactory,
+    MailboxFacet,
+    MailboxFacetFactory,
+    AllowList,
+    Forwarder,
+    ForwarderFactory,
+    MockExecutorFacet,
+    MockExecutorFacetFactory
+} from '../../typechain';
+
+// import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 
 import * as fs from 'fs';
 
@@ -11,7 +22,9 @@ import {
     AccessMode,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     requestExecute,
-    requestExecuteDirect
+    requestExecuteDirect,
+    L2_TO_L1_MESSENGER,
+    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
 } from './utils';
 import { Wallet } from 'ethers';
 
@@ -19,7 +32,6 @@ import * as ethers from 'ethers';
 
 import { Deployer } from '../../src.ts/deploy';
 import { facetCut, Action } from '../../src.ts/diamondCut';
-
 
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
@@ -33,7 +45,7 @@ const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.js
 describe('Mailbox tests', function () {
     let allowList: AllowList;
     let bridgeheadContract: ethers.Contract;
-    let bridgeheadChainContract: ethers.Contract;
+    let mailbox: ethers.Contract;
     let proxyAsMockExecutor: MockExecutorFacet;
     let owner: ethers.Signer;
     let randomSigner: ethers.Signer;
@@ -106,13 +118,14 @@ describe('Mailbox tests', function () {
         const mockExecutorContract = await mockExecutorFactory.deploy();
 
         const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
-        initialDiamondCut.facetCuts.push(facetCut(mockExecutorContract.getAddress(), mockExecutorContract.interface, Action.Add, true));
+        initialDiamondCut.facetCuts.push(
+            facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true)
+        );
 
         const proofSystem = deployer.proofSystemContract(deployWallet);
-
         await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
-        await deployer.registerHyperchain(create2Salt,  initialDiamondCut,gasPrice);
+        await deployer.registerHyperchain(create2Salt, initialDiamondCut, gasPrice);
         chainId = deployer.chainId;
 
         // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
@@ -141,8 +154,8 @@ describe('Mailbox tests', function () {
         await allowTx.wait();
 
         bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
-        bridgeheadChainContract = BridgeheadChainFactory.connect(
-            deployer.addresses.Bridgehead.ChainProxy,
+        mailbox = MailboxFacetFactory.connect(
+            deployer.addresses.ProofSystem.DiamondProxy,
             deployWallet
         );
 
@@ -210,7 +223,7 @@ describe('Mailbox tests', function () {
     it('Should not accept bytecode that is too long', async () => {
         const revertReason = await getCallRevertReason(
             requestExecuteDirect(
-                bridgeheadChainContract,
+                mailbox,
                 ethers.constants.AddressZero,
                 ethers.BigNumber.from(0),
                 '0x',
@@ -296,16 +309,38 @@ describe('Mailbox tests', function () {
     });
 
     describe(`finalizeEthWithdrawal`, function () {
-        const BLOCK_NUMBER = 1;
+        const BLOCK_NUMBER = 0;
         const MESSAGE_INDEX = 0;
         const TX_NUMBER_IN_BLOCK = 0;
         const L1_RECEIVER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
         const AMOUNT = 1;
+        // console.log(
+        //     ethers.utils.id('finalizeEthWithdrawal(uint256,uint256,uint256,uint16,bytes,bytes32[])').substring(0, 10) +
+        //         L1_RECEIVER.slice(2) +
+        //         '0000000000000000000000000000000000000000000000000000000000000001'
+        // );
+
         const MESSAGE =
+            '0x0fdef251d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
+        const originalMessage =
             '0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
-        // MESSAGE_HASH = 0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52
+        // console.log(ethers.utils.keccak256(originalMessage))
+        const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
+        const originalMessageHash = ethers.utils.keccak256(originalMessage);
+        // const originalMessageHash = "0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52"
+        const key = ethers.utils.hexZeroPad(L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
+        const HASHED_LOG = ethers.utils.solidityKeccak256(
+            ['uint8', 'bool', 'uint16', 'address', 'bytes32', 'bytes32'],
+            [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
+        );
+        const OG_HASHED_LOG = ethers.utils.solidityKeccak256(
+            ['uint8', 'bool', 'uint16', 'address', 'bytes32', 'bytes32'],
+            [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, originalMessageHash]
+        );
+        // console.log(OG_HASHED_LOG)
         // HASHED_LOG = 0x110c937a27f7372384781fe744c2e971daa9556b1810f2edea90fb8b507f84b1
-        const L2_LOGS_TREE_ROOT = '0xfa6b5a02c911a05e9dfe9e03f6dedb9cd30795bbac2aaf5bdd2632d2671a7e3d';
+        // const L2_LOGS_TREE_ROOT = '0xfa6b5a02c911a05e9dfe9e03f6dedb9cd30795bbac2aaf5bdd2632d2671a7e3d';
+
         const MERKLE_PROOF = [
             '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba',
             '0xc3d03eebfd83049991ea3d3e358b6712e7aa2e2e63dc2d4b438987cec28ac8d0',
@@ -318,6 +353,14 @@ describe('Mailbox tests', function () {
             '0xac506ecb5465659b3a927143f6d724f91d8d9c4bdb2463aee111d9aa869874db'
         ];
 
+        let L2_LOGS_TREE_ROOT = HASHED_LOG;
+        // let OG_L2_LOGS = OG_HASHED_LOG;
+        for (let i = 0; i < MERKLE_PROOF.length; i++) {
+            L2_LOGS_TREE_ROOT = ethers.utils.keccak256(L2_LOGS_TREE_ROOT + MERKLE_PROOF[i].slice(2));
+            // OG_L2_LOGS = ethers.utils.keccak256(OG_L2_LOGS + MERKLE_PROOF[i].slice(2));
+        }
+        // console.log(OG_L2_LOGS);
+
         before(async () => {
             await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
         });
@@ -327,7 +370,13 @@ describe('Mailbox tests', function () {
             invalidProof[0] = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb';
 
             const revertReason = await getCallRevertReason(
-                bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
+                mailbox.finalizeEthWithdrawal(
+                    BLOCK_NUMBER,
+                    MESSAGE_INDEX,
+                    TX_NUMBER_IN_BLOCK,
+                    MESSAGE,
+                    invalidProof
+                )
             );
             expect(revertReason).equal(`pi`);
         });
@@ -335,15 +384,27 @@ describe('Mailbox tests', function () {
         it(`Successful withdrawal`, async () => {
             const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
 
-            await bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-
+            await mailbox.finalizeEthWithdrawal(
+                BLOCK_NUMBER,
+                MESSAGE_INDEX,
+                TX_NUMBER_IN_BLOCK,
+                MESSAGE,
+                MERKLE_PROOF
+            );
+            /// todo this test fails as proxyExecutor has an uncommented line.
             const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
             expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
         });
 
         it(`Reverts when withdrawal is already finalized`, async () => {
             const revertReason = await getCallRevertReason(
-                bridgeheadChainContract.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+                mailbox.finalizeEthWithdrawal(
+                    BLOCK_NUMBER,
+                    MESSAGE_INDEX,
+                    TX_NUMBER_IN_BLOCK,
+                    MESSAGE,
+                    MERKLE_PROOF
+                )
             );
             expect(revertReason).equal(`jj`);
         });
@@ -356,7 +417,7 @@ describe('Mailbox tests', function () {
         });
 
         it(`Should not allow an un-whitelisted address to call`, async () => {
-            await allowList.setAccessMode(bridgeheadChainContract.address, AccessMode.Closed);
+            await allowList.setAccessMode(mailbox.address, AccessMode.Closed);
 
             const revertReason = await getCallRevertReason(
                 requestExecute(
@@ -374,11 +435,11 @@ describe('Mailbox tests', function () {
         });
 
         it(`Should allow the whitelisted address to call`, async () => {
-            await allowList.setAccessMode(bridgeheadChainContract.address, AccessMode.SpecialAccessOnly);
+            await allowList.setAccessMode(mailbox.address, AccessMode.SpecialAccessOnly);
             await allowList.setPermissionToCall(
                 await owner.getAddress(),
-                bridgeheadChainContract.address,
-                `0xca0fbd7c`,
+                mailbox.address,
+                '0x9274a021',
                 true
             );
 
@@ -476,7 +537,7 @@ describe('Mailbox tests', function () {
                 const result = await sendTransaction(refundRecipient);
 
                 const [event] = (await result.transaction.wait()).logs;
-                const parsedEvent = bridgeheadContract.interface.parseLog(event);
+                const parsedEvent = mailbox.interface.parseLog(event);
                 expect(parsedEvent.name).to.equal('NewPriorityRequest');
 
                 const canonicalTransaction = parsedEvent.args.transaction;

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.13;
 
 import "./BridgeheadBase.sol";
-// import "../Config.sol";
+// import "../../common/Config.sol";
 import "../bridgehead-interfaces/IRegistry.sol";
 import "../../common/libraries/UncheckedMath.sol";
 // import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
@@ -22,9 +22,8 @@ contract Registry is IRegistry, BridgeheadBase {
     /// @notice Proof system can be any contract with the appropriate interface, functionality
     function newProofSystem(address _proofSystem) external onlyGovernor {
         // KL todo add checks here
-        require(!bridgeheadStorage.proofSystem[_proofSystem], "r35");
-        bridgeheadStorage.proofSystem[_proofSystem] = true;
-        bridgeheadStorage.totalProofSystems += 1;
+        require(!bridgeheadStorage.proofSystemIsRegistered[_proofSystem], "r35");
+        bridgeheadStorage.proofSystemIsRegistered[_proofSystem] = true;
     }
 
     /// @notice
@@ -47,7 +46,6 @@ contract Registry is IRegistry, BridgeheadBase {
                             block.chainid,
                             address(this),
                             _proofSystem,
-                            block.timestamp,
                             msg.sender
                         )
                     )
@@ -58,29 +56,29 @@ contract Registry is IRegistry, BridgeheadBase {
         }
         // KL todo add checks here
 
-        require(bridgeheadStorage.proofSystem[_proofSystem], "r19");
-        require(bridgeheadStorage.chainContract[chainId] == address(0), "r20");
+        require(bridgeheadStorage.proofSystemIsRegistered[_proofSystem], "r19");
+        // require(bridgeheadStorage.chainContract[chainId] == address(0), "r20");
 
-        bridgeheadStorage.totalChains += 1;
-        bridgeheadStorage.chainProofSystem[chainId] = _proofSystem;
+        // bridgeheadStorage.totalChains += 1;
+        bridgeheadStorage.proofSystem[chainId] = _proofSystem;
 
-        bytes memory data = abi.encodeWithSelector(
-            IBridgeheadChain.initialize.selector,
-            chainId,
-            _proofSystem,
-            _chainGovernor,
-            _allowList,
-            bridgeheadStorage.priorityTxMaxGasLimit
-        );
-        TransparentUpgradeableProxy chainContract = new TransparentUpgradeableProxy(
-            bridgeheadStorage.chainImplementation,
-            bridgeheadStorage.chainProxyAdmin,
-            data
-        );
-        bridgeheadStorage.chainContract[chainId] = address(chainContract);
+        // bytes memory data = abi.encodeWithSelector(
+        //     IBridgeheadChain.initialize.selector,
+        //     chainId,
+        //     _proofSystem,
+        //     _chainGovernor,
+        //     _allowList,
+        //     bridgeheadStorage.priorityTxMaxGasLimit
+        // );
+        // TransparentUpgradeableProxy chainContract = new TransparentUpgradeableProxy(
+        //     bridgeheadStorage.chainImplementation,
+        //     bridgeheadStorage.chainProxyAdmin,
+        //     data
+        // );
+        // bridgeheadStorage.chainContract[chainId] = address(chainContract);
 
-        IProofForBridgehead(_proofSystem).newChain(chainId, address(chainContract), _chainGovernor, _diamondCut);
+        IProofSystem(_proofSystem).newChain(chainId, _chainGovernor, _diamondCut);
 
-        emit NewChain(uint16(chainId), address(chainContract), _proofSystem, msg.sender);
+        emit NewChain(uint16(chainId), _proofSystem, msg.sender);
     }
 }

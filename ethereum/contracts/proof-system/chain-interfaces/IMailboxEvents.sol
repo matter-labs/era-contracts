@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "./IChainBase.sol";
+import "./IBase.sol";
 import "../../common/Messaging.sol";
 
 interface IMailboxEvents {
@@ -11,7 +11,8 @@ interface IMailboxEvents {
     /// @param txHash keccak256 hash of encoded transaction representation
     /// @param expirationTimestamp Timestamp up to which priority request should be processed
     /// @param transaction The whole transaction structure that is requested to be executed on L2
-    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data. Will be marked as known bytecodes in L2
+    /// @param factoryDeps An array of bytecodes that were shown in the L1 public data.
+    /// Will be marked as known bytecodes in L2
     event NewPriorityRequest(
         uint256 txId,
         bytes32 txHash,

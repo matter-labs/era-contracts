@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";

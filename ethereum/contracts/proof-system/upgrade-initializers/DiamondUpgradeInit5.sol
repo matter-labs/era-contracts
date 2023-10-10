@@ -2,30 +2,21 @@
 
 pragma solidity ^0.8.13;
 
-import "../Config.sol";
-import "../chain-deps/Mailbox.sol";
+import "../../common/Config.sol";
+import "../chain-deps/facets/Mailbox.sol";
 import "../../common/libraries/Diamond.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import "../../common/L2ContractAddresses.sol";
 
-interface IOldContractDeployer {
-    struct ForceDeployment {
-        bytes32 bytecodeHash;
-        address newAddress;
-        uint256 value;
-        bytes input;
-    }
-
-    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
-}
-
 /// @author Matter Labs
-contract DiamondUpgradeInit4 is Mailbox {
-    function forceDeploy2(
+contract DiamondUpgradeInit5 is MailboxFacet{
+    function forceDeploy(
         bytes calldata _upgradeDeployerCalldata,
         bytes calldata _upgradeSystemContractsCalldata,
         bytes[] calldata _factoryDeps
     ) external payable returns (bytes32) {
+        // 1. Update bytecode for the deployer smart contract
+
         WritePriorityOpParams memory params;
 
         params.sender = L2_FORCE_DEPLOYER_ADDR;
@@ -35,11 +26,10 @@ contract DiamondUpgradeInit4 is Mailbox {
         params.l2GasPricePerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         params.refundRecipient = address(0);
 
-        // 1. Update bytecode for the deployer smart contract
-        _requestL2Transaction(params, _upgradeDeployerCalldata, _factoryDeps, true);
+        _requestL2Transaction(0, params, _upgradeDeployerCalldata, _factoryDeps, true);
 
-        // 2. Redeploy other contracts by one transaction
-        _requestL2Transaction(params, _upgradeSystemContractsCalldata, _factoryDeps, true);
+        // 2. Redeploy system contracts by one priority transaction
+        _requestL2Transaction(0, params, _upgradeSystemContractsCalldata, _factoryDeps, true);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

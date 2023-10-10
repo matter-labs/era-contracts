@@ -8,7 +8,7 @@ import {RegistryTest} from "./_Registry_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
-import {IProofForBridgehead} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofForBridgehead.sol";
+import {IProofSystem} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofSystem.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgeheadChain} from "../../../../../../cache/solpp-generated-contracts/bridgehead/chain-interfaces/IBridgeheadChain.sol";
 import {Vm} from "forge-std/Test.sol";
@@ -89,7 +89,7 @@ contract NewChainTest is RegistryTest {
             abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofForBridgehead.newChain.selector), "");
+        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
         bridgehead.newChain(chainId, proofSystemAddress, governorAddress, allowList, getDiamondCutData());
@@ -108,7 +108,7 @@ contract NewChainTest is RegistryTest {
             abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofForBridgehead.newChain.selector), "");
+        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
 
         // === Internal call checks ===
         vm.expectCall(
@@ -126,7 +126,7 @@ contract NewChainTest is RegistryTest {
         vm.expectCall(
             proofSystemAddress,
             abi.encodeWithSelector(
-                IProofForBridgehead.newChain.selector,
+                IProofSystem.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,
@@ -196,7 +196,7 @@ contract NewChainTest is RegistryTest {
             abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofForBridgehead.newChain.selector), "");
+        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
 
         // === Internal call checks ===
         vm.expectCall(
@@ -214,7 +214,7 @@ contract NewChainTest is RegistryTest {
         vm.expectCall(
             proofSystemAddress,
             abi.encodeWithSelector(
-                IProofForBridgehead.newChain.selector,
+                IProofSystem.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,

@@ -7,7 +7,7 @@ import "../chain-interfaces/IExecutor.sol";
 import "../../common/libraries/Diamond.sol";
 import "../../bridgehead/bridgehead-interfaces/IBridgeheadForProof.sol";
 import "./facets/Base.sol";
-import "../Config.sol";
+import "../../common/Config.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -28,9 +28,9 @@ contract DiamondInit is ProofChainBase {
     /// initializer
     function initialize(
         uint256 _chainId,
-        address _bridgeheadChainContract,
+        address _proofSystem,
         address _governor,
-        bytes32 _blockHashZero,
+        bytes32 _storedBatchZero,
         IAllowList _allowList,
         IVerifier _verifier,
         VerifierParams calldata _verifierParams,
@@ -41,12 +41,12 @@ contract DiamondInit is ProofChainBase {
         require(_governor != address(0), "vy");
 
         chainStorage.chainId = _chainId;
-        chainStorage.bridgeheadChainContract = _bridgeheadChainContract;
+        chainStorage.proofSystem = _proofSystem;
 
         chainStorage.verifier = _verifier;
         chainStorage.governor = _governor;
 
-        chainStorage.storedBlockHashes[0] = _blockHashZero;
+        chainStorage.storedBatchHashes[0] = _storedBatchZero;
         chainStorage.allowList = _allowList;
         chainStorage.verifierParams = _verifierParams;
         chainStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;

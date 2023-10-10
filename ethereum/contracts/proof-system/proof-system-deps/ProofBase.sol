@@ -31,14 +31,14 @@ contract ProofBase is ReentrancyGuard, AllowListed {
     // }
 
     modifier onlyBridgehead() {
-        require(msg.sender == proofStorage.bridgeheadContract, "1i"); // message not sent by bridgehead
+        require(msg.sender == proofStorage.bridgehead, "1i"); // message not sent by bridgehead
         _;
     }
 
-    // modifier onlyChain() {
-    //     require(IBridgeheadChain(proofStorage.bridgeheadChainContract).getGovernor() == msg.sender, "1j"); // wrong chainId
-    //     _;
-    // }
+    modifier onlyChain(uint256 _chainId) {
+        require(proofStorage.proofChainContract[_chainId] == msg.sender, "1j"); // wrong chainId
+        _;
+    }
 
     // modifier onlySecurityCouncil() {
     //     require(msg.sender == proofStorage.upgrades.securityCouncil, "a9"); // not a security council

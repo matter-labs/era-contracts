@@ -2,9 +2,7 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import {
-    web3Provider,
-} from './utils';
+import { web3Provider } from './utils';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -44,9 +42,15 @@ async function main() {
 
             const governance = deployer.governanceContract(deployWallet);
             const zkSync = deployer.zkSyncContract(deployWallet);
-            
-            const erc20Bridge = deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
-            const wethBridge = deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
+
+            const erc20Bridge = deployer.transparentUpgradableProxyContract(
+                deployer.addresses.Bridges.ERC20BridgeProxy,
+                deployWallet
+            );
+            const wethBridge = deployer.transparentUpgradableProxyContract(
+                deployer.addresses.Bridges.WethBridgeProxy,
+                deployWallet
+            );
 
             await (await erc20Bridge.changeAdmin(governance.address)).wait();
             await (await wethBridge.changeAdmin(governance.address)).wait();
@@ -57,12 +61,12 @@ async function main() {
                 target: zkSync.address,
                 value: 0,
                 data: zkSync.interface.encodeFunctionData('acceptGovernor')
-            }
+            };
 
-            const operation = { 
+            const operation = {
                 calls: [call],
-                predecessor: ethers.constants.HashZero, 
-                salt: ethers.constants.HashZero 
+                predecessor: ethers.constants.HashZero,
+                salt: ethers.constants.HashZero
             };
 
             await (await governance.scheduleTransparent(operation, 0)).wait();

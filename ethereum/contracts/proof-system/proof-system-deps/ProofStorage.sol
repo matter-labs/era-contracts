@@ -47,30 +47,32 @@ struct ProofStorage {
     uint256[7] __DEPRECATED_diamondCutStorage;
     /// @notice Address which will exercise governance over the network i.e. change validator set, conduct upgrades
     address governor;
+    /// @notice Address
+    address admin;
     /// @notice Address that the governor proposed as one that will replace it
     address pendingGovernor;
     /// @notice Address of the factory
-    address bridgeheadContract;
+    address bridgehead;
     /// @notice chainContract
     mapping(uint256 => address) proofChainContract;
-    /// @dev Verifier contract. Used to verify aggregated proof for blocks
+    /// @dev Verifier contract. Used to verify aggregated proof for Batchs
     address verifier;
-    /// @notice Total number of executed blocks i.e. blocks[totalBlocksExecuted] points at the latest executed block (block 0 is genesis)
-    mapping(uint256 => uint256) totalBlocksExecuted;
-    /// @notice Total number of proved blocks i.e. blocks[totalBlocksProved] points at the latest proved block
-    mapping(uint256 => uint256) totalBlocksVerified;
-    /// @notice Total number of committed blocks i.e. blocks[totalBlocksCommitted] points at the latest committed block
-    mapping(uint256 => uint256) totalBlocksCommitted;
-    /// @dev Stored hashed StoredBlock for block number
-    mapping(uint256 => mapping(uint256 => bytes32)) storedBlockHashes;
+    /// @notice Total number of executed Batchs i.e. Batchs[totalBatchsExecuted] points at the latest executed Batch (Batch 0 is genesis)
+    mapping(uint256 => uint256) totalBatchsExecuted;
+    /// @notice Total number of proved Batchs i.e. Batchs[totalBatchsProved] points at the latest proved Batch
+    mapping(uint256 => uint256) totalBatchsVerified;
+    /// @notice Total number of committed Batchs i.e. Batchs[totalBatchsCommitted] points at the latest committed Batch
+    mapping(uint256 => uint256) totalBatchsCommitted;
+    /// @dev Stored hashed StoredBatch for Batch number
+    mapping(uint256 => mapping(uint256 => bytes32)) storedBatchHashes;
     // /// @dev Stored root hashes of L2 -> L1 logs
     // mapping(uint256 => bytes32) l2LogsRootHashes;
     // /// @dev Container that stores transactions requested from L1
     // PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     address allowList;
-    /// @dev Block hash zero, calculated at initialization
-    bytes32 blockHashZero;
+    /// @dev Batch hash zero, calculated at initialization
+    bytes32 storedBatchZero;
     /// @dev Stored cutData for diamond cut
     bytes32 cutHash;
     /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
@@ -83,11 +85,11 @@ struct ProofStorage {
     bytes32 l2DefaultAccountBytecodeHash;
     /// @dev The maximum number of the L2 gas that a user can request for L1 -> L2 transactions
     /// @dev This is the maximum number of L2 gas that is available for the "body" of the transaction, i.e.
-    /// without overhead for proving the block.
+    /// without overhead for proving the Batch.
     uint256 priorityTxMaxGasLimit;
     /// @dev Storage of variables needed for upgrade facet
     // ProofUpgradeStorage upgrades;
-    // /// @dev A mapping L2 block number => message number => flag.
+    // /// @dev A mapping L2 Batch number => message number => flag.
     // /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     // /// a flag to indicate that the message was already processed.
     // /// @dev Used to indicate that eth withdrawal was already processed
@@ -103,6 +105,6 @@ struct ProofStorage {
     uint256 protocolVersion;
     /// @dev Hash of the system contract upgrade transaction. If 0, then no upgrade transaction needs to be done.
     mapping(uint256 => bytes32) l2SystemContractsUpgradeTxHash;
-    /// @dev Block number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
-    mapping(uint256 => uint256) l2SystemContractsUpgradeBlockNumber;
+    /// @dev Batch number where the upgrade transaction has happened. If 0, then no upgrade transaction has happened yet.
+    mapping(uint256 => uint256) l2SystemContractsUpgradeBatchNumber;
 }

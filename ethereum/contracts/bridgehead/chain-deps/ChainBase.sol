@@ -24,12 +24,6 @@ contract ChainBase is ReentrancyGuard, AllowListed {
     }
 
     /// @notice Checks if message to chain was sent by the proof system
-    modifier onlyProofChain() {
-        require(chainStorage.proofChainContract == msg.sender, "13h"); // wrong chainId
-        _;
-    }
-
-    /// @notice Checks if message to chain was sent by the proof system
     modifier onlyBridgehead() {
         require(chainStorage.bridgehead == msg.sender, "14h"); // wrong chainId
         _;

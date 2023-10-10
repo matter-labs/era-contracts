@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../bridgehead/libraries/PriorityQueue.sol";
+import "../../proof-system/libraries/PriorityQueue.sol";
 
 contract PriorityQueueTest {
     using PriorityQueue for PriorityQueue.Queue;

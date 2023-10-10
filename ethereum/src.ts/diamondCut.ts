@@ -1,7 +1,7 @@
 import { Interface } from 'ethers/lib/utils';
 import * as hardhat from 'hardhat';
 import '@nomiclabs/hardhat-ethers';
-import { ethers, Wallet } from 'ethers';
+import { ethers, Wallet, BigNumberish, BytesLike } from 'ethers';
 import { IProofChainFactory } from '../typechain/IProofChainFactory';
 import { IProofChainBaseFactory } from '../typechain/IProofChainBaseFactory';
 
@@ -22,6 +22,20 @@ export interface DiamondCut {
     facetCuts: FacetCut[];
     initAddress: string;
     initCalldata: string;
+}
+
+export interface InitializeData {
+    bridgehead: BigNumberish;
+    verifier: BigNumberish;
+    governor: BigNumberish;
+    admin: BigNumberish;
+    genesisBatchHash: string;
+    genesisIndexRepeatedStorageChanges: BigNumberish;
+    genesisBatchCommitment: string;
+    allowList: BigNumberish;
+    l2BootloaderBytecodeHash: string;
+    l2DefaultAccountBytecodeHash: string;
+    priorityTxMaxGasLimit: BigNumberish;
 }
 
 export function facetCut(address: string, contract: Interface, action: Action, isFreezable: boolean): FacetCut {
@@ -49,11 +63,7 @@ export function getAllSelectors(contractInterface: Interface) {
         .map((signature) => contractInterface.getSighash(signature));
 }
 
-export async function getCurrentFacetCutsForAdd(
-    adminAddress: string,
-    gettersAddress: string,
-    executorAddress: string,
-) {
+export async function getCurrentFacetCutsForAdd(adminAddress: string, gettersAddress: string,  mailboxAddress:string, executorAddress: string) {
     const facetsCuts = {};
     // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
     // And for some facets there are should be possibility to freeze them by the governor if we found a bug inside.
@@ -69,6 +79,11 @@ export async function getCurrentFacetCutsForAdd(
         facetsCuts['GettersFacet'] = facetCut(getters.address, getters.interface, Action.Add, false);
     }
     // These contracts implement the logic without which we can get out of the freeze.
+    // These contracts implement the logic without which we can get out of the freeze.
+    if (mailboxAddress) {
+        const mailbox = await hardhat.ethers.getContractAt('MailboxFacet', mailboxAddress);
+        facetsCuts['MailboxFacet'] = facetCut(mailbox.address, mailbox.interface, Action.Add, true);
+    }
     if (executorAddress) {
         const executor = await hardhat.ethers.getContractAt('ExecutorFacet', executorAddress);
         facetsCuts['ExecutorFacet'] = facetCut(executor.address, executor.interface, Action.Add, true);
@@ -102,13 +117,10 @@ export async function getFacetCutsForUpgrade(
     zkSyncAddress: string,
     adminAddress: string,
     gettersAddress: string,
-    executorAddress: string,
+    mailboxAddress: string,
+    executorAddress: string
 ) {
-    const newFacetCuts = await getCurrentFacetCutsForAdd(
-        adminAddress,
-        gettersAddress,
-        executorAddress,
-    );
+    const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress,executorAddress);
     const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, Object.keys(newFacetCuts));
     return [...oldFacetCuts, ...Object.values(newFacetCuts)];
 }

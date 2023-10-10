@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import {IBase} from "./IBase.sol";
+import {IProofChainBase} from "./IBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {

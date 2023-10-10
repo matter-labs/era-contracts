@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../zksync/Verifier.sol";
+import "../../proof-system/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierRecursiveTest is Verifier {

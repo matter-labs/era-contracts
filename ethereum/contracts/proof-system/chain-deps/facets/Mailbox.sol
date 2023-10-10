@@ -4,42 +4,34 @@ pragma solidity ^0.8.13;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {ChainBase} from "./ChainBase.sol";
-import {Merkle} from"../libraries/Merkle.sol";
-import {PriorityQueue, PriorityOperation} from  "../libraries/PriorityQueue.sol";
-import {TransactionValidator} from "../libraries/TransactionValidator.sol";
-import {
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    FAIR_L2_GAS_PRICE,
-    L1_GAS_PER_PUBDATA_BYTE,
-    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
-    PRIORITY_OPERATION_L2_TX_TYPE,
-    PRIORITY_EXPIRATION,
-    MAX_NEW_FACTORY_DEPS
-} from "../../common/Config.sol";
-import {UncheckedMath} from"../../common/libraries/UncheckedMath.sol";
-import {UnsafeBytes} from"../../common/libraries/UnsafeBytes.sol";
-import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {
-    L2_BOOTLOADER_ADDRESS,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
-} from "../../common/L2ContractAddresses.sol";
-import {L2Message, L2Log} from "../Storage.sol";
+import {ProofChainBase} from "./Base.sol";
+import {Merkle} from "../../libraries/Merkle.sol";
+import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
+import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
+import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2Message, L2Log} from "../ProofChainStorage.sol";
 
-import {IAllowList} from "../../common/interfaces/IAllowList.sol";
+import {IAllowList} from "../../../common/interfaces/IAllowList.sol";
 
-import {IMailbox, TxStatus} from "../chain-interfaces/IMailbox.sol";
-import "../bridgehead-interfaces/IBridgehead.sol";
+import {IMailbox, TxStatus} from "../../chain-interfaces/IMailbox.sol";
+// import "../../../bridgehead/bridgehead-interfaces/IBridgehead.sol";
+import "../../proof-system-interfaces/IProofMailbox.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract Mailbox is IMailbox, ChainBase {
+contract MailboxFacet is ProofChainBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
+
+    string public constant override getName = "MailboxFacet";
+
 
     function finalizeEthWithdrawalBridgehead(
         address _sender,
@@ -48,7 +40,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external onlyBridgehead knownSenderCanCallFunction(_sender, chainStorage.allowList) {
+    ) external onlyProofSystem knownSenderCanCallFunction(_sender, chainStorage.allowList) {
         _finalizeEthWithdrawalSender(
             _sender,
             _l2BatchNumber,
@@ -61,6 +53,7 @@ contract Mailbox is IMailbox, ChainBase {
 
     // this is implemented in the bridghead, does not go through the router.
     function requestL2TransactionBridgehead(
+        uint256 _msgValue,
         address _sender,
         address _contractL2,
         uint256 _l2Value,
@@ -72,11 +65,12 @@ contract Mailbox is IMailbox, ChainBase {
     )
         external
         payable
-        onlyBridgehead
+        onlyProofSystem
         knownSenderCanCallFunction(_sender, chainStorage.allowList)
         returns (bytes32 canonicalTxHash)
     {
         canonicalTxHash = _requestL2TransactionSender(
+            _msgValue,
             _sender,
             _contractL2,
             _l2Value,
@@ -90,6 +84,13 @@ contract Mailbox is IMailbox, ChainBase {
 
     //////////////////
 
+    /// @return Whether a withdrawal has been finalized.
+    /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
+    /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
+    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
+        return chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
+    }
+
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -101,7 +102,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _index,
         L2Message memory _message,
         bytes32[] calldata _proof
-    ) external view returns (bool) {
+    ) public view returns (bool) {
         return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
     }
 
@@ -167,7 +168,7 @@ contract Mailbox is IMailbox, ChainBase {
     ) internal view returns (bool) {
         // kl todo is this even needed? as we only add logs in executeblocks.
         // But if it is needed we need to update totalBatchsExecuted
-        require(_batchNumber <= chainStorage.totalBatchsExecuted, "xx");
+        require(_batchNumber <= chainStorage.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
@@ -209,6 +210,7 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external pure returns (uint256) {
+
         uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
         return l2GasPrice * _l2GasLimit;
     }
@@ -279,7 +281,7 @@ contract Mailbox is IMailbox, ChainBase {
         {
             chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
         }
-        IBridgehead(chainStorage.bridgehead).withdrawFunds(chainStorage.chainId, _l1WithdrawReceiver, _amount);
+        IProofMailbox(chainStorage.proofSystem).withdrawFunds(chainStorage.chainId, _l1WithdrawReceiver, _amount);
 
         emit EthWithdrawalFinalized(_l1WithdrawReceiver, _amount);
     }
@@ -292,8 +294,14 @@ contract Mailbox is IMailbox, ChainBase {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable knownSenderCanCallFunction(msg.sender, chainStorage.allowList) returns (bytes32 canonicalTxHash) {
+    )
+        external
+        payable
+        knownSenderCanCallFunction(msg.sender, chainStorage.allowList)
+        returns (bytes32 canonicalTxHash)
+    {
         canonicalTxHash = _requestL2TransactionSender(
+            msg.value,
             msg.sender,
             _contractL2,
             _l2Value,
@@ -303,6 +311,7 @@ contract Mailbox is IMailbox, ChainBase {
             _factoryDeps,
             _refundRecipient
         );
+        IProofMailbox(chainStorage.proofSystem).deposit{value: msg.value}(chainStorage.chainId);
     }
 
     /// @notice Request execution of L2 transaction from L1.
@@ -324,6 +333,7 @@ contract Mailbox is IMailbox, ChainBase {
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return canonicalTxHash The hash of the requested L2 transaction. This hash can be used to follow the transaction status
     function _requestL2TransactionSender(
+        uint256 _msgValue,
         address _sender,
         address _contractL2,
         uint256 _l2Value,
@@ -349,7 +359,7 @@ contract Mailbox is IMailbox, ChainBase {
 
         // The L1 -> L2 transaction may be failed and funds will be sent to the `_refundRecipient`,
         // so we use `msg.value` instead of `_l2Value` as the bridged amount.
-        _verifyDepositLimit(_sender, msg.value);
+        _verifyDepositLimit(_sender, _msgValue);
 
         // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
@@ -361,7 +371,7 @@ contract Mailbox is IMailbox, ChainBase {
         params.l2GasPricePerPubdata = _l2GasPerPubdataByteLimit;
         params.refundRecipient = _refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(params, _calldata, _factoryDeps, false);
+        canonicalTxHash = _requestL2Transaction(_msgValue, params, _calldata, _factoryDeps, false);
     }
 
     function _verifyDepositLimit(address _depositor, uint256 _amount) internal {
@@ -378,10 +388,11 @@ contract Mailbox is IMailbox, ChainBase {
         bytes[] calldata _factoryDeps,
         bool _isFree
     ) external onlyProofSystem returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = _requestL2Transaction(_params, _calldata, _factoryDeps, _isFree);
+        canonicalTxHash = _requestL2Transaction(0, _params, _calldata, _factoryDeps, _isFree);
     }
 
     function _requestL2Transaction(
+        uint256 msgValue,
         WritePriorityOpParams memory _params,
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps,
@@ -395,7 +406,7 @@ contract Mailbox is IMailbox, ChainBase {
 
         _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
-        require(msg.value >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+        require(msgValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 
         // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
         address refundRecipient = _params.refundRecipient == address(0) ? _params.sender : _params.refundRecipient;
@@ -407,9 +418,9 @@ contract Mailbox is IMailbox, ChainBase {
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-        _params.valueToMint = msg.value;
+        _params.valueToMint = msgValue;
 
-        IBridgehead(chainStorage.bridgehead).deposit{value: msg.value}(chainStorage.chainId);
+        // IBridgehead(chainStorage.bridgehead).deposit{value: msg.value}(chainStorage.chainId);
 
         canonicalTxHash = _writePriorityOp(_params, _calldata, _factoryDeps);
     }

@@ -74,7 +74,7 @@ describe('WETH Bridge tests', () => {
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(
             owner.provider
         );
-        const governorAddress = await deployWallet.getAddress();
+        const ownerAddress = await deployWallet.getAddress();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -91,7 +91,7 @@ describe('WETH Bridge tests', () => {
 
         const deployer = new Deployer({
             deployWallet,
-            governorAddress,
+            ownerAddress,
             verbose: false,
             addresses: addressConfig,
             bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -133,7 +133,7 @@ describe('WETH Bridge tests', () => {
 
         await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
-        await deployer.registerHyperchain(create2Salt, gasPrice);
+        await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
 
         // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
@@ -278,10 +278,10 @@ describe('WETH Bridge tests', () => {
                     0,
                     0,
                     ethers.utils.hexConcat([functionSignature, ethers.utils.randomBytes(92)]),
-                    []
+                    [ethers.constants.HashZero]
                 )
         );
-        expect(revertReason).equal('rz');
+        expect(revertReason).equal('pi');
     });
 
     it('Should revert on finalizing a withdrawal with wrong L2 sender', async () => {
@@ -299,9 +299,9 @@ describe('WETH Bridge tests', () => {
                         ethers.utils.randomBytes(32),
                         ethers.utils.randomBytes(40)
                     ]),
-                    []
+                    [ethers.constants.HashZero]
                 )
         );
-        expect(revertReason).equal('rz');
+        expect(revertReason).equal('pi');
     });
 });

@@ -171,7 +171,7 @@ describe('TransactionValidator tests', function () {
                     })
                 )
             );
-            expect(result).equal('ul');
+            expect(result).equal('ul1');
         });
 
         it('Should revert when reserved dynamic field has non-zero length', async () => {

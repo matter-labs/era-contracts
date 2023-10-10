@@ -6,7 +6,7 @@ import "../chain-interfaces/IVerifier.sol";
 import "../Verifier.sol";
 import "../../common/interfaces/IAllowList.sol";
 import "../../common/Messaging.sol";
-import "../../bridgehead/libraries/PriorityQueue.sol";
+import "../../proof-system/libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -63,9 +63,9 @@ struct ProofChainStorage {
     /// @dev Stored hashed StoredBatch for batch number
     mapping(uint256 => bytes32) storedBatchHashes;
     /// @dev Stored root hashes of L2 -> L1 logs
-    mapping(uint256 => bytes32) __DEPRECATED_l2LogsRootHashes;
+    mapping(uint256 => bytes32) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
-    PriorityQueue.Queue __DEPRECATED_priorityQueue;
+    PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList allowList;
     /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
@@ -89,13 +89,13 @@ struct ProofChainStorage {
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
     /// @dev Used to indicate that eth withdrawal was already processed
-    mapping(uint256 => mapping(uint256 => bool)) __DEPRECATED_isEthWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => bool)) isEthWithdrawalFinalized;
     /// @dev The most recent withdrawal time and amount reset
     uint256 __DEPRECATED_lastWithdrawalLimitReset;
     /// @dev The accumulated withdrawn amount during the withdrawal limit window
     uint256 __DEPRECATED_withdrawnAmountInWindow;
     /// @dev A mapping user address => the total deposited amount by the user
-    mapping(address => uint256) __DEPRECATED_totalDepositedAmountPerUser;
+    mapping(address => uint256) totalDepositedAmountPerUser;
     /// @dev Stores the protocol version. Note, that the protocol version may not only encompass changes to the
     /// smart contracts, but also to the node behavior.
     uint256 protocolVersion;
@@ -111,4 +111,5 @@ struct ProofChainStorage {
     /// new fields
     uint256 chainId;
     address bridgeheadChainContract;
+    address proofSystem;
 }

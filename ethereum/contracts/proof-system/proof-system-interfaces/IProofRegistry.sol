@@ -9,7 +9,6 @@ interface IProofRegistry {
     /// @notice
     function newChain(
         uint256 _chainId,
-        address _bridgeheadChainContract,
         address _governor,
         Diamond.DiamondCutData memory _diamondCut
     ) external;

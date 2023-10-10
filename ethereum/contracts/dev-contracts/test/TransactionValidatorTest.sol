@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../bridgehead/libraries/TransactionValidator.sol";
+import "../../proof-system/libraries/TransactionValidator.sol";
 import "../../bridgehead/bridgehead-interfaces/IBridgeheadMailbox.sol";
 
 import "../../common/Messaging.sol";

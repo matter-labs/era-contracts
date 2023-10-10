@@ -13,6 +13,7 @@ export const L2_SYSTEM_CONTEXT_ADDRESS = `0x000000000000000000000000000000000000
 export const L2_BOOTLOADER_ADDRESS = `0x0000000000000000000000000000000000008001`;
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = `0x0000000000000000000000000000000000008004`;
 export const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
+export const L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = '0x000000000000000000000000000000000000800a';
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = `0x000000000000000000000000000000000000800e`;
 
 export enum SYSTEM_LOG_KEYS {
@@ -71,7 +72,7 @@ export async function getCallRevertReason(promise) {
                     }
                 }
             } catch (_) {
-                throw e.error.toString().slice(0, 5000) + e.error.toString().slice(-6000);
+                throw e;
             }
         }
     }
@@ -115,7 +116,7 @@ export async function requestExecute(
     );
 }
 
-// due to gas reasons we call tha Chais's contract directly, instead of the bridgehead.
+// due to gas reasons we call tha chains's contract directly, instead of the bridgehead.
 export async function requestExecuteDirect(
     mailbox: ethers.Contract,
     to: Address,
@@ -158,7 +159,7 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
     ]);
 }
 
-export function createSystemLogs() {
+export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish) {
     return [
         constructL2Log(
             true,
@@ -180,12 +181,17 @@ export function createSystemLogs() {
             ethers.constants.HashZero
         ),
         constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),
-        constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY, EMPTY_STRING_KECCAK),
+        constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+            chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
+        ),
         constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
-            ethers.constants.HashZero
+            numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
         )
     ];
 }

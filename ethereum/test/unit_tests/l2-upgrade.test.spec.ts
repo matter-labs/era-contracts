@@ -7,12 +7,14 @@ import {
     ExecutorFacet,
     ExecutorFacetFactory,
     GettersFacetFactory,
-    GovernanceFacetFactory,
+    AdminFacet,
+    AdminFacetFactory,
     BridgeheadChainFactory,
     GettersFacet,
-    AdminFacet,
     DefaultUpgradeFactory,
-    CustomUpgradeTestFactory
+    CustomUpgradeTestFactory,
+    MailboxFacet,
+    MailboxFacetFactory
 } from '../../typechain';
 import {
     getCallRevertReason,
@@ -32,7 +34,6 @@ import {
 import { keccak256 } from 'ethers/lib/utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, Wallet, BytesLike } from 'ethers';
-import { DiamondCutFacet } from '../../typechain';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
 
 import { Deployer } from '../../src.ts/deploy';
@@ -71,7 +72,7 @@ describe('L2 upgrade test', function () {
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
             owner.provider
         );
-        const governorAddress = await deployWallet.getAddress();
+        const ownerAddress = await deployWallet.getAddress();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -88,7 +89,7 @@ describe('L2 upgrade test', function () {
 
         const deployer = new Deployer({
             deployWallet,
-            governorAddress,
+            ownerAddress,
             verbose: false,
             addresses: addressConfig,
             bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -131,7 +132,7 @@ describe('L2 upgrade test', function () {
 
         await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
-        await deployer.registerHyperchain(create2Salt, gasPrice);
+        await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
 
         // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
@@ -161,10 +162,9 @@ describe('L2 upgrade test', function () {
 
         proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
         proxyGetters = GettersFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
-        proxyDiamondCut = DiamondCutFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
-        proxyGovernance = GovernanceFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        proxyAdmin = AdminFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
 
-        await (await proxyGovernance.setValidator(await deployWallet.getAddress(), true)).wait();
+        await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
 
         // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
         let bridgeheadChainContract = BridgeheadChainFactory.connect(
@@ -172,7 +172,8 @@ describe('L2 upgrade test', function () {
             deployWallet
         );
 
-        let priorityOp = await bridgeheadChainContract.priorityQueueFrontOperation();
+
+        let priorityOp = await proxyGetters.priorityQueueFrontOperation();
         priorityOpTxHash = priorityOp[0];
         priorityOperationsHash = keccak256(
             ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
@@ -181,17 +182,17 @@ describe('L2 upgrade test', function () {
 
     it('Upgrade should work even if not all blocks are processed', async () => {
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const l2Logs = encodeLogs([
-            contextLog(timestamp, ethers.constants.HashZero),
+        const systemLogs = encodeLogs([
+            contextLog(timestamp, ethers.constants.HashZero)
             // bootloaderLog(l2UpgradeTxHash),
             // bootloaderLog(l2UpgradeTxHash)
-            chainIdLog(priorityOpTxHash)
+            // chainIdLog(priorityOpTxHash)
         ]);
-        block1Info = await buildCommitBlockInfo(genesisStoredBlockInfo(), {
-            blockNumber: 1,
+        batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
+            batchNumber: 1,
             priorityOperationsHash: priorityOperationsHash,
-            numberOfLayer1Txs: 1,
-            l2Logs
+            numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+            // systemLogs
         });
 
         const commitReceipt = await (await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1Info])).wait();
@@ -229,7 +230,7 @@ describe('L2 upgrade test', function () {
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
         );
-        expect(revertReason).to.equal('Upgrade is not ready yet');        
+        expect(revertReason).to.equal('Upgrade is not ready yet');
     });
 
     it('Should require correct tx type for upgrade tx', async () => {
@@ -412,9 +413,7 @@ describe('L2 upgrade test', function () {
             newProtocolVersion: 4
         };
 
-        const upgradeReceipt = await (
-            await executeUpgrade(chainId, proxyGetters, proxyAdmin, upgrade)
-        ).wait();
+        const upgradeReceipt = await (await executeUpgrade(chainId, proxyGetters, proxyAdmin, upgrade)).wait();
 
         const defaultUpgradeFactory = await hardhat.ethers.getContractFactory('DefaultUpgrade');
         const upgradeEvents = upgradeReceipt.logs.map((log) => {
@@ -493,9 +492,7 @@ describe('L2 upgrade test', function () {
             factoryDeps: [myFactoryDep],
             newProtocolVersion: 5
         };
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, proxyAdmin, upgrade)
-        );
+        const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, proxyAdmin, upgrade));
 
         expect(revertReason).to.equal('Previous upgrade has not been finalized');
     });
@@ -773,7 +770,7 @@ interface L2ToL1Log {
 function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
     return {
         sender: L2_SYSTEM_CONTEXT_ADDRESS,
-        key: packBatchTimestampAndBlockTimestamp(timestamp, timestamp),
+        key: packBatchTimestampAndBatchTimestamp(timestamp, timestamp),
         value: ethers.utils.hexlify(prevBlockHash)
     };
 }
@@ -815,7 +812,7 @@ async function buildCommitBatchInfo(
     info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-    let systemLogs = createSystemLogs();
+    let systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs);
     systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
         true,
         L2_SYSTEM_CONTEXT_ADDRESS,

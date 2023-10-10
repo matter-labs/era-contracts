@@ -8,7 +8,7 @@ import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/ProofChainStorage.sol";
 import {DiamondCutFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/DiamondCut.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";

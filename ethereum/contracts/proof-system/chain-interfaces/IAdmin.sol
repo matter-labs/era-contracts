@@ -6,14 +6,9 @@ import "../../common/interfaces/IAllowList.sol";
 import "../Verifier.sol";
 import "../chain-deps/ProofChainStorage.sol";
 import "./IBase.sol";
+import {Diamond} from "../../common/libraries/Diamond.sol";
 
-<<<<<<<< HEAD:ethereum/contracts/proof-system/chain-interfaces/IGovernance.sol
-interface IGovernance is IProofChainBase {
-========
-import {Diamond} from "../libraries/Diamond.sol";
-
-interface IAdmin is IBase {
->>>>>>>> 75764004f0ae81642a2756d368d59b1635543d75:ethereum/contracts/proof-system/chain-interfaces/IAdmin.sol
+interface IAdmin is IProofChainBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
     function acceptGovernor() external;
@@ -26,8 +21,6 @@ interface IAdmin is IBase {
 
     function setPorterAvailability(bool _zkPorterIsAvailable) external;
 
-<<<<<<<< HEAD:ethereum/contracts/proof-system/chain-interfaces/IGovernance.sol
-========
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
@@ -36,13 +29,6 @@ interface IAdmin is IBase {
 
     function unfreezeDiamond() external;
 
-    /// @notice Porter availability status changes
-    event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
-
-    /// @notice Validator's status changed
-    event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
-
->>>>>>>> 75764004f0ae81642a2756d368d59b1635543d75:ethereum/contracts/proof-system/chain-interfaces/IAdmin.sol
     /// @notice pendingGovernor is changed
     /// @dev Also emitted when new governor is accepted and in this case, `newPendingGovernor` would be zero address
     event NewPendingGovernor(address indexed oldPendingGovernor, address indexed newPendingGovernor);
@@ -60,13 +46,12 @@ interface IAdmin is IBase {
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
 
-<<<<<<<< HEAD:ethereum/contracts/proof-system/chain-interfaces/IGovernance.sol
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
 
     /// @notice Porter availability status changes
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
-========
+
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
@@ -75,5 +60,4 @@ interface IAdmin is IBase {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
->>>>>>>> 75764004f0ae81642a2756d368d59b1635543d75:ethereum/contracts/proof-system/chain-interfaces/IAdmin.sol
 }

@@ -4,8 +4,9 @@ pragma solidity ^0.8.13;
 
 // import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
 import "../../common/Messaging.sol";
+import "../chain-interfaces/IMailboxEvents.sol";
 
-interface IBridgeheadMailbox {
+interface IProofMailbox is IMailboxEvents {
     function deposit(uint256 _chainId) external payable;
 
     function withdrawFunds(
@@ -46,17 +47,10 @@ interface IBridgeheadMailbox {
         TxStatus _status
     ) external view returns (bool);
 
-    function finalizeEthWithdrawal(
+    function requestL2TransactionBridgehead(
         uint256 _chainId,
-        uint256 _l2BlockNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external;
-
-    function requestL2Transaction(
-        uint256 _chainId,
+        uint256 _msgValue,
+        address _msgSender,
         address _contractL2,
         uint256 _l2Value,
         bytes calldata _calldata,
@@ -65,6 +59,16 @@ interface IBridgeheadMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
+
+    function finalizeEthWithdrawalBridgehead(
+        uint256 _chainId,
+        address _msgValue,
+        uint256 _l2BlockNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBlock,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
 
     function l2TransactionBaseCost(
         uint256 _chainId,

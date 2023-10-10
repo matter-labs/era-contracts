@@ -2,21 +2,23 @@
 
 pragma solidity ^0.8.13;
 
-import {Base} from "./Base.sol";
+import {ProofChainBase} from "./Base.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey} from "../../chain-interfaces/IExecutor.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../Config.sol";
-import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
-import {VerifierParams} from "../Storage.sol";
+import {VerifierParams} from "../ProofChainStorage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {IBridgeheadChain} from "../../../bridgehead/chain-interfaces/IBridgeheadChain.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is ProofChainBase, IExecutor {
     using UncheckedMath for uint256;
+    using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "ExecutorFacet";
     uint256 public val;
@@ -181,7 +183,11 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
         onlyValidator
     {
         // Check that we commit batches after last committed batch
-        require(chainStorage.storedBatchHashes[chainStorage.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
+        require(
+            chainStorage.storedBatchHashes[chainStorage.totalBatchesCommitted] ==
+                _hashStoredBatchInfo(_lastCommittedBatchData),
+            "i"
+        ); // incorrect previous batch data
         require(_newBatchesData.length > 0, "No batches to commit");
 
         bytes32 systemContractsUpgradeTxHash = chainStorage.l2SystemContractsUpgradeTxHash;
@@ -209,7 +215,9 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
 
-            chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(
+                _lastCommittedBatchData
+            );
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -247,7 +255,9 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
                 expectedUpgradeTxHash
             );
 
-            chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(
+                _lastCommittedBatchData
+            );
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -256,15 +266,15 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
         }
     }
 
-    // /// @dev Pops the priority operations from the priority queue and returns a rolling hash of operations
-    // function _collectOperationsFromPriorityQueue(uint256 _nPriorityOps) internal returns (bytes32 concatHash) {
-    //     concatHash = EMPTY_STRING_KECCAK;
+    /// @dev Pops the priority operations from the priority queue and returns a rolling hash of operations
+    function _collectOperationsFromPriorityQueue(uint256 _nPriorityOps) internal returns (bytes32 concatHash) {
+        concatHash = EMPTY_STRING_KECCAK;
 
-    //     for (uint256 i = 0; i < _nPriorityOps; i = i.uncheckedInc()) {
-    //         PriorityOperation memory priorityOp = chainStorage.priorityQueue.popFront();
-    //         concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
-    //     }
-    // }
+        for (uint256 i = 0; i < _nPriorityOps; i = i.uncheckedInc()) {
+            PriorityOperation memory priorityOp = chainStorage.priorityQueue.popFront();
+            concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
+        }
+    }
 
     /// @dev Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
@@ -278,15 +288,11 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
             "exe10" // executing batch should be committed
         );
 
-        bytes32 priorityOperationsHash = IBridgeheadChain(chainStorage.bridgeheadChainContract)
-            .collectOperationsFromPriorityQueue(_storedBlock.numberOfLayer1Txs);
+        bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
 
         // Save root hash of L2 -> L1 logs tree
-        IBridgeheadChain(chainStorage.bridgeheadChainContract).addL2Logs(
-            currentBlockNumber,
-            _storedBlock.l2LogsTreeRoot
-        );
+        chainStorage.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
     }
 
     /// @notice Execute batches, complete priority operations and process withdrawals.
@@ -302,7 +308,7 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
         uint256 newTotalBatchesExecuted = chainStorage.totalBatchesExecuted + nBatches;
         chainStorage.totalBatchesExecuted = newTotalBatchesExecuted;
         require(newTotalBatchesExecuted <= chainStorage.totalBatchesVerified, "n"); // Can't execute batches more than committed and proven currently.
-        require(IBridgeheadChain(chainStorage.bridgeheadChainContract).getFirstUnprocessedPriorityTx() != 0, "n2"); // Checking that chainId update is executed. KL todo, put this in priority queue checks
+        require(chainStorage.priorityQueue.getFirstUnprocessedPriorityTx() != 0, "n2"); // Checking that chainId update is executed. KL todo, put this in priority queue checks
 
         uint256 batchWhenUpgradeHappened = chainStorage.l2SystemContractsUpgradeBatchNumber;
         if (batchWhenUpgradeHappened != 0 && batchWhenUpgradeHappened <= newTotalBatchesExecuted) {
@@ -320,7 +326,7 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
     ) external nonReentrant onlyValidator {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = chainStorage.totalBatchesVerified;
-        uint256 committedBatchesLength = _committedBatchechainStorage.length;
+        uint256 committedBatchesLength = _committedBatches.length;
 
         // Save the variable from the storage to memory to save gas
         VerifierParams memory verifierParams = chainStorage.verifierParams;
@@ -335,7 +341,8 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             require(
-                _hashStoredBatchInfo(_committedBatches[i]) == chainStorage.storedBatchHashes[currentTotalBatchesVerified],
+                _hashStoredBatchInfo(_committedBatches[i]) ==
+                    chainStorage.storedBatchHashes[currentTotalBatchesVerified],
                 "o1"
             );
 
@@ -415,7 +422,11 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
             delete chainStorage.l2SystemContractsUpgradeBatchNumber;
         }
 
-        emit BlocksRevert(chainStorage.totalBatchesCommitted, chainStorage.totalBatchesVerified, chainStorage.totalBatchesExecuted);
+        emit BlocksRevert(
+            chainStorage.totalBatchesCommitted,
+            chainStorage.totalBatchesVerified,
+            chainStorage.totalBatchesExecuted
+        );
     }
 
     /// @notice Returns larger of two values
@@ -447,7 +458,12 @@ contract ExecutorFacet is ProofChainBase, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        return abi.encodePacked(chainStorage.zkPorterIsAvailable, chainStorage.l2BootloaderBytecodeHash, chainStorage.l2DefaultAccountBytecodeHash);
+        return
+            abi.encodePacked(
+                chainStorage.zkPorterIsAvailable,
+                chainStorage.l2BootloaderBytecodeHash,
+                chainStorage.l2DefaultAccountBytecodeHash
+            );
     }
 
     function _batchAuxiliaryOutput(CommitBatchInfo calldata _batch, bytes32 _stateDiffHash)

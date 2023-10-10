@@ -8,18 +8,9 @@ import "./bridgehead-deps/BridgeheadMailbox.sol";
 import "./bridgehead-deps/BridgeheadGetters.sol";
 
 contract Bridgehead is BridgeheadGetters, BridgeheadMailbox, Registry {
-    function initialize(
-        address _governor,
-        address _chainImplementation,
-        address _chainProxyAdmin,
-        IAllowList _allowList,
-        uint256 _priorityTxMaxGasLimit
-    ) public {
-        require(bridgeheadStorage.chainImplementation == address(0), "bridgehead1");
+    function initialize(address _governor, IAllowList _allowList) public {
+        require(bridgeheadStorage.governor == address(0), "bridgehead1");
         bridgeheadStorage.governor = _governor;
-        bridgeheadStorage.chainImplementation = _chainImplementation;
-        bridgeheadStorage.chainProxyAdmin = _chainProxyAdmin;
         bridgeheadStorage.allowList = _allowList;
-        bridgeheadStorage.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
     }
 }

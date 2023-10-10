@@ -3,13 +3,12 @@
 pragma solidity ^0.8.13;
 
 import "../proof-system/chain-deps/facets/Base.sol";
-import "../bridgehead/chain-interfaces/IMailbox.sol";
+import "../proof-system/chain-interfaces/IMailbox.sol";
 import "../proof-system/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/Messaging.sol";
-import "../bridgehead/libraries/TransactionValidator.sol";
-import {MAX_NEW_FACTORY_DEPS} from "../bridgehead/Config.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "../proof-system/Config.sol";
+import "../proof-system/libraries/TransactionValidator.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -238,7 +237,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         require(chainStorage.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            chainStorage.l2SystemContractsUpgradeBlockNumber == 0,
+            chainStorage.l2SystemContractsUpgradeBatchNumber == 0,
             "The batch number of the previous upgrade has not been cleaned"
         );
 

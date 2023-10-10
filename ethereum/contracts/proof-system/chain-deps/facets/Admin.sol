@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.13;
 
-import "../interfaces/IAdmin.sol";
-import "../libraries/Diamond.sol";
-import "../../common/libraries/L2ContractHelper.sol";
-import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
+import "../../chain-interfaces/IAdmin.sol";
+import "../../../common/libraries/Diamond.sol";
+import "../../../common/libraries/L2ContractHelper.sol";
+import {L2_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import "./Base.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is Base, IAdmin {
+contract AdminFacet is ProofChainBase, IAdmin {
     string public constant override getName = "AdminFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
@@ -19,20 +19,20 @@ contract AdminFacet is Base, IAdmin {
     /// @param _newPendingGovernor Address of the new governor
     function setPendingGovernor(address _newPendingGovernor) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
-        address oldPendingGovernor = s.pendingGovernor;
+        address oldPendingGovernor = chainStorage.pendingGovernor;
         // Change pending governor
-        s.pendingGovernor = _newPendingGovernor;
+        chainStorage.pendingGovernor = _newPendingGovernor;
         emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
     }
 
     /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
     function acceptGovernor() external {
-        address pendingGovernor = s.pendingGovernor;
+        address pendingGovernor = chainStorage.pendingGovernor;
         require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
 
-        address previousGovernor = s.governor;
-        s.governor = pendingGovernor;
-        delete s.pendingGovernor;
+        address previousGovernor = chainStorage.governor;
+        chainStorage.governor = pendingGovernor;
+        delete chainStorage.pendingGovernor;
 
         emit NewPendingGovernor(pendingGovernor, address(0));
         emit NewGovernor(previousGovernor, pendingGovernor);
@@ -43,20 +43,20 @@ contract AdminFacet is Base, IAdmin {
     /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external onlyGovernorOrAdmin {
         // Save previous value into the stack to put it into the event later
-        address oldPendingAdmin = s.pendingAdmin;
+        address oldPendingAdmin = chainStorage.pendingAdmin;
         // Change pending admin
-        s.pendingAdmin = _newPendingAdmin;
+        chainStorage.pendingAdmin = _newPendingAdmin;
         emit NewPendingGovernor(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
-        address pendingAdmin = s.pendingAdmin;
+        address pendingAdmin = chainStorage.pendingAdmin;
         require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
 
-        address previousAdmin = s.admin;
-        s.admin = pendingAdmin;
-        delete s.pendingAdmin;
+        address previousAdmin = chainStorage.admin;
+        chainStorage.admin = pendingAdmin;
+        delete chainStorage.pendingAdmin;
 
         emit NewPendingAdmin(pendingAdmin, address(0));
         emit NewAdmin(previousAdmin, pendingAdmin);
@@ -66,7 +66,7 @@ contract AdminFacet is Base, IAdmin {
     /// @param _validator Validator address
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external onlyGovernorOrAdmin {
-        s.validators[_validator] = _active;
+        chainStorage.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
 
@@ -74,7 +74,7 @@ contract AdminFacet is Base, IAdmin {
     /// @param _zkPorterIsAvailable The availability of zk porter shard
     function setPorterAvailability(bool _zkPorterIsAvailable) external onlyGovernor {
         // Change the porter availability
-        s.zkPorterIsAvailable = _zkPorterIsAvailable;
+        chainStorage.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
@@ -83,8 +83,8 @@ contract AdminFacet is Base, IAdmin {
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
         require(_newPriorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "n5");
 
-        uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
-        s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
+        uint256 oldPriorityTxMaxGasLimit = chainStorage.priorityTxMaxGasLimit;
+        chainStorage.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 

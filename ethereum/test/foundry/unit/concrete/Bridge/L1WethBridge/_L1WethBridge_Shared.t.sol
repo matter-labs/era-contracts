@@ -9,7 +9,7 @@ import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contr
 import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/ProofChainStorage.sol";
 import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";

@@ -15,7 +15,7 @@ import "../../common/L2ContractAddresses.sol";
 
 import "../../bridgehead/chain-interfaces/IBridgeheadChain.sol";
 
-// import "../chain-interfaces/IProofChain.sol";
+import "../chain-interfaces/IMailbox.sol";
 
 import "../DiamondProxy.sol";
 import "../chain-interfaces/IDiamondInit.sol";
@@ -39,13 +39,12 @@ contract ProofRegistry is ProofBase, IProofRegistry {
         bytes memory setChainIdCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
         bytes[] memory emptyA;
 
-        IBridgeheadChain(_chainContract).requestL2TransactionProof(params, setChainIdCalldata, emptyA, true);
+        IMailbox(_chainContract).requestL2TransactionProof(params, setChainIdCalldata, emptyA, true);
     }
 
     /// @notice
     function newChain(
         uint256 _chainId,
-        address _bridgeheadChainContract,
         address _governor,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyBridgehead {
@@ -57,9 +56,9 @@ contract ProofRegistry is ProofBase, IProofRegistry {
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
-            bytes32(uint256(uint160(_bridgeheadChainContract))),
+            bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(uint160(_governor))),
-            bytes32(proofStorage.blockHashZero),
+            bytes32(proofStorage.storedBatchZero),
             copiedData
         );
         Diamond.DiamondCutData memory cutData = _diamondCut;
@@ -71,8 +70,9 @@ contract ProofRegistry is ProofBase, IProofRegistry {
             // _diamondCut
         );
 
-        IBridgeheadChain(_bridgeheadChainContract).setProofChainContract(address(proofChainContract));
-        _specialSetChainIdInVMTx(_chainId, _bridgeheadChainContract);
+        // IBridgeheadChain(_bridgeheadChainContract).setProofChainContract(address(proofChainContract));
+        _specialSetChainIdInVMTx(_chainId, address(proofChainContract));
+        proofStorage.proofChainContract[_chainId] = address(proofChainContract);
 
         emit NewProofChain(_chainId, address(proofChainContract));
     }

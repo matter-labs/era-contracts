@@ -11,7 +11,7 @@ interface IDiamondInit {
         uint256 _chainId,
         address _bridgeheadChainContract,
         address _governor,
-        bytes32 _blockHashZero,
+        bytes32 _storedBatchZero,
         address _allowList,
         address _verifier,
         VerifierParams calldata _verifierParams,
