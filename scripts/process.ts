@@ -49,7 +49,7 @@ function upgradeSystemContextCalldata() {
 
     const forceDeplyment: ForceDeployment = {
         bytecodeHash: newHash,
-        newAddress: SYSTEM_CONTRACTS.systemContext.address, 
+        newAddress: SYSTEM_CONTRACTS.systemContext.address,
         callConstructor: false,
         value: 0,
         input: '0x'
@@ -60,7 +60,7 @@ function upgradeSystemContextCalldata() {
 
     // Padding calldata from the right. We really need to do it, since Yul would "implicitly" pad it from the left and it
     // it is not what we want.
-    while((calldata.length - 2) % 64 != 0) {
+    while ((calldata.length - 2) % 64 != 0) {
         calldata += '0';
     }
 
@@ -68,10 +68,10 @@ function upgradeSystemContextCalldata() {
     const TABULATION = '\t\t\t\t\t';
     // In the first slot we need to store the calldata's length
     let data = `mstore(0x00, ${originalLength})\n`;
-    
+
     const slices = (calldata.length - 2) / 64;
 
-    for(let slice = 0; slice < slices; slice++) {
+    for (let slice = 0; slice < slices; slice++) {
         const offset = slice * 32;
         const sliceHex = calldata.slice(2 + offset * 2, 2 + offset * 2 + 64);
 
@@ -87,7 +87,7 @@ let params = {
     MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector('KnownCodesStorage', 'markFactoryDeps'),
     VALIDATE_TX_SELECTOR: getSelector('IAccount', 'validateTransaction'),
     EXECUTE_TX_SELECTOR: getSelector('DefaultAccount', 'executeTransaction'),
-    RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector('ContractDeployer','extendedAccountVersion'),
+    RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector('ContractDeployer', 'extendedAccountVersion'),
     RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector('AccountCodeStorage', 'getRawCodeHash'),
     PAY_FOR_TX_SELECTOR: getSelector('DefaultAccount', 'payForTransaction'),
     PRE_PAYMASTER_SELECTOR: getSelector('DefaultAccount', 'prepareForPaymaster'),
@@ -108,10 +108,10 @@ let params = {
     RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector('INonceHolder', 'validateNonceUsage'),
     RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector('L2EthToken', 'mint'),
     GET_TX_HASHES_SELECTOR: getSelector('BootloaderUtilities', 'getTransactionHashes'),
-    CREATE_SELECTOR: getSelector('ContractDeployer','create'),
-    CREATE2_SELECTOR: getSelector('ContractDeployer','create2'),
-    CREATE_ACCOUNT_SELECTOR: getSelector('ContractDeployer','createAccount'),
-    CREATE2_ACCOUNT_SELECTOR: getSelector('ContractDeployer','create2Account'),
+    CREATE_SELECTOR: getSelector('ContractDeployer', 'create'),
+    CREATE2_SELECTOR: getSelector('ContractDeployer', 'create2'),
+    CREATE_ACCOUNT_SELECTOR: getSelector('ContractDeployer', 'createAccount'),
+    CREATE2_ACCOUNT_SELECTOR: getSelector('ContractDeployer', 'create2Account'),
     PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector('L2EthToken', 'transferFromTo'),
     SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector('IAccount', 'validateTransaction'),
     SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector('IPaymaster', 'validateAndPayForPaymasterTransaction'),
@@ -137,6 +137,58 @@ let params = {
     ...SYSTEM_PARAMS
 };
 
+
+function extractTestFunctionNames(sourceCode: string): string[] {
+    // Remove single-line comments
+    sourceCode = sourceCode.replace(/\/\/[^\n]*/g, '');
+
+    // Remove multi-line comments
+    sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, '');
+
+
+    const regexPatterns = [
+        /function\s+(TEST\w+)/g,
+    ];
+
+    let results: string[] = [];
+    for (const pattern of regexPatterns) {
+        let match;
+        while ((match = pattern.exec(sourceCode)) !== null) {
+            results.push(match[1]);
+        }
+    }
+
+    return [...new Set(results)]; // Remove duplicates
+}
+
+function createTestFramework(tests: string[]): string {
+    let testFramework = `
+    let test_id:= mload(0)
+
+    switch test_id 
+    case 0 {
+        testing_totalTests(${tests.length})
+    }
+    `;
+
+    tests.forEach((value, index) => {
+        testFramework += `
+        case ${index + 1} {
+            testing_start("${value}")
+            ${value}()
+        }
+        `
+    });
+
+    testFramework += `
+        default {
+        }
+    return (0, 0)
+    `
+
+    return testFramework;
+}
+
 async function main() {
     const bootloader = await renderFile('bootloader/bootloader.yul', params);
     // The overhead is unknown for gas tests and so it should be zero to calculate it 
@@ -158,7 +210,7 @@ async function main() {
     const provedBatchBootloader = preprocess.preprocess(
         bootloader,
         { BOOTLOADER_TYPE: 'proved_batch' }
-    );    
+    );
     console.log('Preprocessing playground block bootloader');
     const playgroundBatchBootloader = preprocess.preprocess(
         bootloader,
@@ -175,10 +227,28 @@ async function main() {
         { BOOTLOADER_TYPE: 'playground_batch' }
     );
 
-    if(!existsSync(OUTPUT_DIR)) {
+    console.log('Preprocessing bootloader tests');
+    const bootloaderTests = await renderFile('bootloader/tests/bootloader/bootloader_test.yul', {});
+
+    const testMethods = extractTestFunctionNames(bootloaderTests)
+
+    console.log("Found tests: " + testMethods);
+
+    const testFramework = createTestFramework(testMethods);
+
+    const bootloaderTestUtils = await renderFile('bootloader/tests/utils/test_utils.yul', {});
+
+    const bootloaderWithTests = await renderFile('bootloader/bootloader.yul', {
+        ...params,
+        CODE_START_PLACEHOLDER: "\n" + bootloaderTestUtils + "\n" + bootloaderTests + "\n" + testFramework
+    });
+    const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: 'proved_batch' });
+
+    if (!existsSync(OUTPUT_DIR)) {
         mkdirSync(OUTPUT_DIR);
     }
 
+    writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
     writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
     writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
     writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);

@@ -62,9 +62,12 @@ function preparePaths(path: string, files: string[], outputDirName: string | nul
             return `sources/${val}`;
         })
         .join(' ');
+    const currentWorkingDirectory = process.cwd();
+    console.log(`Yarn project directory: ${currentWorkingDirectory}`);
+
     const outputDir = outputDirName || files[0];
     // This script is located in `system-contracts/scripts`, so we get one directory back.
-    const absolutePathSources = `${__dirname}/../${path}`; 
+    const absolutePathSources = `${__dirname}/../${path}`;
     const absolutePathArtifacts = `${__dirname}/../${path}/artifacts`;
 
     return new CompilerPaths(filePaths, outputDir, absolutePathSources, absolutePathArtifacts);
