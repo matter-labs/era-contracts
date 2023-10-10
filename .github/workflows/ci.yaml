@@ -1,17 +1,72 @@
-name: "Rust CI"
-on:
-  pull_request:
+name: "CI"
+
+on: pull_request
 
 jobs:
   build:
-    name: Build contracts
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
-      - run: yarn
-      - run: yarn build
-      - run: yarn preprocess
-      - run: yarn compile-yul
+          cache: yarn
 
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build Solidity artifacts
+        run: yarn build
+
+      - name: Build yul artifacts
+        run: yarn preprocess && yarn compile-yul
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-${{ github.sha }}
+          path: |
+            artifacts-zk
+            cache-zk
+            typechain-types
+            contracts/artifacts
+            contracts/precompiles/artifacts
+
+  test:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Use era-test-node for testing
+        uses: dutterbutter/era-test-node-action@latest
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-${{ github.sha }}
+          path: |
+            artifacts-zk
+            cache-zk
+            typechain-types
+            contracts/artifacts
+            contracts/precompiles/artifacts
+
+      - name: Run tests
+        run: yarn test

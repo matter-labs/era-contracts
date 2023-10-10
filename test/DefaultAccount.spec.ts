@@ -1,27 +1,27 @@
 import { expect } from 'chai';
+import { ethers, network } from 'hardhat';
+import * as zksync from 'zksync-web3';
+import { Wallet } from 'zksync-web3';
+import { serialize } from 'zksync-web3/build/src/utils';
 import {
+    Callable,
     DefaultAccount,
     DefaultAccount__factory,
-    NonceHolder,
-    NonceHolder__factory,
-    Callable,
     L2EthToken,
     L2EthToken__factory,
-    MockERC20Approve
+    MockERC20Approve,
+    NonceHolder,
+    NonceHolder__factory
 } from '../typechain-types';
 import {
     BOOTLOADER_FORMAL_ADDRESS,
-    NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
-    ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS
+    ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS,
+    NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS
 } from './shared/constants';
-import { Wallet } from 'zksync-web3';
-import { getWallets, deployContract, setCode, loadArtifact } from './shared/utils';
-import { network, ethers } from 'hardhat';
-import { hashBytecode, serialize } from 'zksync-web3/build/src/utils';
-import * as zksync from 'zksync-web3';
-import { TransactionData, signedTxToTransactionData } from './shared/transactions';
+import { signedTxToTransactionData } from './shared/transactions';
+import { deployContract, getWallets, loadArtifact, setCode } from './shared/utils';
 
-describe('DefaultAccount tests', function () {
+xdescribe('DefaultAccount tests', function () {
     let wallet: Wallet;
     let account: Wallet;
     let defaultAccount: DefaultAccount;

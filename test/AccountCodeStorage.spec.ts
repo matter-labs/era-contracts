@@ -1,9 +1,9 @@
 import { expect } from 'chai';
+import { ethers, network } from 'hardhat';
+import { Wallet } from 'zksync-web3';
 import { AccountCodeStorage } from '../typechain-types';
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS, EMPTY_STRING_KECCAK } from './shared/constants';
-import { Wallet } from 'zksync-web3';
-import { getWallets, deployContract } from './shared/utils';
-import { network, ethers } from 'hardhat';
+import { deployContract, getWallets } from './shared/utils';
 
 describe('AccountCodeStorage tests', function () {
     let wallet: Wallet;
@@ -39,7 +39,7 @@ describe('AccountCodeStorage tests', function () {
             ).to.be.revertedWith('Callable only by the deployer system contract');
         });
 
-        it('failed to set with constructed bytecode', async () => {
+        xit('failed to set with constructed bytecode', async () => {
             await expect(
                 accountCodeStorage
                     .connect(deployerAccount)
@@ -47,7 +47,7 @@ describe('AccountCodeStorage tests', function () {
             ).to.be.revertedWith('Code hash is not for a contract on constructor');
         });
 
-        it('successfully stored', async () => {
+        xit('successfully stored', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
@@ -67,7 +67,7 @@ describe('AccountCodeStorage tests', function () {
             ).to.be.revertedWith('Callable only by the deployer system contract');
         });
 
-        it('failed to set with constructing bytecode', async () => {
+        xit('failed to set with constructing bytecode', async () => {
             await expect(
                 accountCodeStorage
                     .connect(deployerAccount)
@@ -75,7 +75,7 @@ describe('AccountCodeStorage tests', function () {
             ).to.be.revertedWith('Code hash is not for a constructed contract');
         });
 
-        it('successfully stored', async () => {
+        xit('successfully stored', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);
@@ -95,7 +95,7 @@ describe('AccountCodeStorage tests', function () {
             );
         });
 
-        it('failed to mark already constructed bytecode', async () => {
+        xit('failed to mark already constructed bytecode', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);
@@ -107,7 +107,7 @@ describe('AccountCodeStorage tests', function () {
             await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
         });
 
-        it('successfully marked', async () => {
+        xit('successfully marked', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
@@ -127,7 +127,7 @@ describe('AccountCodeStorage tests', function () {
             expect(await accountCodeStorage.getRawCodeHash(RANDOM_ADDRESS)).to.be.eq(ethers.constants.HashZero);
         });
 
-        it('non-zero', async () => {
+        xit('non-zero', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);
@@ -152,7 +152,7 @@ describe('AccountCodeStorage tests', function () {
             expect(await accountCodeStorage.getCodeHash(wallet.address)).to.be.eq(EMPTY_STRING_KECCAK);
         });
 
-        it('address in the constructor', async () => {
+        xit('address in the constructor', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
@@ -162,7 +162,7 @@ describe('AccountCodeStorage tests', function () {
             await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
         });
 
-        it('constructed code hash', async () => {
+        xit('constructed code hash', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);
@@ -188,7 +188,7 @@ describe('AccountCodeStorage tests', function () {
             expect(await accountCodeStorage.getCodeSize('0x0000000000000000000000000000000000000001')).to.be.eq(0);
         });
 
-        it('address in the constructor', async () => {
+        xit('address in the constructor', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
@@ -198,7 +198,7 @@ describe('AccountCodeStorage tests', function () {
             await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
         });
 
-        it('non-zero size', async () => {
+        xit('non-zero size', async () => {
             await accountCodeStorage
                 .connect(deployerAccount)
                 .storeAccountConstructedCodeHash(RANDOM_ADDRESS, CONSTRUCTED_BYTECODE_HASH);

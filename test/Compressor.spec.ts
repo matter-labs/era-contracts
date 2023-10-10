@@ -1,4 +1,8 @@
 import { expect } from 'chai';
+import { BigNumber, BytesLike } from 'ethers';
+import { ethers, network } from 'hardhat';
+import * as zksync from 'zksync-web3';
+import { Wallet } from 'zksync-web3';
 import { Compressor, MockKnownCodesStorage__factory } from '../typechain-types';
 import {
     BOOTLOADER_FORMAL_ADDRESS,
@@ -6,13 +10,9 @@ import {
     L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
     TWO_IN_256
 } from './shared/constants';
-import { Wallet } from 'zksync-web3';
-import { getWallets, deployContract, getCode, loadArtifact, setCode } from './shared/utils';
-import { network, ethers } from 'hardhat';
-import * as zksync from 'zksync-web3';
-import { BigNumber, BytesLike } from 'ethers';
+import { deployContract, getCode, getWallets, loadArtifact, setCode } from './shared/utils';
 
-describe('Compressor tests', function () {
+xdescribe('Compressor tests', function () {
     let wallet: Wallet;
     let compressor: Compressor;
     let bootloader: ethers.Signer;

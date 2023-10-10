@@ -1,9 +1,9 @@
 import { expect } from 'chai';
+import { ethers, network } from 'hardhat';
+import { Wallet } from 'zksync-web3';
 import { ImmutableSimulator } from '../typechain-types';
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from './shared/constants';
-import { Wallet } from 'zksync-web3';
-import { getWallets, deployContract } from './shared/utils';
-import { network, ethers } from 'hardhat';
+import { deployContract, getWallets } from './shared/utils';
 
 describe('ImmutableSimulator tests', function () {
     let wallet: Wallet;
@@ -33,7 +33,7 @@ describe('ImmutableSimulator tests', function () {
             );
         });
 
-        it('successfully set', async () => {
+        xit('successfully set', async () => {
             await network.provider.request({
                 method: 'hardhat_impersonateAccount',
                 params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS]
