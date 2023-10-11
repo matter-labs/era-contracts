@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 
 import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
 import {TxStatus} from "../../../../../../cache/solpp-generated-contracts/common/Messaging.sol";
-import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/bridgehead/chain-interfaces/IMailbox.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
