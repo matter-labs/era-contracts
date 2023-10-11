@@ -5,7 +5,7 @@
     "prettier/prettier": ["error"],
     "func-visibility": ["error", { "ignoreConstructors": true }],
     "compiler-version": ["error", ">=0.8.0"],
-    "max-line-length": ["error", 400],
+    "max-line-length": ["error", 150],
     "var-name-mixedcase": "off",
     "func-name-mixedcase": "off",
     "no-inline-assembly": "off",

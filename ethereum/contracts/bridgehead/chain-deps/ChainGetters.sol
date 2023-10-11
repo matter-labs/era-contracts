@@ -7,7 +7,7 @@ import "./ChainBase.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../chain-interfaces/IChainGetters.sol";
 
-/// @title Getters Contract implements functions for getting contract state from outside the blockchain.
+/// @title Getters Contract implements functions for getting contract state from outside the batchchain.
 /// @author Matter Labs
 contract ChainGetters is IChainGetters, ChainBase {
     using UncheckedMath for uint256;
@@ -26,12 +26,12 @@ contract ChainGetters is IChainGetters, ChainBase {
         return chainStorage.pendingGovernor;
     }
 
-    /// @return The total number of blocks that were committed & verified & executed
+    /// @return The total number of batchs that were committed & verified & executed
     function getChainId() external view returns (uint256) {
         return chainStorage.chainId;
     }
 
-    /// @return The total number of blocks that were committed & verified & executed
+    /// @return The total number of batchs that were committed & verified & executed
     function getProofSystem() external view returns (address) {
         return chainStorage.proofSystem;
     }

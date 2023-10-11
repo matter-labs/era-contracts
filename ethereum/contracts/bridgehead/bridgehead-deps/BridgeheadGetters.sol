@@ -17,7 +17,7 @@ contract BridgeheadGetters is BridgeheadBase {
         return bridgeheadStorage.allowList;
     }
 
-    /// @return The total number of blocks that were committed & verified & executed
+    /// @return The total number of batches that were committed & verified & executed
     function getIsProofSystem(address _proofSystem) external view returns (bool) {
         return bridgeheadStorage.proofSystemIsRegistered[_proofSystem];
     }

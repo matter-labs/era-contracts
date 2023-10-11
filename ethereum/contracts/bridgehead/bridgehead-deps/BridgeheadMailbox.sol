@@ -19,25 +19,25 @@ contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
 
     function proveL2MessageInclusion(
         uint256 _chainId,
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address proofSystem = bridgeheadStorage.proofSystem[_chainId];
         return
-            IProofSystem(proofSystem).proveL2MessageInclusion(_chainId, _blockNumber, _index, _message, _proof);
+            IProofSystem(proofSystem).proveL2MessageInclusion(_chainId, _batchNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(
         uint256 _chainId,
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address proofSystem = bridgeheadStorage.proofSystem[_chainId];
-        return IProofSystem(proofSystem).proveL2LogInclusion(_chainId, _blockNumber, _index, _log, _proof);
+        return IProofSystem(proofSystem).proveL2LogInclusion(_chainId, _batchNumber, _index, _log, _proof);
     }
 
     function proveL1ToL2TransactionStatus(

@@ -22,7 +22,7 @@ interface IBridgeheadMailbox {
 
     function proveL2MessageInclusion(
         uint256 _chainId,
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
@@ -30,7 +30,7 @@ interface IBridgeheadMailbox {
 
     function proveL2LogInclusion(
         uint256 _chainId,
-        uint256 _blockNumber,
+        uint256 _batchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof

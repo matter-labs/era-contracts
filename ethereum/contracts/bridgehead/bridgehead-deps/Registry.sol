@@ -43,7 +43,7 @@ contract Registry is IRegistry, BridgeheadBase {
                     keccak256(
                         abi.encodePacked(
                             "CHAIN_ID",
-                            block.chainid,
+                            batch.chainid,
                             address(this),
                             _proofSystem,
                             msg.sender
