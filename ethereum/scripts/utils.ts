@@ -9,7 +9,7 @@ export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, 'contracts/zksync/artifacts-zk/');
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string || "./", 'contracts/zksync/artifacts-zk/');
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
 const openzeppelinTransparentProxyArtifactsPath = path.join(
     contractArtifactsPath,
