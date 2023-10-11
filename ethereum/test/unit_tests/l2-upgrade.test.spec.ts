@@ -243,7 +243,7 @@ describe('L2 upgrade test', function () {
             })
         );
 
-        expect(revertReason).to.equal('L2 system upgrade tx type is wrong');
+        expect(revertReason).to.equal('L2 sys upgrade tx type is wrong');
     });
 
     it('Should include the new protocol version as part of nonce', async () => {

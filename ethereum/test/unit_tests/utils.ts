@@ -81,7 +81,7 @@ export async function getCallRevertReason(promise) {
 
 export async function requestExecute(
     chainId: ethers.BigNumberish,
-    mailbox: ethers.Contract,
+    bridgehead: ethers.Contract,
     to: Address,
     l2Value: ethers.BigNumber,
     calldata: ethers.BytesLike,
@@ -91,10 +91,10 @@ export async function requestExecute(
     overrides?: ethers.PayableOverrides
 ) {
     overrides ??= {};
-    overrides.gasPrice ??= mailbox.provider.getGasPrice();
+    overrides.gasPrice ??= bridgehead.provider.getGasPrice();
 
     if (!overrides.value) {
-        const baseCost = await mailbox.l2TransactionBaseCost(
+        const baseCost = await bridgehead.l2TransactionBaseCost(
             chainId,
             overrides.gasPrice,
             l2GasLimit,
@@ -103,7 +103,7 @@ export async function requestExecute(
         overrides.value = baseCost.add(l2Value);
     }
 
-    return await mailbox.requestL2Transaction(
+    return await bridgehead.requestL2Transaction(
         chainId,
         to,
         l2Value,
@@ -126,7 +126,7 @@ export async function requestExecuteDirect(
     factoryDeps: BytesLike[],
     refundRecipient: string
 ) {
-    let overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 29000000 as BigNumberish };
+    let overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 28000000 as BigNumberish };
     overrides.gasPrice = await mailbox.provider.getGasPrice();
 
     // we call bridgeheadChain direcetly to avoid running out of gas.
