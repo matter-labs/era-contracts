@@ -381,7 +381,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     }
 
     /// @return l2Token Address of an L2 token counterpart.
-    function l2TokenAddress(address _l1Token, uint256 chainId) public view override returns (address l2Token) {
+    function l2TokenAddress(address _l1Token, uint256) public view override returns (address l2Token) {
         l2Token = _l1Token == l1WethAddress ? l2WethAddress : address(0);
     }
 
