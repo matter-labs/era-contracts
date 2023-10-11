@@ -55,18 +55,6 @@ struct ProofStorage {
     address bridgehead;
     /// @notice chainContract
     mapping(uint256 => address) proofChainContract;
-    /// @dev Verifier contract. Used to verify aggregated proof for Batchs
-    address verifier;
-    /// @notice Total number of executed Batchs i.e. Batchs[totalBatchsExecuted] points at the latest executed Batch (Batch 0 is genesis)
-    mapping(uint256 => uint256) totalBatchsExecuted;
-    /// @notice Total number of proved Batchs i.e. Batchs[totalBatchsProved] points at the latest proved Batch
-    mapping(uint256 => uint256) totalBatchsVerified;
-    /// @notice Total number of committed Batchs i.e. Batchs[totalBatchsCommitted] points at the latest committed Batch
-    mapping(uint256 => uint256) totalBatchsCommitted;
-    /// @dev Stored hashed StoredBatch for Batch number
-    mapping(uint256 => mapping(uint256 => bytes32)) storedBatchHashes;
-    // /// @dev Stored root hashes of L2 -> L1 logs
-    // mapping(uint256 => bytes32) l2LogsRootHashes;
     // /// @dev Container that stores transactions requested from L1
     // PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
