@@ -73,7 +73,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     event NewAllowList(address indexed oldAllowList, address indexed newAllowList);
 
     /// @notice The main function that will be provided by the upgrade proxy
-    function upgrade(uint256 , ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
+    function upgrade(uint256, ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occured. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -172,7 +172,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        uint256 ,
+        uint256,
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
         uint256 _newProtocolVersion
@@ -227,7 +227,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 , uint256 _newProtocolVersion) internal {
+    function _setNewProtocolVersion(uint256, uint256 _newProtocolVersion) internal {
         uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
