@@ -6,7 +6,7 @@ pragma solidity ^0.8.13;
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
-contract BridgeheadGetters is BridgeheadBase {
+contract BridgeheadGettersFacet is BridgeheadBase {
     /// @return The address of the current governor
     function getGovernor() external view returns (address) {
         return bridgeheadStorage.governor;

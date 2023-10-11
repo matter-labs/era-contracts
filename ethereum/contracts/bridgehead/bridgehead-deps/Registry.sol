@@ -14,10 +14,11 @@ import "../../common/libraries/Diamond.sol";
 // import "../../common/L2ContractAddresses.sol";
 import "../chain-interfaces/IBridgeheadChain.sol";
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+// import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-contract Registry is IRegistry, BridgeheadBase {
+contract BridgeheadRegistryFacet is IRegistry, BridgeheadBase {
     using UncheckedMath for uint256;
+    string public constant override getName = "BridgeheadRegistryFacet";
 
     /// @notice Proof system can be any contract with the appropriate interface, functionality
     function newProofSystem(address _proofSystem) external onlyGovernor {

@@ -77,7 +77,7 @@ export async function create2DeployFromL1(
     l2GasLimit: ethers.BigNumberish,
     gasPrice?: ethers.BigNumberish
 ) {
-    const zkSyncAddress = deployedAddressesFromEnv().Bridgehead.BridgeheadProxy;
+    const zkSyncAddress = deployedAddressesFromEnv().Bridgehead.BridgeheadDiamondProxy;
     const zkSync = IBridgeheadFactory.connect(zkSyncAddress, wallet);
 
     const deployerSystemContracts = new Interface(artifacts.readArtifactSync('IContractDeployer').abi);

@@ -142,7 +142,7 @@ describe('L2 upgrade test', function () {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
                 deployer.addresses.Bridgehead.ChainProxy,
                 deployer.addresses.ProofSystem.ProofSystemProxy,
                 deployer.addresses.ProofSystem.DiamondProxy,
@@ -166,7 +166,7 @@ describe('L2 upgrade test', function () {
 
         await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
 
-        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
+        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
         let bridgeheadChainContract = BridgeheadChainFactory.connect(
             deployer.addresses.Bridgehead.ChainProxy,
             deployWallet

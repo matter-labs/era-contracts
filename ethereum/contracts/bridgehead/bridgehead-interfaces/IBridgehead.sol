@@ -8,4 +8,5 @@ import "./IBridgeheadMailbox.sol";
 import "./IRegistry.sol";
 import "./IBridgeheadGetters.sol";
 
-interface IBridgehead is IBridgeheadMailbox, IBridgeheadGetters, IRegistry {}
+interface IBridgehead is IBridgeheadMailbox, IBridgeheadGetters, IRegistry, IBridgeheadAdmin {
+}

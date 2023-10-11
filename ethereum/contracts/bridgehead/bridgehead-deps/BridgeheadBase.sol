@@ -21,4 +21,10 @@ contract BridgeheadBase is ReentrancyGuard, AllowListed {
         require(msg.sender == bridgeheadStorage.proofSystem[_chainId], "12c");
         _;
     }
+
+    /// @notice Checks that the message sender is an active governor or admin
+    modifier onlyGovernorOrAdmin() {
+        require(msg.sender == bridgeheadStorage.governor || msg.sender == bridgeheadStorage.admin, "Only by governor or admin");
+        _;
+    }
 }

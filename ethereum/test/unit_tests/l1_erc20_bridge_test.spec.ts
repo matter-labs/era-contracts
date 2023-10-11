@@ -5,7 +5,7 @@ import * as hardhat from 'hardhat';
 import * as fs from 'fs';
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from 'zksync-web3/build/src/utils';
-import { AllowList, TestnetERC20Token, TestnetERC20TokenFactory, BridgeheadFactory, Bridgehead } from '../../typechain';
+import { AllowList, TestnetERC20Token, TestnetERC20TokenFactory, BridgeheadMailboxFacet , BridgeheadMailboxFacetFactory} from '../../typechain';
 import { IL1Bridge } from '../../typechain/IL1Bridge';
 import { IL1BridgeFactory } from '../../typechain/IL1BridgeFactory';
 import { AccessMode, getCallRevertReason } from './utils';
@@ -30,7 +30,7 @@ describe(`L1ERC20Bridge tests`, function () {
     let erc20TestToken: TestnetERC20Token;
     let testnetERC20TokenContract: ethers.Contract;
     let l1Erc20BridgeContract: ethers.Contract;
-    let bridgeheadContract: Bridgehead;
+    let bridgeheadMailboxFacet: BridgeheadMailboxFacet;
     let chainId = 0;
 
     before(async () => {
@@ -40,6 +40,7 @@ describe(`L1ERC20Bridge tests`, function () {
             owner.provider
         );
         const ownerAddress = await deployWallet.getAddress();
+        process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -108,7 +109,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
                 deployer.addresses.Bridgehead.ChainProxy,
                 deployer.addresses.ProofSystem.ProofSystemProxy,
                 deployer.addresses.ProofSystem.DiamondProxy,
@@ -126,11 +127,11 @@ describe(`L1ERC20Bridge tests`, function () {
         );
         await allowTx.wait();
 
-        bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
+        bridgeheadMailboxFacet = BridgeheadMailboxFacetFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
 
         const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory('L1ERC20Bridge');
         l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(
-            deployer.addresses.Bridgehead.BridgeheadProxy,
+            deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
             allowList.address
         );
         l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
@@ -147,7 +148,7 @@ describe(`L1ERC20Bridge tests`, function () {
         await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits('10000', 18));
 
         // // Exposing the methods of IZkSync to the diamond proxy
-        // bridgeheadContract = BridgeheadFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
+        // bridgeheadMailboxFacet = BridgeheadMailboxFacetFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
     });
 
     it(`Should not allow an un-whitelisted address to deposit`, async () => {
@@ -190,7 +191,7 @@ describe(`L1ERC20Bridge tests`, function () {
         const depositorAddress = await randomSigner.getAddress();
         await depositERC20(
             l1ERC20Bridge.connect(randomSigner),
-            bridgeheadContract,
+            bridgeheadMailboxFacet,
             chainId,
             depositorAddress,
             testnetERC20TokenContract.address,
@@ -265,7 +266,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
 async function depositERC20(
     bridge: IL1Bridge,
-    bridgeheadContract: Bridgehead,
+    bridgeheadMailboxFacet: BridgeheadMailboxFacet,
     chainId: BigNumberish,
     l2Receiver: string,
     l1Token: string,
@@ -275,7 +276,7 @@ async function depositERC20(
 ) {
     const gasPrice = await bridge.provider.getGasPrice();
     const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-    const neededValue = await bridgeheadContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
+    const neededValue = await bridgeheadMailboxFacet.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
 
     await bridge.deposit(
         chainId,

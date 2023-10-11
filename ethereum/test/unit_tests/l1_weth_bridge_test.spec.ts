@@ -143,7 +143,7 @@ describe('WETH Bridge tests', () => {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadProxy,
+                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
                 deployer.addresses.Bridgehead.ChainProxy,
                 deployer.addresses.ProofSystem.ProofSystemProxy,
                 deployer.addresses.ProofSystem.DiamondProxy,
@@ -161,7 +161,7 @@ describe('WETH Bridge tests', () => {
         );
         await allowTx.wait();
 
-        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadProxy, deployWallet);
+        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
 
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
@@ -172,7 +172,7 @@ describe('WETH Bridge tests', () => {
 
         const bridge = await (
             await hardhat.ethers.getContractFactory('L1WethBridge')
-        ).deploy(l1Weth.address, deployer.addresses.Bridgehead.BridgeheadProxy, deployer.addresses.AllowList);
+        ).deploy(l1Weth.address, deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployer.addresses.AllowList);
 
         // we don't test L2, so it is ok to give garbage factory deps and L2 address
         const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';

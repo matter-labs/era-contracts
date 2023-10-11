@@ -7,7 +7,7 @@ import "./BridgeheadBase.sol";
 import "../bridgehead-interfaces/IBridgeheadMailbox.sol";
 import "../../proof-system/proof-system-interfaces/IProofSystem.sol";
 
-contract BridgeheadMailbox is BridgeheadBase, IBridgeheadMailbox {
+contract BridgeheadMailboxFacet is BridgeheadBase, IBridgeheadMailbox {
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,
