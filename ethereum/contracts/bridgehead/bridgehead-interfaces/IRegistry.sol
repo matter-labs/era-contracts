@@ -12,7 +12,6 @@ interface IRegistry is IBridgeheadBase {
         uint256 _chainId,
         address _proofSystem,
         address _chainGovernor,
-        IAllowList _allowList,
         Diamond.DiamondCutData calldata _diamondCut
     ) external returns (uint256 chainId);
 
