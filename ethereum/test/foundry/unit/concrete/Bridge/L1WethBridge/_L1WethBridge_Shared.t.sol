@@ -6,15 +6,15 @@ import {Test} from "forge-std/Test.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import {L1WethBridge} from "../../../../../../cache/solpp-generated-contracts/bridge/L1WethBridge.sol";
 import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contracts/WETH9.sol";
-import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
+import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/facets/Mailbox.sol";
+import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/DiamondInit.sol";
 import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/ProofChainStorage.sol";
-import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
-import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
+import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
+import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/proof-system/DiamondProxy.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {IZkSync} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IZkSync.sol";
+import {IProofChain} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IProofChain.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract L1WethBridgeTest is Test {
@@ -80,7 +80,7 @@ contract L1WethBridgeTest is Test {
 
         l1Weth = new WETH9();
 
-        IZkSync zkSync = IZkSync(address(diamondProxy));
+        IProofChain zkSync = IProofChain(address(diamondProxy));
 
         L1WethBridge bridge = new L1WethBridge(payable(address(l1Weth)), zkSync, allowList);
 

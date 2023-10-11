@@ -4,7 +4,7 @@ pragma solidity ^0.8.17;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/common/Config.sol";
 
 contract DepositTest is L1WethBridgeTest {
     function test_RevertWhen_UnWhitelistedAddressDeposits() public {
