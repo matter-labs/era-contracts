@@ -6,12 +6,14 @@ import {
     web3Provider,
     getNumberFromEnv,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+} from './utils';
+import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
     L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
     L2_STANDARD_ERC20_PROXY_BYTECODE,
     L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE
-} from './utils';
+} from './utils-bytecode';
 
 import * as fs from 'fs';
 import * as path from 'path';

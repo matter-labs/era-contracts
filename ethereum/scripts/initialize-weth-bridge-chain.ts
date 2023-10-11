@@ -5,10 +5,12 @@ import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import {
     web3Provider,
     getNumberFromEnv,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+} from './utils';
+import {
     L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
     L2_WETH_BRIDGE_PROXY_BYTECODE
-} from './utils';
+} from './utils-bytecode';
 
 import * as fs from 'fs';
 import * as path from 'path';

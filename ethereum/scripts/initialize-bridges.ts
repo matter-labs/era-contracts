@@ -6,7 +6,9 @@ import {
     computeL2Create2Address,
     web3Provider,
     hashL2Bytecode,
-    applyL1ToL2Alias,
+    applyL1ToL2Alias
+} from './utils';
+import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
     L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
@@ -19,7 +21,7 @@ import {
     L2_WETH_BRIDGE_INTERFACE,
     L2_ERC20_BRIDGE_INTERFACE,
     L2_WETH_INTERFACE
-} from './utils';
+} from './utils-bytecode';
 
 import * as fs from 'fs';
 import * as path from 'path';
