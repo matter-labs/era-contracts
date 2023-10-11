@@ -6,7 +6,6 @@ pragma solidity ^0.8.17;
 
 import {BridgeheadTest} from "../_Bridgehead_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {IBridgeheadChain} from "../../../../../../cache/solpp-generated-contracts/bridgehead/chain-interfaces/IBridgeheadChain.sol";
 import {IProofSystem} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofSystem.sol";
 
 /* solhint-enable max-line-length */
