@@ -7,6 +7,7 @@ import "../../common/Messaging.sol";
 import "./IBridgeheadMailbox.sol";
 import "./IRegistry.sol";
 import "./IBridgeheadGetters.sol";
+import "./IBridgeheadAdmin.sol";
 
 interface IBridgehead is IBridgeheadMailbox, IBridgeheadGetters, IRegistry, IBridgeheadAdmin {
 }

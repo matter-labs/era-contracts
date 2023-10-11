@@ -3,13 +3,21 @@
 
 pragma solidity ^0.8.13;
 
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, 
+    L2_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
+import {DiamondProxy} from "../common/DiamondProxy.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IAllowList} from "../common/interfaces/IAllowList.sol";
+import {L2Message, L2Log, TxStatus, WritePriorityOpParams} from "../common/Messaging.sol";
 import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
+import {IMailbox} from "./chain-interfaces/IMailbox.sol";
+import {IBridgeheadMailbox} from "../bridgehead/bridgehead-interfaces/IBridgeheadMailbox.sol";
+import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {Diamond} from "../common/libraries/Diamond.sol";
-import {ProofChainBase} from "./chain-deps/facets/Base.sol";
+import {ProofBase} from "./proof-system-deps/ProofBase.sol";
 import {Verifier} from "./Verifier.sol";
 import {VerifierParams} from "./chain-deps/ProofChainStorage.sol";
 import {InitializeData} from "./proof-system-interfaces/IProofSystem.sol";
@@ -36,7 +44,7 @@ contract ProofSystem is IProofRegistry, IProofMailbox, ProofBase {
     }
 
     /// @return The address of the allowList
-    function getAllowList() external view returns (IAllowList) {
+    function getAllowList() external view returns (address) {
         return proofStorage.allowList;
     }
 

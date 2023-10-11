@@ -33,7 +33,6 @@ contract BridgeheadRegistryFacet is IRegistry, BridgeheadBase {
         uint256 _chainId,
         address _proofSystem,
         address _chainGovernor,
-        IAllowList _allowList,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyGovernor returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
