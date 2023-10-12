@@ -83,7 +83,12 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     function isValidator(address _address) external view returns (bool) {
         return chainStorage.validators[_address];
     }
-
+    
+    /// @return Merkle root of the tree with L2 logs for the selected batch
+      function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32) {
+        return chainStorage.l2LogsRootHashes[_batchNumber];
+    }
+    
     /// @notice For unfinalized (non executed) blocks may change
     /// @dev returns zero for non-committed blocks
     /// @return The hash of committed L2 block.
@@ -105,31 +110,6 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
     function getVerifierParams() external view returns (VerifierParams memory) {
         return chainStorage.verifierParams;
     }
-
-    // /// @return The address of the security council multisig
-    // function getSecurityCouncil() external view returns (address) {
-    //     return chainStorage.upgrades.securityCouncil;
-    // }
-
-    // /// @return Current upgrade proposal state
-    // function getUpgradeProposalState() external view returns (ProofUpgradeState) {
-    //     return chainStorage.upgrades.state;
-    // }
-
-    // /// @return The upgrade proposal hash if there is an active one and zero otherwise
-    // function getProposedUpgradeHash() external view returns (bytes32) {
-    //     return chainStorage.upgrades.proposedUpgradeHash;
-    // }
-
-    // /// @return The timestamp when the upgrade was proposed, zero if there are no active proposals
-    // function getProposedUpgradeTimestamp() external view returns (uint256) {
-    //     return chainStorage.upgrades.proposedUpgradeTimestamp;
-    // }
-
-    // /// @return The serial number of a proposed upgrade, increments when proposing a new one
-    // function getCurrentProposalId() external view returns (uint256) {
-    //     return chainStorage.upgrades.currentProposalId;
-    // }
 
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256) {
@@ -189,6 +169,13 @@ contract GettersFacet is ProofChainBase, IGetters, ILegacyGetters {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         require(ds.selectorToFacet[_selector].facetAddress != address(0), "g2");
         return ds.selectorToFacet[_selector].isFreezable;
+    }
+
+    /// @return Whether a withdrawal has been finalized.
+    /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
+    /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
+    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
+        return chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
     }
 
     /*//////////////////////////////////////////////////////////////

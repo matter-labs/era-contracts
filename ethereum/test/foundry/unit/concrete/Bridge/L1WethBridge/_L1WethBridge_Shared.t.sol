@@ -11,7 +11,7 @@ import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/pr
 import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/DiamondInit.sol";
 import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/ProofChainStorage.sol";
 import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
-import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/proof-system/DiamondProxy.sol";
+import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {IProofChain} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IProofChain.sol";
