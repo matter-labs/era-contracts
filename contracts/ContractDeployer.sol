@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -228,8 +228,24 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             false,
             _deployment.callConstructor
         );
+    }
 
-        emit ContractDeployed(_sender, _deployment.bytecodeHash, _deployment.newAddress);
+    /// @notice The method that is temporarily needed to upgrade the Keccka256 precompile. It is to be removed in the 
+    /// future. Unlike a normal forced deployment, it does not update account information as it requires updating a 
+    /// mapping, and so requires Keccak256 precompile to work already.
+    /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256 
+    /// precompile. 
+    function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
+        _ensureBytecodeIsKnown(_keccak256BytecodeHash);
+
+        _constructContract(
+            msg.sender,
+            address(KECCAK256_SYSTEM_CONTRACT),
+            _keccak256BytecodeHash,
+            msg.data[0:0],
+            false,
+            false
+        );
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
@@ -295,7 +311,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         _constructContract(msg.sender, _newAddress, _bytecodeHash, _input, false, true);
-        emit ContractDeployed(msg.sender, _bytecodeHash, _newAddress);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -352,5 +367,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             // If we do not call the constructor, we need to set the constructed code hash.
             ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, _bytecodeHash);
         }
+
+        emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
 }

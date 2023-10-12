@@ -488,6 +488,10 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
+            function KECCAK256_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008010
+            }
+
             function L1_MESSENGER_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008008
             }
@@ -632,6 +636,70 @@ object "Bootloader" {
                             }
                         <!-- @endif -->
                     }
+            }
+
+            /// @dev Checks whether the code hash of the Keccak256 precompile contract is correct and updates it if needed.
+            /// @dev When we upgrade to the new version of the Keccak256 precompile contract, the keccak precompile will not work correctly 
+            /// and so the upgrade it should be done before any `keccak` calls. 
+            /// @dev Since this upgrade has 
+            function upgradeKeccakIfNeeded() {
+                let expectedCodeHash := {{KECCAK256_EXPECTED_CODE_HASH}}
+                
+                let actualCodeHash := getRawCodeHash(KECCAK256_ADDR(), true)
+                if iszero(eq(expectedCodeHash, actualCodeHash)) {
+                    // The `mimicCallOnlyResult` requires that the first word of the data
+                    // contains its length. Here is 36 bytes, i.e. 4 byte selector + 32 byte hash.
+                    mstore(0, 36)
+                    mstore(32, {{PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR}})
+                    mstore(36, expectedCodeHash)
+                    
+                    // We'll use a mimicCall to simulate the correct sender.
+                    let success := mimicCallOnlyResult(
+                        CONTRACT_DEPLOYER_ADDR(),
+                        FORCE_DEPLOYER(), 
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    )
+
+                    if iszero(success) {
+                        assertionError("keccak256 upgrade fail")
+                    }
+                }
+            }
+
+            function getRawCodeHash(addr, assertSuccess) -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                let success := call(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails, 
+                // it most likely means that the caller did not provide enough gas for
+                // the call. 
+                // In case the caller is certain that the amount of gas provided is enough, i.e. 
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    if assertSuccess {
+                        // The call must've succeeded, but revert the bootloader.
+                        assertionError("getRawCodeHash failed")
+                    }
+                    
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
             }
 
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
@@ -1956,26 +2024,7 @@ object "Bootloader" {
             /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
-                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
-                mstore(4, addr)
-                let success := call(
-                    gas(),
-                    ACCOUNT_CODE_STORAGE_ADDR(),
-                    0,
-                    0,
-                    36,
-                    0,
-                    32
-                )
-
-                if iszero(success) {
-                    // The call to the account code storage should always succeed
-                    nearCallPanic()
-                }
-
-                let rawCodeHash := mload(0)
-
-                ret := iszero(rawCodeHash)
+                ret := iszero(getRawCodeHash(addr, false))
             }
 
             /// @dev Calls the `payForTransaction` method of an account
@@ -3656,6 +3705,8 @@ object "Bootloader" {
                 /// Just like the batch number, while calculated on the bootloader side,
                 /// the operator still provides it to make sure that its data is in sync. 
                 let EXPECTED_BASE_FEE := mload(192)
+
+                upgradeKeccakIfNeeded()
 
                 validateOperatorProvidedPrices(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
 
