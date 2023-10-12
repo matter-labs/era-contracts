@@ -21,11 +21,12 @@ import {
     getAddressFromEnv,
     getHashFromEnv,
     getNumberFromEnv,
+    readSystemContractsBytecode,   
+    readBatchBootloaderBytecode,
     getTokens
 } from '../scripts/utils';
-import { readSystemContractsBytecode,   
-         readBatchBootloaderBytecode
-} from '../scripts/utils-bytecode';
+
+
 import { deployViaCreate2 } from './deploy-utils';
 import { IGovernanceFactory } from '../typechain/IGovernanceFactory';
 

@@ -74,7 +74,27 @@ export function applyL1ToL2Alias(address: string): string {
     return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
 }
 
+export function readBytecode(path: string, fileName: string) {
+    return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).bytecode;
+}
 
+export function readInterface(path: string, fileName: string) {
+    const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
+    return new ethers.utils.Interface(abi);
+}
+
+export function readBatchBootloaderBytecode() {
+    const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts/bootloader`);
+    return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
+}
+
+export function readSystemContractsBytecode(fileName: string) {
+    const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, `etc/system-contracts`);
+    const artifact = fs.readFileSync(
+        `${systemContractsPath}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
+    );
+    return JSON.parse(artifact.toString()).bytecode;
+}
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
     // For getting the consistent length we first convert the bytecode to UInt8Array
