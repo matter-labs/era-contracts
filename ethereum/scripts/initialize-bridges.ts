@@ -22,6 +22,7 @@ import {
     L2_ERC20_BRIDGE_INTERFACE,
     L2_WETH_INTERFACE
 } from './utils-bytecode';
+import { IBridgeheadFactory } from '../typechain/IBridgeheadFactory';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -36,13 +37,14 @@ async function initializeBridges(
     gasPrice: ethers.BigNumber,
     cmdErc20Bridge: string
 ) {
-    const bridgehead = deployer.bridgeheadContract(deployWallet);
+    const bridgehead = IBridgeheadFactory.connect(process.env.CONTRACTS_BRIDGEHEAD_DIAMOND_PROXY_ADDR, deployWallet);
     const nonce = await deployWallet.getTransactionCount();
 
     const erc20Bridge = cmdErc20Bridge
         ? deployer.defaultERC20Bridge(deployWallet).attach(cmdErc20Bridge)
         : deployer.defaultERC20Bridge(deployWallet);
-
+    
+    console.log("KL todo", bridgehead.address)
     const l1GovernorAddress = await bridgehead.getGovernor();
     // Check whether governor is a smart contract on L1 to apply alias if needed.
     const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));

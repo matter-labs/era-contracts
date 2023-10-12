@@ -93,7 +93,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _l2WethAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
     function initialize(
-        // kl todo we need to split initialize and initialize chain
         bytes[] calldata _factoryDeps,
         address _l2WethAddress,
         address _governor
@@ -119,7 +118,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
     /// proxy
     function initializeChain(
-        // kl todo we need to split initialize and initialize chain
         uint256 _chainId,
         bytes[] calldata _factoryDeps,
         uint256 _deployBridgeImplementationFee,

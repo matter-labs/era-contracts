@@ -646,7 +646,7 @@ export class Deployer {
         );
 
         if (this.verbose) {
-            console.log(`CONTRACTS_BRRIDGEHEAD_DIAMOND_PROXY_ADDR=${contractAddress}`);
+            console.log(`CONTRACTS_BRIDGEHEAD_DIAMOND_PROXY_ADDR=${contractAddress}`);
         }
 
         this.addresses.Bridgehead.BridgeheadDiamondProxy = contractAddress;
@@ -713,14 +713,12 @@ export class Deployer {
         // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
         const inputChainId = 0;
         const governor = this.ownerAddress;
-        const allowList = this.addresses.AllowList;
         const initialDiamondCut = diamondCut ? diamondCut : await this.initialProofSystemProxyDiamondCut();
 
         const tx = await bridgehead.newChain(
             inputChainId,
             this.addresses.ProofSystem.ProofSystemProxy,
             governor,
-            allowList,
             initialDiamondCut,
             { gasPrice, nonce, gasLimit }
         );
