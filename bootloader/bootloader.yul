@@ -674,7 +674,7 @@ object "Bootloader" {
             function getRawCodeHash(addr, assertSuccess) -> ret {
                 mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
                 mstore(4, addr)
-                let success := call(
+                let success := staticcall(
                     gas(),
                     ACCOUNT_CODE_STORAGE_ADDR(),
                     0,
