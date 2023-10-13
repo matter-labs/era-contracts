@@ -641,7 +641,6 @@ object "Bootloader" {
             /// @dev Checks whether the code hash of the Keccak256 precompile contract is correct and updates it if needed.
             /// @dev When we upgrade to the new version of the Keccak256 precompile contract, the keccak precompile will not work correctly 
             /// and so the upgrade it should be done before any `keccak` calls. 
-            /// @dev Since this upgrade has 
             function upgradeKeccakIfNeeded() {
                 let expectedCodeHash := {{KECCAK256_EXPECTED_CODE_HASH}}
                 
@@ -691,7 +690,7 @@ object "Bootloader" {
                 // (`assertSuccess` = true), then we should panic.
                 if iszero(success) {
                     if assertSuccess {
-                        // The call must've succeeded, but revert the bootloader.
+                        // The call must've succeeded, but it didn't. So we revert the bootloader.
                         assertionError("getRawCodeHash failed")
                     }
                     

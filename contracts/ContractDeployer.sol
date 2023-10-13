@@ -230,7 +230,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         );
     }
 
-    /// @notice The method that is temporarily needed to upgrade the Keccka256 precompile. It is to be removed in the 
+    /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. It is to be removed in the 
     /// future. Unlike a normal forced deployment, it does not update account information as it requires updating a 
     /// mapping, and so requires Keccak256 precompile to work already.
     /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256 
