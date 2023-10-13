@@ -71,11 +71,6 @@ object "Keccak256" {
 
             // 2. Parse calldata fat pointer
             let ptrOffset := and(calldataFatPtr, UINT32_BIT_MASK())
-            // TODO: Remove this check before merging.
-            // Assert that calldata ptr offset if zero. 
-            if ptrOffset {
-                revert(0, 0)
-            }
             let ptrMemoryPage := and(shr(32, calldataFatPtr), UINT32_BIT_MASK())
             let ptrStart := and(shr(64, calldataFatPtr), UINT32_BIT_MASK())
             let ptrLength := and(shr(96, calldataFatPtr), UINT32_BIT_MASK())
