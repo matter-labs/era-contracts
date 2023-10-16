@@ -70,7 +70,6 @@ object "Keccak256" {
             let calldataFatPtr := getCalldataPtr()
 
             // 2. Parse calldata fat pointer
-            let ptrOffset := and(calldataFatPtr, UINT32_BIT_MASK())
             let ptrMemoryPage := and(shr(32, calldataFatPtr), UINT32_BIT_MASK())
             let ptrStart := and(shr(64, calldataFatPtr), UINT32_BIT_MASK())
             let ptrLength := and(shr(96, calldataFatPtr), UINT32_BIT_MASK())
