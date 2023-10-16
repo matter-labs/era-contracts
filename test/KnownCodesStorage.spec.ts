@@ -30,7 +30,7 @@ xdescribe('KnownCodesStorage tests', function () {
         knownCodesStorage = (await deployContract('KnownCodesStorage')) as KnownCodesStorage;
 
         _l1MessengerCode = await getCode(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
-        let l1MessengerArtifact = await loadArtifact('MockL1Messenger');
+        const l1MessengerArtifact = await loadArtifact('MockL1Messenger');
         await setCode(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, l1MessengerArtifact.bytecode);
         mockL1Messenger = MockL1Messenger__factory.connect(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, wallet);
 

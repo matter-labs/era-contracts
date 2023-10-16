@@ -1,14 +1,14 @@
-import { Provider, Contract, Wallet } from 'zksync-web3';
 import { Deployer } from '@matterlabs/hardhat-zksync-deploy';
-import { readYulBytecode } from '../../scripts/utils';
-import { ethers, network } from 'hardhat';
+import { ZkSyncArtifact } from '@matterlabs/hardhat-zksync-deploy/dist/types';
 import { BytesLike } from 'ethers';
 import * as hre from 'hardhat';
+import { ethers, network } from 'hardhat';
 import * as zksync from 'zksync-web3';
-import { ZkSyncArtifact } from '@matterlabs/hardhat-zksync-deploy/dist/types';
-import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from './constants';
-import { ContractDeployer__factory } from '../../typechain-types';
+import { Contract, Provider, Wallet } from 'zksync-web3';
 import { Language } from '../../scripts/constants';
+import { readYulBytecode } from '../../scripts/utils';
+import { ContractDeployer__factory } from '../../typechain-types';
+import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from './constants';
 
 const RICH_WALLETS = [
     {
@@ -29,6 +29,7 @@ const RICH_WALLETS = [
     }
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const provider = new Provider((hre.network.config as any).url);
 
 const wallet = new Wallet(RICH_WALLETS[0].privateKey, provider);
@@ -45,7 +46,7 @@ export async function callFallback(contract: Contract, data: string) {
 }
 
 export function getWallets(): Wallet[] {
-    let wallets = [];
+    const wallets = [];
     for (let i = 0; i < RICH_WALLETS.length; i++) {
         wallets[i] = new Wallet(RICH_WALLETS[i].privateKey, provider);
     }
@@ -56,6 +57,7 @@ export async function loadArtifact(name: string): Promise<ZkSyncArtifact> {
     return await deployer.loadArtifact(name);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function deployContract(name: string, constructorArguments?: any[] | undefined): Promise<Contract> {
     const artifact = await loadArtifact(name);
     return await deployer.deploy(artifact, constructorArguments);
@@ -107,7 +109,9 @@ export async function setCode(address: string, bytecode: BytesLike) {
     try {
         // publish bytecode in a separate tx
         await publishBytecode(bytecode);
-    } catch {}
+    } catch {
+        // ignore error
+    }
 
     await network.provider.request({
         method: 'hardhat_impersonateAccount',

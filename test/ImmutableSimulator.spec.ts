@@ -1,12 +1,10 @@
 import { expect } from 'chai';
 import { ethers, network } from 'hardhat';
-import { Wallet } from 'zksync-web3';
 import { ImmutableSimulator } from '../typechain-types';
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from './shared/constants';
-import { deployContract, getWallets } from './shared/utils';
+import { deployContract } from './shared/utils';
 
 describe('ImmutableSimulator tests', function () {
-    let wallet: Wallet;
     let immutableSimulator: ImmutableSimulator;
 
     const RANDOM_ADDRESS = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
@@ -22,7 +20,6 @@ describe('ImmutableSimulator tests', function () {
     ];
 
     before(async () => {
-        wallet = getWallets()[0];
         immutableSimulator = (await deployContract('ImmutableSimulator')) as ImmutableSimulator;
     });
 

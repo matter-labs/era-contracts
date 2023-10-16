@@ -1,17 +1,21 @@
 import * as hre from 'hardhat';
 
-import { Command } from 'commander';
-import {Provider, Wallet} from 'zksync-web3';
 import { Deployer } from '@matterlabs/hardhat-zksync-deploy';
-
-import * as path from 'path';
-import * as fs from 'fs';
-
-import { Language, SYSTEM_CONTRACTS } from './constants';
-import { formatUnits, parseUnits } from 'ethers/lib/utils';
+import { Command } from 'commander';
 import { BigNumber, ethers } from 'ethers';
-import {readYulBytecode, publishFactoryDeps, DeployedDependency, Dependency, filterPublishedFactoryDeps } from './utils';
+import { formatUnits, parseUnits } from 'ethers/lib/utils';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Provider, Wallet } from 'zksync-web3';
 import { hashBytecode } from 'zksync-web3/build/src/utils';
+import { Language, SYSTEM_CONTRACTS } from './constants';
+import {
+    Dependency,
+    DeployedDependency,
+    filterPublishedFactoryDeps,
+    publishFactoryDeps,
+    readYulBytecode
+} from './utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
@@ -36,22 +40,15 @@ class ZkSyncDeployer {
         this.dependenciesToUpgrade = [];
     }
 
-    async publishFactoryDeps(
-        dependencies: Dependency[],
-    ) {
-        await publishFactoryDeps(
-            dependencies,
-            this.deployer,
-            this.nonce,
-            this.gasPrice
-        );
+    async publishFactoryDeps(dependencies: Dependency[]) {
+        await publishFactoryDeps(dependencies, this.deployer, this.nonce, this.gasPrice);
         this.nonce += 1;
     }
 
     // Returns the current default account bytecode on zkSync
     async currentDefaultAccountBytecode(): Promise<string> {
         const zkSync = await this.deployer.zkWallet.getMainContract();
-        return await zkSync.getL2DefaultAccountBytecodeHash()
+        return await zkSync.getL2DefaultAccountBytecodeHash();
     }
 
     // If needed, appends the default account bytecode to the upgrade
@@ -64,25 +61,29 @@ class ZkSyncDeployer {
             this.defaultAccountToUpgrade = {
                 name: DEFAULT_ACCOUNT_CONTRACT_NAME,
                 bytecodeHashes: [bytecodeHash]
-            }
+            };
         }
     }
-    
+
     // Publish default account bytecode
     async publishDefaultAA(defaultAccountBytecode: string) {
-        const [defaultAccountBytecodes, ] = await filterPublishedFactoryDeps(DEFAULT_ACCOUNT_CONTRACT_NAME, [defaultAccountBytecode], this.deployer);
-        
+        const [defaultAccountBytecodes] = await filterPublishedFactoryDeps(
+            DEFAULT_ACCOUNT_CONTRACT_NAME,
+            [defaultAccountBytecode],
+            this.deployer
+        );
+
         if (defaultAccountBytecodes.length == 0) {
             console.log('Default account bytecode is already published, skipping');
             return;
         }
 
-        await this.publishFactoryDeps(
-            [{
+        await this.publishFactoryDeps([
+            {
                 name: DEFAULT_ACCOUNT_CONTRACT_NAME,
-                bytecodes: defaultAccountBytecodes,
-            }],
-        );
+                bytecodes: defaultAccountBytecodes
+            }
+        ]);
         this.nonce += 1;
     }
 
@@ -108,39 +109,38 @@ class ZkSyncDeployer {
             this.bootloaderToUpgrade = {
                 name: BOOTLOADER_CONTRACT_NAME,
                 bytecodeHashes: [bytecodeHash]
-            }
+            };
         }
     }
 
     async publishBootloader(bootloaderCode: string) {
         console.log('\nPublishing bootloader bytecode:');
 
-        const [deps, ] = await filterPublishedFactoryDeps(BOOTLOADER_CONTRACT_NAME, [bootloaderCode], this.deployer);
+        const [deps] = await filterPublishedFactoryDeps(BOOTLOADER_CONTRACT_NAME, [bootloaderCode], this.deployer);
 
         if (deps.length == 0) {
             console.log('Default bootloader bytecode is already published, skipping');
             return;
         }
 
-        await this.publishFactoryDeps(
-            [{
+        await this.publishFactoryDeps([
+            {
                 name: BOOTLOADER_CONTRACT_NAME,
-                bytecodes: deps,
-            }],
-        );
+                bytecodes: deps
+            }
+        ]);
     }
 
     async processBootloader() {
-        const bootloaderCode = ethers.utils.hexlify(fs.readFileSync('./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin'));
+        const bootloaderCode = ethers.utils.hexlify(
+            fs.readFileSync('./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin')
+        );
 
         await this.publishBootloader(bootloaderCode);
         await this.checkShouldUpgradeBootloader(bootloaderCode);
     }
 
-    async shouldUpgradeSystemContract(
-        contractAddress: string,
-        expectedBytecodeHash: string
-    ): Promise<boolean> {
+    async shouldUpgradeSystemContract(contractAddress: string, expectedBytecodeHash: string): Promise<boolean> {
         // We could have also used the `getCode` method of the JSON-RPC, but in the context
         // of system upgrades looking into account code storage is more robust
         const currentBytecodeHash = await this.deployer.zkWallet.provider.getStorageAt(
@@ -154,20 +154,15 @@ class ZkSyncDeployer {
     // Returns the contracts to be published.
     async prepareContractsForPublishing(): Promise<Dependency[]> {
         const dependenciesToPublish: Dependency[] = [];
-        for(const contract of Object.values(SYSTEM_CONTRACTS)) {
-            let contractName = contract.codeName;
+        for (const contract of Object.values(SYSTEM_CONTRACTS)) {
+            const contractName = contract.codeName;
             let factoryDeps: string[] = [];
             if (contract.lang == Language.Solidity) {
                 const artifact = await this.deployer.loadArtifact(contractName);
-                factoryDeps = [
-                    ...await this.deployer.extractFactoryDeps(artifact),
-                    artifact.bytecode
-                ];
+                factoryDeps = [...(await this.deployer.extractFactoryDeps(artifact)), artifact.bytecode];
             } else {
                 // Yul files have only one dependency
-                factoryDeps = [
-                    readYulBytecode(contract)
-                ];
+                factoryDeps = [readYulBytecode(contract)];
             }
 
             const contractBytecodeHash = ethers.utils.hexlify(hashBytecode(factoryDeps[factoryDeps.length - 1]));
@@ -176,15 +171,19 @@ class ZkSyncDeployer {
                     name: contractName,
                     bytecodeHashes: [contractBytecodeHash],
                     address: contract.address
-                })
+                });
             }
-            
-            let [bytecodesToPublish, currentLength] = await filterPublishedFactoryDeps(contractName, factoryDeps, this.deployer);
+
+            const [bytecodesToPublish, currentLength] = await filterPublishedFactoryDeps(
+                contractName,
+                factoryDeps,
+                this.deployer
+            );
             if (bytecodesToPublish.length == 0) {
                 console.log(`All bytecodes for ${contractName} are already published, skipping`);
                 continue;
             }
-            if(currentLength > MAX_COMBINED_LENGTH) {
+            if (currentLength > MAX_COMBINED_LENGTH) {
                 throw new Error(`Can not publish dependencies of contract ${contractName}`);
             }
 
@@ -202,12 +201,13 @@ class ZkSyncDeployer {
         let currentLength = 0;
         let currentDependencies: Dependency[] = [];
         // We iterate over dependencies and try to batch the publishing of those in order to save up on gas as well as time.
-        for (let dependency of dependenciesToPublish) {
-            const dependencyLength = dependency.bytecodes.reduce((prev, dep) => prev + ethers.utils.arrayify(dep).length, 0);
+        for (const dependency of dependenciesToPublish) {
+            const dependencyLength = dependency.bytecodes.reduce(
+                (prev, dep) => prev + ethers.utils.arrayify(dep).length,
+                0
+            );
             if (currentLength + dependencyLength > MAX_COMBINED_LENGTH) {
-                await this.publishFactoryDeps(
-                    currentDependencies,
-                );
+                await this.publishFactoryDeps(currentDependencies);
                 currentLength = dependencyLength;
                 currentDependencies = [dependency];
             } else {
@@ -216,9 +216,7 @@ class ZkSyncDeployer {
             }
         }
         if (currentDependencies.length > 0) {
-            await this.publishFactoryDeps(
-                currentDependencies,
-            );
+            await this.publishFactoryDeps(currentDependencies);
         }
     }
 
@@ -226,11 +224,10 @@ class ZkSyncDeployer {
         return {
             systemContracts: this.dependenciesToUpgrade,
             defaultAA: this.defaultAccountToUpgrade,
-            bootloader: this.bootloaderToUpgrade,
-        }
+            bootloader: this.bootloaderToUpgrade
+        };
     }
 }
-
 
 export function l1RpcUrl() {
     return process.env.ETH_CLIENT_WEB3_URL as string;
@@ -260,12 +257,12 @@ async function main() {
             const l2Rpc = cmd.l2Rpc ? cmd.l2Rpc : l2RpcUrl();
             const providerL1 = new ethers.providers.JsonRpcProvider(l1Rpc);
             const providerL2 = new Provider(l2Rpc);
-            const wallet= cmd.privateKey
-            ? new Wallet(cmd.privateKey)
+            const wallet = cmd.privateKey
+                ? new Wallet(cmd.privateKey)
                 : Wallet.fromMnemonic(
-                    process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                    "m/44'/60'/0'/0/1"
-                );
+                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+                      "m/44'/60'/0'/0/1"
+                  );
             wallet.connect(providerL2);
             wallet.connectToL1(providerL1);
 
@@ -279,7 +276,7 @@ async function main() {
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await providerL1.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
-            let nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getTransactionCount();
+            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getTransactionCount();
             console.log(`Using nonce: ${nonce}`);
 
             const zkSyncDeployer = new ZkSyncDeployer(deployer, gasPrice, nonce);
@@ -302,7 +299,6 @@ async function main() {
                 fs.writeFileSync(cmd.file, JSON.stringify(result, null, 2));
             }
             console.log('\nPublishing factory dependencies complete!');
-
         });
 
     await program.parseAsync(process.argv);

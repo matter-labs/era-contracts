@@ -1,11 +1,11 @@
 import { expect } from 'chai';
-import { BootloaderUtilities } from '../typechain-types';
-import { Wallet } from 'zksync-web3';
-import { getWallets, deployContract } from './shared/utils';
 import { ethers } from 'hardhat';
 import * as zksync from 'zksync-web3';
-import { hashBytecode, serialize } from 'zksync-web3/build/src/utils';
-import { TransactionData, signedTxToTransactionData } from './shared/transactions';
+import { Wallet } from 'zksync-web3';
+import { serialize } from 'zksync-web3/build/src/utils';
+import { BootloaderUtilities } from '../typechain-types';
+import { signedTxToTransactionData } from './shared/transactions';
+import { deployContract, getWallets } from './shared/utils';
 
 describe('BootloaderUtilities tests', function () {
     let wallet: Wallet;
@@ -80,7 +80,7 @@ describe('BootloaderUtilities tests', function () {
             const parsedTx = zksync.utils.parseTransaction(txBytes);
             const txData = signedTxToTransactionData(parsedTx)!;
 
-            let signature = ethers.utils.arrayify(txData.signature);
+            const signature = ethers.utils.arrayify(txData.signature);
             signature[64] = 29;
             txData.signature = signature;
 
@@ -126,7 +126,7 @@ describe('BootloaderUtilities tests', function () {
             const parsedEIP1559tx = zksync.utils.parseTransaction(signedEip1559Tx);
 
             const EIP1559TxData = signedTxToTransactionData(parsedEIP1559tx)!;
-            let signature = ethers.utils.arrayify(EIP1559TxData.signature);
+            const signature = ethers.utils.arrayify(EIP1559TxData.signature);
             signature[64] = 0;
             EIP1559TxData.signature = signature;
 
@@ -172,7 +172,7 @@ describe('BootloaderUtilities tests', function () {
             const parsedEIP2930tx = zksync.utils.parseTransaction(signedEip2930Tx);
 
             const EIP2930TxData = signedTxToTransactionData(parsedEIP2930tx)!;
-            let signature = ethers.utils.arrayify(EIP2930TxData.signature);
+            const signature = ethers.utils.arrayify(EIP2930TxData.signature);
             signature[64] = 100;
             EIP2930TxData.signature = signature;
 

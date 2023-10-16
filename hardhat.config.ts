@@ -1,9 +1,10 @@
+import '@matterlabs/hardhat-zksync-chai-matchers';
+import '@matterlabs/hardhat-zksync-solc';
+import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-solpp';
 import '@typechain/hardhat';
-import '@nomiclabs/hardhat-ethers';
-import '@matterlabs/hardhat-zksync-solc';
-import '@matterlabs/hardhat-zksync-chai-matchers';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const systemConfig = require('./SystemConfig.json');
 
 export default {
@@ -34,7 +35,7 @@ export default {
                 ECRECOVER_COST_GAS: systemConfig.ECRECOVER_COST_GAS,
                 KECCAK_ROUND_COST_GAS: systemConfig.KECCAK_ROUND_COST_GAS,
                 SHA256_ROUND_COST_GAS: systemConfig.SHA256_ROUND_COST_GAS
-            }
+            };
         })()
     },
     networks: {

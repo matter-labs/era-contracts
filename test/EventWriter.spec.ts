@@ -15,7 +15,7 @@ xdescribe('EventWriter tests', function () {
 
     before(async () => {
         _eventWriterCode = await getCode(EVENT_WRITER_CONTRACT_ADDRESS);
-        let eventWriterTestCode = readYulBytecode({
+        const eventWriterTestCode = readYulBytecode({
             codeName: 'EventWriter',
             path: '',
             lang: Language.Yul,

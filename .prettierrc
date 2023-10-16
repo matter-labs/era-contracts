@@ -1,0 +1,63 @@
+{
+  "plugins": ["prettier-plugin-solidity"],
+  "overrides": [
+    {
+      "files": "*.js",
+      "options": {
+        "tabWidth": 4,
+        "printWidth": 120,
+        "singleQuote": true,
+        "trailingComma": "none",
+        "bracketSpacing": true
+      }
+    },
+    {
+      "files": "*.json",
+      "options": {
+        "tabWidth": 2,
+        "printWidth": 120,
+        "bracketSpacing": true
+      }
+    },
+    {
+      "files": "*.md",
+      "options": {
+        "tabWidth": 2,
+        "printWidth": 120,
+        "parser": "markdown",
+        "singleQuote": true,
+        "trailingComma": "none",
+        "bracketSpacing": true,
+        "proseWrap": "always"
+      }
+    },
+    {
+      "files": "*.sol",
+      "options": {
+        "printWidth": 120,
+        "tabWidth": 4,
+        "useTabs": false,
+        "singleQuote": false,
+        "bracketSpacing": false
+      }
+    },
+    {
+      "files": "*.ts",
+      "options": {
+        "tabWidth": 4,
+        "printWidth": 120,
+        "parser": "typescript",
+        "singleQuote": true,
+        "trailingComma": "none",
+        "bracketSpacing": true
+      }
+    },
+    {
+      "files": "*.yaml",
+      "options": {
+        "tabWidth": 2,
+        "printWidth": 120
+      }
+    }
+  ]
+}

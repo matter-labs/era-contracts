@@ -18,11 +18,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build Solidity artifacts
+      - name: Build artifacts
         run: yarn build
-
-      - name: Build yul artifacts
-        run: yarn preprocess && yarn compile-yul
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -36,8 +33,27 @@ jobs:
             contracts/precompiles/artifacts
             bootloader/build
 
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run lint
+        run: yarn lint
+
   test:
-    needs: [build]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -69,13 +85,11 @@ jobs:
             contracts/precompiles/artifacts
             bootloader/build
 
-
       - name: Run tests
         run: yarn test
 
-
   test_bootloader:
-    needs: [build]
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     steps:
@@ -99,7 +113,6 @@ jobs:
             contracts/artifacts
             contracts/precompiles/artifacts
             bootloader/build
-
 
       - name: Run bootloader tests
         run: "cd bootloader/test_infra && cargo run"

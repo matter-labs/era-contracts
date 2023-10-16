@@ -41,20 +41,22 @@ xdescribe('ContractDeployer tests', function () {
         wallet = getWallets()[0];
 
         _contractDeployerCode = await getCode(DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
-        let contractDeployerArtifact = await loadArtifact('ContractDeployer');
+        const contractDeployerArtifact = await loadArtifact('ContractDeployer');
         await setCode(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, contractDeployerArtifact.bytecode);
         contractDeployer = ContractDeployer__factory.connect(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
         nonceHolder = NonceHolder__factory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
-        let contractDeployerSystemCallContract = await deployContract('SystemCaller', [contractDeployer.address]);
+        const contractDeployerSystemCallContract = await deployContract('SystemCaller', [contractDeployer.address]);
         contractDeployerSystemCall = new Contract(
             contractDeployerSystemCallContract.address,
             contractDeployerArtifact.abi,
             wallet
         ) as ContractDeployer;
 
-        let contractDeployerNotSystemCallContract = await deployContract('NotSystemCaller', [contractDeployer.address]);
+        const contractDeployerNotSystemCallContract = await deployContract('NotSystemCaller', [
+            contractDeployer.address
+        ]);
         contractDeployerNotSystemCall = new Contract(
             contractDeployerNotSystemCallContract.address,
             contractDeployerArtifact.abi,
@@ -145,7 +147,7 @@ xdescribe('ContractDeployer tests', function () {
 
     describe('getAccountInfo', function () {
         it('success', async () => {
-            let accountInfo = await contractDeployer.getAccountInfo(RANDOM_ADDRESS);
+            const accountInfo = await contractDeployer.getAccountInfo(RANDOM_ADDRESS);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -240,8 +242,8 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-            let expectedAddress = utils.createAddress(wallet.address, nonce);
+            const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
+            const expectedAddress = utils.createAddress(wallet.address, nonce);
             await expect(
                 contractDeployer.createAccount(
                     ethers.constants.HashZero,
@@ -254,14 +256,14 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(0, '0xdeadbeef');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
 
         it('non-zero value deployed', async () => {
-            let nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-            let expectedAddress = utils.createAddress(wallet.address, nonce);
+            const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
+            const expectedAddress = utils.createAddress(wallet.address, nonce);
             await expect(
                 contractDeployer.createAccount(
                     ethers.constants.HashZero,
@@ -275,7 +277,7 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(11111111, '0x');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -316,7 +318,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let expectedAddress = utils.create2Address(
+            const expectedAddress = utils.create2Address(
                 wallet.address,
                 utils.hashBytecode(deployableArtifact.bytecode),
                 '0x1234567891234567891234512222122167891123456789123456787654323456',
@@ -334,7 +336,7 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(0, '0xdeadbeef');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -351,7 +353,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('non-zero value deployed', async () => {
-            let expectedAddress = utils.create2Address(
+            const expectedAddress = utils.create2Address(
                 wallet.address,
                 utils.hashBytecode(deployableArtifact.bytecode),
                 ethers.constants.HashZero,
@@ -370,7 +372,7 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(5555, '0x');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -388,8 +390,8 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-            let expectedAddress = utils.createAddress(wallet.address, nonce);
+            const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
+            const expectedAddress = utils.createAddress(wallet.address, nonce);
             await expect(
                 contractDeployer.create(
                     ethers.constants.HashZero,
@@ -401,7 +403,7 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(0, '0x12');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -419,7 +421,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let expectedAddress = utils.create2Address(
+            const expectedAddress = utils.create2Address(
                 wallet.address,
                 utils.hashBytecode(deployableArtifact.bytecode),
                 '0x1234567891234567891234512222122167891123456789123456787654323456',
@@ -436,7 +438,7 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
                 .to.emit(Deployable__factory.connect(expectedAddress, wallet), 'Deployed')
                 .withArgs(0, '0xab');
-            let accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
+            const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -444,7 +446,7 @@ xdescribe('ContractDeployer tests', function () {
 
     describe('forceDeployOnAddress', function () {
         it('not from self call failed', async () => {
-            let deploymentData = {
+            const deploymentData = {
                 bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),
                 newAddress: RANDOM_ADDRESS,
                 callConstructor: false,
@@ -457,7 +459,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('not known bytecode hash failed', async () => {
-            let deploymentData = {
+            const deploymentData = {
                 bytecodeHash: '0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF',
                 newAddress: RANDOM_ADDRESS,
                 callConstructor: false,
@@ -470,7 +472,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let deploymentData = {
+            const deploymentData = {
                 bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),
                 newAddress: RANDOM_ADDRESS,
                 callConstructor: false,
@@ -481,7 +483,7 @@ xdescribe('ContractDeployer tests', function () {
                 .to.emit(contractDeployer, 'ContractDeployed')
                 .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), RANDOM_ADDRESS)
                 .to.not.emit(Deployable__factory.connect(RANDOM_ADDRESS, wallet), 'Deployed');
-            let accountInfo = await contractDeployer.getAccountInfo(RANDOM_ADDRESS);
+            const accountInfo = await contractDeployer.getAccountInfo(RANDOM_ADDRESS);
             expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });
@@ -489,7 +491,7 @@ xdescribe('ContractDeployer tests', function () {
 
     describe('forceDeployOnAddresses', function () {
         it('not allowed to call', async () => {
-            let deploymentData = [
+            const deploymentData = [
                 {
                     bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),
                     newAddress: RANDOM_ADDRESS_2,
@@ -511,7 +513,7 @@ xdescribe('ContractDeployer tests', function () {
         });
 
         it('successfully deployed', async () => {
-            let deploymentData = [
+            const deploymentData = [
                 {
                     bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),
                     newAddress: RANDOM_ADDRESS_2,
@@ -536,11 +538,11 @@ xdescribe('ContractDeployer tests', function () {
                 .withArgs(0, '0x')
                 .to.not.emit(Deployable__factory.connect(RANDOM_ADDRESS_3, wallet), 'Deployed');
 
-            let accountInfo1 = await contractDeployer.getAccountInfo(RANDOM_ADDRESS_2);
+            const accountInfo1 = await contractDeployer.getAccountInfo(RANDOM_ADDRESS_2);
             expect(accountInfo1.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo1.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
 
-            let accountInfo2 = await contractDeployer.getAccountInfo(RANDOM_ADDRESS_3);
+            const accountInfo2 = await contractDeployer.getAccountInfo(RANDOM_ADDRESS_3);
             expect(accountInfo2.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
             expect(accountInfo2.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
         });

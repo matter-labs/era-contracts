@@ -7,15 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {
-    SystemLogKey,
-    SYSTEM_CONTEXT_CONTRACT,
-    KNOWN_CODE_STORAGE_CONTRACT,
-    COMPRESSOR_CONTRACT,
-    STATE_DIFF_ENTRY_SIZE,
-    MAX_ALLOWED_PUBDATA_PER_BATCH,
-    L2_TO_L1_LOGS_MERKLE_TREE_LEAVES
-} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES} from "./Constants.sol";
 
 /**
  * @author Matter Labs

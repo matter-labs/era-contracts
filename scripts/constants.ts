@@ -110,12 +110,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     compressor: {
         address: '0x000000000000000000000000000000000000800e',
         codeName: 'Compressor',
-        lang: Language.Solidity,
+        lang: Language.Solidity
     },
     complexUpgrader: {
         address: '0x000000000000000000000000000000000000800f',
         codeName: 'ComplexUpgrader',
-        lang: Language.Solidity,
+        lang: Language.Solidity
     },
     keccak256: {
         address: '0x0000000000000000000000000000000000008010',
@@ -199,7 +199,7 @@ function isFixedType(x: FieldType): x is FixedType {
     return !isDynamicType(x);
 }
 
-export const TransactionFields: Record<string, FieldType|FixedType[]> = {
+export const TransactionFields: Record<string, FieldType | FixedType[]> = {
     txType: 'uint256',
     from: 'address',
     to: 'address',
@@ -224,10 +224,10 @@ export const TransactionFields: Record<string, FieldType|FixedType[]> = {
     // Reserved dynamic type for the future use-case. Using it should be avoided,
     // But it is still here, just in case we want to enable some additional functionality.
     reservedDynamic: 'bytes'
-}
+};
 
 function capitalize(s: string) {
-    if(!s.length) {
+    if (!s.length) {
         return s;
     }
     return `${s[0].toUpperCase()}${s.substring(1)}`;
@@ -242,7 +242,7 @@ function getGetterName(fieldName: string) {
 }
 
 function getPtrGetterName(fieldName: string) {
-    return `get${capitalize(fieldName)}Ptr`;     
+    return `get${capitalize(fieldName)}Ptr`;
 }
 
 function getGetter(fieldName: string, offset: number) {
@@ -252,7 +252,7 @@ function getGetter(fieldName: string, offset: number) {
             function ${getterName}(innerTxDataOffset) -> ret {
                 ret := mload(${memPos})
             }
-    `
+    `;
 }
 
 function getPtrGetter(fieldName: string, offset: number) {
@@ -263,12 +263,12 @@ function getPtrGetter(fieldName: string, offset: number) {
                 ret := mload(${memPos})
                 ret := add(innerTxDataOffset, ret)
             }
-    `
+    `;
 }
 
 function getTypeValidationMethodName(type: FieldType) {
-    if(type == 'bytes32[]'){
-        return 'validateBytes32Array'
+    if (type == 'bytes32[]') {
+        return 'validateBytes32Array';
     } else {
         return `validate${capitalize(type)}`;
     }
@@ -280,12 +280,12 @@ function getBytesLengthGetterName(fieldName: string): string {
 
 function getBytesLengthGetter(fieldName: string, type: DynamicType) {
     let lengthToBytes: string;
-    if(type == 'bytes') {
+    if (type == 'bytes') {
         lengthToBytes = `lengthToWords(mload(ptr))`;
-    } else if(type == 'bytes32[]') {
+    } else if (type == 'bytes32[]') {
         lengthToBytes = `mul(mload(ptr),32)`;
     } else {
-        throw new Error(`Type ${type} is not supported`)
+        throw new Error(`Type ${type} is not supported`);
     }
 
     const getterName = getBytesLengthGetterName(fieldName);
@@ -294,14 +294,16 @@ function getBytesLengthGetter(fieldName: string, type: DynamicType) {
                 let ptr := ${getPtrGetterName(fieldName)}(innerTxDataOffset)
                 ret := ${lengthToBytes}
             }
-    `
+    `;
 }
 
 function getDataLength(baseLength: number, dynamicFields: [string, DynamicType][]) {
-    const ptrAdders = dynamicFields.map(([fieldName,]) => {
-        return `
-                ret := add(ret, ${getBytesLengthGetterName(fieldName)}(innerTxDataOffset))`
-    }).join('');
+    const ptrAdders = dynamicFields
+        .map(([fieldName]) => {
+            return `
+                ret := add(ret, ${getBytesLengthGetterName(fieldName)}(innerTxDataOffset))`;
+        })
+        .join('');
 
     return `
             function getDataLength(innerTxDataOffset) -> ret {
@@ -312,16 +314,16 @@ function getDataLength(baseLength: number, dynamicFields: [string, DynamicType][
 
                 ${ptrAdders}
             }
-    `
+    `;
 }
 
 function validateFixedSizeField(fieldName: string, type: FixedType): string {
-    if(type == 'uint256') {
+    if (type == 'uint256') {
         // There is no validation for uint256
         return ``;
     }
     const assertionErrorStr = getEncodingError(fieldName);
-    const fieldValue = `${fieldName}Value`
+    const fieldValue = `${fieldName}Value`;
     return `
                 let ${fieldValue} := ${getGetterName(fieldName)}(innerTxDataOffset)
                 if iszero(${getTypeValidationMethodName(type)}(${fieldValue})) {
@@ -335,31 +337,33 @@ function getEncodingError(fieldName: string) {
     // because the maximum length is 32.
     const assertionError = `Encoding ${fieldName}`;
 
-    if(assertionError.length > 32) {
-        throw new Error(`Assertion str too long: ${assertionError}`)
+    if (assertionError.length > 32) {
+        throw new Error(`Assertion str too long: ${assertionError}`);
     }
 
     return assertionError;
 }
 
 function getValidateTxStructure(
-    fixedFieldsChecks: string, 
+    fixedFieldsChecks: string,
     fixedLenPart: number,
     dynamicFields: [string, DynamicType][]
 ): string {
-    const dynamicChecks = dynamicFields.map(([fieldName, type]) => {
-        const lengthPos = `${fieldName}LengthPos`;
-        const assertionError = getEncodingError(fieldName);
-        const validationMethod = getTypeValidationMethodName(type);
+    const dynamicChecks = dynamicFields
+        .map(([fieldName, type]) => {
+            const lengthPos = `${fieldName}LengthPos`;
+            const assertionError = getEncodingError(fieldName);
+            const validationMethod = getTypeValidationMethodName(type);
 
-        return `
+            return `
                 let ${lengthPos} := ${getPtrGetterName(fieldName)}(innerTxDataOffset)
                 if iszero(eq(${lengthPos}, expectedDynamicLenPtr)) {
                     assertionError("${assertionError}")
                 }
                 expectedDynamicLenPtr := ${validationMethod}(${lengthPos})
-        `
-    }).join('\n');
+        `;
+        })
+        .join('\n');
 
     return `
             /// This method checks that the transaction's structure is correct
@@ -381,10 +385,10 @@ export function getTransactionUtils(): string {
     let checksStr = ``;
 
     const dynamicFields: [string, DynamicType][] = [];
-    for(const [key, value] of Object.entries(TransactionFields)) {
+    for (const [key, value] of Object.entries(TransactionFields)) {
         if (Array.isArray(value)) {
-            // We assume that the 
-            for(let i = 0; i < value.length; i++) {
+            // We assume that the
+            for (let i = 0; i < value.length; i++) {
                 const keyName = `${key}${i}`;
                 result += getGetter(keyName, innerOffsetBytes);
                 checksStr += validateFixedSizeField(keyName, value[i]);
@@ -402,11 +406,7 @@ export function getTransactionUtils(): string {
         }
     }
 
-    result += getValidateTxStructure(
-        checksStr,
-        innerOffsetBytes,
-        dynamicFields
-    );
+    result += getValidateTxStructure(checksStr, innerOffsetBytes, dynamicFields);
 
     result += getDataLength(innerOffsetBytes, dynamicFields);
 

@@ -37,7 +37,7 @@ xdescribe('DefaultAccount tests', function () {
     before(async () => {
         wallet = getWallets()[0];
         account = getWallets()[2];
-        let defaultAccountArtifact = await loadArtifact('DefaultAccount');
+        const defaultAccountArtifact = await loadArtifact('DefaultAccount');
         await setCode(account.address, defaultAccountArtifact.bytecode);
         defaultAccount = DefaultAccount__factory.connect(account.address, wallet);
         nonceHolder = NonceHolder__factory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
@@ -45,7 +45,7 @@ xdescribe('DefaultAccount tests', function () {
         callable = (await deployContract('Callable')) as Callable;
         mockERC20Approve = (await deployContract('MockERC20Approve')) as MockERC20Approve;
 
-        let paymasterFlowInterfaceArtifact = await loadArtifact('IPaymasterFlow');
+        const paymasterFlowInterfaceArtifact = await loadArtifact('IPaymasterFlow');
         paymasterFlowInterface = new ethers.utils.Interface(paymasterFlowInterfaceArtifact.abi);
 
         await network.provider.request({
@@ -64,7 +64,7 @@ xdescribe('DefaultAccount tests', function () {
 
     describe('validateTransaction', function () {
         it('non-deployer ignored', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: RANDOM_ADDRESS,
@@ -92,7 +92,7 @@ xdescribe('DefaultAccount tests', function () {
         });
 
         it('invalid ignature', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: RANDOM_ADDRESS,
@@ -121,7 +121,7 @@ xdescribe('DefaultAccount tests', function () {
         });
 
         it('valid tx', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: RANDOM_ADDRESS,
@@ -153,7 +153,7 @@ xdescribe('DefaultAccount tests', function () {
 
     describe('executeTransaction', function () {
         it('non-deployer ignored', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: callable.address,
@@ -178,7 +178,7 @@ xdescribe('DefaultAccount tests', function () {
         });
 
         it('successfully executed', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: callable.address,
@@ -204,7 +204,7 @@ xdescribe('DefaultAccount tests', function () {
 
     describe('executeTransactionFromOutside', function () {
         it('nothing', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: callable.address,
@@ -218,9 +218,7 @@ xdescribe('DefaultAccount tests', function () {
             const parsedTx = zksync.utils.parseTransaction(txBytes);
             const txData = signedTxToTransactionData(parsedTx)!;
 
-            const txHash = parsedTx.hash;
             delete legacyTx.from;
-            const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
             await expect(await defaultAccount.executeTransactionFromOutside(txData)).to.not.emit(callable, 'Called');
         });
@@ -228,7 +226,7 @@ xdescribe('DefaultAccount tests', function () {
 
     describe('payForTransaction', function () {
         it('non-deployer ignored', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: callable.address,
@@ -247,14 +245,14 @@ xdescribe('DefaultAccount tests', function () {
             delete legacyTx.from;
             const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
-            let balanceBefore = await l2EthToken.balanceOf(defaultAccount.address);
+            const balanceBefore = await l2EthToken.balanceOf(defaultAccount.address);
             await defaultAccount.payForTransaction(txHash, signedHash, txData);
-            let balanceAfter = await l2EthToken.balanceOf(defaultAccount.address);
+            const balanceAfter = await l2EthToken.balanceOf(defaultAccount.address);
             expect(balanceAfter).to.be.eq(balanceBefore);
         });
 
         it('successfully payed', async () => {
-            let nonce = await nonceHolder.getMinNonce(account.address);
+            const nonce = await nonceHolder.getMinNonce(account.address);
             const legacyTx = await account.populateTransaction({
                 type: 0,
                 to: callable.address,

@@ -1,5 +1,5 @@
-import * as zksync from 'zksync-web3';
 import { BigNumberish, BytesLike, Transaction } from 'ethers';
+import * as zksync from 'zksync-web3';
 
 // Interface encoding the transaction struct used for AA protocol
 export interface TransactionData {
@@ -45,6 +45,7 @@ export function signedTxToTransactionData(tx: Transaction) {
         throw new Error('Invalid `v`');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function legacyTxToTransactionData(tx: any): TransactionData {
         return {
             txType: 0,
@@ -66,6 +67,7 @@ export function signedTxToTransactionData(tx: Transaction) {
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function eip2930TxToTransactionData(tx: any): TransactionData {
         return {
             txType: 1,
@@ -87,6 +89,7 @@ export function signedTxToTransactionData(tx: Transaction) {
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function eip1559TxToTransactionData(tx: any): TransactionData {
         return {
             txType: 2,
@@ -108,6 +111,7 @@ export function signedTxToTransactionData(tx: Transaction) {
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function eip712TxToTransactionData(tx: any): TransactionData {
         return {
             txType: 113,

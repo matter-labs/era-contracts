@@ -1,17 +1,14 @@
 import { expect } from 'chai';
 import { ethers, network } from 'hardhat';
-import { Wallet } from 'zksync-web3';
 import { ComplexUpgrader, DummyUpgrade } from '../typechain-types';
 import { FORCE_DEPLOYER_ADDRESS } from './shared/constants';
-import { deployContract, getWallets } from './shared/utils';
+import { deployContract } from './shared/utils';
 
 describe('ComplexUpgrader tests', function () {
-    let wallet: Wallet;
     let complexUpgrader: ComplexUpgrader;
     let dummyUpgrade: DummyUpgrade;
 
     before(async () => {
-        wallet = getWallets()[0];
         complexUpgrader = (await deployContract('ComplexUpgrader')) as ComplexUpgrader;
         dummyUpgrade = (await deployContract('DummyUpgrade')) as DummyUpgrade;
     });

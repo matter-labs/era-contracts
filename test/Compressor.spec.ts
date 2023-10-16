@@ -24,7 +24,7 @@ xdescribe('Compressor tests', function () {
         wallet = getWallets()[0];
         compressor = (await deployContract('Compressor')) as Compressor;
         _knownCodesStorageCode = await getCode(KNOWN_CODE_STORAGE_CONTRACT_ADDRESS);
-        let mockKnownCodesStorageArtifact = await loadArtifact('MockKnownCodesStorage');
+        const mockKnownCodesStorageArtifact = await loadArtifact('MockKnownCodesStorage');
         await setCode(KNOWN_CODE_STORAGE_CONTRACT_ADDRESS, mockKnownCodesStorageArtifact.bytecode);
 
         await network.provider.request({
@@ -184,7 +184,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('enumeration index size is too large', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901234',
                     index: 0,
@@ -192,9 +192,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from('0x1234567890123456789012345678901234567890123456789012345678901234')
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[0].key = '0x1234567890123456789012345678901234567890123456789012345678901233';
-            let compressedStateDiffs = compressStateDiffs(9, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(9, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -203,7 +203,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('initial write key mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901234',
                     index: 0,
@@ -211,9 +211,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(0)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[0].key = '0x1234567890123456789012345678901234567890123456789012345678901233';
-            let compressedStateDiffs = compressStateDiffs(4, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -222,7 +222,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('repeated write key mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901234',
                     index: 1,
@@ -230,9 +230,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(0)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[0].index = 2;
-            let compressedStateDiffs = compressStateDiffs(8, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(8, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -241,7 +241,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('no compression value mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901234',
                     index: 1,
@@ -255,9 +255,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: TWO_IN_256.sub(2)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[1].finalValue = TWO_IN_256.sub(1);
-            let compressedStateDiffs = compressStateDiffs(3, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(3, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -266,7 +266,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('transform value mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901234',
                     index: 255,
@@ -280,9 +280,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(1)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[1].finalValue = BigNumber.from(0);
-            let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -291,7 +291,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('add value mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901235',
                     index: 255,
@@ -299,9 +299,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: TWO_IN_256.div(2).sub(1)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[0].finalValue = TWO_IN_256.div(2);
-            let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -310,7 +310,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('sub value mismatch', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901236',
                     index: 0,
@@ -318,9 +318,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: TWO_IN_256.div(4).sub(5)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs[0].finalValue = TWO_IN_256.div(4).sub(1);
-            let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -329,7 +329,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('invalid operation', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901236',
                     index: 0,
@@ -337,9 +337,9 @@ xdescribe('Compressor tests', function () {
                     finalValue: TWO_IN_256.div(4).sub(5)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
-            let compressedStateDiffsCharArray = compressedStateDiffs.split('');
+            const compressedStateDiffsCharArray = compressedStateDiffs.split('');
             compressedStateDiffsCharArray[2 + 4 + 64 + 1] = 'f';
             compressedStateDiffs = compressedStateDiffsCharArray.join('');
             await expect(
@@ -350,7 +350,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('Incorrect number of initial storage diffs', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901236',
                     index: 0,
@@ -364,14 +364,14 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(0)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs.push({
                 key: '0x0234567890123456789012345678901234567890123456789012345678901231',
                 index: 0,
                 initValue: BigNumber.from(0),
                 finalValue: BigNumber.from(1)
             });
-            let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -380,7 +380,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('Extra data in compressed state diffs', async () => {
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901236',
                     index: 0,
@@ -394,14 +394,14 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(0)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
             stateDiffs.push({
                 key: '0x0234567890123456789012345678901234567890123456789012345678901231',
                 index: 1,
                 initValue: BigNumber.from(0),
                 finalValue: BigNumber.from(1)
             });
-            let compressedStateDiffs = compressStateDiffs(1, stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
             await expect(
                 compressor
                     .connect(l1Messenger)
@@ -410,9 +410,7 @@ xdescribe('Compressor tests', function () {
         });
 
         it('successfully verified', async () => {
-            const l1Messenger = await ethers.getSigner(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
-
-            let stateDiffs = [
+            const stateDiffs = [
                 {
                     key: '0x1234567890123456789012345678901234567890123456789012345678901230',
                     index: 0,
@@ -444,8 +442,8 @@ xdescribe('Compressor tests', function () {
                     finalValue: BigNumber.from(1)
                 }
             ];
-            let encodedStateDiffs = encodeStateDiffs(stateDiffs);
-            let compressedStateDiffs = compressStateDiffs(4, stateDiffs);
+            const encodedStateDiffs = encodeStateDiffs(stateDiffs);
+            const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
             const tx = {
                 from: L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
                 to: compressor.address,
@@ -470,7 +468,7 @@ interface StateDiff {
 }
 
 function encodeStateDiffs(stateDiffs: StateDiff[]): string {
-    let rawStateDiffs = [];
+    const rawStateDiffs = [];
     for (const stateDiff of stateDiffs) {
         rawStateDiffs.push(
             ethers.utils.solidityPack(
@@ -492,8 +490,8 @@ function encodeStateDiffs(stateDiffs: StateDiff[]): string {
 
 function compressStateDiffs(enumerationIndexSize: number, stateDiffs: StateDiff[]): string {
     let num_initial = 0;
-    let initial = [];
-    let repeated = [];
+    const initial = [];
+    const repeated = [];
     for (const stateDiff of stateDiffs) {
         const addition = stateDiff.finalValue.sub(stateDiff.initValue).add(TWO_IN_256).mod(TWO_IN_256);
         const subtraction = stateDiff.initValue.sub(stateDiff.finalValue).add(TWO_IN_256).mod(TWO_IN_256);
@@ -512,12 +510,12 @@ function compressStateDiffs(enumerationIndexSize: number, stateDiffs: StateDiff[
             op = 0;
         }
         let len = 0;
-        let minHex = min.eq(0) ? '0x' : min.toHexString();
+        const minHex = min.eq(0) ? '0x' : min.toHexString();
         if (op > 0) {
             len = (minHex.length - 2) / 2;
         }
-        let metadata = (len << 3) + op;
-        let enumerationIndexType = 'uint' + (enumerationIndexSize * 8).toString();
+        const metadata = (len << 3) + op;
+        const enumerationIndexType = 'uint' + (enumerationIndexSize * 8).toString();
         if (stateDiff.index === 0) {
             num_initial += 1;
             initial.push(ethers.utils.solidityPack(['bytes32', 'uint8', 'bytes'], [stateDiff.key, metadata, minHex]));

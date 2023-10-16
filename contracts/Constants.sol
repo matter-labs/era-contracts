@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import {IAccountCodeStorage}  from "./interfaces/IAccountCodeStorage.sol";
+import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
@@ -97,7 +97,7 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-/// @dev The number of leaves in the L2->L1 log Merkle tree. 
+/// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 2048 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 2048;
 
