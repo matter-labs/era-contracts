@@ -8,7 +8,7 @@ import "./interfaces/IL1Bridge.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
-import "../bridgehead/bridgehead-interfaces/IBridgehead.sol";
+import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../common/interfaces/IAllowList.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
@@ -47,8 +47,8 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList public immutable allowList;
 
-    /// @dev bridgehead smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehead public immutable bridgehead;
+    /// @dev bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
+    IBridgehub public immutable bridgehub;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
     address public __DEPRECATED_l2Bridge;
@@ -77,11 +77,11 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address payable _l1WethAddress,
-        IBridgehead _bridgehead,
+        IBridgehub _bridgehub,
         IAllowList _allowList
     ) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
-        bridgehead = _bridgehead;
+        bridgehub = _bridgehub;
         allowList = _allowList;
     }
 
@@ -136,7 +136,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         // Deploy L2 bridge implementation contract
         address wethBridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            bridgehead,
+            bridgehub,
             _deployBridgeImplementationFee,
             l2WethBridgeImplementationBytecodeHash,
             "", // Empty constructor data
@@ -161,7 +161,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         // Deploy L2 bridge proxy contract
         l2Bridge[_chainId] = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            bridgehead,
+            bridgehub,
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
             l2WethBridgeProxyConstructorData,
@@ -240,7 +240,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) internal returns (bytes32 txHash) {
-        txHash = bridgehead.requestL2Transaction{value: _amount + msg.value}(
+        txHash = bridgehub.requestL2Transaction{value: _amount + msg.value}(
             _chainId,
             l2Bridge[_chainId],
             _amount,
@@ -304,7 +304,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         }
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = bridgehead.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBatch);
+        bool alreadyFinalised = bridgehub.isEthWithdrawalFinalized(_chainId, _l2MessageIndex, _l2TxNumberInBatch);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
@@ -313,7 +313,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
                 data: _message
             });
             {
-                bool success = bridgehead.proveL2MessageInclusion(
+                bool success = bridgehub.proveL2MessageInclusion(
                     _chainId,
                     _l2BatchNumber,
                     _l2MessageIndex,
@@ -324,7 +324,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             }
         } else {
             // Finalize the withdrawal if it is not yet done.
-            bridgehead.finalizeEthWithdrawal(
+            bridgehub.finalizeEthWithdrawal(
                 _chainId,
                 _l2BatchNumber,
                 _l2MessageIndex,
@@ -360,7 +360,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(
-            bytes4(functionSignature) == IBridgeheadMailbox.finalizeEthWithdrawal.selector,
+            bytes4(functionSignature) == IBridgehubMailbox.finalizeEthWithdrawal.selector,
             "Incorrect ETH message function selector"
         );
 
@@ -387,8 +387,8 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     receive() external payable {
         // Expected to receive ether in two cases:
         // 1. l1 WETH sends ether on `withdraw`
-        // 2. bridgehead contract withdraw funds in `finalizeEthWithdrawal`
-        require(msg.sender == l1WethAddress || msg.sender == address(bridgehead), "pn");
+        // 2. bridgehub contract withdraw funds in `finalizeEthWithdrawal`
+        require(msg.sender == l1WethAddress || msg.sender == address(bridgehub), "pn");
         emit EthReceived(msg.value);
     }
 }

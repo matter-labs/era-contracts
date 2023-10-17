@@ -4,13 +4,13 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
+import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
 import {TxStatus} from "../../../../../../cache/solpp-generated-contracts/common/Messaging.sol";
-import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IMailbox.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
-contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
+contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     uint256 internal blockNumber;
     bytes32 internal l2TxHash;
     uint256 internal l2BlockNumber;
@@ -30,7 +30,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
 
     function test_WhenChainContractReturnsTrue() public {
         vm.mockCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.proveL1ToL2TransactionStatus.selector,
                 l2TxHash,
@@ -44,7 +44,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.proveL1ToL2TransactionStatus.selector,
                 l2TxHash,
@@ -56,7 +56,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
             )
         );
 
-        bool res = bridgehead.proveL1ToL2TransactionStatus(
+        bool res = bridgehub.proveL1ToL2TransactionStatus(
             chainId,
             l2TxHash,
             l2BlockNumber,
@@ -70,7 +70,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
 
     function test_WhenChainContractReturnsFalse() public {
         vm.mockCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.proveL1ToL2TransactionStatus.selector,
                 l2TxHash,
@@ -84,7 +84,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.proveL1ToL2TransactionStatus.selector,
                 l2TxHash,
@@ -96,7 +96,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgeheadMailboxTest {
             )
         );
 
-        bool res = bridgehead.proveL1ToL2TransactionStatus(
+        bool res = bridgehub.proveL1ToL2TransactionStatus(
             chainId,
             l2TxHash,
             l2BlockNumber,

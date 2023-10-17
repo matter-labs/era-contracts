@@ -24,11 +24,11 @@ async function main() {
 
     // Contracts without constructor parameters
     for (const address of [
-        addresses.ProofSystem.GettersFacet,
-        addresses.ProofSystem.DiamondInit,
-        addresses.ProofSystem.GovernanceFacet,
-        addresses.ProofSystem.ExecutorFacet,
-        addresses.ProofSystem.Verifier
+        addresses.StateTransition.GettersFacet,
+        addresses.StateTransition.DiamondInit,
+        addresses.StateTransition.GovernanceFacet,
+        addresses.StateTransition.ExecutorFacet,
+        addresses.StateTransition.Verifier
     ]) {
         const promise = verifyPromise(address);
         promises.push(promise);
@@ -53,7 +53,7 @@ async function main() {
 
     // Bridges
     const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [
-        addresses.ProofSystem.DiamondProxy,
+        addresses.StateTransition.DiamondProxy,
         addresses.AllowList
     ]);
     promises.push(promise);

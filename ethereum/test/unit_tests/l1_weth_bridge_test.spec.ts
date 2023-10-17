@@ -4,7 +4,7 @@ import * as hardhat from 'hardhat';
 
 import * as fs from 'fs';
 
-import { IBridgehead } from '../../typechain/IBridgehead';
+import { IBridgehub } from '../../typechain/IBridgehub';
 import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from '../../typechain';
 import { AccessMode, getCallRevertReason } from './utils';
 import { hashL2Bytecode } from '../../scripts/utils';
@@ -27,7 +27,7 @@ const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x000000000000000000000000000000000000
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 export async function create2DeployFromL1(
-    bridgehead: IBridgehead,
+    bridgehub: IBridgehub,
     chainId: ethers.BigNumberish,
     walletAddress: Address,
     bytecode: ethers.BytesLike,
@@ -38,15 +38,15 @@ export async function create2DeployFromL1(
     const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync('IContractDeployer').abi);
     const bytecodeHash = hashL2Bytecode(bytecode);
     const calldata = deployerSystemContracts.encodeFunctionData('create2', [create2Salt, bytecodeHash, constructor]);
-    const gasPrice = await bridgehead.provider.getGasPrice();
-    const expectedCost = await bridgehead.l2TransactionBaseCost(
+    const gasPrice = await bridgehub.provider.getGasPrice();
+    const expectedCost = await bridgehub.l2TransactionBaseCost(
         chainId,
         gasPrice,
         l2GasLimit,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     );
 
-    await bridgehead.requestL2Transaction(
+    await bridgehub.requestL2Transaction(
         chainId,
         DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
         0,
@@ -117,8 +117,8 @@ describe('WETH Bridge tests', () => {
         process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
         await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
-        await deployer.deployProofSystemContract(create2Salt, gasPrice);
+        await deployer.deployBridgehubContract(create2Salt, gasPrice);
+        await deployer.deployStateTransitionContract(create2Salt,null, gasPrice);
         await deployer.deployBridgeContracts(create2Salt, gasPrice);
         await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
 
@@ -127,11 +127,11 @@ describe('WETH Bridge tests', () => {
             recursionLeafLevelVkHash: zeroHash,
             recursionCircuitsSetVksHash: zeroHash
         };
-        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+        // const initialDiamondCut = await deployer.initialStateTransitionProxyDiamondCut();
 
-        const proofSystem = deployer.proofSystemContract(deployWallet);
+        // const proofSystem = deployer.proofSystemContract(deployWallet);
 
-        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+        // await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
         await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
@@ -143,10 +143,10 @@ describe('WETH Bridge tests', () => {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
-                deployer.addresses.Bridgehead.ChainProxy,
-                deployer.addresses.ProofSystem.ProofSystemProxy,
-                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+                deployer.addresses.Bridgehub.ChainProxy,
+                deployer.addresses.StateTransition.StateTransitionProxy,
+                deployer.addresses.StateTransition.DiamondProxy,
                 deployer.addresses.Bridges.ERC20BridgeProxy,
                 deployer.addresses.Bridges.WethBridgeProxy
             ],
@@ -161,7 +161,7 @@ describe('WETH Bridge tests', () => {
         );
         await allowTx.wait();
 
-        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
+        // bridgehubContract = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployWallet);
 
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
@@ -172,7 +172,7 @@ describe('WETH Bridge tests', () => {
 
         const bridge = await (
             await hardhat.ethers.getContractFactory('L1WethBridge')
-        ).deploy(l1Weth.address, deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployer.addresses.AllowList);
+        ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployer.addresses.AllowList);
 
         // we don't test L2, so it is ok to give garbage factory deps and L2 address
         const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';

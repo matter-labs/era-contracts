@@ -9,7 +9,6 @@ import {
     GettersFacetFactory,
     AdminFacet,
     AdminFacetFactory,
-    BridgeheadChainFactory,
     GettersFacet,
     DefaultUpgradeFactory,
     CustomUpgradeTestFactory,
@@ -73,6 +72,7 @@ describe('L2 upgrade test', function () {
             owner.provider
         );
         const ownerAddress = await deployWallet.getAddress();
+        process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
         const gasPrice = await owner.provider.getGasPrice();
 
@@ -115,8 +115,8 @@ describe('L2 upgrade test', function () {
         process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
         await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
-        await deployer.deployProofSystemContract(create2Salt, gasPrice);
+        await deployer.deployBridgehubContract(create2Salt, gasPrice);
+        await deployer.deployStateTransitionContract(create2Salt, null,gasPrice);
         await deployer.deployBridgeContracts(create2Salt, gasPrice);
         await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
 
@@ -125,12 +125,12 @@ describe('L2 upgrade test', function () {
             recursionLeafLevelVkHash: zeroHash,
             recursionCircuitsSetVksHash: zeroHash
         };
-        verifier = deployer.addresses.ProofSystem.Verifier;
-        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+        verifier = deployer.addresses.StateTransition.Verifier;
+        // const initialDiamondCut = await deployer.initialStateTransitionProxyDiamondCut();
 
-        const proofSystem = deployer.proofSystemContract(deployWallet);
+        // const proofSystem = deployer.proofSystemContract(deployWallet);
 
-        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+        // await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
         await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
@@ -142,10 +142,10 @@ describe('L2 upgrade test', function () {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
-                deployer.addresses.Bridgehead.ChainProxy,
-                deployer.addresses.ProofSystem.ProofSystemProxy,
-                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+                deployer.addresses.Bridgehub.ChainProxy,
+                deployer.addresses.StateTransition.StateTransitionProxy,
+                deployer.addresses.StateTransition.DiamondProxy,
                 deployer.addresses.Bridges.ERC20BridgeProxy,
                 deployer.addresses.Bridges.WethBridgeProxy
             ],
@@ -160,18 +160,17 @@ describe('L2 upgrade test', function () {
         );
         await allowTx.wait();
 
-        proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
-        proxyGetters = GettersFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
-        proxyAdmin = AdminFacetFactory.connect(deployer.addresses.ProofSystem.DiamondProxy, deployWallet);
+        proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+        proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+        proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
         await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
 
-        // bridgeheadContract = BridgeheadFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
-        let bridgeheadChainContract = BridgeheadChainFactory.connect(
-            deployer.addresses.Bridgehead.ChainProxy,
-            deployWallet
-        );
-
+        // bridgehubContract = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployWallet);
+        // let bridgehubChainContract = BridgehubChainFactory.connect(
+        //     deployer.addresses.Bridgehub.ChainProxy,
+        //     deployWallet
+        // );
 
         let priorityOp = await proxyGetters.priorityQueueFrontOperation();
         priorityOpTxHash = priorityOp[0];
@@ -997,7 +996,7 @@ async function executeUpgrade(
     const defaultUpgrade = await defaultUpgradeFactory.deploy();
     const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [chainId, upgrade]);
+    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [ upgrade]);
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
@@ -1025,7 +1024,7 @@ async function executeCustomUpgrade(
     const customUpgrade = await upgradeFactory.deploy();
     const diamondUpgradeInit = CustomUpgradeTestFactory.connect(customUpgrade.address, customUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [chainId, upgrade]);
+    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [ upgrade]);
 
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 

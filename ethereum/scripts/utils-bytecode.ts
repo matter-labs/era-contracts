@@ -2,14 +2,14 @@ import { ethers } from 'ethers';
 import * as chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import { readBytecode, readInterface } from './utils'; 
+import { readBytecode, readInterface } from './utils';
 const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
 export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string || "./", 'contracts/zksync/artifacts-zk/');
+const contractArtifactsPath = path.join((process.env.ZKSYNC_HOME as string) || './', 'contracts/zksync/artifacts-zk/');
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
 const openzeppelinTransparentProxyArtifactsPath = path.join(
     contractArtifactsPath,
@@ -42,6 +42,3 @@ export const L2_WETH_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPat
 export const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
 export const L2_WETH_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2WethBridge');
 export const L2_ERC20_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2ERC20Bridge');
-
-
-

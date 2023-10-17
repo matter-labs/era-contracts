@@ -2,18 +2,18 @@
 
 pragma solidity ^0.8.13;
 
-import "../proof-system/chain-deps/facets/Base.sol";
-import "../proof-system/chain-interfaces/IMailbox.sol";
-import "../proof-system/chain-interfaces/IVerifier.sol";
+import "../state-transition/chain-deps/facets/Base.sol";
+import "../state-transition/chain-interfaces/IMailbox.sol";
+import "../state-transition/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/Messaging.sol";
-import "../proof-system/libraries/TransactionValidator.sol";
+import "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is ProofChainBase {
+abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
     /// @notice The struct that represents the upgrade proposal.
     /// @param l2ProtocolUpgradeTx The system upgrade transaction.
     /// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
@@ -47,18 +47,10 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
     /// @notice Сhanges to the bytecode that is used in L2 as a bootloader (start program)
-    event NewL2BootloaderBytecodeHash(
-        uint256 chainId,
-        bytes32 indexed previousBytecodeHash,
-        bytes32 indexed newBytecodeHash
-    );
+    event NewL2BootloaderBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
     /// @notice Сhanges to the bytecode that is used in L2 as a default account
-    event NewL2DefaultAccountBytecodeHash(
-        uint256 chainId,
-        bytes32 indexed previousBytecodeHash,
-        bytes32 indexed newBytecodeHash
-    );
+    event NewL2DefaultAccountBytecodeHash(bytes32 indexed previousBytecodeHash, bytes32 indexed newBytecodeHash);
 
     /// @notice Verifier address changed
     event NewVerifier(address indexed oldVerifier, address indexed newVerifier);
@@ -73,7 +65,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     event NewAllowList(address indexed oldAllowList, address indexed newAllowList);
 
     /// @notice The main function that will be provided by the upgrade proxy
-    function upgrade(uint256, ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
+    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occured. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -83,7 +75,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
     /// @notice Change default account bytecode hash, that is used on L2
     /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    function _setL2DefaultAccountBytecodeHash(uint256 _chainId, bytes32 _l2DefaultAccountBytecodeHash) private {
+    function _setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) private {
         if (_l2DefaultAccountBytecodeHash == bytes32(0)) {
             return;
         }
@@ -95,16 +87,12 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
         // Change the default account bytecode hash
         chainStorage.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-        emit NewL2DefaultAccountBytecodeHash(
-            _chainId,
-            previousDefaultAccountBytecodeHash,
-            _l2DefaultAccountBytecodeHash
-        );
+        emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
     }
 
     /// @notice Change bootloader bytecode hash, that is used on L2
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    function _setL2BootloaderBytecodeHash(uint256 _chainId, bytes32 _l2BootloaderBytecodeHash) private {
+    function _setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) private {
         if (_l2BootloaderBytecodeHash == bytes32(0)) {
             return;
         }
@@ -116,7 +104,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
         // Change the bootloader bytecode hash
         chainStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-        emit NewL2BootloaderBytecodeHash(_chainId, previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
+        emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
     /// @notice Change the address of the verifier smart contract
@@ -162,9 +150,9 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @notice Updates the bootloader hash and the hash of the default account
     /// @param _bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param _defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    function _setBaseSystemContracts(uint256 _chainId, bytes32 _bootloaderHash, bytes32 _defaultAccountHash) internal {
-        _setL2BootloaderBytecodeHash(_chainId, _bootloaderHash);
-        _setL2DefaultAccountBytecodeHash(_chainId, _defaultAccountHash);
+    function _setBaseSystemContracts(bytes32 _bootloaderHash, bytes32 _defaultAccountHash) internal {
+        _setL2BootloaderBytecodeHash(_bootloaderHash);
+        _setL2DefaultAccountBytecodeHash(_defaultAccountHash);
     }
 
     /// @notice Sets the hash of the L2 system contract upgrade transaction for the next batch to be committed
@@ -172,7 +160,6 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        uint256,
         L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
         uint256 _newProtocolVersion
@@ -227,7 +214,7 @@ abstract contract BaseZkSyncUpgrade is ProofChainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256, uint256 _newProtocolVersion) internal {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal {
         uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,

@@ -4,12 +4,12 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
-import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IMailbox.sol";
+import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
-contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
+contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     uint256 internal l2BlockNumber;
     uint256 internal l2MessageIndex;
     uint16 internal l2TxNumberInBlock;
@@ -30,9 +30,9 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
         bytes memory revertMessage = "random revert";
 
         vm.mockCallRevert(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
-                IMailbox.finalizeEthWithdrawalBridgehead.selector,
+                IMailbox.finalizeEthWithdrawalBridgehub.selector,
                 msgSender,
                 l2BlockNumber,
                 l2MessageIndex,
@@ -44,9 +44,9 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
-                IMailbox.finalizeEthWithdrawalBridgehead.selector,
+                IMailbox.finalizeEthWithdrawalBridgehub.selector,
                 msgSender,
                 l2BlockNumber,
                 l2MessageIndex,
@@ -58,7 +58,7 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
 
         vm.expectRevert(revertMessage);
         vm.startPrank(msgSender);
-        bridgehead.finalizeEthWithdrawal(
+        bridgehub.finalizeEthWithdrawal(
             chainId,
             l2BlockNumber,
             l2MessageIndex,
@@ -70,9 +70,9 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
 
     function test_ShouldReturnReceivedCanonicalTxHash() public {
         vm.mockCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
-                IMailbox.finalizeEthWithdrawalBridgehead.selector,
+                IMailbox.finalizeEthWithdrawalBridgehub.selector,
                 msgSender,
                 l2BlockNumber,
                 l2MessageIndex,
@@ -84,9 +84,9 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
-                IMailbox.finalizeEthWithdrawalBridgehead.selector,
+                IMailbox.finalizeEthWithdrawalBridgehub.selector,
                 msgSender,
                 l2BlockNumber,
                 l2MessageIndex,
@@ -97,7 +97,7 @@ contract FinalizeEthWithdrawalTest is BridgeheadMailboxTest {
         );
 
         vm.startPrank(msgSender);
-        bridgehead.finalizeEthWithdrawal(
+        bridgehub.finalizeEthWithdrawal(
             chainId,
             l2BlockNumber,
             l2MessageIndex,

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../proof-system/chain-deps/facets/Admin.sol";
+import "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
     constructor() {

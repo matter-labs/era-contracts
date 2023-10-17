@@ -82,12 +82,12 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: ZERO_ADDRESS,
+                ownerAddress: ZERO_ADDRESS,
                 verbose: true
             });
 
             const zkSyncContract = IOldDiamondCutFactory.connect(
-                deployer.addresses.ProofSystem.ProofDiamondProxy,
+                deployer.addresses.StateTransition.DiamondProxy,
                 deployWallet
             );
 

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../../common/libraries/Diamond.sol";
-import "../../proof-system/chain-deps/facets/Getters.sol";
+import "../../state-transition/chain-deps/facets/Getters.sol";
 
 contract DiamondCutTestContract is GettersFacet {
     function diamondCut(Diamond.DiamondCutData memory _diamondCut) external {

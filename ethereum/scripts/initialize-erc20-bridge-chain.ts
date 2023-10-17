@@ -2,11 +2,7 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import {
-    web3Provider,
-    getNumberFromEnv,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-} from './utils';
+import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
 import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,

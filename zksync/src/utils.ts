@@ -1,7 +1,7 @@
 import { artifacts } from 'hardhat';
 
 import { deployedAddressesFromEnv } from '../../ethereum/src.ts/deploy';
-import { IBridgeheadFactory } from '../../ethereum/typechain/IBridgeheadFactory';
+import { IBridgehubFactory } from '../../ethereum/typechain/IBridgehubFactory';
 import { Interface } from 'ethers/lib/utils';
 
 import { ethers, Wallet, BytesLike } from 'ethers';
@@ -77,8 +77,8 @@ export async function create2DeployFromL1(
     l2GasLimit: ethers.BigNumberish,
     gasPrice?: ethers.BigNumberish
 ) {
-    const zkSyncAddress = deployedAddressesFromEnv().Bridgehead.BridgeheadDiamondProxy;
-    const zkSync = IBridgeheadFactory.connect(zkSyncAddress, wallet);
+    const zkSyncAddress = deployedAddressesFromEnv().Bridgehub.BridgehubDiamondProxy;
+    const zkSync = IBridgehubFactory.connect(zkSyncAddress, wallet);
 
     const deployerSystemContracts = new Interface(artifacts.readArtifactSync('IContractDeployer').abi);
     const bytecodeHash = hashL2Bytecode(bytecode);

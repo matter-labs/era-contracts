@@ -4,12 +4,12 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
-import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IMailbox.sol";
+import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
-contract RequestL2TransactionTest is BridgeheadMailboxTest {
+contract RequestL2TransactionTest is BridgehubMailboxTest {
     address internal contractL2;
     uint256 internal l2Value;
     bytes internal calldataBytes;
@@ -37,10 +37,10 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
         bytes memory revertMessage = "random revert";
 
         vm.mockCallRevert(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             msgValue,
             abi.encodeWithSelector(
-                IMailbox.requestL2TransactionBridgehead.selector,
+                IMailbox.requestL2TransactionBridgehub.selector,
                 msgSender,
                 contractL2,
                 l2Value,
@@ -54,10 +54,10 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             msgValue,
             abi.encodeWithSelector(
-                IMailbox.requestL2TransactionBridgehead.selector,
+                IMailbox.requestL2TransactionBridgehub.selector,
                 msgSender,
                 contractL2,
                 l2Value,
@@ -71,7 +71,7 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
 
         vm.expectRevert(revertMessage);
         vm.startPrank(msgSender);
-        bridgehead.requestL2Transaction{value: msgValue}(
+        bridgehub.requestL2Transaction{value: msgValue}(
             chainId,
             contractL2,
             l2Value,
@@ -87,10 +87,10 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
         bytes32 expectedCanonicalTxHash = bytes32(uint256(123456789));
 
         vm.mockCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             msgValue,
             abi.encodeWithSelector(
-                IMailbox.requestL2TransactionBridgehead.selector,
+                IMailbox.requestL2TransactionBridgehub.selector,
                 msgSender,
                 contractL2,
                 l2Value,
@@ -104,10 +104,10 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             msgValue,
             abi.encodeWithSelector(
-                IMailbox.requestL2TransactionBridgehead.selector,
+                IMailbox.requestL2TransactionBridgehub.selector,
                 msgSender,
                 contractL2,
                 l2Value,
@@ -120,7 +120,7 @@ contract RequestL2TransactionTest is BridgeheadMailboxTest {
         );
 
         vm.startPrank(msgSender);
-        bytes32 canonicalTxHash = bridgehead.requestL2Transaction{value: msgValue}(
+        bytes32 canonicalTxHash = bridgehub.requestL2Transaction{value: msgValue}(
             chainId,
             contractL2,
             l2Value,

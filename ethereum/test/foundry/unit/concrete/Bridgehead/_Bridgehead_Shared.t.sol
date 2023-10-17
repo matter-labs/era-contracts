@@ -4,29 +4,32 @@ pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
-import {BridgeheadDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehead/bridgehead-deps/BridgeheadDiamondInit.sol";
+import {BridgehubDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-deps/BridgehubDiamondInit.sol";
 import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
 
-contract BridgeheadTest is Test {
-    DiamondProxy internal bridgehead;
-    BridgeheadDiamondInit internal bridgeheadDiamondInit;
+contract BridgehubTest is Test {
+    DiamondProxy internal bridgehub;
+    BridgehubDiamondInit internal bridgehubDiamondInit;
     address internal constant GOVERNOR = address(0x101010101010101010101);
     address internal constant NON_GOVERNOR = address(0x202020202020202020202);
 
     constructor() {
-        
         vm.chainId(31337);
-        bridgeheadDiamondInit = new BridgeheadDiamondInit();
+        bridgehubDiamondInit = new BridgehubDiamondInit();
 
-        bridgehead = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgeheadDiamondInit)));
+        bridgehub = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgehubDiamondInit)));
     }
 
     function getDiamondCutData(address diamondInit) internal returns (Diamond.DiamondCutData memory) {
         address governor = GOVERNOR;
         IAllowList allowList = IAllowList(GOVERNOR);
 
-        bytes memory initCalldata = abi.encodeWithSelector(BridgeheadDiamondInit.initialize.selector, governor, allowList);
+        bytes memory initCalldata = abi.encodeWithSelector(
+            BridgehubDiamondInit.initialize.selector,
+            governor,
+            allowList
+        );
 
         return
             Diamond.DiamondCutData({

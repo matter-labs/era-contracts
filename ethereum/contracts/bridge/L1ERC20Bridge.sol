@@ -12,7 +12,7 @@ import "./interfaces/IL2ERC20Bridge.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
-import "../bridgehead/bridgehead-interfaces/IBridgehead.sol";
+import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../common/Messaging.sol";
 import "../common/interfaces/IAllowList.sol";
 import "../common/AllowListed.sol";
@@ -32,8 +32,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev The smart contract that manages the list with permission to call contract functions
     IAllowList internal immutable allowList;
 
-    /// @dev Bridgehead smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehead internal immutable bridgehead;
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
+    IBridgehub internal immutable bridgehub;
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -79,8 +79,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehead _bridgehead, IAllowList _allowList) reentrancyGuardInitializer {
-        bridgehead = _bridgehead;
+    constructor(IBridgehub _bridgehub, IAllowList _allowList) reentrancyGuardInitializer {
+        bridgehub = _bridgehub;
         allowList = _allowList;
     }
 
@@ -141,7 +141,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         // KL todo we need to make the bridge L2 independent
         address bridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            bridgehead,
+            bridgehub,
             _deployBridgeImplementationFee,
             l2BridgeImplementationBytecodeHash,
             "", // Empty constructor data
@@ -162,7 +162,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         // Deploy L2 bridge proxy contract
         l2Bridge[_chainId] = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
-            bridgehead,
+            bridgehub,
             _deployBridgeProxyFee,
             l2BridgeProxyBytecodeHash,
             l2BridgeProxyConstructorData,
@@ -287,7 +287,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) internal returns (bytes32 l2TxHash) {
-        l2TxHash = bridgehead.requestL2Transaction{value: msg.value}(
+        l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
             _chainId,
             l2Bridge[_chainId],
             0, // L2 msg.value
@@ -350,7 +350,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        bool proofValid = bridgehead.proveL1ToL2TransactionStatus(
+        bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
             _chainId,
             _l2TxHash,
             _l2BatchNumber,
@@ -398,7 +398,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
         // Preventing the stack too deep error
         {
-            bool success = bridgehead.proveL2MessageInclusion(
+            bool success = bridgehub.proveL2MessageInclusion(
                 _chainId,
                 _l2BatchNumber,
                 _l2MessageIndex,

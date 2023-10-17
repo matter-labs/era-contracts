@@ -1,7 +1,7 @@
 pragma solidity ^0.8.13;
 
-import {ExecutorFacet} from "../../proof-system/chain-deps/facets/Executor.sol";
-import {VerifierParams} from "../../proof-system/chain-deps/ProofChainStorage.sol";
+import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
+import {VerifierParams} from "../../state-transition/chain-deps/StateTransitionChainStorage.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(

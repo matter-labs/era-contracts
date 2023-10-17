@@ -5,7 +5,7 @@ import { PermissionToCall, AccessMode, print, getLowerCaseAddress, permissionToC
 
 // Get the interfaces for all needed contracts
 const allowList = new Interface(hardhat.artifacts.readArtifactSync('IAllowList').abi);
-const zkSync = new Interface(hardhat.artifacts.readArtifactSync('IBridgehead').abi);
+const zkSync = new Interface(hardhat.artifacts.readArtifactSync('IBridgehub').abi);
 const l1ERC20Bridge = new Interface(hardhat.artifacts.readArtifactSync('L1ERC20Bridge').abi);
 
 const ZKSYNC_MAINNET_ADDRESS = '0x32400084c286cf3e17e7b677ea9583e60a000324';

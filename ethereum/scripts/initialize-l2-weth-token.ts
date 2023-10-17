@@ -45,7 +45,7 @@ async function getL1TxInfo(
     refundRecipient: string,
     gasPrice: ethers.BigNumber
 ) {
-    const zksync = deployer.bridgeheadContract(ethers.Wallet.createRandom().connect(provider));
+    const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
     const l1Calldata = zksync.interface.encodeFunctionData('requestL2Transaction', [
         chainId,
         to,
@@ -156,7 +156,7 @@ async function main() {
                 verbose: true
             });
 
-            const zkSync = deployer.bridgeheadContract(deployWallet);
+            const zkSync = deployer.bridgehubContract(deployWallet);
             const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
                 chainId,
                 gasPrice,

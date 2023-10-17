@@ -2,12 +2,12 @@
 
 pragma solidity ^0.8.17;
 
-import {BridgeheadTest} from "./_Bridgehead_Shared.t.sol";
+import {BridgehubTest} from "./_Bridgehub_Shared.t.sol";
 import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
-import {BridgeheadDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehead/bridgehead-deps/BridgeheadDiamondInit.sol";
+import {BridgehubDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-deps/BridgehubDiamondInit.sol";
 
-contract InitializeTest is BridgeheadTest {
+contract InitializeTest is BridgehubTest {
     address internal governor;
     address internal chainImplementation;
     address internal chainProxyAdmin;
@@ -15,7 +15,7 @@ contract InitializeTest is BridgeheadTest {
     uint256 internal priorityTxMaxGasLimit;
 
     function setUp() public {
-        bridgeheadDiamondInit = new BridgeheadDiamondInit();
+        bridgehubDiamondInit = new BridgehubDiamondInit();
 
         governor = GOVERNOR;
         chainImplementation = makeAddr("chainImplementation");
@@ -25,19 +25,19 @@ contract InitializeTest is BridgeheadTest {
     }
 
     // function test_RevertWhen_AlreadyInitialized() public {
-    //     bridgehead.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
+    //     bridgehub.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
 
-    //     vm.expectRevert(bytes.concat("bridgehead1"));
-    //     bridgehead.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
+    //     vm.expectRevert(bytes.concat("bridgehub1"));
+    //     bridgehub.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
     // }
 
     // function test_InitializeSuccessfully() public {
-    //     bridgehead.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
+    //     bridgehub.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
 
-    //     assertEq(bridgehead.getGovernor(), governor);
-    //     assertEq(bridgehead.getChainImplementation(), chainImplementation);
-    //     assertEq(bridgehead.getChainProxyAdmin(), chainProxyAdmin);
-    //     assertEq(address(bridgehead.getAllowList()), address(allowList));
-    //     assertEq(bridgehead.getPriorityTxMaxGasLimit(), priorityTxMaxGasLimit);
+    //     assertEq(bridgehub.getGovernor(), governor);
+    //     assertEq(bridgehub.getChainImplementation(), chainImplementation);
+    //     assertEq(bridgehub.getChainProxyAdmin(), chainProxyAdmin);
+    //     assertEq(address(bridgehub.getAllowList()), address(allowList));
+    //     assertEq(bridgehub.getPriorityTxMaxGasLimit(), priorityTxMaxGasLimit);
     // }
 }

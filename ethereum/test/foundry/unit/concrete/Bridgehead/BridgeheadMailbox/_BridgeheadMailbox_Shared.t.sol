@@ -4,33 +4,33 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadTest} from "../_Bridgehead_Shared.t.sol";
+import {BridgehubTest} from "../_Bridgehub_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {IProofSystem} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofSystem.sol";
+import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/state-transition-interfaces/IStateTransition.sol";
 
 /* solhint-enable max-line-length */
 
-contract BridgeheadMailboxTest is BridgeheadTest {
+contract BridgehubMailboxTest is BridgehubTest {
     uint256 internal chainId;
-    address internal chainProofSystem;
+    address internal chainStateTransition;
     address internal chainGovernor;
     IAllowList internal chainAllowList;
 
     constructor() {
         chainId = 987654321;
-        chainProofSystem = makeAddr("chainProofSystem");
+        chainStateTransition = makeAddr("chainStateTransition");
         chainGovernor = makeAddr("chainGovernor");
         chainAllowList = IAllowList(makeAddr("chainAllowList"));
 
         // vm.mockCall(
-        //     bridgehead.getChainImplementation(),
-        //     abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
         //     ""
         // );
-        vm.mockCall(chainProofSystem, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
+        vm.mockCall(chainStateTransition, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
-        bridgehead.newProofSystem(chainProofSystem);
-        bridgehead.newChain(chainId, chainProofSystem, chainGovernor, chainAllowList, getDiamondCutData());
+        bridgehub.newStateTransition(chainStateTransition);
+        bridgehub.newChain(chainId, chainStateTransition, chainGovernor, chainAllowList, getDiamondCutData());
     }
 }

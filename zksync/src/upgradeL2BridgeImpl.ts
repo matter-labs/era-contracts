@@ -69,7 +69,7 @@ async function getL1TxInfo(
     refundRecipient: string,
     gasPrice: BigNumber
 ) {
-    const zksync = deployer.bridgeheadContract(ethers.Wallet.createRandom().connect(provider));
+    const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
     const l1Calldata = zksync.interface.encodeFunctionData('requestL2Transaction', [
         chainId,
         to,
@@ -217,7 +217,7 @@ async function main() {
             if (cmd.l2DoubleCheck !== false) {
                 console.log('Waiting for the L2 transaction to be committed...');
                 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-                await awaitPriorityOps(zksProvider, receipt, deployer.bridgeheadContract(deployWallet).interface);
+                await awaitPriorityOps(zksProvider, receipt, deployer.bridgehubContract(deployWallet).interface);
 
                 // Double checking that the bridge implementation has been deployed
                 const deployedBytecode = await zksProvider.getCode(l2ERC20BridgeImplAddr);
@@ -329,7 +329,7 @@ async function main() {
             // Note that it requires working L2 node.
             if (cmd.l2DoubleCheck !== false) {
                 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-                await awaitPriorityOps(zksProvider, receipt, deployer.bridgeheadContract(deployWallet).interface);
+                await awaitPriorityOps(zksProvider, receipt, deployer.bridgehubContract(deployWallet).interface);
 
                 console.log('The L2 transaction has been successfully committed');
             }
@@ -355,7 +355,7 @@ async function main() {
             const gasPrice = BigNumber.from(cmd.gasPrice);
 
             const deployer = new Deployer({ deployWallet: Wallet.createRandom().connect(provider) });
-            const zksync = deployer.bridgeheadContract(ethers.Wallet.createRandom().connect(provider));
+            const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
 
             const neededValue = await zksync.l2TransactionBaseCost(
                 chainId,

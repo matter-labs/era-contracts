@@ -2,15 +2,8 @@ import { Command } from 'commander';
 import { Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import {
-    web3Provider,
-    getNumberFromEnv,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-} from './utils';
-import {
-    L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
-    L2_WETH_BRIDGE_PROXY_BYTECODE
-} from './utils-bytecode';
+import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import { L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE } from './utils-bytecode';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -52,11 +45,11 @@ async function main() {
                 verbose: true
             });
 
-            const bridgehead = deployer.bridgeheadContract(deployWallet);
+            const bridgehub = deployer.bridgehubContract(deployWallet);
             const l1WethBridge = deployer.defaultWethBridge(deployWallet);
 
             // There will be two deployments done during the initial initialization
-            const requiredValueToInitializeBridge = await bridgehead.l2TransactionBaseCost(
+            const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
                 chainId,
                 gasPrice,
                 DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,

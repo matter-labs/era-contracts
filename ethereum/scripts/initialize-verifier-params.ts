@@ -36,7 +36,7 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: deployWallet.address,
+                ownerAddress: deployWallet.address,
                 verbose: true
             });
 
@@ -46,7 +46,7 @@ async function main() {
                 recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
                 recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
             };
-            const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+            const initialDiamondCut = await deployer.initialStateTransitionProxyDiamondCut();
 
             const tx = await zkSync.setParams(verifierParams, initialDiamondCut);
             console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}`);

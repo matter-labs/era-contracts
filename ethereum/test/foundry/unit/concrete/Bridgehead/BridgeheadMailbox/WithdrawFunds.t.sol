@@ -4,11 +4,11 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
+import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
 
 /* solhint-enable max-line-length */
 
-contract WithdrawFundsTest is BridgeheadMailboxTest {
+contract WithdrawFundsTest is BridgehubMailboxTest {
     address internal to;
     uint256 internal amount;
 
@@ -22,28 +22,28 @@ contract WithdrawFundsTest is BridgeheadMailboxTest {
 
         vm.expectRevert(abi.encodePacked("12c"));
         vm.startPrank(nonChainContract);
-        bridgehead.withdrawFunds(chainId, to, amount);
+        bridgehub.withdrawFunds(chainId, to, amount);
     }
 
     function test_RevertWhen_NotEnoughBalance() public {
-        address chainContract = bridgehead.getChainContract(chainId);
+        address chainContract = bridgehub.getChainContract(chainId);
 
-        // setting the balance of the bridgehead to 0 and trying to withdraw 1 ether
+        // setting the balance of the bridgehub to 0 and trying to withdraw 1 ether
         vm.deal(chainContract, 0 ether);
         amount = 1 ether;
 
         vm.expectRevert(abi.encodePacked("pz"));
         vm.startPrank(chainContract);
-        bridgehead.withdrawFunds(chainId, to, amount);
+        bridgehub.withdrawFunds(chainId, to, amount);
     }
 
     function test_SuccessfulWithdraw() public {
-        address chainContract = bridgehead.getChainContract(chainId);
+        address chainContract = bridgehub.getChainContract(chainId);
 
-        vm.deal(address(bridgehead), 100 ether);
+        vm.deal(address(bridgehub), 100 ether);
         amount = 10 ether;
 
         vm.startPrank(chainContract);
-        bridgehead.withdrawFunds(chainId, to, amount);
+        bridgehub.withdrawFunds(chainId, to, amount);
     }
 }

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import {Diamond} from "../common/libraries/Diamond.sol";
+import {Diamond} from "./libraries/Diamond.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs

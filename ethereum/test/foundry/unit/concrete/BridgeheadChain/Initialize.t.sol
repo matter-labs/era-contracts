@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.17;
 
-import {BridgeheadChainTest} from "./_BridgeheadChain_Shared.t.sol";
+import {BridgehubChainTest} from "./_BridgehubChain_Shared.t.sol";
 import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {BridgeheadChain} from "../../../../../cache/solpp-generated-contracts/bridgehead/BridgeheadChain.sol";
+import {BridgehubChain} from "../../../../../cache/solpp-generated-contracts/bridgehub/BridgehubChain.sol";
 
-contract InitializeTest is BridgeheadChainTest {
+contract InitializeTest is BridgehubChainTest {
     function setUp() public {
-        bridgeheadChain = new BridgeheadChain();
+        bridgehubChain = new BridgehubChain();
 
         chainId = 838383838383;
-        proofSystem = makeAddr("proofSystem");
+        stateTransition = makeAddr("stateTransition");
         governor = makeAddr("governor");
         allowList = IAllowList(makeAddr("owner"));
         priorityTxMaxGasLimit = 99999;
@@ -21,16 +21,16 @@ contract InitializeTest is BridgeheadChainTest {
         governor = address(0);
 
         vm.expectRevert(bytes.concat("vy"));
-        bridgeheadChain.initialize(chainId, proofSystem, governor, allowList, priorityTxMaxGasLimit);
+        bridgehubChain.initialize(chainId, stateTransition, governor, allowList, priorityTxMaxGasLimit);
     }
 
     function test_InitializeSuccessfully() public {
-        bridgeheadChain.initialize(chainId, proofSystem, governor, allowList, priorityTxMaxGasLimit);
+        bridgehubChain.initialize(chainId, stateTransition, governor, allowList, priorityTxMaxGasLimit);
 
-        assertEq(bridgeheadChain.getChainId(), chainId);
-        assertEq(bridgeheadChain.getProofSystem(), proofSystem);
-        assertEq(bridgeheadChain.getGovernor(), governor);
-        assertEq(address(bridgeheadChain.getAllowList()), address(allowList));
-        assertEq(bridgeheadChain.getPriorityTxMaxGasLimit(), priorityTxMaxGasLimit);
+        assertEq(bridgehubChain.getChainId(), chainId);
+        assertEq(bridgehubChain.getStateTransition(), stateTransition);
+        assertEq(bridgehubChain.getGovernor(), governor);
+        assertEq(address(bridgehubChain.getAllowList()), address(allowList));
+        assertEq(bridgehubChain.getPriorityTxMaxGasLimit(), priorityTxMaxGasLimit);
     }
 }

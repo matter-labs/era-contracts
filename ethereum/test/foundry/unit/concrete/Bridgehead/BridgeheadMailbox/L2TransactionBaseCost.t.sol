@@ -4,12 +4,12 @@ pragma solidity ^0.8.17;
 
 /* solhint-disable max-line-length */
 
-import {BridgeheadMailboxTest} from "./_BridgeheadMailbox_Shared.t.sol";
-import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/proof-system/chain-interfaces/IMailbox.sol";
+import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
-contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
+contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     uint256 internal gasPrice;
     uint256 internal l2GasLimit;
     uint256 internal l2GasPerPubdataByteLimit;
@@ -24,7 +24,7 @@ contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
         bytes memory revertMessage = "random revert";
 
         vm.mockCallRevert(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.l2TransactionBaseCost.selector,
                 gasPrice,
@@ -35,7 +35,7 @@ contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.l2TransactionBaseCost.selector,
                 gasPrice,
@@ -45,14 +45,14 @@ contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
         );
 
         vm.expectRevert(revertMessage);
-        bridgehead.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
+        bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
     }
 
     function test_ShouldReturnReceivedCanonicalTxHash() public {
         uint256 expectedBaseCost = 123456789;
 
         vm.mockCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.l2TransactionBaseCost.selector,
                 gasPrice,
@@ -63,7 +63,7 @@ contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
         );
 
         vm.expectCall(
-            bridgehead.getChainContract(chainId),
+            bridgehub.getChainContract(chainId),
             abi.encodeWithSelector(
                 IMailbox.l2TransactionBaseCost.selector,
                 gasPrice,
@@ -72,7 +72,7 @@ contract L2TransactionBaseCostTest is BridgeheadMailboxTest {
             )
         );
 
-        uint256 baseCost = bridgehead.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
+        uint256 baseCost = bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
         assertEq(baseCost, expectedBaseCost);
     }
 }

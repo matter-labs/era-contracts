@@ -44,7 +44,7 @@ async function main() {
                 factoryDeps,
                 priorityTxMaxGasLimit
             ]);
-            const upgradeParam = diamondCut([], l1Contracts.Legacy.ProofDiamondUpgradeInit, upgradeInitData);
+            const upgradeParam = diamondCut([], l1Contracts.StateTransition.DiamondUpgradeInit, upgradeInitData);
 
             // Get transaction data of the `proposeDiamondCut`
             const proposeDiamondCut = await diamondCutFacet.interface.encodeFunctionData('proposeDiamondCut', [

@@ -2,12 +2,7 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import {
-    computeL2Create2Address,
-    web3Provider,
-    hashL2Bytecode,
-    applyL1ToL2Alias
-} from './utils';
+import { computeL2Create2Address, web3Provider, hashL2Bytecode, applyL1ToL2Alias } from './utils';
 import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
@@ -22,7 +17,7 @@ import {
     L2_ERC20_BRIDGE_INTERFACE,
     L2_WETH_INTERFACE
 } from './utils-bytecode';
-import { IBridgeheadFactory } from '../typechain/IBridgeheadFactory';
+import { IBridgehubFactory } from '../typechain/IBridgehubFactory';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -37,15 +32,15 @@ async function initializeBridges(
     gasPrice: ethers.BigNumber,
     cmdErc20Bridge: string
 ) {
-    const bridgehead = IBridgeheadFactory.connect(process.env.CONTRACTS_BRIDGEHEAD_DIAMOND_PROXY_ADDR, deployWallet);
+    const bridgehub = IBridgehubFactory.connect(process.env.CONTRACTS_BRIDGEHEAD_DIAMOND_PROXY_ADDR, deployWallet);
     const nonce = await deployWallet.getTransactionCount();
 
     const erc20Bridge = cmdErc20Bridge
         ? deployer.defaultERC20Bridge(deployWallet).attach(cmdErc20Bridge)
         : deployer.defaultERC20Bridge(deployWallet);
-    
-    console.log("KL todo", bridgehead.address)
-    const l1GovernorAddress = await bridgehead.getGovernor();
+
+    console.log('KL todo', bridgehub.address);
+    const l1GovernorAddress = await bridgehub.getGovernor();
     // Check whether governor is a smart contract on L1 to apply alias if needed.
     const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
     const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
@@ -109,13 +104,13 @@ async function initializeBridges(
     console.log(`ERC20 bridge initialized on L1, gasUsed: ${receipts[0].gasUsed.toString()}`);
 }
 async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumber) {
-    const bridgehead = deployer.bridgeheadContract(deployWallet);
+    const bridgehub = deployer.bridgehubContract(deployWallet);
     const l1WethBridge = deployer.defaultWethBridge(deployWallet);
     const chainId = deployer.chainId;
 
     const abiCoder = new ethers.utils.AbiCoder();
 
-    const l1GovernorAddress = await bridgehead.getGovernor();
+    const l1GovernorAddress = await bridgehub.getGovernor();
     // Check whether governor is a smart contract on L1 to apply alias if needed.
     const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
     const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);

@@ -7,11 +7,10 @@ pragma solidity ^0.8.17;
 import {RegistryTest} from "./_Registry_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import {IProofSystem} from "../../../../../../cache/solpp-generated-contracts/proof-system/proof-system-interfaces/IProofSystem.sol";
+import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/state-transition-interfaces/IStateTransition.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IBridgeheadChain} from "../../../../../../cache/solpp-generated-contracts/bridgehead/chain-interfaces/IBridgeheadChain.sol";
 import {Vm} from "forge-std/Test.sol";
-import {IRegistry} from "../../../../../../cache/solpp-generated-contracts/bridgehead/bridgehead-interfaces/IRegistry.sol";
+import {IRegistry} from "../../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-interfaces/IRegistry.sol";
 
 /* solhint-enable max-line-length */
 
@@ -22,35 +21,35 @@ contract NewChainTest is RegistryTest {
 
     function setUp() public {
         chainId = 838383838383;
-        proofSystemAddress = makeAddr("chainProofSystemAddress");
+        stateTransitionAddress = makeAddr("chainStateTransitionAddress");
         governorAddress = makeAddr("governorAddress");
         allowList = new AllowList(governorAddress);
 
         vm.prank(GOVERNOR);
-        bridgehead.newProofSystem(proofSystemAddress);
+        bridgehub.newStateTransition(stateTransitionAddress);
     }
 
     function getChainContractAddress() internal returns (address chainContractAddress) {
         vm.mockCall(
-            bridgehead.getChainImplementation(),
-            abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
+            bridgehub.getChainImplementation(),
+            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
             ""
         );
 
         uint256 snapshot = vm.snapshot();
-        vm.startPrank(address(bridgehead));
+        vm.startPrank(address(bridgehub));
 
         bytes memory data = abi.encodeWithSelector(
-            IBridgeheadChain.initialize.selector,
+            IBridgehubChain.initialize.selector,
             chainId,
-            proofSystemAddress,
+            stateTransitionAddress,
             governorAddress,
             allowList,
-            bridgehead.getPriorityTxMaxGasLimit()
+            bridgehub.getPriorityTxMaxGasLimit()
         );
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            bridgehead.getChainImplementation(),
-            bridgehead.getChainProxyAdmin(),
+            bridgehub.getChainImplementation(),
+            bridgehub.getChainProxyAdmin(),
             data
         );
         chainContractAddress = address(transparentUpgradeableProxy);
@@ -62,30 +61,30 @@ contract NewChainTest is RegistryTest {
     function test_RevertWhen_NonGovernor() public {
         vm.startPrank(NON_GOVERNOR);
         vm.expectRevert(bytes.concat("12g"));
-        bridgehead.newChain(chainId, proofSystemAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
-    function test_RevertWhen_ProofSystemIsNotInStorage() public {
-        address nonExistentProofSystemAddress = address(0x3030303);
+    function test_RevertWhen_StateTransitionIsNotInStorage() public {
+        address nonExistentStateTransitionAddress = address(0x3030303);
 
         vm.startPrank(GOVERNOR);
         vm.expectRevert(bytes.concat("r19"));
-        bridgehead.newChain(chainId, nonExistentProofSystemAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.newChain(chainId, nonExistentStateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
     function test_RevertWhen_ChainIdIsAlreadyInUse() public {
         vm.mockCall(
-            bridgehead.getChainImplementation(),
-            abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
+            bridgehub.getChainImplementation(),
+            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
-        bridgehead.newChain(chainId, proofSystemAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
 
         vm.expectRevert(bytes.concat("r20"));
-        bridgehead.newChain(chainId, proofSystemAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
     function test_NewChainSuccessfullyWithNonZeroChainId() public {
@@ -94,29 +93,29 @@ contract NewChainTest is RegistryTest {
 
         // === Mocking ===
         vm.mockCall(
-            bridgehead.getChainImplementation(),
-            abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
+            bridgehub.getChainImplementation(),
+            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         // === Internal call checks ===
         vm.expectCall(
-            bridgehead.getChainImplementation(),
+            bridgehub.getChainImplementation(),
             abi.encodeWithSelector(
-                IBridgeheadChain.initialize.selector,
+                IBridgehubChain.initialize.selector,
                 chainId,
-                proofSystemAddress,
+                stateTransitionAddress,
                 governorAddress,
                 allowList,
-                bridgehead.getPriorityTxMaxGasLimit()
+                bridgehub.getPriorityTxMaxGasLimit()
             ),
             1
         );
         vm.expectCall(
-            proofSystemAddress,
+            stateTransitionAddress,
             abi.encodeWithSelector(
-                IProofSystem.newChain.selector,
+                IStateTransition.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,
@@ -129,9 +128,9 @@ contract NewChainTest is RegistryTest {
         vm.recordLogs();
         vm.startPrank(GOVERNOR);
 
-        uint256 resChainId = bridgehead.newChain(
+        uint256 resChainId = bridgehub.newChain(
             chainId,
-            proofSystemAddress,
+            stateTransitionAddress,
             governorAddress,
             allowList,
             getDiamondCutData()
@@ -147,17 +146,17 @@ contract NewChainTest is RegistryTest {
         uint16 eventChainId = abi.decode(abi.encode(entries[2].topics[1]), (uint16));
         address eventChainContract = abi.decode(abi.encode(entries[2].topics[2]), (address));
         address eventChainGovernnance = abi.decode(abi.encode(entries[2].topics[3]), (address));
-        address eventProofSystem = abi.decode(entries[2].data, (address));
+        address eventStateTransition = abi.decode(entries[2].data, (address));
 
         assertEq(eventChainId, uint16(chainId), "NewChain.chainId is wrong");
         assertEq(eventChainContract, chainContractAddress, "NewChain.chainContract is wrong");
         assertEq(eventChainGovernnance, GOVERNOR, "NewChain.chainGovernance is wrong");
-        assertEq(eventProofSystem, proofSystemAddress, "NewChain.proofSystem is wrong");
+        assertEq(eventStateTransition, stateTransitionAddress, "NewChain.stateTransition is wrong");
 
         // === Storage checks ===
-        assertEq(bridgehead.getChainProofSystem(chainId), proofSystemAddress, "saved chainProofSystem is wrong");
-        assertEq(bridgehead.getTotalChains(), 1, "saved totalChains is wrong");
-        assertEq(bridgehead.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
+        assertEq(bridgehub.getChainStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
+        assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
+        assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
         assertEq(resChainId, chainId, "returned chainId is wrong");
     }
 
@@ -171,8 +170,8 @@ contract NewChainTest is RegistryTest {
                     abi.encodePacked(
                         "CHAIN_ID",
                         block.chainid,
-                        address(bridgehead),
-                        proofSystemAddress,
+                        address(bridgehub),
+                        stateTransitionAddress,
                         block.timestamp,
                         GOVERNOR
                     )
@@ -182,29 +181,29 @@ contract NewChainTest is RegistryTest {
 
         // === Mocking ===
         vm.mockCall(
-            bridgehead.getChainImplementation(),
-            abi.encodeWithSelector(IBridgeheadChain.initialize.selector),
+            bridgehub.getChainImplementation(),
+            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
             ""
         );
-        vm.mockCall(proofSystemAddress, abi.encodeWithSelector(IProofSystem.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         // === Internal call checks ===
         vm.expectCall(
-            bridgehead.getChainImplementation(),
+            bridgehub.getChainImplementation(),
             abi.encodeWithSelector(
-                IBridgeheadChain.initialize.selector,
+                IBridgehubChain.initialize.selector,
                 chainId,
-                proofSystemAddress,
+                stateTransitionAddress,
                 governorAddress,
                 allowList,
-                bridgehead.getPriorityTxMaxGasLimit()
+                bridgehub.getPriorityTxMaxGasLimit()
             ),
             1
         );
         vm.expectCall(
-            proofSystemAddress,
+            stateTransitionAddress,
             abi.encodeWithSelector(
-                IProofSystem.newChain.selector,
+                IStateTransition.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,
@@ -217,9 +216,9 @@ contract NewChainTest is RegistryTest {
         vm.recordLogs();
         vm.startPrank(GOVERNOR);
 
-        uint256 resChainId = bridgehead.newChain(
+        uint256 resChainId = bridgehub.newChain(
             inputChainId,
-            proofSystemAddress,
+            stateTransitionAddress,
             governorAddress,
             allowList,
             getDiamondCutData()
@@ -235,17 +234,17 @@ contract NewChainTest is RegistryTest {
         uint16 eventChainId = abi.decode(abi.encode(entries[2].topics[1]), (uint16));
         address eventChainContract = abi.decode(abi.encode(entries[2].topics[2]), (address));
         address eventChainGovernnance = abi.decode(abi.encode(entries[2].topics[3]), (address));
-        address eventProofSystem = abi.decode(entries[2].data, (address));
+        address eventStateTransition = abi.decode(entries[2].data, (address));
 
         assertEq(eventChainId, uint16(chainId), "NewChain.chainId is wrong");
         assertEq(eventChainContract, chainContractAddress, "NewChain.chainContract is wrong");
         assertEq(eventChainGovernnance, GOVERNOR, "NewChain.chainGovernance is wrong");
-        assertEq(eventProofSystem, proofSystemAddress, "NewChain.proofSystem is wrong");
+        assertEq(eventStateTransition, stateTransitionAddress, "NewChain.stateTransition is wrong");
 
         // === Storage checks ===
-        assertEq(bridgehead.getChainProofSystem(chainId), proofSystemAddress, "saved chainProofSystem is wrong");
-        assertEq(bridgehead.getTotalChains(), 1, "saved totalChains is wrong");
-        assertEq(bridgehead.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
+        assertEq(bridgehub.getChainStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
+        assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
+        assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
         assertEq(resChainId, chainId, "returned chainId is wrong");
     }
 }

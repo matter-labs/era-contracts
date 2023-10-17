@@ -38,7 +38,7 @@ async function main() {
             const deployer = new Deployer({ deployWallet, verbose: true });
             await deployer.deployAll();
 
-            const zkSyncContract = deployer.bridgeheadContract(deployWallet);
+            const zkSyncContract = deployer.bridgehubContract(deployWallet);
             await (await zkSyncContract.setValidator(deployWallet.address, true)).wait();
 
             const tokenFactory = await hardhat.ethers.getContractFactory('TestnetERC20Token', deployWallet);

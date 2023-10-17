@@ -81,7 +81,7 @@ export async function getCallRevertReason(promise) {
 
 export async function requestExecute(
     chainId: ethers.BigNumberish,
-    bridgehead: ethers.Contract,
+    bridgehub: ethers.Contract,
     to: Address,
     l2Value: ethers.BigNumber,
     calldata: ethers.BytesLike,
@@ -91,10 +91,10 @@ export async function requestExecute(
     overrides?: ethers.PayableOverrides
 ) {
     overrides ??= {};
-    overrides.gasPrice ??= bridgehead.provider.getGasPrice();
+    overrides.gasPrice ??= bridgehub.provider.getGasPrice();
 
     if (!overrides.value) {
-        const baseCost = await bridgehead.l2TransactionBaseCost(
+        const baseCost = await bridgehub.l2TransactionBaseCost(
             chainId,
             overrides.gasPrice,
             l2GasLimit,
@@ -103,7 +103,7 @@ export async function requestExecute(
         overrides.value = baseCost.add(l2Value);
     }
 
-    return await bridgehead.requestL2Transaction(
+    return await bridgehub.requestL2Transaction(
         chainId,
         to,
         l2Value,
@@ -116,7 +116,7 @@ export async function requestExecute(
     );
 }
 
-// due to gas reasons we call tha chains's contract directly, instead of the bridgehead.
+// due to gas reasons we call tha chains's contract directly, instead of the bridgehub.
 export async function requestExecuteDirect(
     mailbox: ethers.Contract,
     to: Address,
@@ -129,7 +129,7 @@ export async function requestExecuteDirect(
     let overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 28000000 as BigNumberish };
     overrides.gasPrice = await mailbox.provider.getGasPrice();
 
-    // we call bridgeheadChain direcetly to avoid running out of gas.
+    // we call bridgehubChain direcetly to avoid running out of gas.
     const baseCost = await mailbox.l2TransactionBaseCost(
         overrides.gasPrice,
         ethers.BigNumber.from(100000),

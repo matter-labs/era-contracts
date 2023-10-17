@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/proof-system/chain-deps/facets/Mailbox.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;

@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.17;
 
-import {BridgeheadTest} from "../_Bridgehead_Shared.t.sol";
+import {BridgehubTest} from "../_Bridgehub_Shared.t.sol";
 
-contract RegistryTest is BridgeheadTest {
-    address internal proofSystemAddress;
+contract RegistryTest is BridgehubTest {
+    address internal stateTransitionAddress;
 }

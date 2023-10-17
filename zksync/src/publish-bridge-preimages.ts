@@ -43,7 +43,7 @@ async function main() {
             console.log(`Using gas price: ${gasPrice}`);
 
             const deployer = new Deployer({ deployWallet: wallet });
-            const zkSync = deployer.bridgeheadContract(wallet);
+            const zkSync = deployer.bridgehubContract(wallet);
 
             const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
                 chainId,

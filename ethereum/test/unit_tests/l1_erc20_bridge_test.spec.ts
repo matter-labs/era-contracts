@@ -5,7 +5,13 @@ import * as hardhat from 'hardhat';
 import * as fs from 'fs';
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from 'zksync-web3/build/src/utils';
-import { AllowList, TestnetERC20Token, TestnetERC20TokenFactory, BridgeheadMailboxFacet , BridgeheadMailboxFacetFactory} from '../../typechain';
+import {
+    AllowList,
+    TestnetERC20Token,
+    TestnetERC20TokenFactory,
+    BridgehubMailboxFacet,
+    BridgehubMailboxFacetFactory
+} from '../../typechain';
 import { IL1Bridge } from '../../typechain/IL1Bridge';
 import { IL1BridgeFactory } from '../../typechain/IL1BridgeFactory';
 import { AccessMode, getCallRevertReason } from './utils';
@@ -30,7 +36,7 @@ describe(`L1ERC20Bridge tests`, function () {
     let erc20TestToken: TestnetERC20Token;
     let testnetERC20TokenContract: ethers.Contract;
     let l1Erc20BridgeContract: ethers.Contract;
-    let bridgeheadMailboxFacet: BridgeheadMailboxFacet;
+    let bridgehubMailboxFacet: BridgehubMailboxFacet;
     let chainId = 0;
 
     before(async () => {
@@ -83,8 +89,8 @@ describe(`L1ERC20Bridge tests`, function () {
         process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
         await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgeheadContract(create2Salt, gasPrice);
-        await deployer.deployProofSystemContract(create2Salt, gasPrice);
+        await deployer.deployBridgehubContract(create2Salt, gasPrice);
+        await deployer.deployStateTransitionContract(create2Salt,null, gasPrice);
         await deployer.deployBridgeContracts(create2Salt, gasPrice);
         await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
 
@@ -93,11 +99,11 @@ describe(`L1ERC20Bridge tests`, function () {
             recursionLeafLevelVkHash: zeroHash,
             recursionCircuitsSetVksHash: zeroHash
         };
-        const initialDiamondCut = await deployer.initialProofSystemProxyDiamondCut();
+        // const initialDiamondCut = await deployer.initialStateTransitionProxyDiamondCut();
 
-        const proofSystem = deployer.proofSystemContract(deployWallet);
+        // const proofSystem = deployer.proofSystemContract(deployWallet);
 
-        await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
+        // await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
 
         await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
@@ -109,10 +115,10 @@ describe(`L1ERC20Bridge tests`, function () {
 
         const allowTx = await allowList.setBatchAccessMode(
             [
-                deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
-                deployer.addresses.Bridgehead.ChainProxy,
-                deployer.addresses.ProofSystem.ProofSystemProxy,
-                deployer.addresses.ProofSystem.DiamondProxy,
+                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+                deployer.addresses.Bridgehub.ChainProxy,
+                deployer.addresses.StateTransition.StateTransitionProxy,
+                deployer.addresses.StateTransition.DiamondProxy,
                 deployer.addresses.Bridges.ERC20BridgeProxy,
                 deployer.addresses.Bridges.WethBridgeProxy
             ],
@@ -127,11 +133,14 @@ describe(`L1ERC20Bridge tests`, function () {
         );
         await allowTx.wait();
 
-        bridgeheadMailboxFacet = BridgeheadMailboxFacetFactory.connect(deployer.addresses.Bridgehead.BridgeheadDiamondProxy, deployWallet);
+        bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(
+            deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+            deployWallet
+        );
 
         const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory('L1ERC20Bridge');
         l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(
-            deployer.addresses.Bridgehead.BridgeheadDiamondProxy,
+            deployer.addresses.Bridgehub.BridgehubDiamondProxy,
             allowList.address
         );
         l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
@@ -148,7 +157,7 @@ describe(`L1ERC20Bridge tests`, function () {
         await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits('10000', 18));
 
         // // Exposing the methods of IZkSync to the diamond proxy
-        // bridgeheadMailboxFacet = BridgeheadMailboxFacetFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
+        // bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
     });
 
     it(`Should not allow an un-whitelisted address to deposit`, async () => {
@@ -191,7 +200,7 @@ describe(`L1ERC20Bridge tests`, function () {
         const depositorAddress = await randomSigner.getAddress();
         await depositERC20(
             l1ERC20Bridge.connect(randomSigner),
-            bridgeheadMailboxFacet,
+            bridgehubMailboxFacet,
             chainId,
             depositorAddress,
             testnetERC20TokenContract.address,
@@ -266,7 +275,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
 async function depositERC20(
     bridge: IL1Bridge,
-    bridgeheadMailboxFacet: BridgeheadMailboxFacet,
+    bridgehubMailboxFacet: BridgehubMailboxFacet,
     chainId: BigNumberish,
     l2Receiver: string,
     l1Token: string,
@@ -276,7 +285,12 @@ async function depositERC20(
 ) {
     const gasPrice = await bridge.provider.getGasPrice();
     const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-    const neededValue = await bridgeheadMailboxFacet.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
+    const neededValue = await bridgehubMailboxFacet.l2TransactionBaseCost(
+        chainId,
+        gasPrice,
+        l2GasLimit,
+        gasPerPubdata
+    );
 
     await bridge.deposit(
         chainId,

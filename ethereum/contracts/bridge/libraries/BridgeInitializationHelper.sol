@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../bridgehead/bridgehead-interfaces/IBridgehead.sol";
+import "../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -29,7 +29,7 @@ library BridgeInitializationHelper {
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment
     function requestDeployTransaction(
         uint256 _chainId,
-        IBridgehead _zkSync,
+        IBridgehub _zkSync,
         uint256 _deployTransactionFee,
         bytes32 _bytecodeHash,
         bytes memory _constructorData,

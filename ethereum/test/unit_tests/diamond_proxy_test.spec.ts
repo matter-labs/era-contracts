@@ -71,17 +71,19 @@ describe('Diamond proxy tests', function () {
             recursionCircuitsSetVksHash: ethers.constants.HashZero
         };
 
-        const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
-            chainId,
-            '0x0000000000000000000000000000000000000000',
-            governorAddress,
-            '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
-            '0x0000000000000000000000000000000000000000',
-            '0x0000000000000000000000000000000000000000',
-            dummyVerifierParams,
-            '0x0100000000000000000000000000000000000000000000000000000000000000',
-            '0x0100000000000000000000000000000000000000000000000000000000000000',
-            500000 // priority tx max L2 gas limit
+        const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [{
+                chainId,
+                bridgehub: '0x0000000000000000000000000000000000000000',
+                proofSystem: '0x0000000000000000000000000000000000000000',
+                governor: governorAddress,
+                storedBatchZero: '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
+                allowList: '0x0000000000000000000000000000000000000000',
+                verifier: '0x0000000000000000000000000000000000000000',
+                verifierParams: dummyVerifierParams,
+                l2BootloaderBytecodeHash:  '0x0100000000000000000000000000000000000000000000000000000000000000',
+                l2DefaultAccountBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
+                priorityTxMaxGasLimit: 500000 // priority tx max L2 gas limit
+            }
         ]);
 
         const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitCalldata);
