@@ -31,6 +31,13 @@ interface IAdmin is IStateTransitionChainBase {
 
     function unfreezeDiamond() external;
 
+    /// @notice Porter availability status changes
+    event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
+
+    /// @notice Validator's status changed
+    event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
+    
+
     /// @notice pendingGovernor is changed
     /// @dev Also emitted when new governor is accepted and in this case, `newPendingGovernor` would be zero address
     event NewPendingGovernor(address indexed oldPendingGovernor, address indexed newPendingGovernor);
@@ -47,12 +54,6 @@ interface IAdmin is IStateTransitionChainBase {
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
-
-    /// @notice Validator's status changed
-    event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
-
-    /// @notice Porter availability status changes
-    event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

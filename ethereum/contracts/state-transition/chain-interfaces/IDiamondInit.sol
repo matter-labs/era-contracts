@@ -21,6 +21,7 @@ struct InitializeData {
     address bridgehub;
     address stateTransition;
     address governor;
+    address admin;
     bytes32 storedBatchZero;
     IAllowList allowList;
     IVerifier verifier;
