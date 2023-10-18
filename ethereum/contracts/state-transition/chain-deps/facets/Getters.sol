@@ -94,11 +94,11 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
         return chainStorage.l2LogsRootHashes[_batchNumber];
     }
 
-    /// @notice For unfinalized (non executed) blocks may change
-    /// @dev returns zero for non-committed blocks
-    /// @return The hash of committed L2 block.
-    function storedBatchHash(uint256 _blockNumber) external view returns (bytes32) {
-        return chainStorage.storedBatchHashes[_blockNumber];
+    /// @notice For unfinalized (non executed) batches may change
+    /// @dev returns zero for non-committed batches
+    /// @return The hash of committed L2 batch.
+    function storedBatchHash(uint256 _batchNumber) external view returns (bytes32) {
+        return chainStorage.storedBatchHashes[_batchNumber];
     }
 
     /// @return Bytecode hash of bootloader program.

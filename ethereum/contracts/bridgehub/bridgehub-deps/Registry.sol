@@ -4,17 +4,9 @@
 pragma solidity ^0.8.13;
 
 import "./BridgehubBase.sol";
-// import "../../common/Config.sol";
 import "../bridgehub-interfaces/IRegistry.sol";
 import "../../common/libraries/UncheckedMath.sol";
-// import "../bridgehub-interfaces/IBridgehubMailbox.sol";
-// import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
-
-// import "../../common/libraries/L2ContractHelper.sol";
-// import "../../common/L2ContractAddresses.sol";
-
-// import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
     using UncheckedMath for uint256;
@@ -44,7 +36,6 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
 
         require(bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "r19");
 
-        // bridgehubStorage.totalChains += 1;
         bridgehubStorage.stateTransition[chainId] = _stateTransition;
 
         emit NewChain(uint16(chainId), _stateTransition, msg.sender);

@@ -134,7 +134,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) external view override returns (bool) {
+    ) public view override returns (bool) {
         // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
         // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
         //
@@ -163,8 +163,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        // kl todo is this even needed? as we only add logs in executeblocks.
-        // But if it is needed we need to update totalBatchsExecuted
         require(_batchNumber <= chainStorage.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
@@ -206,7 +204,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) external pure returns (uint256) {
+    ) public pure returns (uint256) {
         uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
         return l2GasPrice * _l2GasLimit;
     }

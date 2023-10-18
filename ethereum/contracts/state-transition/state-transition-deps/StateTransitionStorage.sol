@@ -56,8 +56,8 @@ struct StateTransitionStorage {
     bytes32 storedBatchZero;
     /// @dev Stored cutData for diamond cut
     bytes32 cutHash;
-    /// @dev Stored cutData for upgrade diamond cut
-    bytes32 upgradeCutHash;
+    /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    mapping(uint256 => bytes32) upgradeCutHash;
     /// @dev protocolVersion
     uint256 protocolVersion;
 }

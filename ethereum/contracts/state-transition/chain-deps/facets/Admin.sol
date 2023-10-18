@@ -95,8 +95,11 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransition {
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint256 _latestProtocolVersion) external onlyStateTransition {
         Diamond.diamondCut(_diamondCut);
+        if (chainStorage.protocolVersion == _latestProtocolVersion) {
+            chainStorage.upToDate = true;
+        }
         emit ExecuteUpgrade(_diamondCut);
     }
 
@@ -112,7 +115,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
         if (chainStorage.protocolVersion == _protocolVersion) {
             return;
         }
-        require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
+        chainStorage.upToDate = false;
         diamondStorage.isFrozen = true;
 
         emit Freeze();
@@ -134,6 +137,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     function unfreezeDiamond() external onlyGovernorOrAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
+        require(chainStorage.upToDate, "a8"); // diamond proxy is not up to date
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen
         diamondStorage.isFrozen = false;
 

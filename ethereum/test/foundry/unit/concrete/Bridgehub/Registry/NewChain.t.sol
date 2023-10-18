@@ -30,29 +30,29 @@ contract NewChainTest is RegistryTest {
     }
 
     function getChainContractAddress() internal returns (address chainContractAddress) {
-        vm.mockCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
-            ""
-        );
+        // vm.mockCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
+        //     ""
+        // );
 
         uint256 snapshot = vm.snapshot();
         vm.startPrank(address(bridgehub));
 
-        bytes memory data = abi.encodeWithSelector(
-            IBridgehubChain.initialize.selector,
-            chainId,
-            stateTransitionAddress,
-            governorAddress,
-            allowList,
-            bridgehub.getPriorityTxMaxGasLimit()
-        );
-        TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
-            bridgehub.getChainImplementation(),
-            bridgehub.getChainProxyAdmin(),
-            data
-        );
-        chainContractAddress = address(transparentUpgradeableProxy);
+        // bytes memory data = abi.encodeWithSelector(
+        //     IBridgehubChain.initialize.selector,
+        //     chainId,
+        //     stateTransitionAddress,
+        //     governorAddress,
+        //     allowList,
+        //     bridgehub.getPriorityTxMaxGasLimit()
+        // );
+        // TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
+        //     bridgehub.getChainImplementation(),
+        //     bridgehub.getChainProxyAdmin(),
+        //     data
+        // );
+        // chainContractAddress = address(transparentUpgradeableProxy);
 
         vm.stopPrank();
         vm.revertTo(snapshot);
@@ -73,11 +73,11 @@ contract NewChainTest is RegistryTest {
     }
 
     function test_RevertWhen_ChainIdIsAlreadyInUse() public {
-        vm.mockCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
-            ""
-        );
+        // vm.mockCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
+        //     ""
+        // );
         vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
@@ -92,26 +92,26 @@ contract NewChainTest is RegistryTest {
         address chainContractAddress = getChainContractAddress();
 
         // === Mocking ===
-        vm.mockCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
-            ""
-        );
+        // vm.mockCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
+        //     ""
+        // );
         vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         // === Internal call checks ===
-        vm.expectCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(
-                IBridgehubChain.initialize.selector,
-                chainId,
-                stateTransitionAddress,
-                governorAddress,
-                allowList,
-                bridgehub.getPriorityTxMaxGasLimit()
-            ),
-            1
-        );
+        // vm.expectCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(
+        //         IBridgehubChain.initialize.selector,
+        //         chainId,
+        //         stateTransitionAddress,
+        //         governorAddress,
+        //         allowList,
+        //         bridgehub.getPriorityTxMaxGasLimit()
+        //     ),
+        //     1
+        // );
         vm.expectCall(
             stateTransitionAddress,
             abi.encodeWithSelector(
@@ -184,26 +184,26 @@ contract NewChainTest is RegistryTest {
         );
 
         // === Mocking ===
-        vm.mockCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(IBridgehubChain.initialize.selector),
-            ""
-        );
+        // vm.mockCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
+        //     ""
+        // );
         vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransition.newChain.selector), "");
 
         // === Internal call checks ===
-        vm.expectCall(
-            bridgehub.getChainImplementation(),
-            abi.encodeWithSelector(
-                IBridgehubChain.initialize.selector,
-                chainId,
-                stateTransitionAddress,
-                governorAddress,
-                allowList,
-                bridgehub.getPriorityTxMaxGasLimit()
-            ),
-            1
-        );
+        // vm.expectCall(
+        //     bridgehub.getChainImplementation(),
+        //     abi.encodeWithSelector(
+        //         IBridgehubChain.initialize.selector,
+        //         chainId,
+        //         stateTransitionAddress,
+        //         governorAddress,
+        //         allowList,
+        //         bridgehub.getPriorityTxMaxGasLimit()
+        //     ),
+        //     1
+        // );
         vm.expectCall(
             stateTransitionAddress,
             abi.encodeWithSelector(

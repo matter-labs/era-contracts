@@ -20,7 +20,6 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
     using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "ExecutorFacet";
-    uint256 public val;
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo

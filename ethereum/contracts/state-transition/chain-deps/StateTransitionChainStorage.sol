@@ -112,4 +112,5 @@ struct StateTransitionChainStorage {
     uint256 chainId;
     address bridgehub;
     address stateTransition;
+    bool upToDate;
 }

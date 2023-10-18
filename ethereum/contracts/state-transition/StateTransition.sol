@@ -79,7 +79,11 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     }
 
     /// @notice
-    function newChain(uint256 _chainId, address _governor, Diamond.DiamondCutData calldata _diamondCut) external {
+    function newChain(
+        uint256 _chainId,
+        address _governor,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyGovernor {
         // check not registered
         address bridgehub = proofStorage.bridgehub;
         require(proofStorage.proofChainContract[_chainId] == address(0), "PRegistry 1");
@@ -122,19 +126,32 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         emit StateTransitionNewChain(_chainId, proofChainAddress);
     }
 
-    function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData) external onlyGovernor {
-        proofStorage.upgradeCutHash = keccak256(abi.encode(_cutData));
+    function setUpgradeDiamondCut(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _protocolVersion
+    ) external onlyGovernor {
+        proofStorage.upgradeCutHash[_protocolVersion] = keccak256(abi.encode(_cutData));
     }
 
     function upgradeChain(
         uint256 _chainId,
+        uint256 _protocolVersion,
         Diamond.DiamondCutData calldata _cutData
     ) external onlyChainGovernor(_chainId) {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
-        require(cutHash == proofStorage.upgradeCutHash, "r25");
+        require(cutHash == proofStorage.upgradeCutHash[_protocolVersion], "r25");
 
         IStateTransitionChain proofChainContract = IStateTransitionChain(proofStorage.proofChainContract[_chainId]);
-        proofChainContract.executeUpgrade(_cutData);
+        proofChainContract.executeUpgrade(_cutData, _protocolVersion);
+    }
+
+    function specialUpgradeChain(
+        uint256 _chainId,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
+    ) external onlyGovernor {
+        IStateTransitionChain proofChainContract = IStateTransitionChain(proofStorage.proofChainContract[_chainId]);
+        proofChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
     function freezeNotUpdated() external onlyGovernor {

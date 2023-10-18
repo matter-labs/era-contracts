@@ -119,27 +119,80 @@ library Utils {
         selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
         selectors[18] = GettersFacet.getAllowList.selector;
-        selectors[19] = GettersFacet.isEthWithdrawalFinalized.selector;
-        selectors[20] = GettersFacet.facets.selector;
-        selectors[21] = GettersFacet.facetFunctionSelectors.selector;
-        selectors[22] = GettersFacet.facetAddresses.selector;
-        selectors[23] = GettersFacet.facetAddress.selector;
-        selectors[24] = GettersFacet.isFunctionFreezable.selector;
-        selectors[25] = GettersFacet.isFacetFreezable.selector;
-        selectors[26] = GettersFacet.getTotalBatchesCommitted.selector;
-        selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
-        selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[19] = GettersFacet.facets.selector;
+        selectors[20] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[21] = GettersFacet.facetAddresses.selector;
+        selectors[22] = GettersFacet.facetAddress.selector;
+        selectors[23] = GettersFacet.isFunctionFreezable.selector;
+        selectors[24] = GettersFacet.isFacetFreezable.selector;
+        selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
         return selectors;
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
-        selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
-        selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[3] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[4] = MailboxFacet.requestL2Transaction.selector;
-        selectors[5] = MailboxFacet.l2TransactionBaseCost.selector;
+        selectors[0] = MailboxFacet.isEthWithdrawalFinalized.selector;
+        selectors[1] = MailboxFacet.finalizeEthWithdrawalBridgehub.selector;
+        selectors[2] = MailboxFacet.requestL2TransactionBridgehub.selector;
+        selectors[3] = MailboxFacet.proveL2MessageInclusion.selector;
+        selectors[4] = MailboxFacet.proveL2LogInclusion.selector;
+        selectors[5] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[6] = MailboxFacet.finalizeEthWithdrawal.selector;
+        selectors[7] = MailboxFacet.requestL2Transaction.selector;
+        selectors[8] = MailboxFacet.l2TransactionBaseCost.selector;
         return selectors;
+    }
+
+    function initial_deployment() public returns (address[] memory) {
+        GettersFacet gettersFacet = new GettersFacet();
+        MailboxFacet mailboxFacet = new MailboxFacet();
+        allowList = new AllowList(owner);
+        DiamondInit diamondInit = new DiamondInit();
+
+        bytes8 dummyHash = 0x1234567890123456;
+        address dummyAddress = makeAddr("dummyAddress");
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            dummyAddress,
+            owner,
+            owner,
+            0,
+            0,
+            0,
+            allowList,
+            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
+            false,
+            dummyHash,
+            dummyHash,
+            10000000
+        );
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(gettersFacet),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getGettersSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(mailboxFacet),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMailboxSelectors()
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        uint256 chainId = block.chainid;
+        DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
+
+        vm.prank(owner);
+        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
     }
 }

@@ -55,8 +55,7 @@ abstract contract ReentrancyGuard {
         }
 
         // Check that storage slot for reentrancy guard is empty to rule out possibility of slot conflict
-        // kl todo
-        // require(lockSlotOldValue == 0, "1B");
+        require(lockSlotOldValue == 0, "1B");
     }
 
     /**

@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 /* solhint-disable max-line-length */
 
 import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
-import {IChainGetters} from "../../../../../../cache/solpp-generated-contracts/bridgehub/chain-interfaces/IChainGetters.sol";
+import {IMailbox} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 /* solhint-enable max-line-length */
 
@@ -21,13 +21,13 @@ contract IsEthWithdrawalFinalizedTest is BridgehubMailboxTest {
     function test_WhenChainContractReturnsTrue() public {
         vm.mockCall(
             bridgehub.getChainContract(chainId),
-            abi.encodeWithSelector(IChainGetters.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
+            abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
             abi.encode(true)
         );
 
         vm.expectCall(
             bridgehub.getChainContract(chainId),
-            abi.encodeWithSelector(IChainGetters.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
+            abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
         );
 
         bool res = bridgehub.isEthWithdrawalFinalized(chainId, l2MessageIndex, l2TxNumberInBlock);
@@ -37,13 +37,13 @@ contract IsEthWithdrawalFinalizedTest is BridgehubMailboxTest {
     function test_WhenChainContractReturnsFalse() public {
         vm.mockCall(
             bridgehub.getChainContract(chainId),
-            abi.encodeWithSelector(IChainGetters.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
+            abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
             abi.encode(false)
         );
 
         vm.expectCall(
             bridgehub.getChainContract(chainId),
-            abi.encodeWithSelector(IChainGetters.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
+            abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
         );
 
         bool res = bridgehub.isEthWithdrawalFinalized(chainId, l2MessageIndex, l2TxNumberInBlock);
