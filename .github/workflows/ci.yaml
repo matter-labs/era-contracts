@@ -14,6 +14,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.18.0
+          cache: yarn
 
       - name: Install dependencies
         run: yarn
@@ -51,6 +52,39 @@ jobs:
 
       - name: Run lint
         run: yarn lint
+
+  check_hashes:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-${{ github.sha }}
+          path: |
+            artifacts-zk
+            cache-zk
+            typechain-types
+            contracts/artifacts
+            contracts/precompiles/artifacts
+            bootloader/build
+
+      - name: Check hashes
+        run: yarn calculate-hashes --check-only
 
   test:
     needs: [build, lint]
