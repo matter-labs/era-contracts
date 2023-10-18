@@ -8,10 +8,7 @@ import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 
 interface IRegistry is IBridgehubBase {
-    function newChain(
-        uint256 _chainId,
-        address _stateTransition
-    ) external returns (uint256 chainId);
+    function newChain(uint256 _chainId, address _stateTransition) external returns (uint256 chainId);
 
     function newStateTransition(address _stateTransition) external;
 

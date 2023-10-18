@@ -79,7 +79,6 @@ struct BridgehubStorage {
     address admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
     address pendingAdmin;
-
     /// new fields
     /// @notice we store registered stateTransitions
     mapping(address => bool) stateTransitionIsRegistered;

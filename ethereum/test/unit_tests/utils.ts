@@ -22,7 +22,6 @@ export const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
 export const L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = '0x000000000000000000000000000000000000800a';
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = `0x000000000000000000000000000000000000800e`;
 
-
 const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
@@ -231,66 +230,71 @@ export function packBatchTimestampAndBatchTimestamp(
     return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
 
-export async function initialDeployment(deployWallet: Wallet,ownerAddress:string,  gasPrice: BigNumberish, extraFacets: FacetCut[]) :  Promise<Deployer>{
+export async function initialDeployment(
+    deployWallet: Wallet,
+    ownerAddress: string,
+    gasPrice: BigNumberish,
+    extraFacets: FacetCut[]
+): Promise<Deployer> {
     process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
-        const deployer = new Deployer({
-            deployWallet,
-            ownerAddress,
-            verbose: false ,
-            addresses: addressConfig,
-            bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-            defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
-        });
+    const deployer = new Deployer({
+        deployWallet,
+        ownerAddress,
+        verbose: false,
+        addresses: addressConfig,
+        bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
+        defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
+    });
 
-        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+    const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
-        let nonce = await deployWallet.getTransactionCount();
+    let nonce = await deployWallet.getTransactionCount();
 
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
+    await deployer.deployCreate2Factory({ gasPrice, nonce });
+    nonce++;
 
-        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
-        // nonce++;
+    // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+    // nonce++;
 
-        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
-        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
-        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
-        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
-        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
+    process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
+    process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
+    process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
+    process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
+    process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
+    process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
+    process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
-        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgehubContract(create2Salt, gasPrice);
-        await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
-        await deployer.deployBridgeContracts(create2Salt, gasPrice);
-        await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+    await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+    await deployer.deployBridgehubContract(create2Salt, gasPrice);
+    await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
+    await deployer.deployBridgeContracts(create2Salt, gasPrice);
+    await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
 
-        await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
+    await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
 
-        const allowList = deployer.l1AllowList(deployWallet);
+    const allowList = deployer.l1AllowList(deployWallet);
 
-        const allowTx = await allowList.setBatchAccessMode(
-            [
-                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-                deployer.addresses.Bridgehub.ChainProxy,
-                deployer.addresses.StateTransition.StateTransitionProxy,
-                deployer.addresses.StateTransition.DiamondProxy,
-                deployer.addresses.Bridges.ERC20BridgeProxy,
-                deployer.addresses.Bridges.WethBridgeProxy
-            ],
-            [
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public
-            ]
-        );
-        await allowTx.wait();
-        return deployer;
+    const allowTx = await allowList.setBatchAccessMode(
+        [
+            deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+            deployer.addresses.Bridgehub.ChainProxy,
+            deployer.addresses.StateTransition.StateTransitionProxy,
+            deployer.addresses.StateTransition.DiamondProxy,
+            deployer.addresses.Bridges.ERC20BridgeProxy,
+            deployer.addresses.Bridges.WethBridgeProxy
+        ],
+        [
+            AccessMode.Public,
+            AccessMode.Public,
+            AccessMode.Public,
+            AccessMode.Public,
+            AccessMode.Public,
+            AccessMode.Public
+        ]
+    );
+    await allowTx.wait();
+    return deployer;
 }
 
 export interface StoredBatchInfo {

@@ -19,7 +19,7 @@ import {L2Message, L2Log, WritePriorityOpParams, L2CanonicalTransaction} from ".
 import {IAllowList} from "../../../common/interfaces/IAllowList.sol";
 
 import {IMailbox, TxStatus} from "../../chain-interfaces/IMailbox.sol";
-import {IBridgehub} from  "../../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs

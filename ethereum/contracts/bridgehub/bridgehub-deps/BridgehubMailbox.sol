@@ -14,7 +14,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         uint256 _l2TxNumberInBlock
     ) external view override returns (bool) {
         address proofChain = bridgehubStorage.proofChain[_chainId];
-        return IStateTransitionChain(proofChain).isEthWithdrawalFinalized( _l2MessageIndex, _l2TxNumberInBlock);
+        return IStateTransitionChain(proofChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
     }
 
     function proveL2MessageInclusion(
@@ -25,7 +25,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address proofChain = bridgehubStorage.proofChain[_chainId];
-        return IStateTransitionChain(proofChain).proveL2MessageInclusion( _batchNumber, _index, _message, _proof);
+        return IStateTransitionChain(proofChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(
@@ -36,7 +36,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address proofChain = bridgehubStorage.proofChain[_chainId];
-        return IStateTransitionChain(proofChain).proveL2LogInclusion( _batchNumber, _index, _log, _proof);
+        return IStateTransitionChain(proofChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
     function proveL1ToL2TransactionStatus(
@@ -51,7 +51,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         address proofChain = bridgehubStorage.proofChain[_chainId];
         return
             IStateTransitionChain(proofChain).proveL1ToL2TransactionStatus(
-                    _l2TxHash,
+                _l2TxHash,
                 _l2BlockNumber,
                 _l2MessageIndex,
                 _l2TxNumberInBlock,
@@ -70,11 +70,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
 
         address proofChain = bridgehubStorage.proofChain[_chainId];
         return
-            IStateTransitionChain(proofChain).l2TransactionBaseCost(
-                    _gasPrice,
-                _l2GasLimit,
-                _l2GasPerPubdataByteLimit
-            );
+            IStateTransitionChain(proofChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
     function requestL2Transaction(
@@ -112,7 +108,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         address proofChain = bridgehubStorage.proofChain[_chainId];
         return
             IStateTransitionChain(proofChain).finalizeEthWithdrawalBridgehub(
-                    msg.sender,
+                msg.sender,
                 _l2BlockNumber,
                 _l2MessageIndex,
                 _l2TxNumberInBlock,

@@ -18,7 +18,7 @@ import {
     requestExecute,
     requestExecuteDirect,
     L2_TO_L1_MESSENGER,
-    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 
+    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
     ethTestConfig,
     initialDeployment
 } from './utils';
@@ -26,10 +26,7 @@ import {
 import * as ethers from 'ethers';
 import { Wallet } from 'ethers';
 
-import { Action, facetCut,  } from '../../src.ts/diamondCut';
-
-
-
+import { Action, facetCut } from '../../src.ts/diamondCut';
 
 describe('Mailbox tests', function () {
     let allowList: AllowList;

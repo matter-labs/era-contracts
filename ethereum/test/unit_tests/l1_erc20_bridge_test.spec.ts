@@ -210,12 +210,7 @@ async function depositERC20(
 ) {
     const gasPrice = await bridge.provider.getGasPrice();
     const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-    const neededValue = await bridgehubMailboxFacet.l2TransactionBaseCost(
-        chainId,
-        gasPrice,
-        l2GasLimit,
-        gasPerPubdata
-    );
+    const neededValue = await bridgehubMailboxFacet.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
 
     await bridge.deposit(
         chainId,

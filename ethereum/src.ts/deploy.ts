@@ -364,7 +364,11 @@ export class Deployer {
         this.addresses.Bridgehub.BridgehubDiamondInit = contractAddress;
     }
 
-    public async deployStateTransitionProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest, extraFacets?: FacetCut[]) {
+    public async deployStateTransitionProxy(
+        create2Salt: string,
+        ethTxOptions: ethers.providers.TransactionRequest,
+        extraFacets?: FacetCut[]
+    ) {
         ethTxOptions.gasLimit ??= 10_000_000;
 
         const StateTransition = await hardhat.ethers.getContractFactory('StateTransition');
@@ -372,7 +376,7 @@ export class Deployer {
         const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
-        const diamondCut = (await this.initialStateTransitionChainDiamondCut(extraFacets))
+        const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
 
         const instance = await hardhat.upgrades.deployProxy(StateTransition, [
             {
@@ -407,7 +411,9 @@ export class Deployer {
 
         if (this.verbose) {
             console.log(
-                `StateTransition Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
+                `StateTransition Proxy deployed, gas used: ${(
+                    await instance.deployTransaction.wait()
+                ).gasUsed.toString()}`
             );
         }
 
@@ -668,7 +674,12 @@ export class Deployer {
         await this.deployBridgehubDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
     }
 
-    public async deployStateTransitionContract(create2Salt: string, extraFacets?:FacetCut[], gasPrice?: BigNumberish, nonce?) {
+    public async deployStateTransitionContract(
+        create2Salt: string,
+        extraFacets?: FacetCut[],
+        gasPrice?: BigNumberish,
+        nonce?
+    ) {
         nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
         await this.deployProofDiamond(create2Salt, gasPrice, nonce);
@@ -710,24 +721,19 @@ export class Deployer {
         // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
         const inputChainId = 0;
         const governor = this.ownerAddress;
-        const initialDiamondCut =  await this.initialStateTransitionChainDiamondCut(extraFacets);
+        const initialDiamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
 
-        const tx = await bridgehub.newChain(
-            inputChainId,
-            this.addresses.StateTransition.StateTransitionProxy,
-            { gasPrice, nonce, gasLimit }
-        );
+        const tx = await bridgehub.newChain(inputChainId, this.addresses.StateTransition.StateTransitionProxy, {
+            gasPrice,
+            nonce,
+            gasLimit
+        });
         const receipt = await tx.wait();
         const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic('NewChain'))
             .topics[1];
-        
-        nonce ++;
-        const tx2 = await stateTransition.newChain(
-            chainId,
-            governor,
-            initialDiamondCut,
-            { gasPrice, nonce, gasLimit }
-        );
+
+        nonce++;
+        const tx2 = await stateTransition.newChain(chainId, governor, initialDiamondCut, { gasPrice, nonce, gasLimit });
         const receipt2 = await tx2.wait();
         const proofContractAddress =
             '0x' +
@@ -738,7 +744,9 @@ export class Deployer {
         this.addresses.StateTransition.DiamondProxy = proofContractAddress;
 
         if (this.verbose) {
-            console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`);
+            console.log(
+                `Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
+            );
             // KL todo: ChainId is not a uint256 yet.
             console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
             console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${proofContractAddress}`);

@@ -7,7 +7,6 @@ import "../../common/ReentrancyGuard.sol";
 import "../../common/AllowListed.sol";
 import "../chain-interfaces/IStateTransitionChain.sol";
 
-
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 contract StateTransitionBase is ReentrancyGuard, AllowListed {

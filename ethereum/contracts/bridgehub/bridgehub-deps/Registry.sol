@@ -10,6 +10,7 @@ import "../../common/libraries/UncheckedMath.sol";
 // import "../bridgehub-interfaces/IBridgehubMailbox.sol";
 // import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
+
 // import "../../common/libraries/L2ContractHelper.sol";
 // import "../../common/L2ContractAddresses.sol";
 
@@ -33,7 +34,9 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
         // KL Todo: uint16 until the server can take bigger numbers.
         if (_chainId == 0) {
             chainId = uint16(
-                uint256(keccak256(abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender)))
+                uint256(
+                    keccak256(abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender))
+                )
             );
         } else {
             chainId = _chainId;
@@ -47,7 +50,10 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
         emit NewChain(uint16(chainId), _stateTransition, msg.sender);
     }
 
-    function setStateTransitionChainContract(uint256 _chainId, address _proofChainContract) external onlyStateTransition(_chainId) {
+    function setStateTransitionChainContract(uint256 _chainId, address _proofChainContract)
+        external
+        onlyStateTransition(_chainId)
+    {
         bridgehubStorage.proofChain[_chainId] = _proofChainContract;
     }
 }

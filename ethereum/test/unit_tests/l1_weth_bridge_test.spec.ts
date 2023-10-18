@@ -86,7 +86,6 @@ describe('WETH Bridge tests', () => {
         chainId = deployer.chainId;
         allowList = deployer.l1AllowList(deployWallet);
 
-
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
             owner

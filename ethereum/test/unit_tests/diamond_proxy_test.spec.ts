@@ -72,7 +72,8 @@ describe('Diamond proxy tests', function () {
             recursionCircuitsSetVksHash: ethers.constants.HashZero
         };
 
-        const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [{
+        const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [
+            {
                 chainId,
                 bridgehub: '0x0000000000000000000000000000000000000000',
                 stateTransition: await owner.getAddress(),
@@ -81,7 +82,7 @@ describe('Diamond proxy tests', function () {
                 allowList: '0x0000000000000000000000000000000000000000',
                 verifier: '0x0000000000000000000000000000000000000000',
                 verifierParams: dummyVerifierParams,
-                l2BootloaderBytecodeHash:  '0x0100000000000000000000000000000000000000000000000000000000000000',
+                l2BootloaderBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
                 l2DefaultAccountBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
                 priorityTxMaxGasLimit: 500000 // priority tx max L2 gas limit
             }
