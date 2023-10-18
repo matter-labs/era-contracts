@@ -1,7 +1,7 @@
 import { Interface } from 'ethers/lib/utils';
 import * as hardhat from 'hardhat';
 import '@nomiclabs/hardhat-ethers';
-import { ethers, Wallet, BigNumberish, BytesLike } from 'ethers';
+import { ethers, Wallet, BigNumberish } from 'ethers';
 import { IStateTransitionChainFactory } from '../typechain/IStateTransitionChainFactory';
 import { IStateTransitionChainBaseFactory } from '../typechain/IStateTransitionChainBaseFactory';
 

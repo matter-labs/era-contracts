@@ -1,10 +1,5 @@
-import { ethers } from 'ethers';
-import * as chalk from 'chalk';
-import * as fs from 'fs';
 import * as path from 'path';
 import { readBytecode, readInterface } from './utils';
-const warning = chalk.bold.yellow;
-const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
 export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;

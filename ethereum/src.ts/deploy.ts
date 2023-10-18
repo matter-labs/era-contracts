@@ -4,7 +4,7 @@ import '@openzeppelin/hardhat-upgrades';
 
 import { BigNumberish, ethers, providers, Signer, Wallet } from 'ethers';
 import { Interface } from 'ethers/lib/utils';
-import { diamondCut, DiamondCut, FacetCut, InitializeData } from './diamondCut';
+import { diamondCut, FacetCut } from './diamondCut';
 import { IBridgehubFactory } from '../typechain/IBridgehubFactory';
 import { IStateTransitionFactory } from '../typechain/IStateTransitionFactory';
 import { IStateTransitionChainFactory } from '../typechain/IStateTransitionChainFactory';
@@ -372,7 +372,6 @@ export class Deployer {
         const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
-        const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const diamondCut = (await this.initialStateTransitionChainDiamondCut(extraFacets))
 
         const instance = await hardhat.upgrades.deployProxy(StateTransition, [

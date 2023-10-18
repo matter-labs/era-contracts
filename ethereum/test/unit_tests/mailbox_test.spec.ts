@@ -2,7 +2,6 @@ import { expect } from 'chai';
 import * as hardhat from 'hardhat';
 import {
     BridgehubMailboxFacetFactory,
-    BridgehubMailboxFacet,
     MailboxFacetFactory,
     AllowList,
     Forwarder,
@@ -235,32 +234,15 @@ describe('Mailbox tests', function () {
         const TX_NUMBER_IN_BLOCK = 0;
         const L1_RECEIVER = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
         const AMOUNT = 1;
-        // console.log(
-        //     ethers.utils.id('finalizeEthWithdrawal(uint256,uint256,uint256,uint16,bytes,bytes32[])').substring(0, 10) +
-        //         L1_RECEIVER.slice(2) +
-        //         '0000000000000000000000000000000000000000000000000000000000000001'
-        // );
 
         const MESSAGE =
             '0x0fdef251d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
-        const originalMessage =
-            '0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001';
-        // console.log(ethers.utils.keccak256(originalMessage))
         const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
-        const originalMessageHash = ethers.utils.keccak256(originalMessage);
-        // const originalMessageHash = "0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52"
         const key = ethers.utils.hexZeroPad(L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
         const HASHED_LOG = ethers.utils.solidityKeccak256(
             ['uint8', 'bool', 'uint16', 'address', 'bytes32', 'bytes32'],
             [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
         );
-        const OG_HASHED_LOG = ethers.utils.solidityKeccak256(
-            ['uint8', 'bool', 'uint16', 'address', 'bytes32', 'bytes32'],
-            [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, originalMessageHash]
-        );
-        // console.log(OG_HASHED_LOG)
-        // HASHED_LOG = 0x110c937a27f7372384781fe744c2e971daa9556b1810f2edea90fb8b507f84b1
-        // const L2_LOGS_TREE_ROOT = '0xfa6b5a02c911a05e9dfe9e03f6dedb9cd30795bbac2aaf5bdd2632d2671a7e3d';
 
         const MERKLE_PROOF = [
             '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba',
@@ -275,12 +257,9 @@ describe('Mailbox tests', function () {
         ];
 
         let L2_LOGS_TREE_ROOT = HASHED_LOG;
-        // let OG_L2_LOGS = OG_HASHED_LOG;
         for (let i = 0; i < MERKLE_PROOF.length; i++) {
             L2_LOGS_TREE_ROOT = ethers.utils.keccak256(L2_LOGS_TREE_ROOT + MERKLE_PROOF[i].slice(2));
-            // OG_L2_LOGS = ethers.utils.keccak256(OG_L2_LOGS + MERKLE_PROOF[i].slice(2));
         }
-        // console.log(OG_L2_LOGS);
 
         before(async () => {
             await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);

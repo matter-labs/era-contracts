@@ -12,16 +12,8 @@ import { hashL2Bytecode } from '../../scripts/utils';
 import { Interface } from 'ethers/lib/utils';
 import { Address } from 'zksync-web3/build/src/types';
 
-import { Deployer } from '../../src.ts/deploy';
-
-const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
-
-const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
-
 const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;

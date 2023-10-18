@@ -1,8 +1,6 @@
 import { BigNumber, BigNumberish, BytesLike, ethers, Wallet } from 'ethers';
 import { Address } from 'zksync-web3/build/src/types';
-import { Action, FacetCut, diamondCut, facetCut, getAllSelectors } from '../../src.ts/diamondCut';
-import { expect } from 'chai';
-import * as hardhat from 'hardhat';
+import { FacetCut } from '../../src.ts/diamondCut';
 
 import { Deployer } from '../../src.ts/deploy';
 
@@ -268,8 +266,6 @@ export async function initialDeployment(deployWallet: Wallet,ownerAddress:string
         await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
         await deployer.deployBridgeContracts(create2Salt, gasPrice);
         await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-
-        const stateTransition = deployer.stateTransitionContract(deployWallet);
 
         await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
 

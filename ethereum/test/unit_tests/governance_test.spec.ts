@@ -17,7 +17,6 @@ describe('Admin facet tests', function () {
         const contract = await contractFactory.deploy();
         adminFacetTest = AdminFacetTestFactory.connect(contract.address, contract.signer);
 
-        const governanceFactory = await hardhat.ethers.getContractFactory('Governance');
         const governanceContract = await contractFactory.deploy();
         const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
         await adminFacetTest.setPendingGovernor(governance.address);

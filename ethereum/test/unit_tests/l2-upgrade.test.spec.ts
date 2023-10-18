@@ -3,7 +3,6 @@ import * as hardhat from 'hardhat';
 import * as fs from 'fs';
 import { diamondCut } from '../../src.ts/diamondCut';
 import {
-    AllowList,
     ExecutorFacet,
     ExecutorFacetFactory,
     GettersFacetFactory,
@@ -12,14 +11,11 @@ import {
     GettersFacet,
     DefaultUpgradeFactory,
     CustomUpgradeTestFactory,
-    MailboxFacet,
-    MailboxFacetFactory,
     StateTransition,
     StateTransitionFactory
 } from '../../typechain';
 import {
     getCallRevertReason,
-    AccessMode,
     EMPTY_STRING_KECCAK,
     genesisStoredBatchInfo,
     StoredBatchInfo,
@@ -29,37 +25,28 @@ import {
     createSystemLogs,
     SYSTEM_LOG_KEYS,
     constructL2Log,
-    L2_TO_L1_MESSENGER,
     packBatchTimestampAndBatchTimestamp,
     initialDeployment
 } from './utils';
-import { keccak256 } from 'ethers/lib/utils';
 import * as ethers from 'ethers';
-import { BigNumber, BigNumberish, Wallet, BytesLike } from 'ethers';
+import { BigNumberish, Wallet, BytesLike } from 'ethers';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
-
-import { Deployer } from '../../src.ts/deploy';
-
-const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
 const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
 const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
 describe('L2 upgrade test', function () {
     let proxyExecutor: ExecutorFacet;
     let proxyAdmin: AdminFacet;
-    let proxyMailbox: MailboxFacet;
     let proxyGetters: GettersFacet;
 
     let stateTransition: StateTransition;
 
-    let allowList: AllowList;
     let owner: ethers.Signer;
 
     let batch1Info: CommitBatchInfo;
@@ -69,7 +56,6 @@ describe('L2 upgrade test', function () {
     const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
     let priorityOperationsHash: string;
-    let priorityOpTxHash: string;
 
     before(async () => {
         [owner] = await hardhat.ethers.getSigners();
@@ -95,14 +81,12 @@ describe('L2 upgrade test', function () {
         let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
         chainId = deployer.chainId;
-        allowList = deployer.l1AllowList(deployWallet);
         verifier = deployer.addresses.StateTransition.Verifier;
 
 
         proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
         proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
         proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
-        proxyMailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
         stateTransition = StateTransitionFactory.connect(deployer.addresses.StateTransition.StateTransitionProxy, deployWallet);
 
@@ -110,21 +94,14 @@ describe('L2 upgrade test', function () {
 
  
 
-        let priorityOp = await proxyGetters.priorityQueueFrontOperation();
-        priorityOpTxHash = priorityOp[0];
-        priorityOperationsHash = keccak256(
-            ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
-        );
+        // let priorityOp = await proxyGetters.priorityQueueFrontOperation();
+        // priorityOpTxHash = priorityOp[0];
+        // priorityOperationsHash = keccak256(
+        //     ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+        // );
     });
 
     it('Upgrade should work even if not all blocks are processed', async () => {
-        const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-        const systemLogs = encodeLogs([
-            contextLog(timestamp, ethers.constants.HashZero)
-            // bootloaderLog(l2UpgradeTxHash),
-            // bootloaderLog(l2UpgradeTxHash)
-            // chainIdLog(priorityOpTxHash)
-        ]);
         batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
             batchNumber: 1,
             priorityOperationsHash: priorityOperationsHash,
@@ -696,53 +673,53 @@ type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
 
 // An actual log should also contain shardId/isService and logIndex,
 // but we don't need them for the tests
-interface L2ToL1Log {
-    sender: string;
-    key: string;
-    value: string;
-    shardId?: number;
-    isService?: boolean;
-}
+// interface L2ToL1Log {
+//     sender: string;
+//     key: string;
+//     value: string;
+//     shardId?: number;
+//     isService?: boolean;
+// }
 
-function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
-    return {
-        sender: L2_SYSTEM_CONTEXT_ADDRESS,
-        key: packBatchTimestampAndBatchTimestamp(timestamp, timestamp),
-        value: ethers.utils.hexlify(prevBlockHash)
-    };
-}
+// function contextLog(timestamp: number, prevBlockHash: BytesLike): L2ToL1Log {
+//     return {
+//         sender: L2_SYSTEM_CONTEXT_ADDRESS,
+//         key: packBatchTimestampAndBatchTimestamp(timestamp, timestamp),
+//         value: ethers.utils.hexlify(prevBlockHash)
+//     };
+// }
 
-function bootloaderLog(txHash: BytesLike): L2ToL1Log {
-    return {
-        sender: L2_BOOTLOADER_ADDRESS,
-        key: ethers.utils.hexlify(txHash),
-        value: ethers.utils.hexlify(BigNumber.from(1))
-    };
-}
+// function bootloaderLog(txHash: BytesLike): L2ToL1Log {
+//     return {
+//         sender: L2_BOOTLOADER_ADDRESS,
+//         key: ethers.utils.hexlify(txHash),
+//         value: ethers.utils.hexlify(BigNumber.from(1))
+//     };
+// }
 
-function chainIdLog(txHash: BytesLike): L2ToL1Log {
-    return {
-        sender: L2_BOOTLOADER_ADDRESS,
-        key: ethers.utils.hexlify(txHash),
-        value: ethers.utils.hexlify(BigNumber.from(1)),
-        isService: true,
-        shardId: 0
-    };
-}
+// function chainIdLog(txHash: BytesLike): L2ToL1Log {
+//     return {
+//         sender: L2_BOOTLOADER_ADDRESS,
+//         key: ethers.utils.hexlify(txHash),
+//         value: ethers.utils.hexlify(BigNumber.from(1)),
+//         isService: true,
+//         shardId: 0
+//     };
+// }
 
-function encodeLog(log: L2ToL1Log): string {
-    return ethers.utils.hexConcat([
-        `0x00000000`,
-        log.sender,
-        ethers.utils.hexZeroPad(log.key, 32),
-        ethers.utils.hexZeroPad(log.value, 32)
-    ]);
-}
+// function encodeLog(log: L2ToL1Log): string {
+//     return ethers.utils.hexConcat([
+//         `0x00000000`,
+//         log.sender,
+//         ethers.utils.hexZeroPad(log.key, 32),
+//         ethers.utils.hexZeroPad(log.value, 32)
+//     ]);
+// }
 
-function encodeLogs(logs: L2ToL1Log[]) {
-    const joinedLogs = ethers.utils.hexConcat(logs.map(encodeLog));
-    return ethers.utils.hexConcat(['0x00000000', joinedLogs]);
-}
+// function encodeLogs(logs: L2ToL1Log[]) {
+//     const joinedLogs = ethers.utils.hexConcat(logs.map(encodeLog));
+//     return ethers.utils.hexConcat(['0x00000000', joinedLogs]);
+// }
 
 async function buildCommitBatchInfo(
     prevInfo: StoredBatchInfo,

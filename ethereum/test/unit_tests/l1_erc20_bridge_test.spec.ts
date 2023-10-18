@@ -16,16 +16,8 @@ import { IL1Bridge } from '../../typechain/IL1Bridge';
 import { IL1BridgeFactory } from '../../typechain/IL1BridgeFactory';
 import { AccessMode, getCallRevertReason, initialDeployment } from './utils';
 
-import { Deployer } from '../../src.ts/deploy';
-
-const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
-
-const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
-
 const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 describe(`L1ERC20Bridge tests`, function () {
     let owner: ethers.Signer;

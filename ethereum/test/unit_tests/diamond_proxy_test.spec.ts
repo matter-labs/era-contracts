@@ -1,6 +1,5 @@
 import { expect } from 'chai';
 import * as ethers from 'ethers';
-import { Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
 import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
@@ -10,8 +9,6 @@ import {
     DiamondProxyTestFactory,
     AdminFacet,
     AdminFacetFactory,
-    AllowList,
-
     GettersFacet,
     GettersFacetFactory,
     ExecutorFacet,
@@ -20,14 +17,11 @@ import {
     DiamondInitFactory,
     TestnetERC20TokenFactory
 } from '../../typechain';
-import { getCallRevertReason,     
-        ethTestConfig,
-        initialDeployment } from './utils';
+import { getCallRevertReason } from './utils';
 
 describe('Diamond proxy tests', function () {
     let proxy: DiamondProxy;
     let diamondInit: DiamondInit;
-    let allowList: AllowList;
     let adminFacet: AdminFacet;
     let gettersFacet: GettersFacet;
     let executorFacet: ExecutorFacet;
