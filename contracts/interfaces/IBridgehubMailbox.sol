@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-interface IBridgeheadMailbox {
+interface IBridgehubMailbox {
     function finalizeEthWithdrawal(
         uint256 _chainId, 
         uint256 _l2BlockNumber,

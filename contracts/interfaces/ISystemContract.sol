@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "../Constants.sol";
 
 /// @dev Solidity does not allow exporting modifiers via libraries, so
 /// the only way to do reuse modifiers is to have a base contract
