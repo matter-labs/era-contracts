@@ -677,7 +677,6 @@ object "Bootloader" {
                     gas(),
                     ACCOUNT_CODE_STORAGE_ADDR(),
                     0,
-                    0,
                     36,
                     0,
                     32
