@@ -52,7 +52,6 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         return proofStorage.governor;
     }
 
-
     function getBridgehub() external view returns (address) {
         return proofStorage.bridgehub;
     }
@@ -106,10 +105,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         cutData.initCalldata = initData;
 
         // deploy proofChainContract
-        DiamondProxy proofChainContract = new DiamondProxy(
-            block.chainid,
-            cutData
-        );
+        DiamondProxy proofChainContract = new DiamondProxy(block.chainid, cutData);
 
         // save data
         address proofChainAddress = address(proofChainContract);
@@ -123,10 +119,10 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         // set chainId in VM
         _specialSetChainIdInVMTx(_chainId, proofChainAddress);
 
-        emit NewStateTransitionChain(_chainId, proofChainAddress);
+        emit StateTransitionNewChain(_chainId, proofChainAddress);
     }
 
-    function setUpgradeDiamondCutWithProposedUpgrade(Diamond.DiamondCutData calldata _cutData) external onlyGovernor {
+    function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData) external onlyGovernor {
         proofStorage.upgradeCutHash = keccak256(abi.encode(_cutData));
     }
 

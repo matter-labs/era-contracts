@@ -6,7 +6,7 @@ import * as fs from 'fs';
 
 import { IBridgehub } from '../../typechain/IBridgehub';
 import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from '../../typechain';
-import { AccessMode, getCallRevertReason } from './utils';
+import { AccessMode, getCallRevertReason, initialDeployment } from './utils';
 import { hashL2Bytecode } from '../../scripts/utils';
 
 import { Interface } from 'ethers/lib/utils';
@@ -89,79 +89,11 @@ describe('WETH Bridge tests', () => {
 
         await owner.sendTransaction(tx);
 
-        const deployer = new Deployer({
-            deployWallet,
-            ownerAddress,
-            verbose: false,
-            addresses: addressConfig,
-            bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-            defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
-        });
+        let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
-        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-
-        let nonce = await deployWallet.getTransactionCount();
-
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
-
-        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
-        // nonce++;
-
-        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
-        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
-        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
-        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
-        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
-
-        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgehubContract(create2Salt, gasPrice);
-        await deployer.deployStateTransitionContract(create2Salt,null, gasPrice);
-        await deployer.deployBridgeContracts(create2Salt, gasPrice);
-        await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-
-        const verifierParams = {
-            recursionNodeLevelVkHash: zeroHash,
-            recursionLeafLevelVkHash: zeroHash,
-            recursionCircuitsSetVksHash: zeroHash
-        };
-        // const initialDiamondCut = await deployer.initialStateTransitionProxyDiamondCut();
-
-        // const proofSystem = deployer.proofSystemContract(deployWallet);
-
-        // await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
-
-        await deployer.registerHyperchain(create2Salt, null, gasPrice);
         chainId = deployer.chainId;
-
-        // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
-        // await validatorTx.wait();
-
         allowList = deployer.l1AllowList(deployWallet);
 
-        const allowTx = await allowList.setBatchAccessMode(
-            [
-                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-                deployer.addresses.Bridgehub.ChainProxy,
-                deployer.addresses.StateTransition.StateTransitionProxy,
-                deployer.addresses.StateTransition.DiamondProxy,
-                deployer.addresses.Bridges.ERC20BridgeProxy,
-                deployer.addresses.Bridges.WethBridgeProxy
-            ],
-            [
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public
-            ]
-        );
-        await allowTx.wait();
-
-        // bridgehubContract = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployWallet);
 
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,

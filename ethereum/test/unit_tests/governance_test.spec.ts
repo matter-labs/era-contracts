@@ -52,7 +52,7 @@ describe('Admin facet tests', function () {
         const revertReason = await getCallRevertReason(
             adminFacetTest.connect(randomSigner).setPorterAvailability(false)
         );
-        expect(revertReason).equal('1g1');
+        expect(revertReason).equal('PCBase 1');
     });
 
     it('governor successfully set priority transaction max gas limit', async () => {
@@ -68,7 +68,7 @@ describe('Admin facet tests', function () {
         const revertReason = await getCallRevertReason(
             adminFacetTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
         );
-        expect(revertReason).equal('1g1');
+        expect(revertReason).equal('PCBase 1');
     });
 
     describe('change governor', function () {

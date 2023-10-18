@@ -32,7 +32,7 @@ async function initializeBridges(
     gasPrice: ethers.BigNumber,
     cmdErc20Bridge: string
 ) {
-    const bridgehub = IBridgehubFactory.connect(process.env.CONTRACTS_BRIDGEHEAD_DIAMOND_PROXY_ADDR, deployWallet);
+    const bridgehub = IBridgehubFactory.connect(process.env.CONTRACTS_BRIDGEHUB_DIAMOND_PROXY_ADDR, deployWallet);
     const nonce = await deployWallet.getTransactionCount();
 
     const erc20Bridge = cmdErc20Bridge

@@ -14,5 +14,5 @@ interface IStateTransitionRegistry {
     ) external;
 
     // when a new Chain is added
-    event NewStateTransitionChain(uint256 indexed _chainId, address indexed _proofChainContract);
+    event StateTransitionNewChain(uint256 indexed _chainId, address indexed _proofChainContract);
 }

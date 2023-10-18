@@ -11,10 +11,6 @@ import {
     MockExecutorFacetFactory
 } from '../../typechain';
 
-// import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
-
-import * as fs from 'fs';
-
 import {
     DEFAULT_REVERT_REASON,
     getCallRevertReason,
@@ -23,23 +19,18 @@ import {
     requestExecute,
     requestExecuteDirect,
     L2_TO_L1_MESSENGER,
-    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
+    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 
+    ethTestConfig,
+    initialDeployment
 } from './utils';
-import { Wallet } from 'ethers';
 
 import * as ethers from 'ethers';
+import { Wallet } from 'ethers';
 
-import { Deployer } from '../../src.ts/deploy';
-import { facetCut, Action } from '../../src.ts/diamondCut';
+import { Action, facetCut,  } from '../../src.ts/diamondCut';
 
-const zeroHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
-const testConfigPath = './test/test_config/constant';
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
 describe('Mailbox tests', function () {
     let allowList: AllowList;
@@ -60,12 +51,11 @@ describe('Mailbox tests', function () {
             owner.provider
         );
         const ownerAddress = await deployWallet.getAddress();
-        process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
         const gasPrice = await owner.provider.getGasPrice();
 
         const tx = {
-            from: owner.getAddress(),
+            from: await owner.getAddress(),
             to: deployWallet.address,
             value: ethers.utils.parseEther('1000'),
             nonce: owner.getTransactionCount(),
@@ -75,81 +65,14 @@ describe('Mailbox tests', function () {
 
         await owner.sendTransaction(tx);
 
-        const deployer = new Deployer({
-            deployWallet,
-            ownerAddress,
-            verbose: false ,
-            addresses: addressConfig,
-            bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-            defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH
-        });
-
-        const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-
-        let nonce = await deployWallet.getTransactionCount();
-
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
-
-        // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
-        // nonce++;
-
-        process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
-        process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
-        process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
-        process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
-        process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
-        process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
-
         const mockExecutorFactory = await hardhat.ethers.getContractFactory('MockExecutorFacet');
         const mockExecutorContract = await mockExecutorFactory.deploy();
         const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
 
-        await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
-        await deployer.deployBridgehubContract(create2Salt, gasPrice);
-        await deployer.deployStateTransitionContract(create2Salt, [extraFacet], gasPrice);
-        await deployer.deployBridgeContracts(create2Salt, gasPrice);
-        await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+        let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
-        // const verifierParams = {
-        //     recursionNodeLevelVkHash: zeroHash,
-        //     recursionLeafLevelVkHash: zeroHash,
-        //     recursionCircuitsSetVksHash: zeroHash
-        // };
-
-
-
-        const proofSystem = deployer.proofSystemContract(deployWallet);
-        // await (await proofSystem.setParams(verifierParams, initialDiamondCut)).wait();
-
-        await deployer.registerHyperchain(create2Salt, [extraFacet], gasPrice);
         chainId = deployer.chainId;
-
-        // const validatorTx = await deployer.proofChainContract(deployWallet).setValidator(await validator.getAddress(), true);
-        // await validatorTx.wait();
-
         allowList = deployer.l1AllowList(deployWallet);
-
-        const allowTx = await allowList.setBatchAccessMode(
-            [
-                deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-                deployer.addresses.Bridgehub.ChainProxy,
-                deployer.addresses.StateTransition.StateTransitionProxy,
-                deployer.addresses.StateTransition.DiamondProxy,
-                deployer.addresses.Bridges.ERC20BridgeProxy,
-                deployer.addresses.Bridges.WethBridgeProxy
-            ],
-            [
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public,
-                AccessMode.Public
-            ]
-        );
-        await allowTx.wait();
 
         bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(
             deployer.addresses.Bridgehub.BridgehubDiamondProxy,

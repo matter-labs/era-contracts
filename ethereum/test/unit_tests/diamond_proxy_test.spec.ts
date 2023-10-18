@@ -1,14 +1,17 @@
 import { expect } from 'chai';
 import * as ethers from 'ethers';
+import { Wallet } from 'ethers';
 import * as hardhat from 'hardhat';
 import { Action, facetCut, diamondCut, getAllSelectors } from '../../src.ts/diamondCut';
 import {
-    DiamondProxy as DiamondProxy,
-    DiamondProxyFactory as DiamondProxyFactory,
+    DiamondProxy,
+    DiamondProxyFactory,
     DiamondProxyTest,
     DiamondProxyTestFactory,
     AdminFacet,
     AdminFacetFactory,
+    AllowList,
+
     GettersFacet,
     GettersFacetFactory,
     ExecutorFacet,
@@ -17,21 +20,25 @@ import {
     DiamondInitFactory,
     TestnetERC20TokenFactory
 } from '../../typechain';
-import { getCallRevertReason } from './utils';
+import { getCallRevertReason,     
+        ethTestConfig,
+        initialDeployment } from './utils';
 
 describe('Diamond proxy tests', function () {
     let proxy: DiamondProxy;
     let diamondInit: DiamondInit;
+    let allowList: AllowList;
     let adminFacet: AdminFacet;
     let gettersFacet: GettersFacet;
     let executorFacet: ExecutorFacet;
     let diamondProxyTest: DiamondProxyTest;
     let governor: ethers.Signer;
+    let owner: ethers.Signer;
     let governorAddress: string;
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
     before(async () => {
-        [governor] = await hardhat.ethers.getSigners();
+        [owner, governor] = await hardhat.ethers.getSigners();
         governorAddress = await governor.getAddress();
 
         const diamondInitFactory = await hardhat.ethers.getContractFactory('DiamondInit');
@@ -74,7 +81,7 @@ describe('Diamond proxy tests', function () {
         const diamondInitCalldata = diamondInit.interface.encodeFunctionData('initialize', [{
                 chainId,
                 bridgehub: '0x0000000000000000000000000000000000000000',
-                proofSystem: '0x0000000000000000000000000000000000000000',
+                stateTransition: await owner.getAddress(),
                 governor: governorAddress,
                 storedBatchZero: '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
                 allowList: '0x0000000000000000000000000000000000000000',

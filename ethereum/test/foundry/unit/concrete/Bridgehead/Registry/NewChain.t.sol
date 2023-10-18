@@ -154,7 +154,11 @@ contract NewChainTest is RegistryTest {
         assertEq(eventStateTransition, stateTransitionAddress, "NewChain.stateTransition is wrong");
 
         // === Storage checks ===
-        assertEq(bridgehub.getChainStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
+        assertEq(
+            bridgehub.getChainStateTransition(chainId),
+            stateTransitionAddress,
+            "saved chainStateTransition is wrong"
+        );
         assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
         assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
         assertEq(resChainId, chainId, "returned chainId is wrong");
@@ -242,7 +246,11 @@ contract NewChainTest is RegistryTest {
         assertEq(eventStateTransition, stateTransitionAddress, "NewChain.stateTransition is wrong");
 
         // === Storage checks ===
-        assertEq(bridgehub.getChainStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
+        assertEq(
+            bridgehub.getChainStateTransition(chainId),
+            stateTransitionAddress,
+            "saved chainStateTransition is wrong"
+        );
         assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
         assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
         assertEq(resChainId, chainId, "returned chainId is wrong");
