@@ -13,7 +13,7 @@ import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contr
 // import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
 // import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {Utils} from "../../Utils/Utils.sol";
+// import {Utils} from "../../Utils/Utils.sol";
 import {IStateTransitionChain} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IStateTransitionChain.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
