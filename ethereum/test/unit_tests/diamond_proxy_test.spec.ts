@@ -78,9 +78,10 @@ describe('Diamond proxy tests', function () {
                 bridgehub: '0x0000000000000000000000000000000000000000',
                 stateTransition: await owner.getAddress(),
                 governor: governorAddress,
+                admin: governorAddress,
                 storedBatchZero: '0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21',
                 allowList: '0x0000000000000000000000000000000000000000',
-                verifier: '0x0000000000000000000000000000000000000000',
+                verifier: '0x0000000000000000000000000000000000000001',
                 verifierParams: dummyVerifierParams,
                 l2BootloaderBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
                 l2DefaultAccountBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
@@ -137,7 +138,8 @@ describe('Diamond proxy tests', function () {
         const diamondCutInitData = diamondCut([], diamondProxyTest.address, diamondProxyTestCalldata);
 
         const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData('executeUpgrade', [
-            diamondCutInitData
+            diamondCutInitData,
+            0
         ]);
         await proxy.fallback({ data: adminFacetExecuteCalldata });
 
@@ -155,7 +157,10 @@ describe('Diamond proxy tests', function () {
         ];
         const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, '0x');
 
-        const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData('executeUpgrade', [diamondCutData]);
+        const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData('executeUpgrade', [
+            diamondCutData,
+            0
+        ]);
         await proxy.fallback({ data: adminFacetExecuteCalldata });
     });
 

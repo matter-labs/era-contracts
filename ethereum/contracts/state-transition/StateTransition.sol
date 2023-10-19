@@ -95,12 +95,13 @@ contract StateTransition is IStateTransition, StateTransitionBase {
 
         // construct init data
         bytes memory initData;
-        bytes memory copiedData = _diamondCut.initCalldata[164:];
+        bytes memory copiedData = _diamondCut.initCalldata[196:];
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(address(bridgehub)))),
             bytes32(uint256(uint160(address(this)))),
+            bytes32(uint256(uint160(_governor))),
             bytes32(uint256(uint160(_governor))),
             bytes32(proofStorage.storedBatchZero),
             copiedData

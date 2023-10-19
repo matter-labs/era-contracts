@@ -5,8 +5,8 @@ pragma solidity ^0.8.13;
 import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 import "./facets/Base.sol";
-import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE} from  "../../common/Config.sol";
-import {InitializeData } from "../chain-interfaces/IDiamondInit.sol";
+import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../../common/Config.sol";
+import {InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -19,7 +19,6 @@ contract DiamondInit is StateTransitionChainBase {
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
-        
         require(address(_initializeData.verifier) != address(0), "vt");
         require(_initializeData.governor != address(0), "vy");
         require(_initializeData.admin != address(0), "hc");

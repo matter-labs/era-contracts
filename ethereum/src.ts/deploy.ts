@@ -165,6 +165,7 @@ export class Deployer {
                 bridgehub: '0x0000000000000000000000000000000000001234',
                 stateTransition: '0x0000000000000000000000000000000000002234',
                 governor: '0x0000000000000000000000000000000000003234',
+                admin: '0x0000000000000000000000000000000000004234',
                 storedBatchZero: '0x0000000000000000000000000000000000000000000000000000000000000000',
                 allowList: this.addresses.AllowList,
                 verifier: this.addresses.StateTransition.Verifier,

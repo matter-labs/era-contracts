@@ -32,6 +32,8 @@ import * as ethers from 'ethers';
 import { BigNumberish, Wallet, BytesLike } from 'ethers';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
 
+import { keccak256 } from 'ethers/lib/utils';
+
 const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';
 
@@ -94,11 +96,11 @@ describe('L2 upgrade test', function () {
 
         await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
 
-        // let priorityOp = await proxyGetters.priorityQueueFrontOperation();
+        let priorityOp = await proxyGetters.priorityQueueFrontOperation();
         // priorityOpTxHash = priorityOp[0];
-        // priorityOperationsHash = keccak256(
-        //     ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
-        // );
+        priorityOperationsHash = keccak256(
+            ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+        );
     });
 
     it('Upgrade should work even if not all blocks are processed', async () => {
@@ -916,8 +918,8 @@ async function executeUpgrade(
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
     // This promise will be handled in the tests
-    (await stateTransition.setUpgradeDiamondCut(diamondCutData)).wait();
-    return stateTransition.upgradeChain(chainId, diamondCutData);
+    (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
+    return stateTransition.upgradeChain(chainId, partialUpgrade.newProtocolVersion, diamondCutData);
 }
 
 async function executeCustomUpgrade(
@@ -945,8 +947,8 @@ async function executeCustomUpgrade(
     const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
     // This promise will be handled in the tests
-    (await stateTransition.setUpgradeDiamondCut(diamondCutData)).wait();
-    return stateTransition.upgradeChain(chainId, diamondCutData);
+    (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
+    return stateTransition.upgradeChain(chainId, partialUpgrade.newProtocolVersion, diamondCutData);
 }
 
 async function makeExecutedEqualCommitted(

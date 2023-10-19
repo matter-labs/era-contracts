@@ -23,7 +23,7 @@ interface IAdmin is IStateTransitionChainBase {
 
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint256 _latestProtocolVersion) external;
 
     function freezeNotUpdated(uint256 _protocolVersion) external;
 
@@ -36,7 +36,6 @@ interface IAdmin is IStateTransitionChainBase {
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
-    
 
     /// @notice pendingGovernor is changed
     /// @dev Also emitted when new governor is accepted and in this case, `newPendingGovernor` would be zero address
