@@ -8,7 +8,7 @@ import {RegistryTest} from "./_Registry_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
 import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/state-transition-interfaces/IStateTransition.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+// import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Vm} from "forge-std/Test.sol";
 import {IRegistry} from "../../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-interfaces/IRegistry.sol";
 
