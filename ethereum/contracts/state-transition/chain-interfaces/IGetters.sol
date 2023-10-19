@@ -3,7 +3,7 @@
 pragma solidity ^0.8.13;
 
 // import "../libraries/PriorityQueue.sol";
-import {VerifierParams, ProofUpgradeState} from "../chain-deps/StateTransitionChainStorage.sol";
+import {VerifierParams, UpgradeState} from "../chain-deps/StateTransitionChainStorage.sol";
 import "./IBase.sol";
 
 interface IGetters is IStateTransitionChainBase {

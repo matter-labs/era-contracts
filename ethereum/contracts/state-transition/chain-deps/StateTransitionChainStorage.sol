@@ -12,7 +12,7 @@ import "../../state-transition/libraries/PriorityQueue.sol";
 /// @param None Upgrade is NOT initiated
 /// @param Transparent Fully transparent upgrade is initiated, upgrade data is publicly known
 /// @param Shadow Shadow upgrade is initiated, upgrade data is hidden
-enum ProofUpgradeState {
+enum UpgradeState {
     None,
     Transparent,
     Shadow
@@ -29,7 +29,7 @@ enum ProofUpgradeState {
 /// @param currentProposalId The serial number of proposed upgrades, increments when proposing a new one
 struct UpgradeStorage {
     bytes32 proposedUpgradeHash;
-    ProofUpgradeState state;
+    UpgradeState state;
     address securityCouncil;
     bool approvedBySecurityCouncil;
     uint40 proposedUpgradeTimestamp;

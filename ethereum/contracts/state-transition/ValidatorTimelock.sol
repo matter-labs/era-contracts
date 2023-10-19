@@ -21,7 +21,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     using LibMap for LibMap.Uint32Map;
 
     /// @dev Part of the IBase interface. Not used in this contract.
-    string public constant getName = "ValidatorTimelock";
+    string public constant override getName = "ValidatorTimelock";
 
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
@@ -30,7 +30,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     event NewValidator(address _oldValidator, address _newValidator);
 
     /// @dev The main zkSync smart contract.
-    address public immutable diamondProxy;
+    address public immutable stateTransitionChain;
 
     /// @dev The mapping of L2 batch number => timestamp when it was committed.
     LibMap.Uint32Map internal committedBatchTimestamp;
@@ -41,9 +41,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor(address _initialOwner, address _diamondProxy, uint32 _executionDelay, address _validator) {
+    constructor(address _initialOwner, address _stateTransitionChain, uint32 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
-        diamondProxy = _diamondProxy;
+        stateTransitionChain = _stateTransitionChain;
         executionDelay = _executionDelay;
         validator = _validator;
     }
@@ -117,21 +117,20 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 uint256 commitBatchTimestamp = committedBatchTimestamp.get(_newBatchesData[i].batchNumber);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
-                // * The block was committed, but not though this contract.
-                // * The block wasn't committed at all, so execution will fail in the zkSync contract.
-                // We allow executing such blocks.
+                // * The batch was committed, but not though this contract.
+                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
+                // We allow executing such batches.
 
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
-
-            _propagateToZkSync();
         }
+        _propagateToZkSync();
     }
 
     /// @dev Call the zkSync contract with the same calldata as this contract was called.
     /// Note: it is called the zkSync contract, not delegatecalled!
     function _propagateToZkSync() internal {
-        address contractAddress = diamondProxy;
+        address contractAddress = stateTransitionChain;
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
