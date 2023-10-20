@@ -5,8 +5,11 @@ pragma abicoder v2;
 
 import "../libraries/SystemContractsCaller.sol";
 import "../Constants.sol";
+import "../libraries/EfficientCall.sol";
 
 contract KeccakTest {
+    bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+
     // Just some computation-heavy function, it will be used to test out of gas
     function infiniteFuction(uint256 n) pure public returns (uint256 sumOfSquares) {
         for(uint i = 0; i < n; i++) {
@@ -50,7 +53,7 @@ contract KeccakTest {
     }
 
     function zeroPointerTest() external {
-        try this.infiniteFuction{gas: 1000000}(1000000) returns (uint256 sumOfSquares) {
+        try this.infiniteFuction{gas: 1000000}(1000000) returns (uint256) {
             revert("The transaction should have failed");
         } catch {}
 
@@ -71,6 +74,46 @@ contract KeccakTest {
             result := mload(0)
         }
 
-        require(result == bytes32(0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470), "The result is not correct");
+        require(result == EMPTY_STRING_KECCAK, "The result is not correct");
+    }
+
+    function keccakUpgradeTest(
+        bytes calldata eraseCallData, 
+        bytes calldata upgradeCalldata
+    ) external returns (bytes32 hash) {
+        // Firstly, we reset keccak256 bytecode to be some random bytecode
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            eraseCallData,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
+
+        // Since the keccak contract has been erased, it should not work anymore
+        try this.callKeccak(msg.data[0:0]) returns (bytes32) {
+            revert("The keccak should not work anymore");
+        } catch {}
+        // bytes32 incorrectHash = this.callKeccak(msg.data[0:0]);
+        // require(incorrectHash == bytes32(0), "The keccak should now return always incorrect values");
+
+        // Upgrading it back to the correct version:
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            upgradeCalldata,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
+
+        // Now it should work again
+        hash = this.callKeccak(msg.data[0:0]);
+        require(hash == EMPTY_STRING_KECCAK, "Keccak should start working again");
+    }   
+    
+    function callKeccak(bytes calldata _data) external pure returns (bytes32 hash) {
+        hash = keccak256(_data);
     }
 }
