@@ -87,6 +87,7 @@ async function initializeBridges(
         erc20Bridge.initialize(
             [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],
             l2TokenFactoryAddr,
+            l2ERC20BridgeProxyAddr,
             l2GovernorAddress,
             {
                 gasPrice,
@@ -163,6 +164,7 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
     const tx = await l1WethBridge.initialize(
         [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
         l2WethProxyAddress,
+        l2WethBridgeProxyAddress,
         l2GovernorAddress,
         {
             gasPrice
@@ -174,7 +176,7 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
     const receipt = await tx.wait();
 
     console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}, ${chainId}`);
-    console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge(chainId)}`);
+    console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
 }
 
 async function main() {

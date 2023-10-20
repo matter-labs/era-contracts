@@ -71,7 +71,7 @@ async function main() {
             const receipt = await tx.wait();
 
             console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);
-            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge(chainId)}`);
+            console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
         });
 
     await program.parseAsync(process.argv);

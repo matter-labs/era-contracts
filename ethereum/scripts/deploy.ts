@@ -83,7 +83,7 @@ async function main() {
             await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
             await deployer.deployAllowList(create2Salt, { gasPrice });
             await deployer.deployBridgehubContract(create2Salt, gasPrice, nonce + 2);
-            await deployer.deployStateTransitionContract(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying factory contracts
+            await deployer.deployStateTransitionContract(create2Salt, null, gasPrice); // Do not pass nonce, since it was increment after deploying factory contracts
             await deployer.deployBridgeContracts(create2Salt, gasPrice);
             await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
         });

@@ -44,7 +44,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     mapping(address => mapping(address => mapping(bytes32 => uint256))) internal __DEPRECATED_depositAmount;
 
     /// @dev The address of deployed L2 bridge counterpart
-    address public __DEPRECATED_l2Bridge;
+    address public l2Bridge;
 
     /// @dev The address that acts as a beacon for L2 tokens
     address public l2TokenBeacon;
@@ -68,9 +68,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev A mapping chainId => account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256)))) internal depositAmount;
-
-    /// @dev The address of deployed L2 bridge counterpart
-    mapping(uint256 => address) public l2Bridge;
 
     // if EOA then L1toL2 alias is applied.
     address public l2Governor;
@@ -98,6 +95,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     function initialize(
         bytes[] calldata _factoryDeps,
         address _l2TokenBeacon,
+        address _l2Bridge,
         address _governor
     ) external payable reentrancyGuardInitializer {
         require(_l2TokenBeacon != address(0), "nf");
@@ -107,6 +105,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         // The caller miscalculated deploy transactions fees
         l2TokenProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[2]);
         l2TokenBeacon = _l2TokenBeacon;
+        l2Bridge = _l2Bridge;
         l2Governor = _governor;
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
@@ -126,7 +125,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes[] calldata _factoryDeps,
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
-    ) external payable reentrancyGuardInitializer {
+    ) external payable {
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
         require(_factoryDeps.length == 3, "mk1");
         require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "mk2");
@@ -160,7 +159,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         }
 
         // Deploy L2 bridge proxy contract
-        l2Bridge[_chainId] = BridgeInitializationHelper.requestDeployTransaction(
+        address newL2Bridge = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
             bridgehub,
             _deployBridgeProxyFee,
@@ -169,6 +168,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
             new bytes[](0)
         );
+        require(newL2Bridge == l2Bridge, "bridge deployed incorrectly");
     }
 
     /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
@@ -289,7 +289,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     ) internal returns (bytes32 l2TxHash) {
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
             _chainId,
-            l2Bridge[_chainId],
+            l2Bridge,
             0, // L2 msg.value
             _l2TxCalldata,
             _l2TxGasLimit,
@@ -392,7 +392,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: _l2TxNumberInBatch,
-            sender: l2Bridge[_chainId],
+            sender: l2Bridge,
             data: _message
         });
 
@@ -453,13 +453,13 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token
-    function l2TokenAddress(address _l1Token, uint256 _chainId) public view returns (address) {
+    function l2TokenAddress(address _l1Token) public view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
         return
             L2ContractHelper.computeCreate2Address(
-                l2Bridge[_chainId],
+                l2Bridge,
                 salt,
                 l2TokenProxyBytecodeHash,
                 constructorInputHash

@@ -41,14 +41,12 @@ async function main() {
             const tx = await allowListContract.setBatchAccessMode(
                 [
                     deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-                    deployer.addresses.Bridgehub.ChainProxy,
                     deployer.addresses.StateTransition.StateTransitionProxy,
                     deployer.addresses.StateTransition.DiamondProxy,
                     deployer.addresses.Bridges.ERC20BridgeProxy,
                     deployer.addresses.Bridges.WethBridgeProxy
                 ],
                 [
-                    AccessMode.Public,
                     AccessMode.Public,
                     AccessMode.Public,
                     AccessMode.Public,

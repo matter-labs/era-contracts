@@ -26,7 +26,7 @@ async function main() {
     for (const address of [
         addresses.StateTransition.GettersFacet,
         addresses.StateTransition.DiamondInit,
-        addresses.StateTransition.GovernanceFacet,
+        addresses.StateTransition.AdminFacet,
         addresses.StateTransition.ExecutorFacet,
         addresses.StateTransition.Verifier
     ]) {

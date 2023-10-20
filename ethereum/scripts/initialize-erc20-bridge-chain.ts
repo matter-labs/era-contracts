@@ -49,11 +49,11 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress: deployWallet.address,
+                ownerAddress: deployWallet.address,
                 verbose: true
             });
 
-            const bridgehead = deployer.bridgeheadContract(deployWallet);
+            const bridgehead = deployer.bridgehubContract(deployWallet);
             const erc20Bridge = cmd.erc20Bridge
                 ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
                 : deployer.defaultERC20Bridge(deployWallet);
@@ -111,7 +111,7 @@ async function main() {
             const receipts = await Promise.all(txs.map((tx) => tx.wait(2)));
 
             console.log(`ERC20 bridge priority tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
-            console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await erc20Bridge.l2Bridge(chainId)}`);
+            console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await erc20Bridge.l2Bridge()}`);
         });
 
     await program.parseAsync(process.argv);

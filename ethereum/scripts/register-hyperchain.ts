@@ -33,8 +33,8 @@ async function main() {
                   ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-            const governorAddress = cmd.governorAddress ? cmd.governorAddress : deployWallet.address;
-            console.log(`Using governor address: ${governorAddress}`);
+            const ownerAddress = cmd.governorAddress ? cmd.governorAddress : deployWallet.address;
+            console.log(`Using governor address: ${ownerAddress}`);
 
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
@@ -46,11 +46,11 @@ async function main() {
 
             const deployer = new Deployer({
                 deployWallet,
-                governorAddress,
+                ownerAddress,
                 verbose: true
             });
 
-            await deployer.registerHyperchain(create2Salt, gasPrice); // temporary, we will have a full contract
+            await deployer.registerHyperchain(create2Salt, null, gasPrice); // temporary, we will have a full contract
             await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
         });
 
