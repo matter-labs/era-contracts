@@ -457,12 +457,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return
-            L2ContractHelper.computeCreate2Address(
-                l2Bridge,
-                salt,
-                l2TokenProxyBytecodeHash,
-                constructorInputHash
-            );
+        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 }

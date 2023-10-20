@@ -84,7 +84,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
             BridgehubMailboxFacet: getAddressFromEnv('CONTRACTS_BRIDGEHUB_MAILBOX_FACET_ADDR'),
             BridgehubRegistryFacet: getAddressFromEnv('CONTRACTS_BRIDGEHUB_REGISTRY_FACET_ADDR'),
             BridgehubDiamondInit: getAddressFromEnv('CONTRACTS_BRIDGEHUB_DIAMOND_INIT_ADDR'),
-            BridgehubDiamondProxy: getAddressFromEnv('CONTRACTS_BRIDGEHUB_DIAMOND_PROXY_ADDR'),
+            BridgehubDiamondProxy: getAddressFromEnv('CONTRACTS_BRIDGEHUB_DIAMOND_PROXY_ADDR')
         },
         StateTransition: {
             StateTransitionProxy: getAddressFromEnv('CONTRACTS_STATE_TRANSITION_PROXY_ADDR'),
@@ -552,7 +552,10 @@ export class Deployer {
         this.addresses.Bridges.WethBridgeProxy = contractAddress;
     }
 
-    public async deployStateTransitionDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    public async deployStateTransitionDiamondInit(
+        create2Salt: string,
+        ethTxOptions: ethers.providers.TransactionRequest
+    ) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2('DiamondInit', [], create2Salt, ethTxOptions);
 

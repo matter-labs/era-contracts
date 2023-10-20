@@ -46,13 +46,7 @@ async function main() {
                     deployer.addresses.Bridges.ERC20BridgeProxy,
                     deployer.addresses.Bridges.WethBridgeProxy
                 ],
-                [
-                    AccessMode.Public,
-                    AccessMode.Public,
-                    AccessMode.Public,
-                    AccessMode.Public,
-                    AccessMode.Public
-                ],
+                [AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public],
                 { nonce }
             );
             await tx.wait();
