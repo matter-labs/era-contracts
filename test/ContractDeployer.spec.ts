@@ -16,7 +16,7 @@ import {
 } from './shared/constants';
 import { deployContract, getCode, getWallets, loadArtifact, publishBytecode, setCode } from './shared/utils';
 
-xdescribe('ContractDeployer tests', function () {
+describe('ContractDeployer tests', function () {
     let wallet: Wallet;
     let contractDeployer: ContractDeployer;
     let contractDeployerSystemCall: ContractDeployer;

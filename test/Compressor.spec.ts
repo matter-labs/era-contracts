@@ -12,7 +12,7 @@ import {
 } from './shared/constants';
 import { deployContract, getCode, getWallets, loadArtifact, setCode } from './shared/utils';
 
-xdescribe('Compressor tests', function () {
+describe('Compressor tests', function () {
     let wallet: Wallet;
     let compressor: Compressor;
     let bootloader: ethers.Signer;

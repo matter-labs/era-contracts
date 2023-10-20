@@ -23,7 +23,7 @@ describe('ComplexUpgrader tests', function () {
             ).to.be.revertedWith('Can only be called by FORCE_DEPLOYER');
         });
 
-        xit('successfully upgraded', async () => {
+        it('successfully upgraded', async () => {
             await network.provider.request({
                 method: 'hardhat_impersonateAccount',
                 params: [FORCE_DEPLOYER_ADDRESS]

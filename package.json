@@ -8,7 +8,7 @@
     "@nomiclabs/hardhat-solpp": "^2.0.1",
     "commander": "^9.4.1",
     "ethers": "^5.7.0",
-    "hardhat": "^2.11.0",
+    "hardhat": "=2.16.0",
     "preprocess": "^3.2.0",
     "zksync-web3": "^0.14.3"
   },

@@ -1,6 +1,11 @@
 name: "CI"
 
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
 
 jobs:
   build:
@@ -100,8 +105,17 @@ jobs:
           node-version: 18.18.0
           cache: yarn
 
-      - name: Use era-test-node for testing
-        uses: dutterbutter/era-test-node-action@latest
+      - name: Use Nightly Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2023-04-17
+
+      - name: Use era_test_node for testing
+        uses: baptiste0928/cargo-install@21a18ba3bf4a184d1804e8b759930d3471b1c941
+        with:
+          crate: era_test_node
+          git: https://github.com/matter-labs/era-test-node.git
+          branch: boojum-integration
 
       - name: Install dependencies
         run: yarn
@@ -119,8 +133,15 @@ jobs:
             contracts/precompiles/artifacts
             bootloader/build
 
+      - name: Start era_test_node
+        run: era_test_node run > /dev/null 2>&1 &
+
       - name: Run tests
         run: yarn test
+
+      - name: Print output logs of era_test_node
+        if: always()
+        run: cat era_test_node.log
 
   test_bootloader:
     needs: [build, lint]

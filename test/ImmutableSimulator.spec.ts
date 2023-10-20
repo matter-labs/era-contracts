@@ -30,7 +30,7 @@ describe('ImmutableSimulator tests', function () {
             );
         });
 
-        xit('successfully set', async () => {
+        it('successfully set', async () => {
             await network.provider.request({
                 method: 'hardhat_impersonateAccount',
                 params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS]

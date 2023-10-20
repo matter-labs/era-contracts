@@ -6,7 +6,7 @@ import { EventWriterTest } from '../typechain-types';
 import { EVENT_WRITER_CONTRACT_ADDRESS } from './shared/constants';
 import { deployContract, getCode, getWallets, setCode } from './shared/utils';
 
-xdescribe('EventWriter tests', function () {
+describe('EventWriter tests', function () {
     let wallet: Wallet;
     let eventWriter: Contract;
     let eventWriterTest: EventWriterTest;
