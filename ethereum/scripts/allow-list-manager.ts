@@ -1,7 +1,7 @@
-import * as hardhat from 'hardhat';
-import { Interface } from 'ethers/lib/utils';
 import { Command } from 'commander';
-import { PermissionToCall, AccessMode, print, getLowerCaseAddress, permissionToCallComparator } from './utils';
+import { Interface } from 'ethers/lib/utils';
+import * as hardhat from 'hardhat';
+import { AccessMode, PermissionToCall, getLowerCaseAddress, permissionToCallComparator, print } from './utils';
 
 // Get the interfaces for all needed contracts
 const allowList = new Interface(hardhat.artifacts.readArtifactSync('IAllowList').abi);
@@ -35,11 +35,15 @@ function functionSelector(functionName: string): string {
 
     try {
         selectors.push(zkSync.getSighash(zkSync.getFunction(functionName)));
-    } catch {}
+    } catch {
+        // ignore
+    }
 
     try {
         selectors.push(l1ERC20Bridge.getSighash(l1ERC20Bridge.getFunction(functionName)));
-    } catch {}
+    } catch {
+        // ignore
+    }
 
     if (selectors.length == 0) {
         throw `No selector found for the ${functionName} function`;

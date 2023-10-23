@@ -1,37 +1,36 @@
 import { expect } from 'chai';
+import * as ethers from 'ethers';
+import { BigNumberish, BytesLike } from 'ethers';
 import * as hardhat from 'hardhat';
-import { Action, facetCut, diamondCut } from '../../src.ts/diamondCut';
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
+import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
-    DiamondInitFactory,
-    AllowListFactory,
-    AllowList,
-    ExecutorFacet,
-    ExecutorFacetFactory,
-    GettersFacetFactory,
-    GettersFacet,
     AdminFacet,
     AdminFacetFactory,
+    AllowList,
+    AllowListFactory,
+    CustomUpgradeTestFactory,
     DefaultUpgradeFactory,
-    CustomUpgradeTestFactory
+    DiamondInitFactory,
+    ExecutorFacet,
+    ExecutorFacetFactory,
+    GettersFacet,
+    GettersFacetFactory
 } from '../../typechain';
 import {
-    getCallRevertReason,
     AccessMode,
-    EMPTY_STRING_KECCAK,
-    genesisStoredBatchInfo,
-    StoredBatchInfo,
     CommitBatchInfo,
-    L2_SYSTEM_CONTEXT_ADDRESS,
+    EMPTY_STRING_KECCAK,
     L2_BOOTLOADER_ADDRESS,
-    createSystemLogs,
+    L2_SYSTEM_CONTEXT_ADDRESS,
     SYSTEM_LOG_KEYS,
+    StoredBatchInfo,
     constructL2Log,
-    L2_TO_L1_MESSENGER,
+    createSystemLogs,
+    genesisStoredBatchInfo,
+    getCallRevertReason,
     packBatchTimestampAndBatchTimestamp
 } from './utils';
-import * as ethers from 'ethers';
-import { BigNumber, BigNumberish, BytesLike } from 'ethers';
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -360,7 +359,9 @@ describe('L2 upgrade test', function () {
                     name: event.name,
                     args: parsedArgs
                 };
-            } catch (_) {}
+            } catch (_) {
+                // ignore
+            }
         });
         l2UpgradeTxHash = upgradeEvents.find((event) => event.name == 'UpgradeComplete').args.l2UpgradeTxHash;
 
@@ -657,7 +658,9 @@ describe('L2 upgrade test', function () {
                     name: event.name,
                     args: parsedArgs
                 };
-            } catch (_) {}
+            } catch (_) {
+                // ignore
+            }
         });
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;

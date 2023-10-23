@@ -1,9 +1,7 @@
 import { BigNumber, BigNumberish, BytesLike, ethers } from 'ethers';
 import { Address } from 'zksync-web3/build/src/types';
-import { Action, diamondCut, facetCut, getAllSelectors } from '../../src.ts/diamondCut';
-import { expect } from 'chai';
-import * as hardhat from 'hardhat';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require('@openzeppelin/contracts/build/contracts/IERC20');
 export const DEFAULT_REVERT_REASON = 'VM did not revert';
 
@@ -28,6 +26,7 @@ export enum SYSTEM_LOG_KEYS {
 
 // The default price for the pubdata in L2 gas to be used in L1->L2 transactions
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA =
+// eslint-disable-next-line @typescript-eslint/no-var-requires
     require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 /// Set of parameters that are needed to test the processing of priority operations

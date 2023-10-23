@@ -12,9 +12,11 @@ import { getNumberFromEnv } from './scripts/utils';
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     require('dotenv').config();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const systemParams = require('../SystemConfig.json');
 
 const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');

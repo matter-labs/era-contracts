@@ -1,26 +1,27 @@
 import { expect } from 'chai';
 import { ethers } from 'ethers';
 import * as hardhat from 'hardhat';
-import { IZkSync } from '../../typechain/IZkSync';
+import { hashL2Bytecode } from '../../scripts/utils';
 import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
     AllowList,
     AllowListFactory,
     DiamondInitFactory,
     GettersFacetFactory,
-    MailboxFacetFactory,
     L1WethBridge,
     L1WethBridgeFactory,
+    MailboxFacetFactory,
     WETH9,
     WETH9Factory
 } from '../../typechain';
+import { IZkSync } from '../../typechain/IZkSync';
 import { AccessMode, getCallRevertReason } from './utils';
-import { hashL2Bytecode } from '../../scripts/utils';
 
 import { Interface } from 'ethers/lib/utils';
 import { Address } from 'zksync-web3/build/src/types';
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 export async function create2DeployFromL1(

@@ -1,7 +1,7 @@
-import * as hardhat from 'hardhat';
+import * as chalk from 'chalk';
 import { ethers } from 'ethers';
 import { Interface } from 'ethers/lib/utils';
-import * as chalk from 'chalk';
+import * as hardhat from 'hardhat';
 import { web3Url } from './utils';
 
 const erc20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync('L1ERC20Bridge').abi);
@@ -97,7 +97,9 @@ async function reason() {
                 } else {
                     console.log(log);
                 }
-            } catch {}
+            } catch {
+                // ignore
+            }
         }
     }
 }

@@ -1,11 +1,12 @@
-import * as hardhat from 'hardhat';
 import '@nomiclabs/hardhat-ethers';
+import { ArgumentParser } from 'argparse';
 import { Wallet } from 'ethers';
 import * as fs from 'fs';
+import * as hardhat from 'hardhat';
 import * as path from 'path';
-import { ArgumentParser } from 'argparse';
 import { web3Provider } from './utils';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
