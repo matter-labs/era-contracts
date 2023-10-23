@@ -1,28 +1,27 @@
-import * as hardhat from 'hardhat';
 import '@nomiclabs/hardhat-ethers';
+import * as hardhat from 'hardhat';
 
 import { BigNumberish, ethers, providers, Signer, Wallet } from 'ethers';
-import { Interface } from 'ethers/lib/utils';
-import { diamondCut, getCurrentFacetCutsForAdd } from './diamondCut';
-import { IZkSyncFactory } from '../typechain/IZkSyncFactory';
-import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
-import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
-import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
-import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
-import { AllowListFactory } from '../typechain';
-import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
-import { hexlify } from 'ethers/lib/utils';
+import { hexlify, Interface } from 'ethers/lib/utils';
 import {
-    readSystemContractsBytecode,
-    hashL2Bytecode,
     getAddressFromEnv,
     getHashFromEnv,
     getNumberFromEnv,
+    getTokens,
+    hashL2Bytecode,
     readBatchBootloaderBytecode,
-    getTokens
+    readSystemContractsBytecode
 } from '../scripts/utils';
-import { deployViaCreate2 } from './deploy-utils';
+import { AllowListFactory } from '../typechain';
 import { IGovernanceFactory } from '../typechain/IGovernanceFactory';
+import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
+import { IZkSyncFactory } from '../typechain/IZkSyncFactory';
+import { L1ERC20BridgeFactory } from '../typechain/L1ERC20BridgeFactory';
+import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
+import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
+import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
+import { deployViaCreate2 } from './deploy-utils';
+import { diamondCut, getCurrentFacetCutsForAdd } from './diamondCut';
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode('DefaultAccount')));
@@ -167,9 +166,11 @@ export class Deployer {
 
     private async deployViaCreate2(
         contractName: string,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         args: any[],
         create2Salt: string,
         ethTxOptions: ethers.providers.TransactionRequest,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         libraries?: any
     ) {
         const result = await deployViaCreate2(

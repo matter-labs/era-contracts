@@ -1,16 +1,18 @@
+import '@nomiclabs/hardhat-ethers';
 import { ethers } from 'ethers';
 import * as hardhat from 'hardhat';
-import '@nomiclabs/hardhat-ethers';
 import { SingletonFactoryFactory } from '../typechain';
 
 export async function deployViaCreate2(
     deployWallet: ethers.Wallet,
     contractName: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     args: any[],
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     create2FactoryAddress: string,
     verbose: boolean = true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     libraries?: any
 ): Promise<[string, string]> {
     // [address, txHash]

@@ -138,6 +138,7 @@ export function computeL2Create2Address(
     return ethers.utils.hexDataSlice(data, 12);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function print(name: string, data: any) {
     console.log(`${name}:\n`, JSON.stringify(data, null, 4), '\n');
 }

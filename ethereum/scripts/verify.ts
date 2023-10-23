@@ -1,6 +1,7 @@
-import { deployedAddressesFromEnv } from '../src.ts/deploy';
 import * as hardhat from 'hardhat';
+import { deployedAddressesFromEnv } from '../src.ts/deploy';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {
     return new Promise((resolve, reject) => {
         hardhat

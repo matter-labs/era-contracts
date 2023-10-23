@@ -1,16 +1,17 @@
-import * as hardhat from 'hardhat';
 import { expect } from 'chai';
+import * as hardhat from 'hardhat';
 
 import { ethers } from 'ethers';
-import { L1ERC20BridgeTestFactory, L1ERC20Bridge } from '../../typechain';
+import { L1ERC20Bridge, L1ERC20BridgeTestFactory } from '../../typechain';
 
-import { ITransparentUpgradeableProxyFactory } from '../../typechain/ITransparentUpgradeableProxyFactory';
 import { ITransparentUpgradeableProxy } from '../../typechain/ITransparentUpgradeableProxy';
+import { ITransparentUpgradeableProxyFactory } from '../../typechain/ITransparentUpgradeableProxyFactory';
 
 // TODO: change to the mainet config
 const L1_ERC20_BRIDGE = '0x927DdFcc55164a59E0F33918D13a2D559bC10ce7';
 const GOVERNOR_ADDRESS = '0x98591957D9741e7E7d58FC253044e0A014A3a323';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function isPromiseFailed(promise: Promise<any>): Promise<boolean> {
     let failed = false;
     try {
