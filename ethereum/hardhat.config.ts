@@ -5,7 +5,7 @@ import '@nomiclabs/hardhat-waffle';
 import 'hardhat-contract-sizer';
 import 'hardhat-gas-reporter';
 import 'hardhat-typechain';
-import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
+import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names';
 import { task } from 'hardhat/config';
 import 'solidity-coverage';
 import { getNumberFromEnv } from './scripts/utils';
@@ -114,5 +114,6 @@ export default {
     }
 };
 
-task('solpp', 'Preprocess Solidity source files')
-    .setAction(async (_, hre) => hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS));
+task('solpp', 'Preprocess Solidity source files').setAction(async (_, hre) =>
+    hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS)
+);

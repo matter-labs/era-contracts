@@ -32,7 +32,11 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA =
 
 /// Set of parameters that are needed to test the processing of priority operations
 export class DummyOp {
-    constructor(public id: number, public expirationBatch: BigNumber, public layer2Tip: number) {}
+    constructor(
+        public id: number,
+        public expirationBatch: BigNumber,
+        public layer2Tip: number
+    ) {}
 }
 
 export enum AccessMode {

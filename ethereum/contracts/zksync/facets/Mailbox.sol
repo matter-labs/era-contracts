@@ -15,21 +15,8 @@ import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IAllowList} from "../../common/interfaces/IAllowList.sol";
 import {Base} from "./Base.sol";
-import {
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    FAIR_L2_GAS_PRICE,
-    L1_GAS_PER_PUBDATA_BYTE,
-    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
-    PRIORITY_OPERATION_L2_TX_TYPE,
-    PRIORITY_EXPIRATION,
-    MAX_NEW_FACTORY_DEPS
-} from "../Config.sol";
-import {
-    L2_BOOTLOADER_ADDRESS,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-    L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR
-} from "../../common/L2ContractAddresses.sol";
-
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -385,11 +372,9 @@ contract MailboxFacet is Base, IMailbox {
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(bytes[] calldata _factoryDeps)
-        internal
-        pure
-        returns (uint256[] memory hashedFactoryDeps)
-    {
+    function _hashFactoryDeps(
+        bytes[] calldata _factoryDeps
+    ) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
@@ -403,11 +388,9 @@ contract MailboxFacet is Base, IMailbox {
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(bytes memory _message)
-        internal
-        pure
-        returns (address l1Receiver, uint256 amount)
-    {
+    function _parseL2WithdrawalMessage(
+        bytes memory _message
+    ) internal pure returns (address l1Receiver, uint256 amount) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`

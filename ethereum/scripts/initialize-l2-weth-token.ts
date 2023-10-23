@@ -20,7 +20,7 @@ const openzeppelinTransparentProxyArtifactsPath = path.join(
 
 function readInterface(path: string, fileName: string, solFileName?: string) {
     solFileName ??= fileName;
-    const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName }.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
+    const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
     return new ethers.utils.Interface(abi);
 }
 

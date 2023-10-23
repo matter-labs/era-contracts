@@ -64,10 +64,7 @@ describe('L2 upgrade test', function () {
 
         const adminFacetFactory = await hardhat.ethers.getContractFactory('AdminFacet');
         const adminFacetContract = await adminFacetFactory.deploy();
-        const adminFacet = AdminFacetFactory.connect(
-            adminFacetContract.address,
-            adminFacetContract.signer
-        );
+        const adminFacet = AdminFacetFactory.connect(adminFacetContract.address, adminFacetContract.signer);
 
         const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
         const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
@@ -168,7 +165,7 @@ describe('L2 upgrade test', function () {
                 l2ProtocolUpgradeTx: noopUpgradeTransaction
             })
         );
-        expect(revertReason).to.equal('Upgrade is not ready yet');        
+        expect(revertReason).to.equal('Upgrade is not ready yet');
     });
 
     it('Should require correct tx type for upgrade tx', async () => {
@@ -434,9 +431,7 @@ describe('L2 upgrade test', function () {
             factoryDeps: [myFactoryDep],
             newProtocolVersion: 5
         };
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(proxyGetters, proxyAdmin, upgrade)
-        );
+        const revertReason = await getCallRevertReason(executeUpgrade(proxyGetters, proxyAdmin, upgrade));
 
         expect(revertReason).to.equal('Previous upgrade has not been finalized');
     });

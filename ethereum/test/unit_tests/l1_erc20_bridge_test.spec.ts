@@ -66,7 +66,7 @@ describe(`L1ERC20Bridge tests`, function () {
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: dummyHash,
                 l2DefaultAccountBytecodeHash: dummyHash,
-                priorityTxMaxGasLimit: 10000000,
+                priorityTxMaxGasLimit: 10000000
             }
         ]);
 

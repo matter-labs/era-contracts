@@ -1,8 +1,7 @@
 pragma solidity ^0.8.13;
 
-import {ExecutorFacet} from '../../zksync/facets/Executor.sol';
+import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
 import {VerifierParams} from "../../zksync/Storage.sol";
-
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
@@ -13,25 +12,28 @@ contract ExecutorProvingTest is ExecutorFacet {
         return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
     }
 
-    function createBatchCommitment(CommitBatchInfo calldata _newBatchData, bytes32 _stateDiffHash)
-    external
-    view
-    returns (bytes32) {
+    function createBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash
+    ) external view returns (bytes32) {
         return _createBatchCommitment(_newBatchData, _stateDiffHash);
-
     }
 
-    function processL2Logs(CommitBatchInfo calldata _newBatch, bytes32 _expectedSystemContractUpgradeTxHash)
-    external
-    pure
-    returns (
-        uint256 numberOfLayer1Txs,
-        bytes32 chainedPriorityTxsHash,
-        bytes32 previousBatchHash,
-        bytes32 stateDiffHash,
-        bytes32 l2LogsTreeRoot,
-        uint256 packedBatchAndL2BlockTimestamp
-    ) {
+    function processL2Logs(
+        CommitBatchInfo calldata _newBatch,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    )
+        external
+        pure
+        returns (
+            uint256 numberOfLayer1Txs,
+            bytes32 chainedPriorityTxsHash,
+            bytes32 previousBatchHash,
+            bytes32 stateDiffHash,
+            bytes32 l2LogsTreeRoot,
+            uint256 packedBatchAndL2BlockTimestamp
+        )
+    {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
@@ -42,4 +44,3 @@ contract ExecutorProvingTest is ExecutorFacet {
         s.zkPorterIsAvailable = false;
     }
 }
-
