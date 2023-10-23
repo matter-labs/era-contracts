@@ -78,7 +78,7 @@ describe('Diamond proxy upgrade fork test', function () {
             const mailbox = await hardhat.ethers.getContractAt('MailboxFacet', newMailboxFacet.address);
 
             const oldFacets = await diamondProxy.facets();
-            let selectorsToRemove = [];
+            const selectorsToRemove = [];
             for (let i = 0; i < oldFacets.length; ++i) {
                 selectorsToRemove.push(...oldFacets[i].selectors);
             }

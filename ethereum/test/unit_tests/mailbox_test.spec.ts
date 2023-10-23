@@ -259,7 +259,7 @@ describe('Mailbox tests', function () {
         });
 
         it(`Reverts when proof is invalid`, async () => {
-            let invalidProof = [...MERKLE_PROOF];
+            const invalidProof = [...MERKLE_PROOF];
             invalidProof[0] = '0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb';
 
             const revertReason = await getCallRevertReason(
@@ -363,7 +363,7 @@ describe('Mailbox tests', function () {
                 refundRecipient
             ]);
 
-        let overrides: ethers.PayableOverrides = {};
+        const overrides: ethers.PayableOverrides = {};
         overrides.gasPrice = await mailbox.provider.getGasPrice();
         overrides.value = await mailbox.l2TransactionBaseCost(
             overrides.gasPrice,

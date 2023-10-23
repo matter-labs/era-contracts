@@ -31,7 +31,7 @@ const ALPHA_MAINNET_ALLOW_LIST = [
 ];
 
 function functionSelector(functionName: string): string {
-    let selectors = new Array(0);
+    const selectors = new Array(0);
 
     try {
         selectors.push(zkSync.getSighash(zkSync.getFunction(functionName)));
@@ -151,7 +151,7 @@ async function main() {
 
     alphaMainnet.command('add <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<PermissionToCall> = new Array(0);
+        const parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: true, ...permission });
@@ -163,7 +163,7 @@ async function main() {
 
     alphaMainnet.command('remove <addresses>').action(async (addresses: string) => {
         const parsedAddresses = JSON.parse(addresses);
-        let parameters: Array<PermissionToCall> = new Array(0);
+        const parameters: Array<PermissionToCall> = new Array(0);
         for (const caller of parsedAddresses) {
             for (const permission of ALPHA_MAINNET_ALLOW_LIST) {
                 parameters.push({ caller, enable: false, ...permission });

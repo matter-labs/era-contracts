@@ -76,13 +76,13 @@ describe('Verifier test', function () {
         await verifier.fallback({ data: calldata });
 
         // Check that proof is verified
-        let result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
+        const result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
         expect(result, 'proof verification failed').true;
     });
 
     describe('Should verify valid proof with fields values in non standard format', function () {
         it('Public input with dirty bits over Fr mask', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Fill dirty bits
             validProof.publicInputs[0] = ethers.BigNumber.from(validProof.publicInputs[0])
                 .add('0xe000000000000000000000000000000000000000000000000000000000000000')
@@ -96,7 +96,7 @@ describe('Verifier test', function () {
         });
 
         it('Elliptic curve points over modulo', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Add modulo to points
             validProof.serializedProof[0] = ethers.BigNumber.from(validProof.serializedProof[0]).add(Q_MOD);
             validProof.serializedProof[1] = ethers.BigNumber.from(validProof.serializedProof[1]).add(Q_MOD).add(Q_MOD);
@@ -109,7 +109,7 @@ describe('Verifier test', function () {
         });
 
         it('Fr over modulo', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Add modulo to number
             validProof.serializedProof[22] = ethers.BigNumber.from(validProof.serializedProof[22]).add(R_MOD);
             const result = await verifier.verify(
@@ -123,7 +123,7 @@ describe('Verifier test', function () {
 
     describe('Should revert on invalid input', function () {
         it('More than 1 public inputs', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more public input to proof
             invalidProof.publicInputs.push(invalidProof.publicInputs[0]);
             const revertReason = await getCallRevertReason(
@@ -144,7 +144,7 @@ describe('Verifier test', function () {
         });
 
         it('More than 44 words for proof', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more "serialized proof" input
             invalidProof.serializedProof.push(invalidProof.serializedProof[0]);
             const revertReason = await getCallRevertReason(
@@ -165,7 +165,7 @@ describe('Verifier test', function () {
         });
 
         it('Not empty recursive aggregation input', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more "recursive aggregation input" value
             invalidProof.recursiveAggregationInput.push(invalidProof.publicInputs[0]);
             const revertReason = await getCallRevertReason(
@@ -179,7 +179,7 @@ describe('Verifier test', function () {
         });
 
         it('Elliptic curve point at infinity', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Change first point to point at infinity (encode as (0, 0) on EVM)
             invalidProof.serializedProof[0] = ethers.constants.HashZero;
             invalidProof.serializedProof[1] = ethers.constants.HashZero;
@@ -284,13 +284,13 @@ describe('Verifier with recursive part test', function () {
         await verifier.fallback({ data: calldata });
 
         // Check that proof is verified
-        let result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
+        const result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
         expect(result, 'proof verification failed').true;
     });
 
     describe('Should verify valid proof with fields values in non standard format', function () {
         it('Public input with dirty bits over Fr mask', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Fill dirty bits
             validProof.publicInputs[0] = ethers.BigNumber.from(validProof.publicInputs[0])
                 .add('0xe000000000000000000000000000000000000000000000000000000000000000')
@@ -304,7 +304,7 @@ describe('Verifier with recursive part test', function () {
         });
 
         it('Elliptic curve points over modulo', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Add modulo to points
             validProof.serializedProof[0] = ethers.BigNumber.from(validProof.serializedProof[0]).add(Q_MOD);
             validProof.serializedProof[1] = ethers.BigNumber.from(validProof.serializedProof[1]).add(Q_MOD).add(Q_MOD);
@@ -317,7 +317,7 @@ describe('Verifier with recursive part test', function () {
         });
 
         it('Fr over modulo', async () => {
-            let validProof = JSON.parse(JSON.stringify(PROOF));
+            const validProof = JSON.parse(JSON.stringify(PROOF));
             // Add modulo to number
             validProof.serializedProof[22] = ethers.BigNumber.from(validProof.serializedProof[22]).add(R_MOD);
             const result = await verifier.verify(
@@ -331,7 +331,7 @@ describe('Verifier with recursive part test', function () {
 
     describe('Should revert on invalid input', function () {
         it('More than 1 public inputs', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more public input to proof
             invalidProof.publicInputs.push(invalidProof.publicInputs[0]);
             const revertReason = await getCallRevertReason(
@@ -352,7 +352,7 @@ describe('Verifier with recursive part test', function () {
         });
 
         it('More than 44 words for proof', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more "serialized proof" input
             invalidProof.serializedProof.push(invalidProof.serializedProof[0]);
             const revertReason = await getCallRevertReason(
@@ -373,7 +373,7 @@ describe('Verifier with recursive part test', function () {
         });
 
         it('More than 4 words for recursive aggregation input', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Add one more "recursive aggregation input" value
             invalidProof.recursiveAggregationInput.push(invalidProof.recursiveAggregationInput[0]);
             const revertReason = await getCallRevertReason(
@@ -394,7 +394,7 @@ describe('Verifier with recursive part test', function () {
         });
 
         it('Elliptic curve point at infinity', async () => {
-            let invalidProof = JSON.parse(JSON.stringify(PROOF));
+            const invalidProof = JSON.parse(JSON.stringify(PROOF));
             // Change first point to point at infinity (encode as (0, 0) on EVM)
             invalidProof.serializedProof[0] = ethers.constants.HashZero;
             invalidProof.serializedProof[1] = ethers.constants.HashZero;

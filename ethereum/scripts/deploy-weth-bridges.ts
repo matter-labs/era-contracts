@@ -32,7 +32,7 @@ async function main() {
             const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
             console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
-            let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
             console.log(`Using nonce: ${nonce}`);
 
             const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));

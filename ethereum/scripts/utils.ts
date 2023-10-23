@@ -45,7 +45,7 @@ export function web3Provider() {
 }
 
 export function getAddressFromEnv(envName: string): string {
-    let address = process.env[envName];
+    const address = process.env[envName];
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
         throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
     }
@@ -53,7 +53,7 @@ export function getAddressFromEnv(envName: string): string {
 }
 
 export function getHashFromEnv(envName: string): string {
-    let hash = process.env[envName];
+    const hash = process.env[envName];
     if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
         throw new Error(`Incorrect hash format hash in ${envName} env: ${hash}`);
     }
@@ -61,7 +61,7 @@ export function getHashFromEnv(envName: string): string {
 }
 
 export function getNumberFromEnv(envName: string): string {
-    let number = process.env[envName];
+    const number = process.env[envName];
     if (!/^([1-9]\d*|0)$/.test(number)) {
         throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
     }

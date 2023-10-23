@@ -44,7 +44,7 @@ async function deployFacetCuts(
               "m/44'/60'/0'/0/1"
           ).connect(provider);
     const deployedFacets = {};
-    let ethTxOptions = {};
+    const ethTxOptions = {};
     if (!nonce) {
         ethTxOptions['nonce'] = await wallet.getTransactionCount();
     } else {

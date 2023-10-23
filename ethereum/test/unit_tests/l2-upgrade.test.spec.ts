@@ -723,7 +723,7 @@ async function buildCommitBatchInfo(
     info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-    let systemLogs = createSystemLogs();
+    const systemLogs = createSystemLogs();
     systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
         true,
         L2_SYSTEM_CONTEXT_ADDRESS,

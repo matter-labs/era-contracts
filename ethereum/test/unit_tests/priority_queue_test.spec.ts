@@ -6,7 +6,7 @@ import { getCallRevertReason } from './utils';
 
 describe('Priority queue tests', function () {
     let priorityQueueTest: PriorityQueueTest;
-    let queue = [];
+    const queue = [];
 
     before(async () => {
         const contractFactory = await hardhat.ethers.getContractFactory('PriorityQueueTest');

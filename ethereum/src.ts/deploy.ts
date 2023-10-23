@@ -109,7 +109,7 @@ export class Deployer {
         const genesisIndexRepeatedStorageChanges = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBatchCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
 
-        let verifierParams =
+        const verifierParams =
             process.env['CONTRACTS_PROVER_AT_GENESIS'] == 'fri'
                 ? {
                       recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH'),
@@ -172,7 +172,7 @@ export class Deployer {
         ethTxOptions: ethers.providers.TransactionRequest,
         libraries?: any
     ) {
-        let result = await deployViaCreate2(
+        const result = await deployViaCreate2(
             this.deployWallet,
             contractName,
             args,

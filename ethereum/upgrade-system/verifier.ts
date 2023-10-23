@@ -28,7 +28,7 @@ async function deployVerifier(
 
     create2Salt = create2Salt ?? ethers.constants.HashZero;
 
-    let ethTxOptions = {};
+    const ethTxOptions = {};
     if (!nonce) {
         ethTxOptions['nonce'] = await wallet.getTransactionCount();
     }

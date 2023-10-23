@@ -55,7 +55,7 @@ describe('WETH Bridge tests', () => {
     let allowList: AllowList;
     let bridgeProxy: L1WethBridge;
     let l1Weth: WETH9;
-    let functionSignature = '0x6c0960f9';
+    const functionSignature = '0x6c0960f9';
 
     before(async () => {
         [owner, randomSigner] = await hardhat.ethers.getSigners();
