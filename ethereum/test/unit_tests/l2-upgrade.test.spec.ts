@@ -699,28 +699,6 @@ type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
     batchNumber: BigNumberish;
 };
 
-// An actual log should also contain shardId/isService and logIndex,
-// but we don't need them for the tests
-interface L2ToL1Log {
-    sender: string;
-    key: string;
-    value: string;
-}
-
-function encodeLog(log: L2ToL1Log): string {
-    return ethers.utils.hexConcat([
-        `0x00000000`,
-        log.sender,
-        ethers.utils.hexZeroPad(log.key, 32),
-        ethers.utils.hexZeroPad(log.value, 32)
-    ]);
-}
-
-function encodeLogs(logs: L2ToL1Log[]) {
-    const joinedLogs = ethers.utils.hexConcat(logs.map(encodeLog));
-    return ethers.utils.hexConcat(['0x00000000', joinedLogs]);
-}
-
 async function buildCommitBatchInfo(
     prevInfo: StoredBatchInfo,
     info: CommitBatchInfoWithTimestamp

@@ -1,8 +1,8 @@
 import { expect } from 'chai';
+import * as ethers from 'ethers';
 import * as hardhat from 'hardhat';
 import { AdminFacetTest, AdminFacetTestFactory, GovernanceFactory } from '../../typechain';
 import { getCallRevertReason } from './utils';
-import * as ethers from 'ethers';
 
 function randomAddress() {
     return ethers.utils.hexlify(ethers.utils.randomBytes(20));
@@ -17,7 +17,6 @@ describe('Admin facet tests', function () {
         const contract = await contractFactory.deploy();
         adminFacetTest = AdminFacetTestFactory.connect(contract.address, contract.signer);
 
-        const governanceFactory = await hardhat.ethers.getContractFactory('Governance');
         const governanceContract = await contractFactory.deploy();
         const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
         await adminFacetTest.setPendingGovernor(governance.address);
