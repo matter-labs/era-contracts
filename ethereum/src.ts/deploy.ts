@@ -140,6 +140,7 @@ export class Deployer {
             }
         ]);
 
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
     }

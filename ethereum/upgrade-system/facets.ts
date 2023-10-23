@@ -1,10 +1,10 @@
 import { Command } from 'commander';
-import { getFacetCutsForUpgrade } from '../src.ts/diamondCut';
 import { BigNumber, ethers } from 'ethers';
 import * as fs from 'fs';
-import { deployViaCreate2 } from '../src.ts/deploy-utils';
-import { web3Url } from 'zk/build/utils';
 import * as path from 'path';
+import { web3Url } from 'zk/build/utils';
+import { deployViaCreate2 } from '../src.ts/deploy-utils';
+import { getFacetCutsForUpgrade } from '../src.ts/diamondCut';
 import { insertGasPrice } from './utils';
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
@@ -14,6 +14,7 @@ async function deployFacetCut(
     wallet: ethers.Wallet,
     name: string,
     create2Address: string,
+    // eslint-disable-next-line @typescript-eslint/ban-types
     ethTxOptions: {},
     create2Salt?: string
 ) {

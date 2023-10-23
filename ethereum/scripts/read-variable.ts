@@ -335,6 +335,7 @@ async function getValue(address: string, contractName: string, name: string): Pr
         throw new Error(`Unknown contract name, available contracts: ${Object.keys(contractMap)}`);
     }
     const buildInfo = await hre.artifacts.getBuildInfo(contractMap[contractName].fullName);
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const layout = buildInfo.output.contracts[contractMap[contractName].file][contractName].storageLayout;
     types = layout.types;
