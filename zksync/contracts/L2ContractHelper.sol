@@ -50,11 +50,7 @@ interface IContractDeployer {
     /// @param _salt a unique value to create the deterministic address of the new contract
     /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
     /// @param _input the calldata to be sent to the constructor of the new contract
-    function create2(
-        bytes32 _salt,
-        bytes32 _bytecodeHash,
-        bytes calldata _input
-    ) external;
+    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external;
 }
 
 /**

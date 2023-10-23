@@ -42,11 +42,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @param _l1WethAddress The address of the L1 WETH token.
     /// @param _l2WethAddress The address of the L2 WETH token.
     /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
-    function initialize(
-        address _l1Bridge,
-        address _l1WethAddress,
-        address _l2WethAddress
-    ) external initializer {
+    function initialize(address _l1Bridge, address _l1WethAddress, address _l2WethAddress) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
         require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
         require(_l2WethAddress != address(0), "L2 WETH token address cannot be zero");
@@ -60,11 +56,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @param _l1Receiver The account address that would receive the WETH on L1
     /// @param _l2Token Address of the L2 WETH token
     /// @param _amount Total amount of WETH to withdraw
-    function withdraw(
-        address _l1Receiver,
-        address _l2Token,
-        uint256 _amount
-    ) external override {
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
         require(_l2Token == l2WethAddress, "Only WETH can be withdrawn");
         require(_amount > 0, "Amount cannot be zero");
 
