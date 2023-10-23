@@ -1,13 +1,14 @@
 import { artifacts } from 'hardhat';
 
+import { Interface } from 'ethers/lib/utils';
 import { deployedAddressesFromEnv } from '../../ethereum/src.ts/deploy';
 import { IZkSyncFactory } from '../../ethereum/typechain/IZkSyncFactory';
-import { Interface } from 'ethers/lib/utils';
 
-import { ethers, Wallet, BytesLike } from 'ethers';
+import { BytesLike, Wallet, ethers } from 'ethers';
 import { Provider } from 'zksync-web3';
 import { sleep } from 'zksync-web3/build/src/utils';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
