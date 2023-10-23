@@ -3,7 +3,7 @@ name: CI
 on: pull_request
 
 jobs:
-  lint:
+  lint-l1:
     runs-on: ubuntu-latest
 
     defaults:
@@ -20,6 +20,33 @@ jobs:
           node-version: 18.18.0
           cache: yarn
           cache-dependency-path: ethereum/yarn.lock
+
+      - name: Install yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Lint
+        run: yarn lint
+
+  lint-l2:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: zksync
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+          cache-dependency-path: zksync/yarn.lock
 
       - name: Install yarn
         run: npm install -g yarn
@@ -103,7 +130,7 @@ jobs:
             zksync/typechain
 
   test-hardhat-l1:
-    needs: [build-l1, lint]
+    needs: [build-l1, lint-l1]
     runs-on: ubuntu-latest
 
     defaults:
@@ -141,7 +168,7 @@ jobs:
         run: yarn test --no-compile
 
   test-foundry-l1:
-    needs: [build-l1, lint]
+    needs: [build-l1, lint-l1]
     runs-on: ubuntu-latest
 
     defaults:
@@ -184,7 +211,7 @@ jobs:
         run: forge test
 
   test-hardhat-l2:
-    needs: [build-l2]
+    needs: [build-l2, lint-l2]
     runs-on: ubuntu-latest
 
     defaults:
