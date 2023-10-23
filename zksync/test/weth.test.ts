@@ -16,8 +16,8 @@ const richAccount = {
 const eth18 = ethers.utils.parseEther('18');
 
 describe('WETH token & WETH bridge', function () {
-    let provider = new Provider(hre.config.networks.localhost.url);
-    let wallet = new Wallet(richAccount.privateKey, provider);
+    const provider = new Provider(hre.config.networks.localhost.url);
+    const wallet = new Wallet(richAccount.privateKey, provider);
     let wethToken: L2Weth;
     let wethBridge: L2WethBridge;
 

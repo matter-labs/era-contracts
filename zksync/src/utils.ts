@@ -98,7 +98,7 @@ export async function create2DeployFromL1(
 }
 
 export function getNumberFromEnv(envName: string): string {
-    let number = process.env[envName];
+    const number = process.env[envName];
     if (!/^([1-9]\d*|0)$/.test(number)) {
         throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
     }
