@@ -1,14 +1,14 @@
+import '@nomiclabs/hardhat-ethers';
 import { Command } from 'commander';
 import { BigNumber, Wallet } from 'ethers';
-import { Provider } from 'zksync-web3';
+import * as fs from 'fs';
+import * as hre from 'hardhat';
 import { ethers } from 'hardhat';
-import '@nomiclabs/hardhat-ethers';
+import * as path from 'path';
+import { Provider } from 'zksync-web3';
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from 'zksync-web3/build/src/utils';
 import { getAddressFromEnv, getNumberFromEnv, web3Provider } from '../../ethereum/scripts/utils';
 import { Deployer } from '../../ethereum/src.ts/deploy';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as hre from 'hardhat';
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from 'zksync-web3/build/src/utils';
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1 } from './utils';
 
 export function getContractBytecode(contractName: string) {
@@ -16,6 +16,7 @@ export function getContractBytecode(contractName: string) {
 }
 
 type SupportedContracts = 'L2ERC20Bridge' | 'L2StandardERC20' | 'L2WethBridge' | 'L2Weth';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function checkSupportedContract(contract: any): contract is SupportedContracts {
     if (!['L2ERC20Bridge', 'L2StandardERC20', 'L2WethBridge', 'L2Weth'].includes(contract)) {
         throw new Error(`Unsupported contract: ${contract}`);

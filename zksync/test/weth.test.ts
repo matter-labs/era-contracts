@@ -1,12 +1,12 @@
-import { expect } from 'chai';
-import { Wallet, Provider } from 'zksync-web3';
-import * as hre from 'hardhat';
-import { ethers } from 'ethers';
-import { L2WethFactory } from '../typechain/L2WethFactory';
-import { L2Weth } from '../typechain/L2Weth';
-import { L2WethBridgeFactory } from '../typechain/L2WethBridgeFactory';
-import { L2WethBridge } from '../typechain/L2WethBridge';
 import { Deployer } from '@matterlabs/hardhat-zksync-deploy';
+import { expect } from 'chai';
+import { ethers } from 'ethers';
+import * as hre from 'hardhat';
+import { Provider, Wallet } from 'zksync-web3';
+import { L2Weth } from '../typechain/L2Weth';
+import { L2WethBridge } from '../typechain/L2WethBridge';
+import { L2WethBridgeFactory } from '../typechain/L2WethBridgeFactory';
+import { L2WethFactory } from '../typechain/L2WethFactory';
 
 const richAccount = {
     address: '0x36615Cf349d7F6344891B1e7CA7C72883F5dc049',
@@ -36,6 +36,7 @@ describe('WETH token & WETH bridge', function () {
             wethBridgeImpl.address,
             randomAddress,
             '0x'
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ])) as any;
 
         wethToken = L2WethFactory.connect(wethTokenProxy.address, wallet);
