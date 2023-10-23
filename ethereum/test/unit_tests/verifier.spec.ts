@@ -76,7 +76,11 @@ describe('Verifier test', function () {
         await verifier.fallback({ data: calldata });
 
         // Check that proof is verified
-        const result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
+        const result = await verifier.verify(
+            PROOF.publicInputs,
+            PROOF.serializedProof,
+            PROOF.recursiveAggregationInput
+        );
         expect(result, 'proof verification failed').true;
     });
 
@@ -284,7 +288,11 @@ describe('Verifier with recursive part test', function () {
         await verifier.fallback({ data: calldata });
 
         // Check that proof is verified
-        const result = await verifier.verify(PROOF.publicInputs, PROOF.serializedProof, PROOF.recursiveAggregationInput);
+        const result = await verifier.verify(
+            PROOF.publicInputs,
+            PROOF.serializedProof,
+            PROOF.recursiveAggregationInput
+        );
         expect(result, 'proof verification failed').true;
     });
 

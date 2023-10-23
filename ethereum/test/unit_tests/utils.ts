@@ -26,7 +26,7 @@ export enum SYSTEM_LOG_KEYS {
 
 // The default price for the pubdata in L2 gas to be used in L1->L2 transactions
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA =
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 /// Set of parameters that are needed to test the processing of priority operations
