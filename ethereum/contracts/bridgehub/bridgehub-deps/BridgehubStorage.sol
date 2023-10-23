@@ -84,6 +84,6 @@ struct BridgehubStorage {
     mapping(address => bool) stateTransitionIsRegistered;
     /// @notice chainID => stateTransition contract address
     mapping(uint256 => address) stateTransition;
-    /// @notice chainID => proofChain contract address
-    mapping(uint256 => address) proofChain;
+    /// @notice chainID => stateTransitionChain contract address
+    mapping(uint256 => address) stateTransitionChain;
 }

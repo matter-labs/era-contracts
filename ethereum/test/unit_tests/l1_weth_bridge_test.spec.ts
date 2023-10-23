@@ -104,6 +104,7 @@ describe('WETH Bridge tests', () => {
         const bridgeInitData = bridge.interface.encodeFunctionData('initialize', [
             [garbageBytecode, garbageBytecode],
             garbageAddress,
+            garbageAddress,
             await owner.getAddress()
         ]);
 

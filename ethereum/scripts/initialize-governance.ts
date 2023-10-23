@@ -41,7 +41,7 @@ async function main() {
             });
 
             const governance = deployer.governanceContract(deployWallet);
-            const zkSync = deployer.zkSyncContract(deployWallet);
+            const zkSync = deployer.stateTransitionChainContract(deployWallet);
 
             const erc20Bridge = deployer.transparentUpgradableProxyContract(
                 deployer.addresses.Bridges.ERC20BridgeProxy,

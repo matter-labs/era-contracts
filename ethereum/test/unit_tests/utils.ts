@@ -259,7 +259,7 @@ export async function initialDeployment(
 
     process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
     process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = '0';
-    process.env.CONTRACTS_GENESIS_BLOCK_COMMITMENT = zeroHash;
+    process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = zeroHash;
     process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = '72000000';
     process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
     process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;

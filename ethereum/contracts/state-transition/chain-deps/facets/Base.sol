@@ -27,7 +27,7 @@ contract StateTransitionChainBase is ReentrancyGuard, AllowListed {
     }
 
     modifier onlyStateTransition() {
-        require(msg.sender == chainStorage.stateTransition, "PCBase 3"); // message not sent by proofsystem
+        require(msg.sender == chainStorage.stateTransition, "PCBase 3"); // message not sent by state transition
         _;
     }
 

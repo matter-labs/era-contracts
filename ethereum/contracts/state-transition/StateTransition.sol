@@ -57,7 +57,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     }
 
     function getStateTransitionChainContract(uint256 _chainId) external view returns (address) {
-        return proofStorage.proofChainContract[_chainId];
+        return proofStorage.stateTransitionChainContract[_chainId];
     }
 
     /// registry
@@ -86,7 +86,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     ) external onlyGovernor {
         // check not registered
         address bridgehub = proofStorage.bridgehub;
-        require(proofStorage.proofChainContract[_chainId] == address(0), "PRegistry 1");
+        require(proofStorage.stateTransitionChainContract[_chainId] == address(0), "PRegistry 1");
         require(IBridgehub(bridgehub).getChainStateTransition(_chainId) == address(this), "PRegsitry 2");
 
         // check input
@@ -109,22 +109,22 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData memory cutData = _diamondCut;
         cutData.initCalldata = initData;
 
-        // deploy proofChainContract
-        DiamondProxy proofChainContract = new DiamondProxy(block.chainid, cutData);
+        // deploy stateTransitionChainContract
+        DiamondProxy stateTransitionChainContract = new DiamondProxy(block.chainid, cutData);
 
         // save data
-        address proofChainAddress = address(proofChainContract);
+        address stateTransitionChainAddress = address(stateTransitionChainContract);
 
-        proofStorage.proofChainContract[_chainId] = proofChainAddress;
-        proofStorage.chainNumberToContract[proofStorage.totalChains] = proofChainAddress;
+        proofStorage.stateTransitionChainContract[_chainId] = stateTransitionChainAddress;
+        proofStorage.chainNumberToContract[proofStorage.totalChains] = stateTransitionChainAddress;
         ++proofStorage.totalChains;
 
-        IBridgehub(bridgehub).setStateTransitionChainContract(_chainId, proofChainAddress);
+        IBridgehub(bridgehub).setStateTransitionChainContract(_chainId, stateTransitionChainAddress);
 
         // set chainId in VM
-        _specialSetChainIdInVMTx(_chainId, proofChainAddress);
+        _specialSetChainIdInVMTx(_chainId, stateTransitionChainAddress);
 
-        emit StateTransitionNewChain(_chainId, proofChainAddress);
+        emit StateTransitionNewChain(_chainId, stateTransitionChainAddress);
     }
 
     function setUpgradeDiamondCut(
@@ -142,8 +142,8 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
         require(cutHash == proofStorage.upgradeCutHash[_protocolVersion], "r25");
 
-        IStateTransitionChain proofChainContract = IStateTransitionChain(proofStorage.proofChainContract[_chainId]);
-        proofChainContract.executeUpgrade(_cutData, _protocolVersion);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]);
+        stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
     function specialUpgradeChain(
@@ -151,15 +151,15 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         uint256 _protocolVersion,
         Diamond.DiamondCutData calldata _cutData
     ) external onlyGovernor {
-        IStateTransitionChain proofChainContract = IStateTransitionChain(proofStorage.proofChainContract[_chainId]);
-        proofChainContract.executeUpgrade(_cutData, _protocolVersion);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]);
+        stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
     function freezeNotUpdated() external onlyGovernor {
         uint256 protocolVersion = proofStorage.protocolVersion;
         for (uint256 i = 0; i < proofStorage.totalChains; i = i.uncheckedInc()) {
-            IStateTransitionChain proofChainContract = IStateTransitionChain(proofStorage.chainNumberToContract[i]);
-            proofChainContract.freezeNotUpdated(protocolVersion);
+            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.chainNumberToContract[i]);
+            stateTransitionChainContract.freezeNotUpdated(protocolVersion);
         }
     }
 }

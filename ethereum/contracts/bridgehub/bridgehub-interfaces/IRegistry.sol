@@ -15,5 +15,5 @@ interface IRegistry is IBridgehubBase {
     // KL todo: chainId not uin256
     event NewChain(uint16 indexed chainId, address stateTransition, address indexed chainGovernance);
 
-    function setStateTransitionChainContract(uint256 _chainId, address _proofChainContract) external;
+    function setStateTransitionChainContract(uint256 _chainId, address _stateTransitionChainContract) external;
 }

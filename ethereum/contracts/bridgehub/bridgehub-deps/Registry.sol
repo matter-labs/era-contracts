@@ -41,10 +41,10 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
         emit NewChain(uint16(chainId), _stateTransition, msg.sender);
     }
 
-    function setStateTransitionChainContract(uint256 _chainId, address _proofChainContract)
+    function setStateTransitionChainContract(uint256 _chainId, address _stateTransitionChainContract)
         external
         onlyStateTransition(_chainId)
     {
-        bridgehubStorage.proofChain[_chainId] = _proofChainContract;
+        bridgehubStorage.stateTransitionChain[_chainId] = _stateTransitionChainContract;
     }
 }

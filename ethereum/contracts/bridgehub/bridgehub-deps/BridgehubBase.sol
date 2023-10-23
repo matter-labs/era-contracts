@@ -23,7 +23,7 @@ contract BridgehubBase is ReentrancyGuard, AllowListed {
     }
 
     modifier onlyStateTransitionChain(uint256 _chainId) {
-        require(msg.sender == bridgehubStorage.proofChain[_chainId], "12e");
+        require(msg.sender == bridgehubStorage.stateTransitionChain[_chainId], "12e");
         _;
     }
 

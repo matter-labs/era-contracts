@@ -2,7 +2,11 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import {
+    web3Provider,
+    getNumberFromEnv,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+} from './utils';
 import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
@@ -53,7 +57,7 @@ async function main() {
                 verbose: true
             });
 
-            const bridgehead = deployer.bridgehubContract(deployWallet);
+            const bridgehub = deployer.bridgehubContract(deployWallet);
             const erc20Bridge = cmd.erc20Bridge
                 ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
                 : deployer.defaultERC20Bridge(deployWallet);
@@ -61,14 +65,14 @@ async function main() {
             const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
 
             // There will be two deployments done during the initial initialization
-            const requiredValueToInitializeBridge = await bridgehead.l2TransactionBaseCost(
+            const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
                 chainId,
                 gasPrice,
                 DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
 
-            const requiredValueToPublishBytecodes = await bridgehead.l2TransactionBaseCost(
+            const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
                 chainId,
                 gasPrice,
                 priorityTxMaxGasLimit,
@@ -76,7 +80,7 @@ async function main() {
             );
 
             const independentInitialization = [
-                bridgehead.requestL2Transaction(
+                bridgehub.requestL2Transaction(
                     chainId,
                     ethers.constants.AddressZero,
                     0,

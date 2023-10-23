@@ -51,7 +51,7 @@ struct StateTransitionStorage {
     uint256 totalChains;
     mapping(uint256 => address) chainNumberToContract;
     /// @notice chainId => chainContract
-    mapping(uint256 => address) proofChainContract;
+    mapping(uint256 => address) stateTransitionChainContract;
     /// @dev Batch hash zero, calculated at initialization
     bytes32 storedBatchZero;
     /// @dev Stored cutData for diamond cut

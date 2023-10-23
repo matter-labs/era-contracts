@@ -24,12 +24,12 @@ contract StateTransitionBase is ReentrancyGuard, AllowListed {
     }
 
     modifier onlyChain(uint256 _chainId) {
-        require(proofStorage.proofChainContract[_chainId] == msg.sender, "1j"); // wrong chainId
+        require(proofStorage.stateTransitionChainContract[_chainId] == msg.sender, "1j"); // wrong chainId
         _;
     }
 
     modifier onlyChainGovernor(uint256 _chainId) {
-        require(IStateTransitionChain(proofStorage.proofChainContract[_chainId]).getGovernor() == msg.sender, "1j"); // wrong chainId
+        require(IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]).getGovernor() == msg.sender, "1j"); // wrong chainId
         _;
     }
 }

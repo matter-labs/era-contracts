@@ -14,7 +14,7 @@ import { L1WethBridgeFactory } from '../typechain/L1WethBridgeFactory';
 import { ValidatorTimelockFactory } from '../typechain/ValidatorTimelockFactory';
 import { SingletonFactoryFactory } from '../typechain/SingletonFactoryFactory';
 import { AllowListFactory } from '../typechain';
-import { TransparentUpgradeableProxyFactory } from '../typechain/TransparentUpgradeableProxyFactory';
+import { ITransparentUpgradeableProxyFactory } from '../typechain/ITransparentUpgradeableProxyFactory';
 import { hexlify } from 'ethers/lib/utils';
 import {
     hashL2Bytecode,
@@ -370,7 +370,7 @@ export class Deployer {
 
         const genesisBlockHash = getHashFromEnv('CONTRACTS_GENESIS_ROOT'); // TODO: confusing name
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
-        const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BLOCK_COMMITMENT');
+        const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
         const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
 
         const instance = await hardhat.upgrades.deployProxy(StateTransition, [
@@ -794,7 +794,7 @@ export class Deployer {
     }
 
     public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-        return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+        return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
     }
 
     public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
@@ -809,7 +809,7 @@ export class Deployer {
         return IStateTransitionFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
     }
 
-    public proofChainContract(signerOrProvider: Signer | providers.Provider) {
+    public stateTransitionChainContract(signerOrProvider: Signer | providers.Provider) {
         return IStateTransitionChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
     }
 
