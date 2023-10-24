@@ -28,7 +28,7 @@ jobs:
         run: yarn install
 
       - name: Lint
-        run: yarn lint
+        run: yarn lint:check
 
   lint-l2:
     runs-on: ubuntu-latest
@@ -55,7 +55,7 @@ jobs:
         run: yarn install
 
       - name: Lint
-        run: yarn lint
+        run: yarn lint:check
 
   build-l1:
     runs-on: ubuntu-latest
