@@ -14,10 +14,12 @@ import {Diamond} from "../../common/libraries/Diamond.sol";
 struct ProofInitializeData {
     address bridgehub;
     address governor;
+    address diamondInit;
     bytes32 genesisBatchHash;
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
     Diamond.DiamondCutData diamondCut;
+    uint256 protocolVersion;
 }
 
 interface IStateTransitionDiamondInit {

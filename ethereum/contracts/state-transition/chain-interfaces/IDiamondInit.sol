@@ -3,6 +3,7 @@
 pragma solidity ^0.8.13;
 
 import "../../common/interfaces/IAllowList.sol";
+import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import "../chain-interfaces/IExecutor.sol";
 import "./IVerifier.sol";
 import "../../common/interfaces/IAllowList.sol";
@@ -33,4 +34,8 @@ struct InitializeData {
 
 interface IDiamondInit {
     function initialize(InitializeData calldata _initData) external returns (bytes32);
+
+    function setChainIdUpgrade(uint256 _chainId, uint256 _protocolVersion) external  returns (bytes32) ;
+
+    event SetChainIdUpgrade(L2CanonicalTransaction l2Transaction, uint256 timestamp, uint256 protocolVersion);
 }

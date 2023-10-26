@@ -2,9 +2,8 @@
 
 pragma solidity ^0.8.13;
 
-import "./l2-deps/ISystemContext.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 import "../common/DiamondProxy.sol";
 import {ProofInitializeData} from "./state-transition-interfaces/IStateTransitionDiamondInit.sol";
@@ -23,8 +22,10 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     function initialize(ProofInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         require(_initializeData.governor != address(0), "vy");
 
-        proofStorage.bridgehub = _initializeData.bridgehub;
-        proofStorage.governor = _initializeData.governor;
+        stateTransitionStorage.bridgehub = _initializeData.bridgehub;
+        stateTransitionStorage.governor = _initializeData.governor;
+        stateTransitionStorage.diamondInit = _initializeData.diamondInit;
+        stateTransitionStorage.protocolVersion = _initializeData.protocolVersion;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(
@@ -37,9 +38,9 @@ contract StateTransition is IStateTransition, StateTransitionBase {
             0,
             _initializeData.genesisBatchCommitment
         );
-        proofStorage.storedBatchZero = keccak256(abi.encode(storedBatchZero));
+        stateTransitionStorage.storedBatchZero = keccak256(abi.encode(storedBatchZero));
 
-        proofStorage.cutHash = keccak256(abi.encode(_initializeData.diamondCut));
+        stateTransitionStorage.cutHash = keccak256(abi.encode(_initializeData.diamondCut));
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -49,33 +50,29 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     /// getters
     /// @return The address of the current governor
     function getGovernor() external view returns (address) {
-        return proofStorage.governor;
+        return stateTransitionStorage.governor;
     }
 
     function getBridgehub() external view returns (address) {
-        return proofStorage.bridgehub;
+        return stateTransitionStorage.bridgehub;
     }
 
     function getStateTransitionChainContract(uint256 _chainId) external view returns (address) {
-        return proofStorage.stateTransitionChainContract[_chainId];
+        return stateTransitionStorage.stateTransitionChainContract[_chainId];
     }
 
     /// registry
     // we have to set the chainId, as blockhashzero is the same for all chains, and specifies the genesis chainId
-    function _specialSetChainIdInVMTx(uint256 _chainId, address _chainContract) internal {
-        WritePriorityOpParams memory params;
+    function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
+        Diamond.FacetCut[] memory emptyArray;
 
-        params.sender = L2_FORCE_DEPLOYER_ADDR;
-        params.l2Value = 0;
-        params.contractAddressL2 = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
-        params.l2GasLimit = $(PRIORITY_TX_MAX_GAS_LIMIT);
-        params.l2GasPricePerPubdata = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-        params.refundRecipient = address(0);
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: emptyArray,
+            initAddress: stateTransitionStorage.diamondInit, 
+            initCalldata: abi.encodeWithSelector(IDiamondInit.setChainIdUpgrade.selector, _chainId, stateTransitionStorage.protocolVersion)
+        });
 
-        bytes memory setChainIdCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
-        bytes[] memory emptyA;
-
-        IMailbox(_chainContract).requestL2TransactionProof(params, setChainIdCalldata, emptyA, true);
+        IAdmin(_chainContract).executeUpgrade(cutData, stateTransitionStorage.protocolVersion);
     }
 
     /// @notice
@@ -85,13 +82,13 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyGovernor {
         // check not registered
-        address bridgehub = proofStorage.bridgehub;
-        require(proofStorage.stateTransitionChainContract[_chainId] == address(0), "PRegistry 1");
+        address bridgehub = stateTransitionStorage.bridgehub;
+        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0), "PRegistry 1");
         require(IBridgehub(bridgehub).getChainStateTransition(_chainId) == address(this), "PRegsitry 2");
 
         // check input
         bytes32 cutHash = keccak256(abi.encode(_diamondCut));
-        require(cutHash == proofStorage.cutHash, "PRegistry 3");
+        require(cutHash == stateTransitionStorage.cutHash, "PRegistry 3");
 
         // construct init data
         bytes memory initData;
@@ -103,7 +100,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(uint160(_governor))),
             bytes32(uint256(uint160(_governor))),
-            bytes32(proofStorage.storedBatchZero),
+            bytes32(stateTransitionStorage.storedBatchZero),
             copiedData
         );
         Diamond.DiamondCutData memory cutData = _diamondCut;
@@ -115,14 +112,14 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         // save data
         address stateTransitionChainAddress = address(stateTransitionChainContract);
 
-        proofStorage.stateTransitionChainContract[_chainId] = stateTransitionChainAddress;
-        proofStorage.chainNumberToContract[proofStorage.totalChains] = stateTransitionChainAddress;
-        ++proofStorage.totalChains;
+        stateTransitionStorage.stateTransitionChainContract[_chainId] = stateTransitionChainAddress;
+        stateTransitionStorage.chainNumberToContract[stateTransitionStorage.totalChains] = stateTransitionChainAddress;
+        ++stateTransitionStorage.totalChains;
 
         IBridgehub(bridgehub).setStateTransitionChainContract(_chainId, stateTransitionChainAddress);
 
         // set chainId in VM
-        _specialSetChainIdInVMTx(_chainId, stateTransitionChainAddress);
+        _setChainIdUpgrade(_chainId, stateTransitionChainAddress);
 
         emit StateTransitionNewChain(_chainId, stateTransitionChainAddress);
     }
@@ -131,7 +128,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData calldata _cutData,
         uint256 _protocolVersion
     ) external onlyGovernor {
-        proofStorage.upgradeCutHash[_protocolVersion] = keccak256(abi.encode(_cutData));
+        stateTransitionStorage.upgradeCutHash[_protocolVersion] = keccak256(abi.encode(_cutData));
     }
 
     function upgradeChain(
@@ -140,9 +137,9 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData calldata _cutData
     ) external onlyChainGovernor(_chainId) {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
-        require(cutHash == proofStorage.upgradeCutHash[_protocolVersion], "r25");
+        require(cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion], "r25");
 
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]);
         stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
@@ -151,14 +148,14 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         uint256 _protocolVersion,
         Diamond.DiamondCutData calldata _cutData
     ) external onlyGovernor {
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]);
         stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
     function freezeNotUpdated() external onlyGovernor {
-        uint256 protocolVersion = proofStorage.protocolVersion;
-        for (uint256 i = 0; i < proofStorage.totalChains; i = i.uncheckedInc()) {
-            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(proofStorage.chainNumberToContract[i]);
+        uint256 protocolVersion = stateTransitionStorage.protocolVersion;
+        for (uint256 i = 0; i < stateTransitionStorage.totalChains; i = i.uncheckedInc()) {
+            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.chainNumberToContract[i]);
             stateTransitionChainContract.freezeNotUpdated(protocolVersion);
         }
     }

@@ -372,15 +372,18 @@ export class Deployer {
         const genesisRollupLeafIndex = getNumberFromEnv('CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX');
         const genesisBlockCommitment = getHashFromEnv('CONTRACTS_GENESIS_BATCH_COMMITMENT');
         const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
+        const protocolVersion = getNumberFromEnv('CONTRACTS_LATEST_PROTOCOL_VERSION');
 
         const instance = await hardhat.upgrades.deployProxy(StateTransition, [
             {
                 bridgehub: this.addresses.Bridgehub.BridgehubDiamondProxy,
                 governor: this.ownerAddress,
+                diamondInit: this.addresses.StateTransition.DiamondInit,
                 genesisBatchHash: genesisBlockHash,
                 genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
                 genesisBatchCommitment: genesisBlockCommitment,
-                diamondCut
+                diamondCut,
+                protocolVersion
             }
         ]);
         await instance.deployed();

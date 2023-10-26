@@ -5,13 +5,17 @@ pragma solidity ^0.8.13;
 import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 import "./facets/Base.sol";
-import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../../common/Config.sol";
-import {InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+
+import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE} from "../../common/Config.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
+
+import "../l2-deps/ISystemContext.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
-contract DiamondInit is StateTransitionChainBase {
+contract DiamondInit is StateTransitionChainBase, IDiamondInit {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
@@ -43,6 +47,58 @@ contract DiamondInit is StateTransitionChainBase {
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+
+        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+
+    function setChainIdUpgrade(uint256 _chainId, uint256 _protocolVersion) external returns (bytes32) {
+        WritePriorityOpParams memory params;
+
+        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
+        uint256[] memory uintEmptyArray;
+
+        
+        L2CanonicalTransaction memory l2Transaction = L2CanonicalTransaction({
+            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            from: uint256(uint160(L2_BOOTLOADER_ADDRESS)),
+            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
+            gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
+            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            maxFeePerGas: uint256(0),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            nonce: uint256(0),
+            value: 0,
+            reserved: [uint256(0), 0, 0, 0],
+            data: systemContextCalldata,
+            signature: new bytes(0),
+            factoryDeps: uintEmptyArray,
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
+
+    //     ProposedUpgrade memory upgrade = ProposedUpgrade({
+    //         l2ProtocolUpgradeTx: l2Transaction,
+    //         factoryDeps:empty,
+    //         bootloaderHash:0 ,
+    //         defaultAccountHash:0,
+    //         verifier:address(0),
+    //         verifierParams:,
+    //         l1ContractsUpgradeCalldata:,
+    //         postUpgradeCalldata:bytes,
+    //         upgradeTimestamp:0,
+    //         newProtocolVersion:0,
+    //         newAllowList:address(0),
+    // })
+        
+        bytes memory encodedTransaction = abi.encode(l2Transaction);
+
+        bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
+
+        emit SetChainIdUpgrade(l2Transaction, block.timestamp, _protocolVersion);
+
+        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;    
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

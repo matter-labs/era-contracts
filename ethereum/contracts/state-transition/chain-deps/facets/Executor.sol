@@ -306,7 +306,6 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         uint256 newTotalBatchesExecuted = chainStorage.totalBatchesExecuted + nBatches;
         chainStorage.totalBatchesExecuted = newTotalBatchesExecuted;
         require(newTotalBatchesExecuted <= chainStorage.totalBatchesVerified, "n"); // Can't execute batches more than committed and proven currently.
-        require(chainStorage.priorityQueue.getFirstUnprocessedPriorityTx() != 0, "n2"); // Checking that chainId update is executed. KL todo, put this in priority queue checks
 
         uint256 batchWhenUpgradeHappened = chainStorage.l2SystemContractsUpgradeBatchNumber;
         if (batchWhenUpgradeHappened != 0 && batchWhenUpgradeHappened <= newTotalBatchesExecuted) {

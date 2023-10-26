@@ -415,8 +415,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
         _params.valueToMint = msgValue;
 
-        // IBridgehub(chainStorage.bridgehub).deposit{value: msg.value}(chainStorage.chainId);
-
         canonicalTxHash = _writePriorityOp(_params, _calldata, _factoryDeps);
     }
 

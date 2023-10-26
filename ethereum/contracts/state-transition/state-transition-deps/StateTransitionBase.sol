@@ -10,26 +10,26 @@ import "../chain-interfaces/IStateTransitionChain.sol";
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 contract StateTransitionBase is ReentrancyGuard, AllowListed {
-    StateTransitionStorage internal proofStorage;
+    StateTransitionStorage internal stateTransitionStorage;
 
     /// @notice Checks that the message sender is an active governor
     modifier onlyGovernor() {
-        require(msg.sender == proofStorage.governor, "1g"); // only by governor
+        require(msg.sender == stateTransitionStorage.governor, "1g"); // only by governor
         _;
     }
 
     modifier onlyBridgehub() {
-        require(msg.sender == proofStorage.bridgehub, "1i"); // message not sent by bridgehub
+        require(msg.sender == stateTransitionStorage.bridgehub, "1i"); // message not sent by bridgehub
         _;
     }
 
     modifier onlyChain(uint256 _chainId) {
-        require(proofStorage.stateTransitionChainContract[_chainId] == msg.sender, "1j"); // wrong chainId
+        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == msg.sender, "1j"); // wrong chainId
         _;
     }
 
     modifier onlyChainGovernor(uint256 _chainId) {
-        require(IStateTransitionChain(proofStorage.stateTransitionChainContract[_chainId]).getGovernor() == msg.sender, "1j"); // wrong chainId
+        require(IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]).getGovernor() == msg.sender, "1j"); // wrong chainId
         _;
     }
 }

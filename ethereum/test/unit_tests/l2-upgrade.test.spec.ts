@@ -57,7 +57,7 @@ describe('L2 upgrade test', function () {
     let verifier: string;
     const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
-    let priorityOperationsHash: string;
+    // let priorityOperationsHash: string;
 
     before(async () => {
         [owner] = await hardhat.ethers.getSigners();
@@ -96,18 +96,20 @@ describe('L2 upgrade test', function () {
 
         await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
 
-        let priorityOp = await proxyGetters.priorityQueueFrontOperation();
-        // priorityOpTxHash = priorityOp[0];
-        priorityOperationsHash = keccak256(
-            ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
-        );
+    //     let priorityOp = await proxyGetters.priorityQueueFrontOperation();
+    //     // priorityOpTxHash = priorityOp[0];
+    //     priorityOperationsHash = keccak256(
+    //         ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+    //     );
     });
 
     it('Upgrade should work even if not all blocks are processed', async () => {
         batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
             batchNumber: 1,
-            priorityOperationsHash: priorityOperationsHash,
-            numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+            // priorityOperationsHash: priorityOperationsHash,
+            // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+            priorityOperationsHash: keccak256(EMPTY_STRING_KECCAK),
+            numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000000'
             // systemLogs
         });
 
