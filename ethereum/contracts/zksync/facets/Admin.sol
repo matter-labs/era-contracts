@@ -46,7 +46,7 @@ contract AdminFacet is Base, IAdmin {
         address oldPendingAdmin = s.pendingAdmin;
         // Change pending admin
         s.pendingAdmin = _newPendingAdmin;
-        emit NewPendingGovernor(oldPendingAdmin, _newPendingAdmin);
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
