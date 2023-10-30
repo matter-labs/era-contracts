@@ -69,6 +69,7 @@ interface IMailbox is IBase {
     /// @param contractAddressL2 The address of the contract on L2 to call.
     /// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
     /// @param l2GasLimit The limit of the L2 gas for the L2 transaction
+    /// @param l2GasPrice The price of the L2 gas in Wei to be used for this transaction. 
     /// @param l2GasPricePerPubdata The price for a single pubdata byte in L2 gas.
     /// @param valueToMint The amount of ether that should be minted on L2 as the result of this transaction.
     /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
