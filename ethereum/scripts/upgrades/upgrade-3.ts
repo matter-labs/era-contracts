@@ -33,7 +33,7 @@ async function prepareCalldata(
 }
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;

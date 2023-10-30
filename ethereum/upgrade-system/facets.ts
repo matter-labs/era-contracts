@@ -1,5 +1,6 @@
 import { Command } from "commander";
-import { BigNumber, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { web3Url } from "zk/build/utils";
@@ -7,7 +8,7 @@ import { deployViaCreate2 } from "../src.ts/deploy-utils";
 import { getFacetCutsForUpgrade } from "../src.ts/diamondCut";
 import { insertGasPrice } from "./utils";
 
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function deployFacetCut(

@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import { AdminFacetTest, AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
+import type { AdminFacetTest } from "../../typechain";
+import { AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 
 function randomAddress() {

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
-import { BigNumberish } from "ethers";
+import type { BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
 import "@nomiclabs/hardhat-ethers";
@@ -51,7 +51,7 @@ async function prepareCalldata(
 }
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 

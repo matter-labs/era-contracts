@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import { MerkleTest, MerkleTestFactory } from "../../typechain";
+import type { MerkleTest } from "../../typechain";
+import { MerkleTestFactory } from "../../typechain";
 import { MerkleTree } from "merkletreejs";
 import { getCallRevertReason } from "./utils";
 import * as ethers from "ethers";

@@ -1,10 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
-import { DummyExecutor, DummyExecutorFactory, ValidatorTimelock, ValidatorTimelockFactory } from "../../typechain";
+import type { DummyExecutor, ValidatorTimelock } from "../../typechain";
+import { DummyExecutorFactory, ValidatorTimelockFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 
-describe(`ValidatorTimelock tests`, function () {
+describe("ValidatorTimelock tests", function () {
   let owner: ethers.Signer;
   let validator: ethers.Signer;
   let randomSigner: ethers.Signer;
@@ -27,7 +28,7 @@ describe(`ValidatorTimelock tests`, function () {
       bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
       eventsQueueStateHash: ethers.utils.randomBytes(32),
       systemLogs: [],
-      totalL2ToL1Pubdata: `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`,
+      totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
   }
 
@@ -47,11 +48,11 @@ describe(`ValidatorTimelock tests`, function () {
   before(async () => {
     [owner, validator, randomSigner] = await hardhat.ethers.getSigners();
 
-    const dummyExecutorFactory = await hardhat.ethers.getContractFactory(`DummyExecutor`);
+    const dummyExecutorFactory = await hardhat.ethers.getContractFactory("DummyExecutor");
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
     dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
 
-    const validatorTimelockFactory = await hardhat.ethers.getContractFactory(`ValidatorTimelock`);
+    const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
     const validatorTimelockContract = await validatorTimelockFactory.deploy(
       await owner.getAddress(),
       dummyExecutor.address,
@@ -64,7 +65,7 @@ describe(`ValidatorTimelock tests`, function () {
     );
   });
 
-  it(`Should revert if non-validator commits batches`, async () => {
+  it("Should revert if non-validator commits batches", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock.connect(randomSigner).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
     );
@@ -72,7 +73,7 @@ describe(`ValidatorTimelock tests`, function () {
     expect(revertReason).equal("8h");
   });
 
-  it(`Should revert if non-validator proves batches`, async () => {
+  it("Should revert if non-validator proves batches", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock
         .connect(randomSigner)
@@ -82,13 +83,13 @@ describe(`ValidatorTimelock tests`, function () {
     expect(revertReason).equal("8h");
   });
 
-  it(`Should revert if non-validator revert batches`, async () => {
+  it("Should revert if non-validator revert batches", async () => {
     const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).revertBatches(1));
 
     expect(revertReason).equal("8h");
   });
 
-  it(`Should revert if non-validator executes batches`, async () => {
+  it("Should revert if non-validator executes batches", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock.connect(randomSigner).executeBatches([getMockStoredBatchInfo(1)])
     );
@@ -96,7 +97,7 @@ describe(`ValidatorTimelock tests`, function () {
     expect(revertReason).equal("8h");
   });
 
-  it(`Should revert if non-owner sets validator`, async () => {
+  it("Should revert if non-owner sets validator", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock.connect(randomSigner).setValidator(await randomSigner.getAddress())
     );
@@ -104,32 +105,32 @@ describe(`ValidatorTimelock tests`, function () {
     expect(revertReason).equal("Ownable: caller is not the owner");
   });
 
-  it(`Should revert if non-owner sets execution delay`, async () => {
+  it("Should revert if non-owner sets execution delay", async () => {
     const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).setExecutionDelay(1000));
 
     expect(revertReason).equal("Ownable: caller is not the owner");
   });
 
-  it(`Should successfully set the validator`, async () => {
+  it("Should successfully set the validator", async () => {
     const validatorAddress = await validator.getAddress();
     await validatorTimelock.connect(owner).setValidator(validatorAddress);
 
     expect(await validatorTimelock.validator()).equal(validatorAddress);
   });
 
-  it(`Should successfully set the execution delay`, async () => {
+  it("Should successfully set the execution delay", async () => {
     await validatorTimelock.connect(owner).setExecutionDelay(10); // set to 10 seconds
 
     expect(await validatorTimelock.executionDelay()).equal(10);
   });
 
-  it(`Should successfully commit batches`, async () => {
+  it("Should successfully commit batches", async () => {
     await validatorTimelock.connect(validator).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
 
     expect(await dummyExecutor.getTotalBatchesCommitted()).equal(1);
   });
 
-  it(`Should successfully prove batches`, async () => {
+  it("Should successfully prove batches", async () => {
     await validatorTimelock
       .connect(validator)
       .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1, 1)], MOCK_PROOF_INPUT);
@@ -137,7 +138,7 @@ describe(`ValidatorTimelock tests`, function () {
     expect(await dummyExecutor.getTotalBatchesVerified()).equal(1);
   });
 
-  it(`Should revert on executing earlier than the delay`, async () => {
+  it("Should revert on executing earlier than the delay", async () => {
     const revertReason = await getCallRevertReason(
       validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(1)])
     );
@@ -145,14 +146,14 @@ describe(`ValidatorTimelock tests`, function () {
     expect(revertReason).equal("5c");
   });
 
-  it(`Should successfully revert batches`, async () => {
+  it("Should successfully revert batches", async () => {
     await validatorTimelock.connect(validator).revertBatches(0);
 
     expect(await dummyExecutor.getTotalBatchesVerified()).equal(0);
     expect(await dummyExecutor.getTotalBatchesCommitted()).equal(0);
   });
 
-  it(`Should successfully overwrite the committing timestamp on the reverted batches timestamp`, async () => {
+  it("Should successfully overwrite the committing timestamp on the reverted batches timestamp", async () => {
     const revertedBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(1));
 
     await validatorTimelock.connect(validator).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
@@ -166,7 +167,7 @@ describe(`ValidatorTimelock tests`, function () {
     expect(newBatchesTimestamp).greaterThanOrEqual(revertedBatchesTimestamp);
   });
 
-  it(`Should successfully execute batches after the delay`, async () => {
+  it("Should successfully execute batches after the delay", async () => {
     await hardhat.network.provider.send("hardhat_mine", ["0x2", "0xc"]); //mine 2 batches with intervals of 12 seconds
     await validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(1)]);
     expect(await dummyExecutor.getTotalBatchesExecuted()).equal(1);

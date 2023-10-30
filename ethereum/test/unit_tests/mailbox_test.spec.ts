@@ -1,15 +1,12 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
+import type { MailboxFacet, MockExecutorFacet, AllowList, Forwarder } from "../../typechain";
 import {
-  MailboxFacet,
   MailboxFacetFactory,
-  MockExecutorFacet,
   MockExecutorFacetFactory,
   DiamondInitFactory,
   AllowListFactory,
-  AllowList,
-  Forwarder,
   ForwarderFactory,
 } from "../../typechain";
 import {
@@ -187,7 +184,7 @@ describe("Mailbox tests", function () {
         )
       );
 
-      expect(revertReason).equal(`d2`);
+      expect(revertReason).equal("d2");
     });
 
     it("Should accept depositing less than or equal to the deposit limit", async () => {
@@ -224,11 +221,11 @@ describe("Mailbox tests", function () {
         )
       );
 
-      expect(revertReason).equal(`d2`);
+      expect(revertReason).equal("d2");
     });
   });
 
-  describe(`finalizeEthWithdrawal`, function () {
+  describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 1;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
@@ -255,17 +252,17 @@ describe("Mailbox tests", function () {
       await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
     });
 
-    it(`Reverts when proof is invalid`, async () => {
+    it("Reverts when proof is invalid", async () => {
       const invalidProof = [...MERKLE_PROOF];
       invalidProof[0] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
 
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal(`pi`);
+      expect(revertReason).equal("pi");
     });
 
-    it(`Successful withdrawal`, async () => {
+    it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
 
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
@@ -274,21 +271,21 @@ describe("Mailbox tests", function () {
       expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
     });
 
-    it(`Reverts when withdrawal is already finalized`, async () => {
+    it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal(`jj`);
+      expect(revertReason).equal("jj");
     });
   });
 
-  describe(`Access mode functionality`, function () {
+  describe("Access mode functionality", function () {
     before(async () => {
       // We still need to set infinite amount of allowed deposit limit in order to ensure that every fee will be accepted
       await allowList.setDepositLimit(ethers.constants.AddressZero, true, ethers.utils.parseEther("2000"));
     });
 
-    it(`Should not allow an un-whitelisted address to call`, async () => {
+    it("Should not allow an un-whitelisted address to call", async () => {
       await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Closed);
 
       const revertReason = await getCallRevertReason(
@@ -302,12 +299,12 @@ describe("Mailbox tests", function () {
           ethers.constants.AddressZero
         )
       );
-      expect(revertReason).equal(`nr`);
+      expect(revertReason).equal("nr");
     });
 
-    it(`Should allow the whitelisted address to call`, async () => {
+    it("Should allow the whitelisted address to call", async () => {
       await allowList.setAccessMode(diamondProxyContract.address, AccessMode.SpecialAccessOnly);
-      await allowList.setPermissionToCall(await owner.getAddress(), diamondProxyContract.address, `0xeb672419`, true);
+      await allowList.setPermissionToCall(await owner.getAddress(), diamondProxyContract.address, "0xeb672419", true);
 
       const revertReason = await getCallRevertReason(
         requestExecute(

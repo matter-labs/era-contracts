@@ -1,6 +1,7 @@
 import * as hardhat from "hardhat";
 import { expect } from "chai";
-import { VerifierTest, VerifierRecursiveTest, VerifierTestFactory } from "../../typechain";
+import type { VerifierTest, VerifierRecursiveTest } from "../../typechain";
+import { VerifierTestFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 import { ethers } from "hardhat";
 

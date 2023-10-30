@@ -2,18 +2,20 @@ import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut, getAllSelectors } from "../../src.ts/diamondCut";
-import {
+import type {
   DiamondProxy,
-  DiamondProxyFactory,
   DiamondProxyTest,
-  DiamondProxyTestFactory,
   AdminFacet,
-  AdminFacetFactory,
   GettersFacet,
-  GettersFacetFactory,
   MailboxFacet,
-  MailboxFacetFactory,
   DiamondInit,
+} from "../../typechain";
+import {
+  DiamondProxyFactory,
+  DiamondProxyTestFactory,
+  AdminFacetFactory,
+  GettersFacetFactory,
+  MailboxFacetFactory,
   DiamondInitFactory,
   TestnetERC20TokenFactory,
 } from "../../typechain";

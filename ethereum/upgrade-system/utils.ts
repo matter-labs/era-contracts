@@ -1,6 +1,6 @@
 /// @dev This method checks if the overrides contain a gasPrice (or maxFeePerGas), if not it will insert
 /// the maxFeePerGas
-import { ethers } from "ethers";
+import type { ethers } from "ethers";
 
 export async function insertGasPrice(l1Provider: ethers.providers.Provider, overrides: ethers.PayableOverrides) {
   if (!overrides.gasPrice && !overrides.maxFeePerGas) {

@@ -1,7 +1,8 @@
-import { Interface } from "ethers/lib/utils";
+import type { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
-import { ethers, Wallet } from "ethers";
+import type { Wallet } from "ethers";
+import { ethers } from "ethers";
 import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
 import { IBaseFactory } from "../typechain/IBaseFactory";
 

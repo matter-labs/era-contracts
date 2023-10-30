@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { ethers } from "hardhat";
-import { PriorityQueueTest, PriorityQueueTestFactory } from "../../typechain";
+import type { PriorityQueueTest } from "../../typechain";
+import { PriorityQueueTestFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 
 describe("Priority queue tests", function () {

@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import { TransactionValidatorTestFactory, TransactionValidatorTest } from "../../typechain";
+import type { TransactionValidatorTest } from "../../typechain";
+import { TransactionValidatorTestFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 import * as ethers from "ethers";
 

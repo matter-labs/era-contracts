@@ -1,17 +1,18 @@
-import { BigNumber, BigNumberish, BytesLike, ethers } from "ethers";
-import { Address } from "zksync-web3/build/src/types";
+import type { BigNumberish, BytesLike } from "ethers";
+import { BigNumber, ethers } from "ethers";
+import type { Address } from "zksync-web3/build/src/types";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
-export const EMPTY_STRING_KECCAK = `0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`;
-export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = `0x0000000000000000000000000000000000000000000000000000000000000000`;
-export const L2_SYSTEM_CONTEXT_ADDRESS = `0x000000000000000000000000000000000000800b`;
-export const L2_BOOTLOADER_ADDRESS = `0x0000000000000000000000000000000000008001`;
-export const L2_KNOWN_CODE_STORAGE_ADDRESS = `0x0000000000000000000000000000000000008004`;
-export const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
-export const L2_BYTECODE_COMPRESSOR_ADDRESS = `0x000000000000000000000000000000000000800e`;
+export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
+export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
+export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
+export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
+export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -94,8 +95,8 @@ export async function requestExecute(
 
 export function constructL2Log(isService: boolean, sender: string, key: number | string, value: string) {
   return ethers.utils.hexConcat([
-    isService ? `0x0001` : `0x0000`,
-    `0x0000`,
+    isService ? "0x0001" : "0x0000",
+    "0x0000",
     sender,
     ethers.utils.hexZeroPad(ethers.utils.hexlify(key), 32),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(value), 32),
@@ -109,7 +110,7 @@ export function createSystemLogs() {
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
+      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
     ),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(

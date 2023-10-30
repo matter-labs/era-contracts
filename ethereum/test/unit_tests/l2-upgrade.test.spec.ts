@@ -1,30 +1,26 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
-import { BigNumberish, BytesLike } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
+import type { AdminFacet, AllowList, ExecutorFacet, GettersFacet } from "../../typechain";
 import {
-  AdminFacet,
   AdminFacetFactory,
-  AllowList,
   AllowListFactory,
   CustomUpgradeTestFactory,
   DefaultUpgradeFactory,
   DiamondInitFactory,
-  ExecutorFacet,
   ExecutorFacetFactory,
-  GettersFacet,
   GettersFacetFactory,
 } from "../../typechain";
+import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
 import {
   AccessMode,
-  CommitBatchInfo,
   EMPTY_STRING_KECCAK,
   L2_BOOTLOADER_ADDRESS,
   L2_SYSTEM_CONTEXT_ADDRESS,
   SYSTEM_LOG_KEYS,
-  StoredBatchInfo,
   constructL2Log,
   createSystemLogs,
   genesisStoredBatchInfo,

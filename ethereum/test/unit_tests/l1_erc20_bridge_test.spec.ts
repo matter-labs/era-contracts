@@ -2,22 +2,22 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
-import { IZkSync, IZkSyncFactory } from "zksync-web3/build/typechain";
+import type { IZkSync } from "zksync-web3/build/typechain";
+import { IZkSyncFactory } from "zksync-web3/build/typechain";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
+import type { AllowList, TestnetERC20Token } from "../../typechain";
 import {
-  AllowList,
   AllowListFactory,
   DiamondInitFactory,
   GettersFacetFactory,
   MailboxFacetFactory,
-  TestnetERC20Token,
   TestnetERC20TokenFactory,
 } from "../../typechain";
-import { IL1Bridge } from "../../typechain/IL1Bridge";
+import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import { AccessMode, getCallRevertReason } from "./utils";
 
-describe(`L1ERC20Bridge tests`, function () {
+describe("L1ERC20Bridge tests", function () {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
   let allowList: AllowList;
@@ -30,7 +30,7 @@ describe(`L1ERC20Bridge tests`, function () {
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
-    const gettersFactory = await hardhat.ethers.getContractFactory(`GettersFacet`);
+    const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
     const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
 
@@ -103,7 +103,7 @@ describe(`L1ERC20Bridge tests`, function () {
     zksyncContract = IZkSyncFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
   });
 
-  it(`Should not allow an un-whitelisted address to deposit`, async () => {
+  it("Should not allow an un-whitelisted address to deposit", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
@@ -116,12 +116,12 @@ describe(`L1ERC20Bridge tests`, function () {
           ethers.constants.AddressZero
         )
     );
-    expect(revertReason).equal(`nr`);
+    expect(revertReason).equal("nr");
 
     await (await allowList.setAccessMode(l1Erc20BridgeContract.address, AccessMode.Public)).wait();
   });
 
-  it(`Should not allow depositing zero amount`, async () => {
+  it("Should not allow depositing zero amount", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
@@ -134,10 +134,10 @@ describe(`L1ERC20Bridge tests`, function () {
           ethers.constants.AddressZero
         )
     );
-    expect(revertReason).equal(`2T`);
+    expect(revertReason).equal("2T");
   });
 
-  it(`Should deposit successfully`, async () => {
+  it("Should deposit successfully", async () => {
     const depositorAddress = await randomSigner.getAddress();
     await depositERC20(
       l1ERC20Bridge.connect(randomSigner),
@@ -149,22 +149,22 @@ describe(`L1ERC20Bridge tests`, function () {
     );
   });
 
-  it(`Should revert on finalizing a withdrawal with wrong message length`, async () => {
+  it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, "0x", [])
     );
-    expect(revertReason).equal(`kk`);
+    expect(revertReason).equal("kk");
   });
 
-  it(`Should revert on finalizing a withdrawal with wrong function signature`, async () => {
+  it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(76), [])
     );
-    expect(revertReason).equal(`nt`);
+    expect(revertReason).equal("nt");
   });
 
-  it(`Should revert on finalizing a withdrawal with wrong batch number`, async () => {
-    const functionSignature = `0x11a2ccc1`;
+  it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
+    const functionSignature = "0x11a2ccc1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
@@ -175,11 +175,11 @@ describe(`L1ERC20Bridge tests`, function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
     );
-    expect(revertReason).equal(`xx`);
+    expect(revertReason).equal("xx");
   });
 
-  it(`Should revert on finalizing a withdrawal with wrong length of proof`, async () => {
-    const functionSignature = `0x11a2ccc1`;
+  it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
+    const functionSignature = "0x11a2ccc1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
@@ -190,11 +190,11 @@ describe(`L1ERC20Bridge tests`, function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
     );
-    expect(revertReason).equal(`xc`);
+    expect(revertReason).equal("xc");
   });
 
-  it(`Should revert on finalizing a withdrawal with wrong proof`, async () => {
-    const functionSignature = `0x11a2ccc1`;
+  it("Should revert on finalizing a withdrawal with wrong proof", async () => {
+    const functionSignature = "0x11a2ccc1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
@@ -207,7 +207,7 @@ describe(`L1ERC20Bridge tests`, function () {
         .connect(randomSigner)
         .finalizeWithdrawal(0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
-    expect(revertReason).equal(`nq`);
+    expect(revertReason).equal("nq");
   });
 });
 

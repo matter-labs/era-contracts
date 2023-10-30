@@ -1,7 +1,8 @@
 import { Command } from "commander";
 import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
-import { AccessMode, PermissionToCall, getLowerCaseAddress, permissionToCallComparator, print } from "./utils";
+import type { AccessMode, PermissionToCall } from "./utils";
+import { getLowerCaseAddress, permissionToCallComparator, print } from "./utils";
 
 // Get the interfaces for all needed contracts
 const allowList = new Interface(hardhat.artifacts.readArtifactSync("IAllowList").abi);

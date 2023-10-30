@@ -1,6 +1,7 @@
 import * as hardhat from "hardhat";
 import { expect } from "chai";
-import { ExecutorProvingTest, ExecutorProvingTestFactory } from "../../typechain";
+import type { ExecutorProvingTest } from "../../typechain";
+import { ExecutorProvingTestFactory } from "../../typechain";
 
 describe("Executor test", function () {
   let executor: ExecutorProvingTest;

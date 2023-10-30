@@ -3,17 +3,17 @@ import { expect } from "chai";
 import { facetCut, Action, getAllSelectors } from "../../src.ts/diamondCut";
 
 import { IDiamondCutFactory } from "../../typechain/IDiamondCutFactory";
-import { IDiamondCut } from "../../typechain/IDiamondCut";
+import type { IDiamondCut } from "../../typechain/IDiamondCut";
 import { IExecutorFactory } from "../../typechain/IExecutorFactory";
-import { IExecutor } from "../../typechain/IExecutor";
+import type { IExecutor } from "../../typechain/IExecutor";
 import { IGettersFactory } from "../../typechain/IGettersFactory";
-import { IGetters } from "../../typechain/IGetters";
+import type { IGetters } from "../../typechain/IGetters";
 import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
-import { IGovernance } from "../../typechain/IGovernance";
+import type { IGovernance } from "../../typechain/IGovernance";
 import { IMailboxFactory } from "../../typechain/IMailboxFactory";
-import { IMailbox } from "../../typechain/IMailbox";
+import type { IMailbox } from "../../typechain/IMailbox";
 import { IZkSyncFactory } from "../../typechain/IZkSyncFactory";
-import { IZkSync } from "../../typechain/IZkSync";
+import type { IZkSync } from "../../typechain/IZkSync";
 import { ethers } from "ethers";
 
 // TODO: change to the mainet config

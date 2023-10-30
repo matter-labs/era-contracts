@@ -1,7 +1,8 @@
 import "@nomiclabs/hardhat-ethers";
 import * as hardhat from "hardhat";
 
-import { BigNumberish, ethers, providers, Signer, Wallet } from "ethers";
+import type { BigNumberish, providers, Signer, Wallet } from "ethers";
+import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import {
   getAddressFromEnv,

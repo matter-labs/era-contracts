@@ -3,22 +3,20 @@ import { ethers } from "ethers";
 import * as hardhat from "hardhat";
 import { hashL2Bytecode } from "../../scripts/utils";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
+import type { AllowList, L1WethBridge, WETH9 } from "../../typechain";
 import {
-  AllowList,
   AllowListFactory,
   DiamondInitFactory,
   GettersFacetFactory,
-  L1WethBridge,
   L1WethBridgeFactory,
   MailboxFacetFactory,
-  WETH9,
   WETH9Factory,
 } from "../../typechain";
-import { IZkSync } from "../../typechain/IZkSync";
+import type { IZkSync } from "../../typechain/IZkSync";
 import { AccessMode, getCallRevertReason } from "./utils";
 
 import { Interface } from "ethers/lib/utils";
-import { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-web3/build/src/types";
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -63,7 +61,7 @@ describe("WETH Bridge tests", () => {
 
     // prepare the diamond
 
-    const gettersFactory = await hardhat.ethers.getContractFactory(`GettersFacet`);
+    const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
     const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
 
@@ -172,7 +170,7 @@ describe("WETH Bridge tests", () => {
     expect(revertReason).equal("Amount cannot be zero");
   });
 
-  it(`Should deposit successfully`, async () => {
+  it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
     await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
     await bridgeProxy
