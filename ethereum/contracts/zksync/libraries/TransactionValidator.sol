@@ -158,7 +158,7 @@ library TransactionValidator {
         // }
         // batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForPublicData);
 
-        // The overhead for ergs that could be used to use single-instance circuits
+        // The overhead for gas that could be used to use single-instance circuits
         uint256 overheadForGas;
         {
             uint256 numerator = batchOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;
