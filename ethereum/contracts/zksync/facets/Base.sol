@@ -6,8 +6,6 @@ import "../Storage.sol";
 import "../../common/ReentrancyGuard.sol";
 import "../../common/AllowListed.sol";
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
