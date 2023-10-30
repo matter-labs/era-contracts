@@ -49,7 +49,7 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
-    "test": "CONTRACT_TESTS=1 yarn hardhat test test/unit_tests/*.spec.ts --network hardhat",
+    "test": "CONTRACT_TESTS=1 hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "hardhat solpp && forge test",
     "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "coverage:foundry": "hardhat solpp && forge coverage",
