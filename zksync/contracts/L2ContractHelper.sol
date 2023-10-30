@@ -44,7 +44,7 @@ interface IContractDeployer {
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     /// @param _deployParams A set of parameters describing force deployment.
-    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external payable;
 
     /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
     /// @param _salt a unique value to create the deterministic address of the new contract
@@ -54,7 +54,7 @@ interface IContractDeployer {
         bytes32 _salt,
         bytes32 _bytecodeHash,
         bytes calldata _input
-    ) external;
+    ) external payable returns (address);
 }
 
 /**
