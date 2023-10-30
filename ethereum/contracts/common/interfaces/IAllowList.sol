@@ -13,6 +13,9 @@ interface IAllowList {
     /// @notice Permission to call is changed
     event UpdateCallPermission(address indexed caller, address indexed target, bytes4 indexed functionSig, bool status);
 
+    /// @notice Deposit limit of a token is changed
+    event UpdateDepositLimit(address indexed l1Token, bool depositLimitation, uint256 depositCap);
+
     /// @notice Type of access to a specific contract includes three different modes
     /// @param Closed No one has access to the contract
     /// @param SpecialAccessOnly Any address with granted special access can interact with a contract (see `hasSpecialAccessToCall`)
