@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "license": "MIT",
   "devDependencies": {
+    "@matterlabs/eslint-config-typescript": "^1.1.2",
+    "@matterlabs/prettier-config": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
     "@nomiclabs/hardhat-solpp": "^2.0.0",
@@ -23,6 +25,9 @@
     "collections": "^5.1.12",
     "commander": "^8.3.0",
     "eslint": "^8.51.0",
+    "eslint-import-resolver-typescript": "^3.6.1",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-prettier": "^5.0.1",
     "ethereum-waffle": "^3.0.0",
     "ethereumjs-abi": "^0.6.8",
     "ethers": "^5.7.0",
