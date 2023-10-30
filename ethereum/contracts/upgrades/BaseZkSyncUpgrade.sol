@@ -7,7 +7,7 @@ import "../zksync/interfaces/IMailbox.sol";
 import "../zksync/interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../zksync/libraries/TransactionValidator.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS} from "../zksync/Config.sol";
+import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../zksync/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -217,6 +217,7 @@ abstract contract BaseZkSyncUpgrade is Base {
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
+        require(_newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA, "Too big protocol version difference");
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
