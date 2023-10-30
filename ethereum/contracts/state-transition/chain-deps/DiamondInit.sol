@@ -68,7 +68,7 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: uint256(0),
+            nonce: _protocolVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,

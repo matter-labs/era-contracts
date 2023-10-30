@@ -68,8 +68,12 @@ contract StateTransition is IStateTransition, StateTransitionBase {
 
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
-            initAddress: stateTransitionStorage.diamondInit, 
-            initCalldata: abi.encodeWithSelector(IDiamondInit.setChainIdUpgrade.selector, _chainId, stateTransitionStorage.protocolVersion)
+            initAddress: stateTransitionStorage.diamondInit,
+            initCalldata: abi.encodeWithSelector(
+                IDiamondInit.setChainIdUpgrade.selector,
+                _chainId,
+                stateTransitionStorage.protocolVersion
+            )
         });
 
         IAdmin(_chainContract).executeUpgrade(cutData, stateTransitionStorage.protocolVersion);
@@ -139,7 +143,9 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
         require(cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion], "r25");
 
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
+            stateTransitionStorage.stateTransitionChainContract[_chainId]
+        );
         stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
@@ -148,14 +154,18 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         uint256 _protocolVersion,
         Diamond.DiamondCutData calldata _cutData
     ) external onlyGovernor {
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]);
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
+            stateTransitionStorage.stateTransitionChainContract[_chainId]
+        );
         stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
     }
 
     function freezeNotUpdated() external onlyGovernor {
         uint256 protocolVersion = stateTransitionStorage.protocolVersion;
         for (uint256 i = 0; i < stateTransitionStorage.totalChains; i = i.uncheckedInc()) {
-            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionStorage.chainNumberToContract[i]);
+            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
+                stateTransitionStorage.chainNumberToContract[i]
+            );
             stateTransitionChainContract.freezeNotUpdated(protocolVersion);
         }
     }

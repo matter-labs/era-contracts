@@ -1,9 +1,9 @@
 import { Command } from 'commander';
-import { Wallet } from 'ethers';
+import { Wallet, ethers } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
 import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
-import { L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE } from './utils-bytecode';
+import { L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE, L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE } from './utils-bytecode';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -56,21 +56,49 @@ async function main() {
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
 
-            const tx = await l1WethBridge.initializeChain(
+            const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
+            
+            const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
                 chainId,
-                [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-                requiredValueToInitializeBridge,
-                requiredValueToInitializeBridge,
-                {
-                    gasPrice,
-                    value: requiredValueToInitializeBridge.mul(2)
-                }
+                gasPrice,
+                priorityTxMaxGasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             );
-            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
 
-            const receipt = await tx.wait();
+            const independentInitialization = [
+                bridgehub.requestL2Transaction(
+                    chainId,
+                    ethers.constants.AddressZero,
+                    0,
+                    '0x',
+                    priorityTxMaxGasLimit,
+                    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                    [L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
+                    deployWallet.address,
+                    { gasPrice, nonce, value: requiredValueToPublishBytecodes }
+                ),
+                l1WethBridge.initializeChain(
+                    chainId,
+                    [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
+                    requiredValueToInitializeBridge,
+                    requiredValueToInitializeBridge,
+                    {
+                        gasPrice,
+                        nonce: nonce + 1,
+                        value: requiredValueToInitializeBridge.mul(2)
+                    }
+                )
+            ];
 
-            console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);
+            const txs = await Promise.all(independentInitialization);
+            for (const tx of txs) {
+                console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+            }
+            const receipts = await Promise.all(txs.map((tx) => tx.wait(2)));
+
+            console.log(`WETH bridge priority tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
+            console.log(`WETH bridge initialized for chain ${chainId}, gasUsed: ${receipts[1].gasUsed.toString()}`);
+            
             console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
         });
 

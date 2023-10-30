@@ -62,6 +62,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
             _governor,
             initData
         );
+        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress);
         l2WethAddress = address(l2Weth);
     }
 

@@ -175,8 +175,10 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
 
     const receipt = await tx.wait();
 
-    console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}, ${chainId}`);
+    console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);
     console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
+    console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddress}`);
+    console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddress}`);
 }
 
 async function main() {
