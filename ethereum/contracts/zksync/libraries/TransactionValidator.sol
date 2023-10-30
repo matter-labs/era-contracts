@@ -51,6 +51,8 @@ library TransactionValidator {
         require(_transaction.to <= type(uint160).max, "ub");
         require(_transaction.paymaster == 0, "uc");
         require(_transaction.value == 0, "ud");
+        require(_transaction.maxFeePerGas == 0, "uq");
+        require(_transaction.maxPriorityFeePerGas == 0, "ux");
         require(_transaction.reserved[0] == 0, "ue");
         require(_transaction.reserved[1] <= type(uint160).max, "uf");
         require(_transaction.reserved[2] == 0, "ug");
