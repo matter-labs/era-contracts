@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
 import {Utils} from "../../Utils/Utils.sol";

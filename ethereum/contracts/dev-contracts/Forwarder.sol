@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract Forwarder {
     function forward(address to, bytes calldata data) external payable returns (bytes memory returnValue) {

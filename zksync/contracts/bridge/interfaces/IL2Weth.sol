@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 interface IL2Weth {
     event Initialize(string name, string symbol, uint8 decimals);
