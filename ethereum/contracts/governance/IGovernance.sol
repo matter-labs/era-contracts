@@ -51,9 +51,9 @@ interface IGovernance {
 
     function cancel(bytes32 _id) external;
 
-    function execute(Operation calldata _operation) external;
+    function execute(Operation calldata _operation) external payable;
 
-    function executeInstant(Operation calldata _operation) external;
+    function executeInstant(Operation calldata _operation) external payable;
 
     function hashOperation(Operation calldata _operation) external pure returns (bytes32);
 
