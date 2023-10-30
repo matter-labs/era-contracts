@@ -38,7 +38,7 @@ library TransactionValidator {
                 _encoded.length,
                 _transaction.factoryDeps.length,
                 _transaction.gasPerPubdataByteLimit
-            ) <= _transaction.gasLimit,
+            ) <= l2GasForTxBody,
             "up"
         );
     }
