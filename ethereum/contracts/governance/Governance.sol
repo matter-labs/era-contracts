@@ -151,7 +151,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Cancel the scheduled operation.
     /// @dev Both the owner and security council may cancel an operation.
     /// @param _id Proposal id value (see `hashOperation`)
-    function cancel(bytes32 _id) external onlyOwnerOrSecurityCouncil {
+    function cancel(bytes32 _id) external onlyOwner {
         require(isOperationPending(_id), "Operation must be pending");
         delete timestamps[_id];
         emit OperationCancelled(_id);
