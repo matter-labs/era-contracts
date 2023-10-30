@@ -4,8 +4,9 @@ import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../ethereum/src.ts/deploy";
 import { IZkSyncFactory } from "../../ethereum/typechain/IZkSyncFactory";
 
-import { BytesLike, Wallet, ethers } from "ethers";
-import { Provider } from "zksync-web3";
+import type { BytesLike, Wallet } from "ethers";
+import { ethers } from "ethers";
+import type { Provider } from "zksync-web3";
 import { sleep } from "zksync-web3/build/src/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires

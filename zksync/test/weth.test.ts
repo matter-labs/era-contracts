@@ -3,8 +3,8 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
-import { L2Weth } from "../typechain/L2Weth";
-import { L2WethBridge } from "../typechain/L2WethBridge";
+import type { L2Weth } from "../typechain/L2Weth";
+import type { L2WethBridge } from "../typechain/L2WethBridge";
 import { L2WethBridgeFactory } from "../typechain/L2WethBridgeFactory";
 import { L2WethFactory } from "../typechain/L2WethFactory";
 
