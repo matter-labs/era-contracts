@@ -86,7 +86,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
-        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BatchTimestamp].
+        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
         // So here we need to only double check that:
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
