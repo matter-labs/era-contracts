@@ -11,6 +11,6 @@ contract ForceDeployUpgrader {
     /// @notice A function that performs force deploy
     /// @param _forceDeployments The force deployments to perform.
     function forceDeploy(IContractDeployer.ForceDeployment[] calldata _forceDeployments) external payable {
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses(_forceDeployments);
+        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(_forceDeployments);
     }
 }
