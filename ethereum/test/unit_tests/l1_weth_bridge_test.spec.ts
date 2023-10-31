@@ -6,8 +6,13 @@ import * as fs from 'fs';
 
 import { IBridgehub } from '../../typechain/IBridgehub';
 import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from '../../typechain';
-import { AccessMode, getCallRevertReason, initialDeployment } from './utils';
-import { hashL2Bytecode } from '../../scripts/utils';
+import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from './utils';
+import { hashL2Bytecode,  } from '../../scripts/utils';
+import { calculateWethAddresses,
+    L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
+    L2_WETH_BRIDGE_PROXY_BYTECODE,
+    } from '../../scripts/utils-bytecode';
+
 
 import { Interface } from 'ethers/lib/utils';
 import { Address } from 'zksync-web3/build/src/types';
@@ -17,6 +22,8 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000008006';
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+
+process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 export async function create2DeployFromL1(
     bridgehub: IBridgehub,
@@ -101,21 +108,22 @@ describe('WETH Bridge tests', () => {
         const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';
         const garbageAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
 
-        const bridgeInitData = bridge.interface.encodeFunctionData('initialize', [
-            [garbageBytecode, garbageBytecode],
-            garbageAddress,
-            garbageAddress,
-            await owner.getAddress()
-        ]);
-
         const _bridgeProxy = await (
             await hardhat.ethers.getContractFactory('ERC1967Proxy')
-        ).deploy(bridge.address, bridgeInitData);
-
+        ).deploy(bridge.address, "0x");
+        
         bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
+
+        const { l2WethProxyAddress, l2WethBridgeProxyAddress} = calculateWethAddresses(await owner.getAddress() , bridgeProxy.address, l1Weth.address);
+
+        await bridgeProxy.initialize([L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
+                l2WethProxyAddress,
+                l2WethBridgeProxyAddress,
+                await owner.getAddress());
+
         await bridgeProxy.initializeChain(
             chainId,
-            [garbageBytecode, garbageBytecode],
+            [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
             ethers.constants.WeiPerEther,
             ethers.constants.WeiPerEther,
             { value: ethers.constants.WeiPerEther.mul(2) }

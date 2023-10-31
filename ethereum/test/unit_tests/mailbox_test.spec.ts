@@ -20,13 +20,15 @@ import {
     L2_TO_L1_MESSENGER,
     L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
     ethTestConfig,
-    initialDeployment
+    initialDeployment,
+    CONTRACTS_LATEST_PROTOCOL_VERSION
 } from './utils';
 
 import * as ethers from 'ethers';
 import { Wallet } from 'ethers';
 
 import { Action, facetCut } from '../../src.ts/diamondCut';
+process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe('Mailbox tests', function () {
     let allowList: AllowList;

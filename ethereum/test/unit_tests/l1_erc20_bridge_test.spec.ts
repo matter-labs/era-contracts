@@ -14,10 +14,12 @@ import {
 } from '../../typechain';
 import { IL1Bridge } from '../../typechain/IL1Bridge';
 import { IL1BridgeFactory } from '../../typechain/IL1BridgeFactory';
-import { AccessMode, getCallRevertReason, initialDeployment } from './utils';
+import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from './utils';
 
 const testConfigPath = './test/test_config/constant';
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+
+process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe(`L1ERC20Bridge tests`, function () {
     let owner: ethers.Signer;

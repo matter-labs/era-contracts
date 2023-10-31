@@ -26,13 +26,16 @@ import {
     SYSTEM_LOG_KEYS,
     constructL2Log,
     packBatchTimestampAndBatchTimestamp,
-    initialDeployment
+    initialDeployment,
+    CONTRACTS_LATEST_PROTOCOL_VERSION
 } from './utils';
 import * as ethers from 'ethers';
 import { BigNumberish, Wallet, BytesLike } from 'ethers';
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from 'zksync-web3/build/src/utils';
 
 import { keccak256 } from 'ethers/lib/utils';
+
+process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 const L2_BOOTLOADER_BYTECODE_HASH = '0x1000100000000000000000000000000000000000000000000000000000000000';
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = '0x1001000000000000000000000000000000000000000000000000000000000000';

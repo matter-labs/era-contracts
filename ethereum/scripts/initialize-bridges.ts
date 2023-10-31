@@ -2,29 +2,27 @@ import { Command } from 'commander';
 import { ethers, Wallet } from 'ethers';
 import { Deployer } from '../src.ts/deploy';
 import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { computeL2Create2Address, web3Provider, hashL2Bytecode, applyL1ToL2Alias } from './utils';
+import { web3Provider, applyL1ToL2Alias } from './utils';
 import {
     L2_ERC20_BRIDGE_PROXY_BYTECODE,
     L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
-    L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
     L2_STANDARD_ERC20_PROXY_BYTECODE,
-    L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
     L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
     L2_WETH_BRIDGE_PROXY_BYTECODE,
-    L2_WETH_IMPLEMENTATION_BYTECODE,
-    L2_WETH_PROXY_BYTECODE,
-    L2_WETH_BRIDGE_INTERFACE,
-    L2_ERC20_BRIDGE_INTERFACE,
-    L2_WETH_INTERFACE
+    calculateWethAddresses,
+    calculateERC20Addresses
 } from './utils-bytecode';
-import { IBridgehubFactory } from '../typechain/IBridgehubFactory';
+import { IBridgehubFactory, } from '../typechain/IBridgehubFactory';
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { L1ERC20Bridge } from '../typechain';
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+
+
 
 async function initializeBridges(
     deployer: Deployer,
@@ -39,50 +37,12 @@ async function initializeBridges(
         ? deployer.defaultERC20Bridge(deployWallet).attach(cmdErc20Bridge)
         : deployer.defaultERC20Bridge(deployWallet);
 
-    console.log('KL todo', bridgehub.address);
     const l1GovernorAddress = await bridgehub.getGovernor();
     // Check whether governor is a smart contract on L1 to apply alias if needed.
     const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
     const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
-    const abiCoder = new ethers.utils.AbiCoder();
-
-    const l2ERC20BridgeImplAddr = computeL2Create2Address(
-        applyL1ToL2Alias(erc20Bridge.address),
-        L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
-        '0x',
-        ethers.constants.HashZero
-    );
-
-    const proxyInitializationParams = L2_ERC20_BRIDGE_INTERFACE.encodeFunctionData('initialize', [
-        erc20Bridge.address,
-        hashL2Bytecode(L2_STANDARD_ERC20_PROXY_BYTECODE),
-        l2GovernorAddress
-    ]);
-    const l2ERC20BridgeProxyAddr = computeL2Create2Address(
-        applyL1ToL2Alias(erc20Bridge.address),
-        L2_ERC20_BRIDGE_PROXY_BYTECODE,
-        ethers.utils.arrayify(
-            abiCoder.encode(
-                ['address', 'address', 'bytes'],
-                [l2ERC20BridgeImplAddr, l2GovernorAddress, proxyInitializationParams]
-            )
-        ),
-        ethers.constants.HashZero
-    );
-
-    const l2StandardToken = computeL2Create2Address(
-        l2ERC20BridgeProxyAddr,
-        L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
-        '0x',
-        ethers.constants.HashZero
-    );
-    const l2TokenFactoryAddr = computeL2Create2Address(
-        l2ERC20BridgeProxyAddr,
-        L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-        ethers.utils.arrayify(abiCoder.encode(['address'], [l2StandardToken])),
-        ethers.constants.HashZero
-    );
-
+    
+    const {l2TokenFactoryAddr, l2ERC20BridgeProxyAddr} = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
     const independentInitialization = [
         erc20Bridge.initialize(
             [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],
@@ -109,57 +69,14 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
     const l1WethBridge = deployer.defaultWethBridge(deployWallet);
     const chainId = deployer.chainId;
 
-    const abiCoder = new ethers.utils.AbiCoder();
 
     const l1GovernorAddress = await bridgehub.getGovernor();
     // Check whether governor is a smart contract on L1 to apply alias if needed.
     const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
     const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
 
-    const l2WethBridgeImplAddress = computeL2Create2Address(
-        applyL1ToL2Alias(l1WethBridge.address),
-        L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
-        '0x',
-        ethers.constants.HashZero
-    );
-
     const l1WethAddress = await l1WethBridge.l1WethAddress();
-    const bridgeProxyInitializationParams = L2_WETH_BRIDGE_INTERFACE.encodeFunctionData('initialize', [
-        l1WethBridge.address,
-        l1WethAddress,
-        l2GovernorAddress
-    ]);
-    const l2WethBridgeProxyAddress = computeL2Create2Address(
-        applyL1ToL2Alias(l1WethBridge.address),
-        L2_WETH_BRIDGE_PROXY_BYTECODE,
-        ethers.utils.arrayify(
-            abiCoder.encode(
-                ['address', 'address', 'bytes'],
-                [l2WethBridgeImplAddress, l2GovernorAddress, bridgeProxyInitializationParams]
-            )
-        ),
-        ethers.constants.HashZero
-    );
-
-    const l2WethImplAddress = computeL2Create2Address(
-        l2WethBridgeProxyAddress,
-        L2_WETH_IMPLEMENTATION_BYTECODE,
-        '0x',
-        ethers.constants.HashZero
-    );
-
-    const proxyInitializationParams = L2_WETH_INTERFACE.encodeFunctionData('initialize', ['Wrapped Ether', 'WETH']);
-    const l2WethProxyAddress = computeL2Create2Address(
-        l2WethBridgeProxyAddress,
-        L2_WETH_PROXY_BYTECODE,
-        ethers.utils.arrayify(
-            abiCoder.encode(
-                ['address', 'address', 'bytes'],
-                [l2WethImplAddress, l2GovernorAddress, proxyInitializationParams]
-            )
-        ),
-        ethers.constants.HashZero
-    );
+    const {l2WethImplAddress, l2WethProxyAddress, l2WethBridgeProxyAddress} = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress);
 
     const tx = await l1WethBridge.initialize(
         [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],

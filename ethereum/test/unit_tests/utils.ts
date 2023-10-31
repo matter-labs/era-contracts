@@ -10,6 +10,7 @@ const testConfigPath = './test/test_config/constant';
 export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: 'utf-8' }));
 
+export const CONTRACTS_LATEST_PROTOCOL_VERSION = (19).toString();
 export const IERC20_INTERFACE = require('@openzeppelin/contracts/build/contracts/IERC20');
 export const DEFAULT_REVERT_REASON = 'VM did not revert';
 
@@ -278,14 +279,12 @@ export async function initialDeployment(
     const allowTx = await allowList.setBatchAccessMode(
         [
             deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-            deployer.addresses.Bridgehub.ChainProxy,
             deployer.addresses.StateTransition.StateTransitionProxy,
             deployer.addresses.StateTransition.DiamondProxy,
             deployer.addresses.Bridges.ERC20BridgeProxy,
             deployer.addresses.Bridges.WethBridgeProxy
         ],
         [
-            AccessMode.Public,
             AccessMode.Public,
             AccessMode.Public,
             AccessMode.Public,
