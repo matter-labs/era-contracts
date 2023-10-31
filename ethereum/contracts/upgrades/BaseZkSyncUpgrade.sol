@@ -217,7 +217,10 @@ abstract contract BaseZkSyncUpgrade is Base {
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );
-        require(_newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA, "Too big protocol version difference");
+        require(
+            _newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA,
+            "Too big protocol version difference"
+        );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
