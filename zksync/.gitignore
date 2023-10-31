@@ -6,3 +6,5 @@
 /typechain
 node_modules
 ./contracts/DS_Store
+yarn-debug.log*
+yarn-error.log*
