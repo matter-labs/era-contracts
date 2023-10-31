@@ -824,7 +824,7 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
         txType: SYSTEM_UPGRADE_TX_TYPE,
         from: ethers.constants.AddressZero,
         to: ethers.constants.AddressZero,
-        gasLimit: 3000000,
+        gasLimit: 5000000,
         gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
         maxFeePerGas: 0,
         maxPriorityFeePerGas: 0,
