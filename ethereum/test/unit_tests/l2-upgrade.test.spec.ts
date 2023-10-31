@@ -216,6 +216,22 @@ describe('L2 upgrade test', function () {
         expect(revertReason).to.equal('New protocol version is not greater than the current one');
     });
 
+    it('Should ensure protocol version not increasing too much', async () => {
+        const wrongTx = buildL2CanonicalTransaction({
+            txType: 254,
+            nonce: 0
+        });
+
+        const revertReason = await getCallRevertReason(
+            executeUpgrade(proxyGetters, proxyAdmin, {
+                l2ProtocolUpgradeTx: wrongTx,
+                newProtocolVersion: 100000
+            })
+        );
+
+        expect(revertReason).to.equal('Too big protocol version difference');
+    });
+
     it('Should validate upgrade transaction overhead', async () => {
         const wrongTx = buildL2CanonicalTransaction({
             nonce: 0,

@@ -270,6 +270,50 @@ contract FacetCutTest is DiamondCutTest {
         assertEq(numOfFacetsAfterAdd, numOfFacetsAfterReplace);
     }
 
+    function test_RevertWhen_AddingFacetWithNoBytecode() public {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = 0x00000005;
+
+        Diamond.FacetCut[] memory facetCuts1 = new Diamond.FacetCut[](1);
+        facetCuts1[0] = Diamond.FacetCut({
+            facet: address(1),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: selectors
+        });
+
+        Diamond.DiamondCutData memory diamondCutData1 = Diamond.DiamondCutData({
+            facetCuts: facetCuts1,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(abi.encodePacked("G"));
+        diamondCutTestContract.diamondCut(diamondCutData1);
+    }
+
+    function test_RevertWhen_ReplacingFacetWithNoBytecode() public {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = 0x00000005;
+
+        Diamond.FacetCut[] memory facetCuts1 = new Diamond.FacetCut[](1);
+        facetCuts1[0] = Diamond.FacetCut({
+            facet: address(1),
+            action: Diamond.Action.Replace,
+            isFreezable: true,
+            selectors: selectors
+        });
+
+        Diamond.DiamondCutData memory diamondCutData1 = Diamond.DiamondCutData({
+            facetCuts: facetCuts1,
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.expectRevert(abi.encodePacked("K"));
+        diamondCutTestContract.diamondCut(diamondCutData1);
+    }
+
     function test_RevertWhen_AddingFacetWithDifferentFreezabilityThanExistingFacets() public {
         bytes4[] memory selectors1 = new bytes4[](1);
         selectors1[0] = 0x00000001;
