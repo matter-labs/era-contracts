@@ -233,7 +233,7 @@ contract FacetCutTest is DiamondCutTest {
 
         Diamond.FacetCut[] memory facetCuts1 = new Diamond.FacetCut[](1);
         facetCuts1[0] = Diamond.FacetCut({
-            facet: address(0x000000000000000000000000000000000000000A),
+            facet: address(executorFacet2),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: selectors
@@ -251,7 +251,7 @@ contract FacetCutTest is DiamondCutTest {
 
         Diamond.FacetCut[] memory facetCuts2 = new Diamond.FacetCut[](1);
         facetCuts2[0] = Diamond.FacetCut({
-            facet: address(0x000000000000000000000000000000000000000A),
+            facet: address(executorFacet2),
             action: Diamond.Action.Replace,
             isFreezable: false,
             selectors: selectors
