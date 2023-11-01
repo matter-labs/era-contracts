@@ -91,7 +91,7 @@ contract ExecutorFacet is Base, IExecutor {
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
         require(block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= batchTimestamp, "h1"); // New batch timestamp is too small
-        require(lastL2BlockTimestamp <= block.timestamp, "h2"); // The last L2 block timestamp is too big
+        require(lastL2BlockTimestamp <= block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA, "h2"); // The last L2 block timestamp is too big
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
