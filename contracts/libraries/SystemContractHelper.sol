@@ -270,6 +270,8 @@ library SystemContractHelper {
     function getZkSyncMeta() internal view returns (ZkSyncMeta memory meta) {
         uint256 metaPacked = getZkSyncMetaBytes();
         meta.gasPerPubdataByte = getGasPerPubdataByteFromMeta(metaPacked);
+        meta.heapSize = getHeapSizeFromMeta(metaPacked);
+        meta.auxHeapSize = getAuxHeapSizeFromMeta(metaPacked);
         meta.shardId = getShardIdFromMeta(metaPacked);
         meta.callerShardId = getCallerShardIdFromMeta(metaPacked);
         meta.codeShardId = getCodeShardIdFromMeta(metaPacked);

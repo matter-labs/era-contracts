@@ -7,6 +7,7 @@ import {
     Callable,
     DefaultAccount,
     DefaultAccount__factory,
+    DelegateCaller,
     L2EthToken,
     L2EthToken__factory,
     MockERC20Approve,
@@ -31,6 +32,7 @@ describe('DefaultAccount tests', function () {
     let callable: Callable;
     let mockERC20Approve: MockERC20Approve;
     let paymasterFlowInterface: ethers.utils.Interface;
+    let delegateCaller: DelegateCaller;
 
     const RANDOM_ADDRESS = ethers.utils.getAddress('0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
 
@@ -43,6 +45,7 @@ describe('DefaultAccount tests', function () {
         nonceHolder = NonceHolder__factory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
         l2EthToken = L2EthToken__factory.connect(ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, wallet);
         callable = (await deployContract('Callable')) as Callable;
+        delegateCaller = (await deployContract('DelegateCaller')) as DelegateCaller;
         mockERC20Approve = (await deployContract('MockERC20Approve')) as MockERC20Approve;
 
         const paymasterFlowInterfaceArtifact = await loadArtifact('IPaymasterFlow');
@@ -352,7 +355,7 @@ describe('DefaultAccount tests', function () {
     });
 
     describe('fallback/receive', function () {
-        it('zero value', async () => {
+        it('zero value by EOA wallet', async () => {
             const call = {
                 from: wallet.address,
                 to: defaultAccount.address,
@@ -362,7 +365,7 @@ describe('DefaultAccount tests', function () {
             expect(await wallet.provider.call(call)).to.be.eq('0x');
         });
 
-        it('non-zero value', async () => {
+        it('non-zero value by EOA wallet', async () => {
             const call = {
                 from: wallet.address,
                 to: defaultAccount.address,
@@ -370,6 +373,32 @@ describe('DefaultAccount tests', function () {
                 data: '0x87238489489983493904904390431212224343434344433443433434344234234234'
             };
             expect(await wallet.provider.call(call)).to.be.eq('0x');
+        });
+
+        it('zero value by bootloader', async () => {
+            // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
+            // the fallback is behaving correctly
+            const calldata = delegateCaller.interface.encodeFunctionData('delegateCall', [defaultAccount.address]);
+            const call = {
+                from: BOOTLOADER_FORMAL_ADDRESS,
+                to: delegateCaller.address,
+                value: 0,
+                data: calldata
+            };
+            expect(await bootloader.call(call)).to.be.eq('0x');
+        });
+
+        it('non-zero value by bootloader', async () => {
+            // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
+            // the fallback is behaving correctly
+            const calldata = delegateCaller.interface.encodeFunctionData('delegateCall', [defaultAccount.address]);
+            const call = {
+                from: BOOTLOADER_FORMAL_ADDRESS,
+                to: delegateCaller.address,
+                value: 3223,
+                data: calldata
+            };
+            expect(await bootloader.call(call)).to.be.eq('0x');
         });
     });
 });

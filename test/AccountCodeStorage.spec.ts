@@ -142,7 +142,13 @@ describe('AccountCodeStorage tests', function () {
 
     describe('getCodeHash', function () {
         it('precompile', async () => {
+            // Check that the smallest precompile has EMPTY_STRING_KECCAK hash
             expect(await accountCodeStorage.getCodeHash('0x0000000000000000000000000000000000000001')).to.be.eq(
+                EMPTY_STRING_KECCAK
+            );
+
+            // Check that the upper end of the precompile range has EMPTY_STRING_KECCAK hash
+            expect(await accountCodeStorage.getCodeHash('0x00000000000000000000000000000000000000ff')).to.be.eq(
                 EMPTY_STRING_KECCAK
             );
         });
