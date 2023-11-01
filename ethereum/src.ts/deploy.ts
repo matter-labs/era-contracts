@@ -131,7 +131,6 @@ export class Deployer {
                 genesisBatchHash,
                 genesisIndexRepeatedStorageChanges,
                 genesisBatchCommitment,
-                allowList: this.addresses.AllowList,
                 verifierParams,
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -279,7 +278,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'L1ERC20Bridge',
-            [this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
+            [this.addresses.ZkSync.DiamondProxy],
             create2Salt,
             ethTxOptions
         );
@@ -326,7 +325,7 @@ export class Deployer {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2(
             'L1WethBridge',
-            [l1WethToken, this.addresses.ZkSync.DiamondProxy, this.addresses.AllowList],
+            [l1WethToken, this.addresses.ZkSync.DiamondProxy],
             create2Salt,
             ethTxOptions
         );

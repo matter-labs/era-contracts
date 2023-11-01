@@ -4,8 +4,6 @@ import * as hardhat from 'hardhat';
 import { IZkSync } from '../../typechain/IZkSync';
 import { Action, diamondCut, facetCut } from '../../src.ts/diamondCut';
 import {
-    AllowList,
-    AllowListFactory,
     DiamondInitFactory,
     GettersFacetFactory,
     MailboxFacetFactory,
@@ -52,7 +50,6 @@ export async function create2DeployFromL1(
 describe('WETH Bridge tests', () => {
     let owner: ethers.Signer;
     let randomSigner: ethers.Signer;
-    let allowList: AllowList;
     let bridgeProxy: L1WethBridge;
     let l1Weth: WETH9;
     let functionSignature = '0x6c0960f9';
@@ -70,10 +67,6 @@ describe('WETH Bridge tests', () => {
         const mailboxContract = await mailboxFactory.deploy();
         const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
-        const allowListFactory = await hardhat.ethers.getContractFactory('AllowList');
-        const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-        allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
-
         const diamondInitFactory = await hardhat.ethers.getContractFactory('DiamondInit');
         const diamondInitContract = await diamondInitFactory.deploy();
         const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
@@ -89,7 +82,6 @@ describe('WETH Bridge tests', () => {
                 genesisBatchHash: ethers.constants.HashZero,
                 genesisIndexRepeatedStorageChanges: 0,
                 genesisBatchCommitment: ethers.constants.HashZero,
-                allowList: allowList.address,
                 verifierParams: {
                     recursionCircuitsSetVksHash: ethers.constants.HashZero,
                     recursionLeafLevelVkHash: ethers.constants.HashZero,
@@ -113,8 +105,6 @@ describe('WETH Bridge tests', () => {
         const chainId = hardhat.network.config.chainId;
         const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
-        await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
-
         l1Weth = WETH9Factory.connect(
             (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
             owner
@@ -124,7 +114,7 @@ describe('WETH Bridge tests', () => {
 
         const bridge = await (
             await hardhat.ethers.getContractFactory('L1WethBridge')
-        ).deploy(l1Weth.address, diamondProxyContract.address, allowListContract.address);
+        ).deploy(l1Weth.address, diamondProxyContract.address);
 
         // we don't test L2, so it is ok to give garbage factory deps and L2 address
         const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';
@@ -142,43 +132,6 @@ describe('WETH Bridge tests', () => {
         ).deploy(bridge.address, bridgeInitData, { value: ethers.constants.WeiPerEther.mul(2) });
 
         bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
-    });
-
-    it('Should not allow an un-whitelisted address to deposit', async () => {
-        const revertReason = await getCallRevertReason(
-            bridgeProxy
-                .connect(randomSigner)
-                .deposit(
-                    await randomSigner.getAddress(),
-                    ethers.constants.AddressZero,
-                    0,
-                    0,
-                    0,
-                    ethers.constants.AddressZero
-                )
-        );
-
-        expect(revertReason).equal('nr');
-
-        // This is only so the following tests don't need whitelisting
-        await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
-    });
-
-    it('Should not allow depositing zero WETH', async () => {
-        const revertReason = await getCallRevertReason(
-            bridgeProxy
-                .connect(randomSigner)
-                .deposit(
-                    await randomSigner.getAddress(),
-                    await bridgeProxy.l1WethAddress(),
-                    0,
-                    0,
-                    0,
-                    ethers.constants.AddressZero
-                )
-        );
-
-        expect(revertReason).equal('Amount cannot be zero');
     });
 
     it(`Should deposit successfully`, async () => {

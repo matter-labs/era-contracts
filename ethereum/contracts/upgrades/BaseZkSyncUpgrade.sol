@@ -28,6 +28,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
     /// the previous protocol version.
     /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
+    // TODO (EVM-319): Remove `newAllowList` from the proposed upgrade structure.
     struct ProposedUpgrade {
         IMailbox.L2CanonicalTransaction l2ProtocolUpgradeTx;
         bytes[] factoryDeps;
@@ -231,17 +232,5 @@ abstract contract BaseZkSyncUpgrade is Base {
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-    }
-
-    /// @notice Change the address of the allow list smart contract
-    /// @param _newAllowList Allow list smart contract address
-    function _setAllowList(IAllowList _newAllowList) internal {
-        if (_newAllowList == IAllowList(address(0))) {
-            return;
-        }
-
-        IAllowList oldAllowList = s.allowList;
-        s.allowList = _newAllowList;
-        emit NewAllowList(address(oldAllowList), address(_newAllowList));
     }
 }

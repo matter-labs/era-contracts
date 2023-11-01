@@ -37,7 +37,6 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
             _proposedUpgrade.newProtocolVersion
         );
 
-        _setAllowList(IAllowList(_proposedUpgrade.newAllowList));
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);

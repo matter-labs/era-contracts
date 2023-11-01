@@ -118,17 +118,16 @@ library Utils {
         selectors[15] = GettersFacet.getVerifierParams.selector;
         selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = GettersFacet.getAllowList.selector;
-        selectors[19] = GettersFacet.isEthWithdrawalFinalized.selector;
-        selectors[20] = GettersFacet.facets.selector;
-        selectors[21] = GettersFacet.facetFunctionSelectors.selector;
-        selectors[22] = GettersFacet.facetAddresses.selector;
-        selectors[23] = GettersFacet.facetAddress.selector;
-        selectors[24] = GettersFacet.isFunctionFreezable.selector;
-        selectors[25] = GettersFacet.isFacetFreezable.selector;
-        selectors[26] = GettersFacet.getTotalBatchesCommitted.selector;
-        selectors[27] = GettersFacet.getTotalBatchesVerified.selector;
-        selectors[28] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[18] = GettersFacet.isEthWithdrawalFinalized.selector;
+        selectors[19] = GettersFacet.facets.selector;
+        selectors[20] = GettersFacet.facetFunctionSelectors.selector;
+        selectors[21] = GettersFacet.facetAddresses.selector;
+        selectors[22] = GettersFacet.facetAddress.selector;
+        selectors[23] = GettersFacet.isFunctionFreezable.selector;
+        selectors[24] = GettersFacet.isFacetFreezable.selector;
+        selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
+        selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
+        selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
         return selectors;
     }
 

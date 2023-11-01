@@ -95,7 +95,6 @@ describe('L2 upgrade test', function () {
                 genesisBatchHash: ethers.constants.HashZero,
                 genesisIndexRepeatedStorageChanges: 0,
                 genesisBatchCommitment: ethers.constants.HashZero,
-                allowList: allowList.address,
                 verifierParams,
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: dummyHash,
