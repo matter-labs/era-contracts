@@ -56,7 +56,7 @@ uint256 constant PRIORITY_EXPIRATION = 0 days;
 uint256 constant UPGRADE_NOTICE_PERIOD = $$(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : "14 days");
 
 /// @dev Timestamp - seconds since unix epoch.
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 1 days;
+uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
 
 /// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
 /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 12 seconds)
