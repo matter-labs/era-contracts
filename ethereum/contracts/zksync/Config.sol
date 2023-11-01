@@ -56,15 +56,7 @@ uint256 constant PRIORITY_EXPIRATION = 0 days;
 uint256 constant UPGRADE_NOTICE_PERIOD = $$(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : "14 days");
 
 /// @dev Timestamp - seconds since unix epoch
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = $$(
-    defined(COMMIT_TIMESTAMP_NOT_OLDER) ? COMMIT_TIMESTAMP_NOT_OLDER : "365 days"
-);
-
-/// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
-/// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
-uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = $$(
-    defined(COMMIT_TIMESTAMP_APPROXIMATION_DELTA) ? COMMIT_TIMESTAMP_APPROXIMATION_DELTA : "365 days"
-);
+uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 1 days;
 
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
