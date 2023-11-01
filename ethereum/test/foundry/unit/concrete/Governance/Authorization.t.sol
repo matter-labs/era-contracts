@@ -54,7 +54,7 @@ contract Authorization is GovernanceTest {
 
     function test_RevertWhen_CancelByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert("Only the owner and security council are allowed to call this function");
+        vm.expectRevert("Ownable: caller is not the owner");
         governance.cancel(bytes32(0));
     }
 

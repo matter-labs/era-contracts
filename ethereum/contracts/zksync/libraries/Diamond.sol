@@ -129,7 +129,10 @@ library Diamond {
     ) private {
         DiamondStorage storage ds = getDiamondStorage();
 
-        require(_facet != address(0), "G"); // facet with zero address cannot be added
+        // Facet with no code cannot be added. 
+        // This check also verifies that the facet does not have zero address, since it is the 
+        // address with which 0x00000000 selector is associated.   
+        require(_facet.code.length > 0, "G"); 
 
         // Add facet to the list of facets if the facet address is new one
         _saveFacetIfNew(_facet);
@@ -153,7 +156,10 @@ library Diamond {
     ) private {
         DiamondStorage storage ds = getDiamondStorage();
 
-        require(_facet != address(0), "K"); // cannot replace facet with zero address
+        // Facet with no code cannot be added. 
+        // This check also verifies that the facet does not have zero address, since it is the 
+        // address with which 0x00000000 selector is associated.   
+        require(_facet.code.length > 0, "K");
 
         uint256 selectorsLength = _selectors.length;
         for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
