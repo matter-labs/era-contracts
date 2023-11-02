@@ -49,7 +49,8 @@ contract L1WethBridgeTest is Test {
             false,
             dummyHash,
             dummyHash,
-            10000000
+            10000000,
+            0
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
