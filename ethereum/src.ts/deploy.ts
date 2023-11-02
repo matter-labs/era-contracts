@@ -121,6 +121,7 @@ export class Deployer {
                 recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
             };
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
+        const initialProtocolVersion = getNumberFromEnv('CONTRACTS_INITIAL_PROTOCOL_VERSION');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
         const diamondInitCalldata = DiamondInit.encodeFunctionData('initialize', [
@@ -137,6 +138,7 @@ export class Deployer {
                 l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
                 l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
                 priorityTxMaxGasLimit,
+                initialProtocolVersion
             }
         ]);
 
