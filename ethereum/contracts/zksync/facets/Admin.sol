@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../interfaces/IAdmin.sol";
 import "../libraries/Diamond.sol";
-import "../../common/libraries/L2ContractHelper.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
 import "./Base.sol";
 
@@ -46,7 +45,7 @@ contract AdminFacet is Base, IAdmin {
         address oldPendingAdmin = s.pendingAdmin;
         // Change pending admin
         s.pendingAdmin = _newPendingAdmin;
-        emit NewPendingGovernor(oldPendingAdmin, _newPendingAdmin);
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
