@@ -76,7 +76,8 @@ describe('Mailbox tests', function () {
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: dummyHash,
                 l2DefaultAccountBytecodeHash: dummyHash,
-                priorityTxMaxGasLimit: 10000000
+                priorityTxMaxGasLimit: 10000000,
+                initialProtocolVersion: 0
             }
         ]);
 

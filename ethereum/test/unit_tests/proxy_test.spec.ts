@@ -80,7 +80,8 @@ describe('Diamond proxy tests', function () {
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
                 l2DefaultAccountBytecodeHash: '0x0100000000000000000000000000000000000000000000000000000000000000',
-                priorityTxMaxGasLimit: 500000
+                priorityTxMaxGasLimit: 500000,
+                initialProtocolVersion: 0
             }
         ]);
 

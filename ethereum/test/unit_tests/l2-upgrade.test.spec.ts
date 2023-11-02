@@ -27,7 +27,7 @@ import {
     SYSTEM_LOG_KEYS,
     constructL2Log,
     L2_TO_L1_MESSENGER,
-    packBatchTimestampAndBatchTimestamp
+    packBatchTimestampAndBatchTimestamp,
 } from './utils';
 import * as ethers from 'ethers';
 import { BigNumber, BigNumberish, BytesLike } from 'ethers';
@@ -100,7 +100,8 @@ describe('L2 upgrade test', function () {
                 zkPorterIsAvailable: false,
                 l2BootloaderBytecodeHash: dummyHash,
                 l2DefaultAccountBytecodeHash: dummyHash,
-                priorityTxMaxGasLimit: 10000000
+                priorityTxMaxGasLimit: 10000000,
+                initialProtocolVersion: 0
             }
         ]);
 
