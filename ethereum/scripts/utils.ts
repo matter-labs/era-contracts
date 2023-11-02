@@ -5,6 +5,11 @@ import * as path from 'path';
 
 const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(['string'], ['zksyncCreate2']);
+
+const ETHEREUM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+const HASH_REGEX = /^0x[a-fA-F0-9]{64}$/;
+const NUMBER_REGEX = /^([1-9]\d*|0)$/;
+
 export const L1_TO_L2_ALIAS_OFFSET = '0x1111000000000000000000000000000000001111';
 
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require('../../SystemConfig.json').REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -45,24 +50,24 @@ export function web3Provider() {
 }
 
 export function getAddressFromEnv(envName: string): string {
-    let address = process.env[envName];
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    const address = process.env[envName];
+    if (!ETHEREUM_ADDRESS_REGEX.test(address)) {
         throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
     }
     return address;
 }
 
 export function getHashFromEnv(envName: string): string {
-    let hash = process.env[envName];
-    if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
+    const hash = process.env[envName];
+    if (!HASH_REGEX.test(hash)) {
         throw new Error(`Incorrect hash format hash in ${envName} env: ${hash}`);
     }
     return hash;
 }
 
 export function getNumberFromEnv(envName: string): string {
-    let number = process.env[envName];
-    if (!/^([1-9]\d*|0)$/.test(number)) {
+    const number = process.env[envName];
+    if (!NUMBER_REGEX.test(number)) {
         throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
     }
     return number;
