@@ -56,7 +56,7 @@ jobs:
         run: yarn
 
       - name: Run lint
-        run: yarn lint
+        run: yarn lint:check
 
   check_hashes:
     needs: [build]
@@ -89,7 +89,7 @@ jobs:
             bootloader/build
 
       - name: Check hashes
-        run: yarn calculate-hashes --check-only
+        run: yarn calculate-hashes:check
 
   test:
     needs: [build, lint]
