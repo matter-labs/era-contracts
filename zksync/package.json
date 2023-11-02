@@ -46,9 +46,6 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
-    "deploy-force-deploy-upgrader": "ts-node src/deployForceDeployUpgrader.ts",
-    "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
-    "deploy-testnet-paymaster": "ts-node src/deployTestnetPaymaster.ts",
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",
@@ -56,9 +53,12 @@
     "lint:ts": "eslint .",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yaml}\"",
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
+    "verify": "hardhat run src/verify.ts",
+    "deploy-testnet-paymaster": "ts-node src/deployTestnetPaymaster.ts",
+    "deploy-force-deploy-upgrader": "ts-node src/deployForceDeployUpgrader.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
-    "upgrade-l2-erc20-contract": "ts-node src/upgradeL2BridgeImpl.ts",
-    "verify": "hardhat run src/verify.ts"
+    "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
+    "upgrade-l2-erc20-contract": "ts-node src/upgradeL2BridgeImpl.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"
