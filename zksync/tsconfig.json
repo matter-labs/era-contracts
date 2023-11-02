@@ -1,9 +1,6 @@
 {
-    "compilerOptions": {
-        "types": [
-            "node",
-            "mocha",
-        ],
-        "downlevelIteration": true,
-    }
+  "compilerOptions": {
+    "types": ["node", "mocha"],
+    "downlevelIteration": true
+  }
 }

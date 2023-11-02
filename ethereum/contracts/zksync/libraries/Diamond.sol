@@ -122,17 +122,13 @@ library Diamond {
 
     /// @dev Add new functions to the diamond proxy
     /// NOTE: expect but NOT enforce that `_selectors` is NON-EMPTY array
-    function _addFunctions(
-        address _facet,
-        bytes4[] memory _selectors,
-        bool _isFacetFreezable
-    ) private {
+    function _addFunctions(address _facet, bytes4[] memory _selectors, bool _isFacetFreezable) private {
         DiamondStorage storage ds = getDiamondStorage();
 
-        // Facet with no code cannot be added. 
-        // This check also verifies that the facet does not have zero address, since it is the 
-        // address with which 0x00000000 selector is associated.   
-        require(_facet.code.length > 0, "G"); 
+        // Facet with no code cannot be added.
+        // This check also verifies that the facet does not have zero address, since it is the
+        // address with which 0x00000000 selector is associated.
+        require(_facet.code.length > 0, "G");
 
         // Add facet to the list of facets if the facet address is new one
         _saveFacetIfNew(_facet);
@@ -149,16 +145,12 @@ library Diamond {
 
     /// @dev Change associated facets to already known function selectors
     /// NOTE: expect but NOT enforce that `_selectors` is NON-EMPTY array
-    function _replaceFunctions(
-        address _facet,
-        bytes4[] memory _selectors,
-        bool _isFacetFreezable
-    ) private {
+    function _replaceFunctions(address _facet, bytes4[] memory _selectors, bool _isFacetFreezable) private {
         DiamondStorage storage ds = getDiamondStorage();
 
-        // Facet with no code cannot be added. 
-        // This check also verifies that the facet does not have zero address, since it is the 
-        // address with which 0x00000000 selector is associated.   
+        // Facet with no code cannot be added.
+        // This check also verifies that the facet does not have zero address, since it is the
+        // address with which 0x00000000 selector is associated.
         require(_facet.code.length > 0, "K");
 
         uint256 selectorsLength = _selectors.length;
@@ -209,11 +201,7 @@ library Diamond {
     /// - `_facet` is NON-ZERO address
     /// - `_facet` is already stored address in `DiamondStorage.facets`
     /// - `_selector` is NOT associated by another facet
-    function _addOneFunction(
-        address _facet,
-        bytes4 _selector,
-        bool _isSelectorFreezable
-    ) private {
+    function _addOneFunction(address _facet, bytes4 _selector, bool _isSelectorFreezable) private {
         DiamondStorage storage ds = getDiamondStorage();
 
         uint16 selectorPosition = (ds.facetToSelectors[_facet].selectors.length).toUint16();

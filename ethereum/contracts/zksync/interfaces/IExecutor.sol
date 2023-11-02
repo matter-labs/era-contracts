@@ -76,8 +76,10 @@ interface IExecutor is IBase {
         uint256[] serializedProof;
     }
 
-    function commitBatches(StoredBatchInfo calldata _lastCommittedBatchData, CommitBatchInfo[] calldata _newBatchesData)
-        external;
+    function commitBatches(
+        StoredBatchInfo calldata _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external;
 
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
