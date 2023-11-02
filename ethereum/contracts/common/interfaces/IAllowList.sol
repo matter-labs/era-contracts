@@ -37,17 +37,9 @@ interface IAllowList {
 
     function getAccessMode(address _target) external view returns (AccessMode);
 
-    function hasSpecialAccessToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool);
+    function hasSpecialAccessToCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool);
 
-    function canCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool);
+    function canCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool);
 
     function getTokenDepositLimitData(address _l1Token) external view returns (Deposit memory);
 
@@ -66,20 +58,11 @@ interface IAllowList {
         bool[] calldata _enables
     ) external;
 
-    function setPermissionToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig,
-        bool _enable
-    ) external;
+    function setPermissionToCall(address _caller, address _target, bytes4 _functionSig, bool _enable) external;
 
     /*//////////////////////////////////////////////////////////////
                            DEPOSIT LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function setDepositLimit(
-        address _l1Token,
-        bool _depositLimitation,
-        uint256 _depositCap
-    ) external;
+    function setDepositLimit(address _l1Token, bool _depositLimitation, uint256 _depositCap) external;
 }
