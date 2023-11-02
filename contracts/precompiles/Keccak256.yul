@@ -4,7 +4,9 @@
  * @dev It accepts the data to be hashed in the calldata, propagate it to the zkEVM built-in circuit precompile via `precompileCall` and burn .
  */
 object "Keccak256" {
-    code { }
+    code { 
+        return(0, 0)
+    }
     object "Keccak256_deployed" {
         code {
             ////////////////////////////////////////////////////////////////
