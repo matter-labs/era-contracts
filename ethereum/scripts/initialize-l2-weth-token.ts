@@ -28,7 +28,7 @@ const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLO
 const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2Weth");
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
   openzeppelinTransparentProxyArtifactsPath,
-  "ITransparentUpgradeableProxy",
+  "TransparentUpgradeableProxy",
   "TransparentUpgradeableProxy"
 );
 
