@@ -22,7 +22,15 @@ contract Base is ReentrancyGuard, AllowListed {
 
     /// @notice Checks that the message sender is an active governor or admin
     modifier onlyGovernorOrAdmin() {
-        require(msg.sender == s.governor || msg.sender == s.admin, "Only by governor or admin");
+        if (s.governor.code.length > 0) {
+            try Ownable(s.governor).owner() returns (address admin) {
+                require(msg.sender == s.governor || msg.sender == admin, "Only by governor or admin");
+            } catch {
+                require(msg.sender == s.governor, "Only by governor or admin");
+            }
+        } else {
+            require(msg.sender == s.governor, "Only by governor or admin");
+        }
         _;
     }
 

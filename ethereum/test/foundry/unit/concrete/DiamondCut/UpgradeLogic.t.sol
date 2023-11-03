@@ -25,17 +25,15 @@ contract UpgradeLogicTest is DiamondCutTest {
     address private randomSigner;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](10);
+        bytes4[] memory dcSelectors = new bytes4[](8);
         dcSelectors[0] = adminFacet.setPendingGovernor.selector;
         dcSelectors[1] = adminFacet.acceptGovernor.selector;
-        dcSelectors[2] = adminFacet.setPendingAdmin.selector;
-        dcSelectors[3] = adminFacet.acceptAdmin.selector;
-        dcSelectors[4] = adminFacet.setValidator.selector;
-        dcSelectors[5] = adminFacet.setPorterAvailability.selector;
-        dcSelectors[6] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        dcSelectors[7] = adminFacet.executeUpgrade.selector;
-        dcSelectors[8] = adminFacet.freezeDiamond.selector;
-        dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
+        dcSelectors[2] = adminFacet.setValidator.selector;
+        dcSelectors[3] = adminFacet.setPorterAvailability.selector;
+        dcSelectors[4] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        dcSelectors[5] = adminFacet.executeUpgrade.selector;
+        dcSelectors[6] = adminFacet.freezeDiamond.selector;
+        dcSelectors[7] = adminFacet.unfreezeDiamond.selector;
         return dcSelectors;
     }
 
@@ -71,7 +69,6 @@ contract UpgradeLogicTest is DiamondCutTest {
         bytes memory diamondInitCalldata = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             0x03752D8252d67f99888E741E3fB642803B29B155,
-            governor,
             governor,
             0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             0,

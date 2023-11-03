@@ -6,6 +6,7 @@ import "../interfaces/IAdmin.sol";
 import "../libraries/Diamond.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
 import "./Base.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
@@ -35,30 +36,6 @@ contract AdminFacet is Base, IAdmin {
 
         emit NewPendingGovernor(pendingGovernor, address(0));
         emit NewGovernor(previousGovernor, pendingGovernor);
-    }
-
-    /// @notice Starts the transfer of admin rights. Only the current governor or admin can propose a new pending one.
-    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
-    /// @param _newPendingAdmin Address of the new admin
-    function setPendingAdmin(address _newPendingAdmin) external onlyGovernorOrAdmin {
-        // Save previous value into the stack to put it into the event later
-        address oldPendingAdmin = s.pendingAdmin;
-        // Change pending admin
-        s.pendingAdmin = _newPendingAdmin;
-        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
-    }
-
-    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
-    function acceptAdmin() external {
-        address pendingAdmin = s.pendingAdmin;
-        require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
-
-        address previousAdmin = s.admin;
-        s.admin = pendingAdmin;
-        delete s.pendingAdmin;
-
-        emit NewPendingAdmin(pendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
     /// @notice Change validator status (active or not active)

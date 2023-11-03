@@ -21,7 +21,6 @@ contract DiamondInit is Base {
     /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
     /// @param _verifier address of Verifier contract
     /// @param _governor address who can manage critical updates in the contract
-    /// @param _admin address who can manage non-critical updates in the contract
     /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
     /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
     /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
@@ -34,7 +33,6 @@ contract DiamondInit is Base {
     struct InitializeData {
         IVerifier verifier;
         address governor;
-        address admin;
         bytes32 genesisBatchHash;
         uint64 genesisIndexRepeatedStorageChanges;
         bytes32 genesisBatchCommitment;
@@ -55,12 +53,10 @@ contract DiamondInit is Base {
     function initialize(InitializeData calldata _initalizeData) external reentrancyGuardInitializer returns (bytes32) {
         require(address(_initalizeData.verifier) != address(0), "vt");
         require(_initalizeData.governor != address(0), "vy");
-        require(_initalizeData.admin != address(0), "hc");
         require(_initalizeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
         s.verifier = _initalizeData.verifier;
         s.governor = _initalizeData.governor;
-        s.admin = _initalizeData.admin;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(

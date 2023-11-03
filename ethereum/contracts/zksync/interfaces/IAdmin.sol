@@ -11,10 +11,6 @@ interface IAdmin is IBase {
 
     function acceptGovernor() external;
 
-    function setPendingAdmin(address _newPendingAdmin) external;
-
-    function acceptAdmin() external;
-
     function setValidator(address _validator, bool _active) external;
 
     function setPorterAvailability(bool _zkPorterIsAvailable) external;

@@ -36,17 +36,15 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
+        bytes4[] memory selectors = new bytes4[](8);
         selectors[0] = admin.setPendingGovernor.selector;
         selectors[1] = admin.acceptGovernor.selector;
-        selectors[2] = admin.setPendingAdmin.selector;
-        selectors[3] = admin.acceptAdmin.selector;
-        selectors[4] = admin.setValidator.selector;
-        selectors[5] = admin.setPorterAvailability.selector;
-        selectors[6] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[7] = admin.executeUpgrade.selector;
-        selectors[8] = admin.freezeDiamond.selector;
-        selectors[9] = admin.unfreezeDiamond.selector;
+        selectors[2] = admin.setValidator.selector;
+        selectors[3] = admin.setPorterAvailability.selector;
+        selectors[4] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = admin.executeUpgrade.selector;
+        selectors[6] = admin.freezeDiamond.selector;
+        selectors[7] = admin.unfreezeDiamond.selector;
         return selectors;
     }
 
@@ -122,7 +120,6 @@ contract ExecutorTest is Test {
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             dummyAddress, //verifier
-            owner,
             owner,
             0,
             0,

@@ -140,7 +140,7 @@ struct AppStorage {
     /// yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
     /// @dev Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
-    address admin;
+    address __DEPRECATED_admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
     address pendingAdmin;
 }
