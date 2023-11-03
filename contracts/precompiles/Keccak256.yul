@@ -85,7 +85,7 @@ object "Keccak256" {
                 0                                 // per precompile interpreted value (0 since circuit doesn't react on this value anyway)
             )
             // 4. Calculate number of required hash rounds per calldata
-            let numRounds := div(add(ptrLength, sub(BLOCK_SIZE(), 1)), BLOCK_SIZE())
+            let numRounds := add(div(ptrLength, BLOCK_SIZE()), 1)
             let gasToPay := mul(KECCAK_ROUND_GAS_COST(), numRounds)
 
             // 5. Call precompile
