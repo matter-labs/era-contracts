@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import "../libraries/PriorityQueue.sol";
 import "./IBase.sol";
 
 /// @author Matter Labs

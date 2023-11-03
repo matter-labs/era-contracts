@@ -6,3 +6,5 @@ node_modules
 ./contracts/DS_Store
 /artifacts-forge
 /cache-forge
+yarn-debug.log*
+yarn-error.log*
