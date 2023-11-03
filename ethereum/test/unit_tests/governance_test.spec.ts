@@ -38,7 +38,6 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
     );
-    console.log(revertReason);
     expect(revertReason).equal("Only by governor or admin");
   });
 
