@@ -9,6 +9,8 @@ import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/ta
 import { task } from "hardhat/config";
 import "solidity-coverage";
 import { getNumberFromEnv } from "./scripts/utils";
+import "@matterlabs/hardhat-zksync-deploy";
+import "@matterlabs/hardhat-zksync-solc";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
@@ -101,11 +103,13 @@ export default {
       url: process.env.ETH_CLIENT_WEB3_URL?.split(",")[0],
     },
     hardhat: {
-      allowUnlimitedContractSize: false,
-      forking: {
-        url: "https://eth-goerli.g.alchemy.com/v2/" + process.env.ALCHEMY_KEY,
-        enabled: process.env.TEST_CONTRACTS_FORK === "1",
-      },
+      zksync: true,
+    },
+    localhost: {
+      // era-test-node default url
+      url: "http://127.0.0.1:8011",
+      ethNetwork: "http://127.0.0.1:8011",
+      zksync: true,
     },
   },
   etherscan: {

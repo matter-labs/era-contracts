@@ -1,3 +1,7 @@
 .idea
 tools/target
 tools/data/Verifier.sol
+
+ethereum/.yarn
+ethereum/artifacts-zk
+ethereum/cache-zk
