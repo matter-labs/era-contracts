@@ -24,9 +24,13 @@ export default {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 9999999,
       },
-      viaIR: true,
+      outputSelection: {
+        "*": {
+          "*": ["storageLayout"],
+        },
+      },
     },
   },
   solpp: {
