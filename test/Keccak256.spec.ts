@@ -5,8 +5,9 @@ import { getWallets, loadArtifact, publishBytecode, setCode } from './shared/uti
 import { ethers } from 'hardhat';
 import { readYulBytecode } from '../scripts/utils';
 import { Language } from '../scripts/constants';
-import { Wallet } from 'ethers';
+import { BytesLike, Wallet, providers } from 'ethers';
 import { expect } from 'chai';
+import { ECDH } from 'crypto';
 
 describe('Keccak256 tests', function () {
     let testWallet: Wallet;
@@ -58,17 +59,26 @@ describe('Keccak256 tests', function () {
         // Displaying seed for reproducible tests
         console.log('Keccak256 fussing seed', ethers.utils.hexlify(seed));
 
-        for(let i = 0; i < 5; i++) {
-            const data = ethers.utils.keccak256(ethers.utils.hexConcat([seed, i]));
+        // Testing empty array
+        await compareCorrectHash('0x', testWallet.provider!);
+        const BLOCK_SIZE = 136;
 
-            const correctHash = ethers.utils.keccak256(data);
-            const hashFromPrecompile = await testWallet.provider.call({
-                to: KECCAK256_CONTRACT_ADDRESS,
-                data: data
-            });
+        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE - 1), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE - 2), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE + 1), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE + 2), testWallet.provider!);
 
-            expect(hashFromPrecompile).to.equal(correctHash, 'Hash is incorrect');
-        }
+        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE - 1), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE - 2), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE + 1), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE + 2), testWallet.provider!);
+
+        // In order to get random length, we use modulo operation
+        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(113).toNumber()), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(1101).toNumber()), testWallet.provider!);
+        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(17).toNumber()), testWallet.provider!);
     });
 
     it('keccak upgrade test', async() => {
@@ -88,3 +98,28 @@ describe('Keccak256 tests', function () {
         );
     })
 });
+
+async function compareCorrectHash (
+    data: BytesLike,
+    provider: providers.Provider
+) {
+    const correctHash = ethers.utils.keccak256(data);
+    const hashFromPrecompile = await provider.call({
+        to: KECCAK256_CONTRACT_ADDRESS,
+        data
+    });
+    expect(hashFromPrecompile).to.equal(correctHash, 'Hash is incorrect');
+}
+
+function randomHexFromSeed(
+    seed: BytesLike,
+    len: number,
+) {
+    const hexLen = len * 2 + 2;
+    let data = '0x';
+    while (data.length < hexLen) {
+        const next = ethers.utils.keccak256(ethers.utils.hexConcat([seed, data]));
+        data = ethers.utils.hexConcat([data, next]);
+    }
+    return data.substring(0, hexLen);
+}
