@@ -11,7 +11,7 @@ import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { AllowListFactory } from "../typechain";
-import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
 import {
   readSystemContractsBytecode,
   hashL2Bytecode,
@@ -468,7 +468,7 @@ export class Deployer {
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
   }
 
   public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
