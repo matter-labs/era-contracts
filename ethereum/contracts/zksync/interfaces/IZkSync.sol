@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "./IMailbox.sol";
-import "./IGovernance.sol";
+import "./IAdmin.sol";
 import "./IExecutor.sol";
-import "./IDiamondCut.sol";
 import "./IGetters.sol";
 
-interface IZkSync is IMailbox, IGovernance, IExecutor, IDiamondCut, IGetters {}
+interface IZkSync is IMailbox, IAdmin, IExecutor, IGetters {}

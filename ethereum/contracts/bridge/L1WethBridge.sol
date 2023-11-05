@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -21,6 +21,7 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev This contract is designed to streamline and enhance the user experience
 /// for bridging WETH tokens between L1 and L2 networks. The primary goal of this bridge is to
 /// simplify the process by minimizing the number of transactions required, thus improving
@@ -54,17 +55,13 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev The address of the WETH on L2
     address public l2WethAddress;
 
-    /// @dev A mapping L2 block number => message number => flag
+    /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address payable _l1WethAddress,
-        IZkSync _zkSync,
-        IAllowList _allowList
-    ) reentrancyGuardInitializer {
+    constructor(address payable _l1WethAddress, IZkSync _zkSync, IAllowList _allowList) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         zkSync = _zkSync;
         allowList = _allowList;
@@ -77,8 +74,10 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
-    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge implementation
-    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge proxy
+    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2
+    /// bridge implementation
+    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
+    /// proxy
     function initialize(
         bytes[] calldata _factoryDeps,
         address _l2WethAddress,
@@ -129,7 +128,8 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
             l2WethBridgeProxyConstructorData,
-            new bytes[](0) // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
+            // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
+            new bytes[](0)
         );
     }
 
@@ -142,13 +142,18 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
     /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
+    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
+    /// out of control.
     /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds are controllable through the Mailbox,
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
+    /// be sent to the `msg.sender` address.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
+    /// sent to the aliased `msg.sender` address.
+    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
+    /// are controllable through the Mailbox,
     /// since the Mailbox applies address aliasing to the from address for the L2 tx if the L1 msg.sender is a contract.
-    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx requests
+    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx
+    /// requests
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return txHash The L2 transaction hash of deposit finalization
     function deposit(
@@ -204,50 +209,52 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on L2.
-    /// Note: Refund is performed by sending an equivalent amount of ETH on L2 to the specified deposit refund recipient address.
+    /// Note: Refund is performed by sending an equivalent amount of ETH on L2 to the specified deposit refund
+    /// recipient address.
     function claimFailedDeposit(
         address, // _depositSender,
         address, // _l1Token,
         bytes32, // _l2TxHash
-        uint256, // _l2BlockNumber,
+        uint256, // _l2BatchNumber,
         uint256, // _l2MessageIndex,
-        uint16, // _l2TxNumberInBlock,
+        uint16, // _l2TxNumberInBatch,
         bytes32[] calldata // _merkleProof
     ) external pure {
         revert("Method not supported. Failed deposit funds are sent to the L2 refund recipient address.");
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the ETH (WETH) withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the ETH withdrawal message containing additional data about WETH withdrawal
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the ETH withdrawal log was sent
+    /// @param _l2BatchNumber The L2 batch number where the ETH (WETH) withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the ETH
+    /// withdrawal message containing additional data about WETH withdrawal
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the ETH withdrawal log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
 
         (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);
 
         // Check if the withdrawal has already been finalized on L2.
-        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
+        bool alreadyFinalised = zkSync.isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
         if (alreadyFinalised) {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             L2Message memory l2ToL1Message = L2Message({
-                txNumberInBlock: _l2TxNumberInBlock,
+                txNumberInBatch: _l2TxNumberInBatch,
                 sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
                 data: _message
             });
-            bool success = zkSync.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
+            bool success = zkSync.proveL2MessageInclusion(_l2BatchNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
             require(success, "vq");
         } else {
             // Finalize the withdrawal if it is not yet done.
-            zkSync.finalizeEthWithdrawal(_l2BlockNumber, _l2MessageIndex, _l2TxNumberInBlock, _message, _merkleProof);
+            zkSync.finalizeEthWithdrawal(_l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
         }
 
         // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
@@ -255,20 +262,20 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         // Transfer WETH tokens from the smart contract address to the withdrawal receiver
         IERC20(l1WethAddress).safeTransfer(l1WethWithdrawReceiver, amount);
 
-        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
 
         emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
     }
 
-    /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken contract
-    function _parseL2EthWithdrawalMessage(bytes memory _message)
-        internal
-        view
-        returns (address l1WethReceiver, uint256 ethAmount)
-    {
+    /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken
+    /// contract
+    function _parseL2EthWithdrawalMessage(
+        bytes memory _message
+    ) internal view returns (address l1WethReceiver, uint256 ethAmount) {
         // Check that the message length is correct.
         // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
-        // It should be equal to the length of the function signature + eth receiver address + uint256 amount + additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
+        // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
+        // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
         require(_message.length == 96, "Incorrect ETH message with additional data length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);

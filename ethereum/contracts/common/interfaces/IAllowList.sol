@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 interface IAllowList {
     /*//////////////////////////////////////////////////////////////
@@ -12,6 +12,9 @@ interface IAllowList {
 
     /// @notice Permission to call is changed
     event UpdateCallPermission(address indexed caller, address indexed target, bytes4 indexed functionSig, bool status);
+
+    /// @notice Deposit limit of a token is changed
+    event UpdateDepositLimit(address indexed l1Token, bool depositLimitation, uint256 depositCap);
 
     /// @notice Type of access to a specific contract includes three different modes
     /// @param Closed No one has access to the contract
@@ -37,17 +40,9 @@ interface IAllowList {
 
     function getAccessMode(address _target) external view returns (AccessMode);
 
-    function hasSpecialAccessToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool);
+    function hasSpecialAccessToCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool);
 
-    function canCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig
-    ) external view returns (bool);
+    function canCall(address _caller, address _target, bytes4 _functionSig) external view returns (bool);
 
     function getTokenDepositLimitData(address _l1Token) external view returns (Deposit memory);
 
@@ -66,20 +61,11 @@ interface IAllowList {
         bool[] calldata _enables
     ) external;
 
-    function setPermissionToCall(
-        address _caller,
-        address _target,
-        bytes4 _functionSig,
-        bool _enable
-    ) external;
+    function setPermissionToCall(address _caller, address _target, bytes4 _functionSig, bool _enable) external;
 
     /*//////////////////////////////////////////////////////////////
                            DEPOSIT LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function setDepositLimit(
-        address _l1Token,
-        bool _depositLimitation,
-        uint256 _depositCap
-    ) external;
+    function setDepositLimit(address _l1Token, bool _depositLimitation, uint256 _depositCap) external;
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {L2Log, L2Message} from "../Storage.sol";
 import "./IBase.sol";
@@ -21,8 +21,8 @@ interface IMailbox is IBase {
     /// @param to The recipient's address. `uint256` type for possible address format changes and maintaining backward compatibility
     /// @param gasLimit The L2 gas limit for L2 transaction. Analog to the `gasLimit` on an L1 transactions
     /// @param gasPerPubdataByteLimit Maximum number of L2 gas that will cost one byte of pubdata (every piece of data that will be stored on L1 as calldata)
-    /// @param maxFeePerGas The absolute maximum sender willing to pay per unit of L2 gas to get the transaction included in a block. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
-    /// @param maxPriorityFeePerGas The additional fee that is paid directly to the validator to incentivize them to include the transaction in a block. Analog to the EIP-1559 `maxPriorityFeePerGas` on an L1 transactions
+    /// @param maxFeePerGas The absolute maximum sender willing to pay per unit of L2 gas to get the transaction included in a batch. Analog to the EIP-1559 `maxFeePerGas` on an L1 transactions
+    /// @param maxPriorityFeePerGas The additional fee that is paid directly to the validator to incentivize them to include the transaction in a batch. Analog to the EIP-1559 `maxPriorityFeePerGas` on an L1 transactions
     /// @param paymaster The address of the EIP-4337 paymaster, that will pay fees for the transaction. `uint256` type for possible address format changes and maintaining backward compatibility
     /// @param nonce The nonce of the transaction. For L1->L2 transactions it is the priority operation Id.
     /// @param value The value to pass with the transaction
@@ -69,6 +69,7 @@ interface IMailbox is IBase {
     /// @param contractAddressL2 The address of the contract on L2 to call.
     /// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
     /// @param l2GasLimit The limit of the L2 gas for the L2 transaction
+    /// @param l2GasPrice The price of the L2 gas in Wei to be used for this transaction.
     /// @param l2GasPricePerPubdata The price for a single pubdata byte in L2 gas.
     /// @param valueToMint The amount of ether that should be minted on L2 as the result of this transaction.
     /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
@@ -87,14 +88,14 @@ interface IMailbox is IBase {
     }
 
     function proveL2MessageInclusion(
-        uint256 _blockNumber,
+        uint256 _l2BatchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view returns (bool);
 
     function proveL2LogInclusion(
-        uint256 _blockNumber,
+        uint256 _l2BatchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
@@ -102,17 +103,17 @@ interface IMailbox is IBase {
 
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view returns (bool);
 
     function finalizeEthWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Smart contract for sending arbitrary length messages to L1
  * @dev by default ZkSync can send fixed-length messages on L1.
  * A fixed length message has 4 parameters `senderAddress` `isService`, `key`, `value`,
@@ -21,6 +22,11 @@ interface IL2Messenger {
     function sendToL1(bytes memory _message) external returns (bytes32);
 }
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to deploy contracts on L2.
+ */
 interface IContractDeployer {
     /// @notice A struct that describes a forced deployment on an address.
     /// @param bytecodeHash The bytecode hash to put on an address.
@@ -38,19 +44,20 @@ interface IContractDeployer {
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     /// @param _deployParams A set of parameters describing force deployment.
-    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external;
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployParams) external payable;
 
     /// @notice Creates a new contract at a determined address using the `CREATE2` salt on L2
     /// @param _salt a unique value to create the deterministic address of the new contract
     /// @param _bytecodeHash the bytecodehash of the new contract to be deployed
     /// @param _input the calldata to be sent to the constructor of the new contract
-    function create2(
-        bytes32 _salt,
-        bytes32 _bytecodeHash,
-        bytes calldata _input
-    ) external;
+    function create2(bytes32 _salt, bytes32 _bytecodeHash, bytes calldata _input) external returns (address);
 }
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice Interface for the contract that is used to simulate ETH on L2.
+ */
 interface IEthToken {
     /// @notice Allows the withdrawal of ETH to a given L1 receiver along with an additional message.
     /// @param _l1Receiver The address on L1 to receive the withdrawn ETH.
@@ -70,6 +77,7 @@ IEthToken constant L2_ETH_ADDRESS = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Helper library for working with L2 contracts on L1.
  */
 library L2ContractHelper {

@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 /// @dev The address of the L2 deployer system contract.
 address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(0x8006);
 
-/// @dev The special reserved L2 address. It is located in the system contracts space but doesn't have deployed bytecode.
+/// @dev The special reserved L2 address. It is located in the system contracts space but doesn't have deployed
+/// bytecode.
 /// @dev The L2 deployer system contract allows changing bytecodes on any address if the `msg.sender` is this address.
-/// @dev So, whenever the governor wants to redeploy system contracts, it just initiates the L1 upgrade call deployer system contract
-/// via the L1 -> L2 transaction with `sender == L2_FORCE_DEPLOYER_ADDR`. For more details see the `diamond-initializers` contracts.
+/// @dev So, whenever the governor wants to redeploy system contracts, it just initiates the L1 upgrade call deployer
+/// system contract
+/// via the L1 -> L2 transaction with `sender == L2_FORCE_DEPLOYER_ADDR`. For more details see the
+/// `diamond-initializers` contracts.
 address constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
@@ -25,3 +28,6 @@ address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(0x8004);
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(0x800b);
+
+/// @dev The address of the bytecode compressor system contract
+address constant L2_BYTECODE_COMPRESSOR_SYSTEM_CONTRACT_ADDR = address(0x800e);

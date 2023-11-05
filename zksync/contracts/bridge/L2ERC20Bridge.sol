@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -15,6 +15,7 @@ import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens.
 contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
@@ -36,11 +37,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         _disableInitializers();
     }
 
-    function initialize(
-        address _l1Bridge,
-        bytes32 _l2TokenProxyBytecodeHash,
-        address _governor
-    ) external initializer {
+    function initialize(address _l1Bridge, bytes32 _l2TokenProxyBytecodeHash, address _governor) external initializer {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_governor != address(0), "sf");
@@ -101,11 +98,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(
-        address _l1Receiver,
-        address _l2Token,
-        uint256 _amount
-    ) external override {
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
         IL2StandardToken(_l2Token).bridgeBurn(msg.sender, _amount);
 
         address l1Token = l1TokenAddress[_l2Token];

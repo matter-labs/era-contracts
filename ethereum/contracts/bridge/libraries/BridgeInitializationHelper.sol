@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../../zksync/interfaces/IZkSync.sol";
 import "../../vendor/AddressAliasHelper.sol";
@@ -9,6 +9,7 @@ import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses
 import "../../common/interfaces/IL2ContractDeployer.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev A helper library for initializing L2 bridges in zkSync L2 network.
 library BridgeInitializationHelper {
     /// @dev The L2 gas limit for requesting L1 -> L2 transaction of deploying L2 bridge instance.

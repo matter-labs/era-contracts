@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "./TestnetERC20Token.sol";
 
@@ -9,11 +9,7 @@ import "./TestnetERC20Token.sol";
 contract RevertTransferERC20 is TestnetERC20Token {
     bool public revertTransfer;
 
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 decimals
-    ) TestnetERC20Token(name, symbol, decimals) {
+    constructor(string memory name, string memory symbol, uint8 decimals) TestnetERC20Token(name, symbol, decimals) {
         revertTransfer = false;
     }
 

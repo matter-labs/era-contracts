@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../libraries/Diamond.sol";
+import "../interfaces/IVerifier.sol";
 import "../facets/Base.sol";
 
 interface IOldDiamondCut {
@@ -43,7 +44,7 @@ contract DiamondUpgradeInit3 is Base {
     function upgrade(
         uint256 _priorityTxMaxGasLimit,
         IAllowList _allowList,
-        Verifier _verifier
+        IVerifier _verifier
     ) external payable returns (bytes32) {
         // Zero out the deprecated storage slots
         delete s.__DEPRECATED_diamondCutStorage;

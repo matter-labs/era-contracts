@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @dev The library provides a set of functions that help read data from an "abi.encodePacked" byte array.
  * @dev Each of the functions accepts the `bytes memory` and the offset where data should be read and returns a value of a certain type.
  *

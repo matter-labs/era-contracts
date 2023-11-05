@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 /// @notice The structure that contains meta information of the L2 transaction that was requested from L1
 /// @dev The weird size of fields was selected specifically to minimize the structure storage size
@@ -14,6 +14,7 @@ struct PriorityOperation {
 }
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @dev The library provides the API to interact with the priority queue container
 /// @dev Order of processing operations from queue - FIFO (Fist in - first out)
 library PriorityQueue {

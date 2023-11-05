@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @dev The interface that is used for encoding/decoding of
  * different types of paymaster flows.
  * @notice This is NOT an interface to be implementated
@@ -12,9 +13,5 @@ pragma solidity ^0.8.0;
 interface IPaymasterFlow {
     function general(bytes calldata input) external;
 
-    function approvalBased(
-        address _token,
-        uint256 _minAllowance,
-        bytes calldata _innerInput
-    ) external;
+    function approvalBased(address _token, uint256 _minAllowance, bytes calldata _innerInput) external;
 }

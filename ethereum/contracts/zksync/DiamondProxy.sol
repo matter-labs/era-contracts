@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
-import "./libraries/Diamond.sol";
+import {Diamond} from "./libraries/Diamond.sol";
 
 /// @title Diamond Proxy Contract (EIP-2535)
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract DiamondProxy {
     constructor(uint256 _chainId, Diamond.DiamondCutData memory _diamondCut) {
         // Check that the contract is deployed on the expected chain.

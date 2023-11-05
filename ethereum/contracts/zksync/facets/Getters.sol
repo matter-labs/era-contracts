@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "./Base.sol";
 import "../libraries/Diamond.sol";
 import "../libraries/PriorityQueue.sol";
 import "../../common/libraries/UncheckedMath.sol";
 import "../interfaces/IGetters.sol";
+import "../interfaces/ILegacyGetters.sol";
 
-/// @title Getters Contract implements functions for getting contract state from outside the blockchain.
+/// @title Getters Contract implements functions for getting contract state from outside the batchchain.
 /// @author Matter Labs
-contract GettersFacet is Base, IGetters {
+/// @custom:security-contact security@matterlabs.dev
+contract GettersFacet is Base, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
@@ -35,19 +37,19 @@ contract GettersFacet is Base, IGetters {
         return s.pendingGovernor;
     }
 
-    /// @return The total number of blocks that were committed
-    function getTotalBlocksCommitted() external view returns (uint256) {
-        return s.totalBlocksCommitted;
+    /// @return The total number of batches that were committed
+    function getTotalBatchesCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
     }
 
-    /// @return The total number of blocks that were committed & verified
-    function getTotalBlocksVerified() external view returns (uint256) {
-        return s.totalBlocksVerified;
+    /// @return The total number of batches that were committed & verified
+    function getTotalBatchesVerified() external view returns (uint256) {
+        return s.totalBatchesVerified;
     }
 
-    /// @return The total number of blocks that were committed & verified & executed
-    function getTotalBlocksExecuted() external view returns (uint256) {
-        return s.totalBlocksExecuted;
+    /// @return The total number of batches that were committed & verified & executed
+    function getTotalBatchesExecuted() external view returns (uint256) {
+        return s.totalBatchesExecuted;
     }
 
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
@@ -77,16 +79,16 @@ contract GettersFacet is Base, IGetters {
         return s.validators[_address];
     }
 
-    /// @return Merkle root of the tree with L2 logs for the selected block
-    function l2LogsRootHash(uint256 _blockNumber) external view returns (bytes32) {
-        return s.l2LogsRootHashes[_blockNumber];
+    /// @return Merkle root of the tree with L2 logs for the selected batch
+    function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32) {
+        return s.l2LogsRootHashes[_batchNumber];
     }
 
-    /// @notice For unfinalized (non executed) blocks may change
-    /// @dev returns zero for non-committed blocks
-    /// @return The hash of committed L2 block.
-    function storedBlockHash(uint256 _blockNumber) external view returns (bytes32) {
-        return s.storedBlockHashes[_blockNumber];
+    /// @notice For unfinalized (non executed) batches may change
+    /// @dev returns zero for non-committed batches
+    /// @return The hash of committed L2 batch.
+    function storedBatchHash(uint256 _batchNumber) external view returns (bytes32) {
+        return s.storedBatchHashes[_batchNumber];
     }
 
     /// @return Bytecode hash of bootloader program.
@@ -104,31 +106,6 @@ contract GettersFacet is Base, IGetters {
         return s.verifierParams;
     }
 
-    /// @return The address of the security council multisig
-    function getSecurityCouncil() external view returns (address) {
-        return s.upgrades.securityCouncil;
-    }
-
-    /// @return Current upgrade proposal state
-    function getUpgradeProposalState() external view returns (UpgradeState) {
-        return s.upgrades.state;
-    }
-
-    /// @return The upgrade proposal hash if there is an active one and zero otherwise
-    function getProposedUpgradeHash() external view returns (bytes32) {
-        return s.upgrades.proposedUpgradeHash;
-    }
-
-    /// @return The timestamp when the upgrade was proposed, zero if there are no active proposals
-    function getProposedUpgradeTimestamp() external view returns (uint256) {
-        return s.upgrades.proposedUpgradeTimestamp;
-    }
-
-    /// @return The serial number of a proposed upgrade, increments when proposing a new one
-    function getCurrentProposalId() external view returns (uint256) {
-        return s.upgrades.currentProposalId;
-    }
-
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256) {
         return s.protocolVersion;
@@ -139,18 +116,13 @@ contract GettersFacet is Base, IGetters {
         return s.l2SystemContractsUpgradeTxHash;
     }
 
-    /// @return The L2 block number in which the upgrade transaction was processed.
+    /// @return The L2 batch number in which the upgrade transaction was processed.
     /// @dev It is equal to 0 in the following two cases:
     /// - No upgrade transaction has ever been processed.
-    /// - The upgrade transaction has been processed and the block with such transaction has been
+    /// - The upgrade transaction has been processed and the batch with such transaction has been
     /// executed (i.e. finalized).
-    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
-        return s.l2SystemContractsUpgradeBlockNumber;
-    }
-
-    /// @return The number of received upgrade approvals from the security council
-    function isApprovedBySecurityCouncil() external view returns (bool) {
-        return s.upgrades.approvedBySecurityCouncil;
+    function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBatchNumber;
     }
 
     /// @return Whether the diamond is frozen or not
@@ -190,10 +162,10 @@ contract GettersFacet is Base, IGetters {
     }
 
     /// @return Whether a withdrawal has been finalized.
-    /// @param _l2BlockNumber The L2 block number within which the withdrawal happened.
+    /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
-    function isEthWithdrawalFinalized(uint256 _l2BlockNumber, uint256 _l2MessageIndex) external view returns (bool) {
-        return s.isEthWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex];
+    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
+        return s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -231,5 +203,45 @@ contract GettersFacet is Base, IGetters {
     function facetAddress(bytes4 _selector) external view returns (address) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         return ds.selectorToFacet[_selector].facetAddress;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        DEPRECATED METHODS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @return The total number of batches that were committed
+    /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
+    function getTotalBlocksCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
+    }
+
+    /// @return The total number of batches that were committed & verified
+    /// @dev It is a *deprecated* method, please use `getTotalBatchesVerified` instead.
+    function getTotalBlocksVerified() external view returns (uint256) {
+        return s.totalBatchesVerified;
+    }
+
+    /// @return The total number of batches that were committed & verified & executed
+    /// @dev It is a *deprecated* method, please use `getTotalBatchesExecuted` instead.
+    function getTotalBlocksExecuted() external view returns (uint256) {
+        return s.totalBatchesExecuted;
+    }
+
+    /// @notice For unfinalized (non executed) batches may change
+    /// @dev It is a *deprecated* method, please use `storedBatchHash` instead.
+    /// @dev returns zero for non-committed batches
+    /// @return The hash of committed L2 batch.
+    function storedBlockHash(uint256 _batchNumber) external view returns (bytes32) {
+        return s.storedBatchHashes[_batchNumber];
+    }
+
+    /// @return The L2 batch number in which the upgrade transaction was processed.
+    /// @dev It is a *deprecated* method, please use `getL2SystemContractsUpgradeBatchNumber` instead.
+    /// @dev It is equal to 0 in the following two cases:
+    /// - No upgrade transaction has ever been processed.
+    /// - The upgrade transaction has been processed and the batch with such transaction has been
+    /// executed (i.e. finalized).
+    function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBatchNumber;
     }
 }

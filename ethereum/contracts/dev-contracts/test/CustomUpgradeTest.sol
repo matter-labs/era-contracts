@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../../zksync/libraries/Diamond.sol";
 import "../../upgrades/BaseZkSyncUpgrade.sol";
@@ -17,7 +17,8 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
 
     /// @notice placeholder function for custom logic for post-upgrade logic.
     /// Typically this function will never be used.
-    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each upgrade.
+    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
+    /// upgrade.
     function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
 
     /// @notice The main function that will be called by the upgrade proxy.

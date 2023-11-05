@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -21,6 +21,7 @@ import "../common/ReentrancyGuard.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
@@ -33,7 +34,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IZkSync internal immutable zkSync;
 
-    /// @dev A mapping L2 block number => message number => flag
+    /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
     mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
 
@@ -76,7 +77,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @notice At the time of the function call, it is not yet deployed in L2, but knowledge of its address
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _governor Address which can change L2 token implementation and upgrade the bridge
-    /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge implementation
+    /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge
+    /// implementation
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function initialize(
         bytes[] calldata _factoryDeps,
@@ -123,7 +125,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             _deployBridgeProxyFee,
             l2BridgeProxyBytecodeHash,
             l2BridgeProxyConstructorData,
-            new bytes[](0) // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+            // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+            new bytes[](0)
         );
     }
 
@@ -136,7 +139,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return l2TxHash The L2 transaction hash of deposit finalization
-    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner method does.
+    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner
+    /// method does.
     function deposit(
         address _l2Receiver,
         address _l1Token,
@@ -156,14 +160,18 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
     /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
+    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses
+    /// out of control.
     /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds are controllable through the Mailbox,
-    /// since the Mailbox applies address aliasing to the from address for the L2 tx if the L1 msg.sender is a contract.
-    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx requests
-    /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will
+    /// be sent to the `msg.sender` address.
+    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be
+    /// sent to the aliased `msg.sender` address.
+    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds
+    /// are controllable through the Mailbox, since the Mailbox applies address aliasing to the from address for the
+    /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
+    /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
+    /// the funds would be lost.
     /// @return l2TxHash The L2 transaction hash of deposit finalization
     function deposit(
         address _l2Receiver,
@@ -205,11 +213,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFunds(
-        address _from,
-        IERC20 _token,
-        uint256 _amount
-    ) internal returns (uint256) {
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
@@ -244,24 +248,24 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _depositSender The address of the deposit initiator
     /// @param _l1Token The address of the deposited L1 ERC20 token
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
-    /// @param _l2BlockNumber The L2 block number where the deposit finalization was processed
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
     function claimFailedDeposit(
         address _depositSender,
         address _l1Token,
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
         bool proofValid = zkSync.proveL1ToL2TransactionStatus(
             _l2TxHash,
-            _l2BlockNumber,
+            _l2BatchNumber,
             _l2MessageIndex,
-            _l2TxNumberInBlock,
+            _l2TxNumberInBatch,
             _merkleProof,
             TxStatus.Failure
         );
@@ -281,22 +285,22 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BlockNumber The L2 block number where the withdrawal was processed
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBlock The L2 transaction number in a block, in which the log was sent
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
     function finalizeWithdrawal(
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant senderCanCallFunction(allowList) {
-        require(!isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex], "pw");
+        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
 
         L2Message memory l2ToL1Message = L2Message({
-            txNumberInBlock: _l2TxNumberInBlock,
+            txNumberInBatch: _l2TxNumberInBatch,
             sender: l2Bridge,
             data: _message
         });
@@ -304,11 +308,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(l2ToL1Message.data);
         // Preventing the stack too deep error
         {
-            bool success = zkSync.proveL2MessageInclusion(_l2BlockNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
+            bool success = zkSync.proveL2MessageInclusion(_l2BatchNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
             require(success, "nq");
         }
 
-        isWithdrawalFinalized[_l2BlockNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
         // Withdraw funds
         IERC20(l1Token).safeTransfer(l1Receiver, amount);
 
@@ -316,17 +320,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(bytes memory _l2ToL1message)
-        internal
-        pure
-        returns (
-            address l1Receiver,
-            address l1Token,
-            uint256 amount
-        )
-    {
+    function _parseL2WithdrawalMessage(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Receiver, address l1Token, uint256 amount) {
         // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 = 76 (bytes).
+        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+        // 76 (bytes).
         require(_l2ToL1message.length == 76, "kk");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
@@ -338,12 +337,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     /// @dev Verify the deposit limit is reached to its cap or not
-    function _verifyDepositLimit(
-        address _l1Token,
-        address _depositor,
-        uint256 _amount,
-        bool _claiming
-    ) internal {
+    function _verifyDepositLimit(address _l1Token, address _depositor, uint256 _amount, bool _claiming) internal {
         IAllowList.Deposit memory limitData = IAllowList(allowList).getTokenDepositLimitData(_l1Token);
         if (!limitData.depositLimitation) return; // no deposit limitation is placed for this token
 
