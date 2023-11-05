@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "./interfaces/IBootloaderUtilities.sol";
 import "./libraries/TransactionHelper.sol";
@@ -9,6 +9,7 @@ import "./libraries/EfficientCall.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice A contract that provides some utility methods for the bootloader
  * that is very hard to write in Yul.
  */

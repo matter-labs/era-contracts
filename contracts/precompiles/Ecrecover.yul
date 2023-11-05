@@ -1,10 +1,13 @@
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice The contract used to emulate EVM's ecrecover precompile.
  * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
  */
 object "Ecrecover" {
-    code { }
+    code {
+        return(0, 0)
+    }
     object "Ecrecover_deployed" {
         code {
             ////////////////////////////////////////////////////////////////

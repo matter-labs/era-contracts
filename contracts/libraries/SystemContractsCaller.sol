@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity 0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "../Constants.sol";
 import "./Utils.sol";
@@ -61,6 +61,7 @@ enum CalldataForwardingMode {
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice A library that allows calling contracts with the `isSystem` flag.
  * @dev It is needed to call ContractDeployer and NonceHolder.
  */

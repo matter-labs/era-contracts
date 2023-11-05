@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity 0.8.20;
 
 import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
 
-import "./SystemContractsCaller.sol";
+import {SystemContractsCaller, CalldataForwardingMode, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, MIMIC_CALL_BY_REF_CALL_ADDRESS, META_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 
 uint256 constant UINT32_MASK = 0xffffffff;
 uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
@@ -31,6 +31,7 @@ enum Global {
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Library used for accessing zkEVM-specific opcodes, needed for the development
  * of system contracts.
  * @dev While this library will be eventually available to public, some of the provided
@@ -143,12 +144,10 @@ library SystemContractHelper {
     /// NOTE: The precompile type depends on `this` which calls precompile, which means that only
     /// system contracts corresponding to the list of precompiles above can do `precompileCall`.
     /// @dev If used not in the `sha256`, `keccak256` or `ecrecover` contracts, it will just burn the gas provided.
-    function precompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
+    /// @dev This method is `unsafe` because it does not check whether there is enough gas to burn.
+    function unsafePrecompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
         address callAddr = PRECOMPILE_CALL_ADDRESS;
 
-        // After `precompileCall` gas will be burned down to 0 if there are not enough of them,
-        // thats why it should be checked before the call.
-        require(gasleft() >= _gasToBurn);
         uint256 cleanupMask = UINT32_MASK;
         assembly {
             // Clearing input params as they are not cleaned by Solidity by default
@@ -271,6 +270,8 @@ library SystemContractHelper {
     function getZkSyncMeta() internal view returns (ZkSyncMeta memory meta) {
         uint256 metaPacked = getZkSyncMetaBytes();
         meta.gasPerPubdataByte = getGasPerPubdataByteFromMeta(metaPacked);
+        meta.heapSize = getHeapSizeFromMeta(metaPacked);
+        meta.auxHeapSize = getAuxHeapSizeFromMeta(metaPacked);
         meta.shardId = getShardIdFromMeta(metaPacked);
         meta.callerShardId = getCallerShardIdFromMeta(metaPacked);
         meta.codeShardId = getCodeShardIdFromMeta(metaPacked);
@@ -327,5 +328,15 @@ library SystemContractHelper {
     /// @return `true` or `false` based on whether the `_address` is a system contract.
     function isSystemContract(address _address) internal pure returns (bool) {
         return uint160(_address) <= uint160(MAX_SYSTEM_CONTRACT_ADDRESS);
+    }
+
+    /// @notice Method used for burning a certain amount of gas.
+    /// @param _gasToPay The number of gas to burn.
+    function burnGas(uint32 _gasToPay) internal view {
+        bool precompileCallSuccess = unsafePrecompileCall(
+            0, // The precompile parameters are formal ones. We only need the precompile call to burn gas.
+            _gasToPay
+        );
+        require(precompileCallSuccess, "Failed to charge gas");
     }
 }

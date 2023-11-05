@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "./interfaces/IImmutableSimulator.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice System smart contract that simulates the behavior of immutable variables in Solidity.
  * @dev The contract stores the immutable variables created during deployment by other contracts on his storage.
  * @dev This simulator is needed so that smart contracts with the same Solidity code but different

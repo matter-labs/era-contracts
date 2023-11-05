@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "./SystemContractHelper.sol";
 import "./Utils.sol";
-import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "../Constants.sol";
+import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice This library is used to perform ultra-efficient calls using zkEVM-specific features.
  * @dev EVM calls always accept a memory slice as input and return a memory slice as output.
  * Therefore, even if the user has a ready-made calldata slice, they still need to copy it to memory
@@ -249,23 +250,16 @@ library EfficientCall {
     ) private view {
         SystemContractHelper.loadCalldataIntoActivePtr();
 
-        // Currently, zkEVM considers the pointer valid if(ptr.offset < ptr.length || (ptr.length == 0 && ptr.offset == 0)), otherwise panics.
-        // So, if the data is empty we need to make the `ptr.length = ptr.offset = 0`, otherwise follow standard logic.
-        if (_data.length == 0) {
-            // Safe to cast, offset is never bigger than `type(uint32).max`
-            SystemContractHelper.ptrShrinkIntoActive(uint32(msg.data.length));
-        } else {
-            uint256 dataOffset;
-            assembly {
-                dataOffset := _data.offset
-            }
-
-            // Safe to cast, offset is never bigger than `type(uint32).max`
-            SystemContractHelper.ptrAddIntoActive(uint32(dataOffset));
-            // Safe to cast, `data.length` is never bigger than `type(uint32).max`
-            uint32 shrinkTo = uint32(msg.data.length - (_data.length + dataOffset));
-            SystemContractHelper.ptrShrinkIntoActive(shrinkTo);
+        uint256 dataOffset;
+        assembly {
+            dataOffset := _data.offset
         }
+
+        // Safe to cast, offset is never bigger than `type(uint32).max`
+        SystemContractHelper.ptrAddIntoActive(uint32(dataOffset));
+        // Safe to cast, `data.length` is never bigger than `type(uint32).max`
+        uint32 shrinkTo = uint32(msg.data.length - (_data.length + dataOffset));
+        SystemContractHelper.ptrShrinkIntoActive(shrinkTo);
 
         uint32 gas = Utils.safeCastToU32(_gas);
         uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer(

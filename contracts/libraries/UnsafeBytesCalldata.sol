@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @dev The library provides a set of functions that help read data from calldata bytes.
  * @dev Each of the functions accepts the `bytes calldata` and the offset where data should be read and returns a value of a certain type.
  *
@@ -22,10 +23,29 @@ library UnsafeBytesCalldata {
         }
     }
 
+    function readUint32(bytes calldata _bytes, uint256 _start) internal pure returns (uint32 result) {
+        assembly {
+            let offset := sub(_bytes.offset, 28)
+            result := calldataload(add(offset, _start))
+        }
+    }
+
     function readUint64(bytes calldata _bytes, uint256 _start) internal pure returns (uint64 result) {
         assembly {
             let offset := sub(_bytes.offset, 24)
             result := calldataload(add(offset, _start))
+        }
+    }
+
+    function readBytes32(bytes calldata _bytes, uint256 _start) internal pure returns (bytes32 result) {
+        assembly {
+            result := calldataload(add(_bytes.offset, _start))
+        }
+    }
+
+    function readUint256(bytes calldata _bytes, uint256 _start) internal pure returns (uint256 result) {
+        assembly {
+            result := calldataload(add(_bytes.offset, _start))
         }
     }
 }

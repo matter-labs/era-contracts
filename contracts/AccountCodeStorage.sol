@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "./interfaces/IAccountCodeStorage.sol";
 import "./libraries/Utils.sol";
@@ -8,6 +8,7 @@ import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PREC
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice The storage of this contract serves as a mapping for the code hashes of the 32-byte account addresses.
  * @dev Code hash is not strictly a hash, it's a structure where the first byte denotes the version of the hash,
  * the second byte denotes whether the contract is constructed, and the next two bytes denote the length in 32-byte words.
@@ -44,7 +45,7 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// but checks whether the bytecode hash corresponds to the constructed smart contract.
     function storeAccountConstructedCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
-        require(Utils.isContractConstructed(_hash), "Code hash is not for a contract on constructor");
+        require(Utils.isContractConstructed(_hash), "Code hash is not for a constructed contract");
         _storeCodeHash(_address, _hash);
     }
 

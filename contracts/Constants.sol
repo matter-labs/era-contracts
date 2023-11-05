@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
-import "./interfaces/IAccountCodeStorage.sol";
-import "./interfaces/INonceHolder.sol";
-import "./interfaces/IContractDeployer.sol";
-import "./interfaces/IKnownCodesStorage.sol";
-import "./interfaces/IImmutableSimulator.sol";
-import "./interfaces/IEthToken.sol";
-import "./interfaces/IL1Messenger.sol";
-import "./interfaces/ISystemContext.sol";
-import "./interfaces/IBytecodeCompressor.sol";
-import "./interfaces/IComplexUpgrader.sol";
-import "./BootloaderUtilities.sol";
+import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
+import {INonceHolder} from "./interfaces/INonceHolder.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
+import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
+import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
+import {IEthToken} from "./interfaces/IEthToken.sol";
+import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
+import {ISystemContext} from "./interfaces/ISystemContext.sol";
+import {ICompressor} from "./interfaces/ICompressor.sol";
+import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
+import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -24,13 +24,13 @@ uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
 
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
+address constant ECADD_SYSTEM_CONTRACT = address(0x06);
+address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 
-/// @dev The current maximum deployed precompile address.
-/// Note: currently only two precompiles are deployed:
-/// 0x01 - ecrecover
-/// 0x02 - sha256
-/// Important! So the constant should be updated if more precompiles are deployed.
-uint256 constant CURRENT_MAX_PRECOMPILE_ADDRESS = uint256(uint160(SHA256_SYSTEM_CONTRACT));
+/// @dev The maximal possible address of an L1-like precompie. These precompiles maintain the following properties:
+/// - Their extcodehash is EMPTY_STRING_KECCAK
+/// - Their extcodesize is 0 despite having a bytecode formally deployed there.
+uint256 constant CURRENT_MAX_PRECOMPILE_ADDRESS = 0xff;
 
 address payable constant BOOTLOADER_FORMAL_ADDRESS = payable(address(SYSTEM_CONTRACTS_OFFSET + 0x01));
 IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
@@ -55,17 +55,13 @@ address constant KECCAK256_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x0b)));
 
-BootloaderUtilities constant BOOTLOADER_UTILITIES = BootloaderUtilities(address(SYSTEM_CONTRACTS_OFFSET + 0x0c));
+IBootloaderUtilities constant BOOTLOADER_UTILITIES = IBootloaderUtilities(address(SYSTEM_CONTRACTS_OFFSET + 0x0c));
 
 address constant EVENT_WRITER_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x0d);
 
-IBytecodeCompressor constant BYTECODE_COMPRESSOR_CONTRACT = IBytecodeCompressor(
-    address(SYSTEM_CONTRACTS_OFFSET + 0x0e)
-);
+ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_OFFSET + 0x0e));
 
-IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(
-    address(SYSTEM_CONTRACTS_OFFSET + 0x0f)
-);
+IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -80,3 +76,49 @@ bytes32 constant CREATE2_PREFIX = 0x2020dba91b30cc0006188af794c2fb30dd8520db7e2c
 /// @dev Prefix used during derivation of account addresses using CREATE
 /// @dev keccak256("zksyncCreate")
 bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
+
+/// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
+uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
+
+/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the 110k - 120k, it is better to
+/// allow the operator to provide any reasonably large value in order to avoid unneeded constraints on the operator.
+uint256 constant MAX_ALLOWED_PUBDATA_PER_BATCH = 520000;
+
+enum SystemLogKey {
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BATCH_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+}
+
+/// @dev The number of leaves in the L2->L1 log Merkle tree.
+/// While formally a tree of any length is acceptable, the node supports only a constant length of 2048 leaves.
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 2048;
+
+/// @dev The length of the derived key in bytes inside compressed state diffs.
+uint256 constant DERIVED_KEY_LENGTH = 32;
+/// @dev The length of the enum index in bytes inside compressed state diffs.
+uint256 constant ENUM_INDEX_LENGTH = 8;
+/// @dev The length of value in bytes inside compressed state diffs.
+uint256 constant VALUE_LENGTH = 32;
+
+/// @dev The length of the compressed initial storage write in bytes.
+uint256 constant COMPRESSED_INITIAL_WRITE_SIZE = DERIVED_KEY_LENGTH + VALUE_LENGTH;
+/// @dev The length of the compressed repeated storage write in bytes.
+uint256 constant COMPRESSED_REPEATED_WRITE_SIZE = ENUM_INDEX_LENGTH + VALUE_LENGTH;
+
+/// @dev The position from which the initial writes start in the compressed state diffs.
+uint256 constant INITIAL_WRITE_STARTING_POSITION = 4;
+
+/// @dev Each storage diffs consists of the following elements:
+/// [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
+/// @dev The offset of the deriived key in a storage diff.
+uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
+/// @dev The offset of the enum index in a storage diff.
+uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;
+/// @dev The offset of the final value in a storage diff.
+uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;

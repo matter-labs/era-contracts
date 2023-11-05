@@ -1,30 +1,26 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {IEthToken} from "./interfaces/IEthToken.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {IMailbox} from "./interfaces/IMailbox.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Native ETH contract.
  * @dev It does NOT provide interfaces for personal interaction with tokens like `transfer`, `approve`, and `transferFrom`.
  * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
  */
-contract L2EthToken is IEthToken {
+contract L2EthToken is IEthToken, ISystemContract {
     /// @notice The balances of the users.
-    mapping(address => uint256) balance;
+    mapping(address => uint256) internal balance;
 
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
-
-    modifier onlyBootloader() {
-        require(msg.sender == BOOTLOADER_FORMAL_ADDRESS, "Callable only by the bootloader");
-        _;
-    }
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
@@ -65,7 +61,7 @@ contract L2EthToken is IEthToken {
     /// @dev This method is only callable by the bootloader.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
-    function mint(address _account, uint256 _amount) external override onlyBootloader {
+    function mint(address _account, uint256 _amount) external override onlyCallFromBootloader {
         totalSupply += _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);

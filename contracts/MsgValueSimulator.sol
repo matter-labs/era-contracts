@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "./libraries/Utils.sol";
 import "./libraries/EfficientCall.sol";
@@ -10,6 +10,7 @@ import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT} from "./Co
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice The contract responsible for simulating transactions with `msg.value` inside zkEVM.
  * @dev It accepts value and whether the call should be system in the first extraAbi param and
  * the address to call in the second extraAbi param, transfers the funds and uses `mimicCall` to continue the

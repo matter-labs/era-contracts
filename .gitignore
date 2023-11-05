@@ -8,3 +8,10 @@ typechain
 build
 yarn-debug.log*
 yarn-error.log*
+
+# Yarn files
+.yarn/
+.yarnrc.yml
+
+.vscode
+target/

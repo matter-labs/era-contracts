@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
-import "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
 
-import "./libraries/Utils.sol";
-import "./libraries/EfficientCall.sol";
+import {Utils} from "./libraries/Utils.sol";
+import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import "./interfaces/ISystemContract.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice System smart contract that is responsible for deploying other smart contracts on zkSync.
  * @dev The contract is responsible for generating the address of the deployed smart contract,
  * incrementing the deployment nonce and making sure that the constructor is never called twice in a contract.
@@ -43,7 +44,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         }
 
         // It is an EOA, it is still an account.
-        if (ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0) {
+        if (
+            _address > address(MAX_SYSTEM_CONTRACT_ADDRESS) &&
+            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0
+        ) {
             return AccountAbstractionVersion.Version1;
         }
 
@@ -213,6 +217,9 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     function forceDeployOnAddress(ForceDeployment calldata _deployment, address _sender) external payable onlySelf {
         _ensureBytecodeIsKnown(_deployment.bytecodeHash);
 
+        // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
+        // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
+        // contract is acceptable.
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
         // Accounts have sequential nonces by default.
@@ -227,8 +234,23 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             false,
             _deployment.callConstructor
         );
+    }
 
-        emit ContractDeployed(_sender, _deployment.bytecodeHash, _deployment.newAddress);
+    /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. It is to be removed in the
+    /// future. Unlike a normal forced deployment, it does not update account information as it requires updating a
+    /// mapping, and so requires Keccak256 precompile to work already.
+    /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256
+    /// precompile.
+    function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
+        _ensureBytecodeIsKnown(_keccak256BytecodeHash);
+        _constructContract(
+            msg.sender,
+            address(KECCAK256_SYSTEM_CONTRACT),
+            _keccak256BytecodeHash,
+            msg.data[0:0],
+            false,
+            false
+        );
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
@@ -236,7 +258,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// by `FORCE_DEPLOYER`.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable {
         require(
-            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT), 
+            msg.sender == FORCE_DEPLOYER || msg.sender == address(COMPLEX_UPGRADER_CONTRACT),
             "Can only be called by FORCE_DEPLOYER or COMPLEX_UPGRADER_CONTRACT"
         );
 
@@ -294,7 +316,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         _constructContract(msg.sender, _newAddress, _bytecodeHash, _input, false, true);
-        emit ContractDeployed(msg.sender, _bytecodeHash, _newAddress);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -351,5 +372,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             // If we do not call the constructor, we need to set the constructed code hash.
             ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, _bytecodeHash);
         }
+
+        emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
 }
