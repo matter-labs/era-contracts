@@ -3465,19 +3465,19 @@ object "Bootloader" {
                 ret := 25
             }
 
-            function L1_MESSENGER_PUBLISHING_FAILED_ERR_CODE() -> ret {
+            function FAILED_TO_PUBLISH_TIMESTAMP_DATA_TO_L1() -> ret {
                 ret := 26
             }
 
-            function L1_MESSENGER_LOG_SENDING_FAILED_ERR_CODE() -> ret {
+            function L1_MESSENGER_PUBLISHING_FAILED_ERR_CODE() -> ret {
                 ret := 27
             }
 
-            function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
+            function L1_MESSENGER_LOG_SENDING_FAILED_ERR_CODE() -> ret {
                 ret := 28
             }
 
-            function FAILED_TO_PUBLISH_TIMESTAMP_DATA_TO_L1() -> ret {
+            function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
                 ret := 29
             }
 
