@@ -131,7 +131,9 @@ async function main() {
             });
             deployer.chainId = parseInt(chainId) || 270;
             await initializeBridges(deployer, deployWallet, gasPrice, cmd.erc20Bridge);
-            await initializeWethBridges(deployer, deployWallet, gasPrice);
+            if (!cmd.erc20Bridge){
+                await initializeWethBridges(deployer, deployWallet, gasPrice);
+            }
         });
 
     await program.parseAsync(process.argv);

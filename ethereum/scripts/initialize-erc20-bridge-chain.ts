@@ -27,7 +27,7 @@ const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLO
 async function main() {
     const program = new Command();
 
-    program.version('0.1.0').name('initialize-bridges-chain');
+    program.version('0.1.0').name('initialize-erc20-bridge-chain');
 
     program
         .option('--private-key <private-key>')

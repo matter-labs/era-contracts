@@ -724,7 +724,7 @@ export class Deployer {
         const governor = this.ownerAddress;
         const initialDiamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
 
-        const tx = await bridgehub.newChain(inputChainId, this.addresses.StateTransition.StateTransitionProxy, {
+        const tx = await bridgehub.newChain(inputChainId, this.addresses.StateTransition.StateTransitionProxy, Date.now(), {
             gasPrice,
             nonce,
             gasLimit
@@ -748,6 +748,10 @@ export class Deployer {
             console.log(
                 `Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
             );
+            console.log(
+                `Hyperchain registration tx hash: ${receipt.transactionHash}`
+            );
+            // 
             // KL todo: ChainId is not a uint256 yet.
             console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
             console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);

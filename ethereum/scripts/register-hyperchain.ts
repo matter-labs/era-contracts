@@ -50,7 +50,7 @@ async function main() {
                 verbose: true
             });
 
-            await deployer.registerHyperchain(create2Salt, null, gasPrice); // temporary, we will have a full contract
+            await deployer.registerHyperchain(create2Salt, null, gasPrice);
             await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
         });
 
