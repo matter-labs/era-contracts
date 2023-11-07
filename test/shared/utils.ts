@@ -34,7 +34,7 @@ const RICH_WALLETS = [
 export const provider = new Provider((hre.network.config as any).url);
 
 const wallet = new Wallet(RICH_WALLETS[0].privateKey, provider);
-const deployer = new Deployer(hre, wallet);
+const deployer = new Deployer(hre, wallet as any);
 
 export async function callFallback(contract: Contract, data: string) {
   // `eth_Call` revert is not parsed by ethers, so we send
