@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { BigNumber, Wallet } from "ethers";
 import * as fs from "fs";
-import { ethers } from 'ethers';
+import { ethers } from "ethers";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
@@ -161,7 +161,9 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
       const deployer = new Deployer({ deployWallet });
-      const gasPrice = cmd.gasPrice ? ethers.utils.parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.constants.HashZero);
       checkSupportedContract(cmd.contract);
 
