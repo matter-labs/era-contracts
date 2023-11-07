@@ -917,10 +917,8 @@ object "Bootloader" {
 
                     // In case the operator provided smaller refund than the one calculated
                     // by the bootloader, we return the refund calculated by the bootloader.
-                    refundGas := max(getOperatorRefundForTx(transactionIndex), potentialRefund)
+                    refundGas := max(getOperatorRefundForTx(transactionIndex), safeAdd(potentialRefund, reservedGas, "iop"))
                 }
-
-                refundGas := add(refundGas, reservedGas)
 
                 if gt(refundGas, gasLimit) {
                     assertionError("L1: refundGas > gasLimit")
@@ -939,10 +937,14 @@ object "Bootloader" {
                 let toRefundRecipient
                 switch success
                 case 0 {
+                    if iszero(isPriorityOp) {
+                        // Upgrade transactions must always succeed
+                        assertionError("Upgrade tx failed")
+                    }
+
                     // If the transaction reverts, then minting the msg.value to the user has been reverted
                     // as well, so we can simply mint everything that the user has deposited to 
                     // the refund recipient
-
                     toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
                 }
                 default {
@@ -1178,7 +1180,7 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasLimitForTx The L2 gas limit for the transaction validation & execution.
             /// @param gasPrice The L2 gas price that should be used by the transaction.
-            /// @return ergsLeft The ergs left after the validation step.
+            /// @return gasLeft The gas left after the validation step.
             function l2TxValidation(
                 txDataOffset,
                 gasLimitForTx,
@@ -1230,9 +1232,9 @@ object "Bootloader" {
 
             /// @dev The function responsible for the execution step of the L2 transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
-            /// @param ergsLeft The ergs left after the validation step.
+            /// @param gasLeft The gas left after the validation step.
             /// @return success Whether or not the execution step was successful.
-            /// @return ergsSpentOnExecute The ergs spent on the transaction execution.
+            /// @return gasSpentOnExecute The gas spent on the transaction execution.
             function l2TxExecution(
                 txDataOffset,
                 gasLeft,
@@ -1262,7 +1264,7 @@ object "Bootloader" {
                 default {
                     // Note, that since gt(gasLeft, gasSpentOnFactoryDeps) = true
                     // sub(gasLeft, gasSpentOnFactoryDeps) > 0, which is important
-                    // because a nearCall with 0 ergs passes on all the ergs of the parent frame.
+                    // because a nearCall with 0 gas passes on all the gas of the parent frame.
                     gasLeft := sub(gasLeft, gasSpentOnFactoryDeps)
 
                     let executeABI := getNearCallABI(gasLeft)
@@ -1425,6 +1427,7 @@ object "Bootloader" {
                     refundRecipient := paymaster
                     
                     if gt(gasLeft, 0) {
+                        checkEnoughGas(gasLeft)
                         let nearCallAbi := getNearCallABI(gasLeft)
                         let gasBeforePostOp := gas()
                         pop(ZKSYNC_NEAR_CALL_callPostOp(
@@ -1435,7 +1438,7 @@ object "Bootloader" {
                             success,
                             // Since the paymaster will be refunded with reservedGas,
                             // it should know about it
-                            safeAdd(gasLeft, reservedGas, "jkl"),
+                            safeAdd(gasLeft, reservedGas, "jkl")
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
@@ -1595,7 +1598,7 @@ object "Bootloader" {
             /// @dev Get checked for overcharged operator's overhead for the transaction.
             /// @param transactionIndex The index of the transaction in the batch
             /// @param txTotalGasLimit The total gass limit of the transaction (including the overhead).
-            /// @param gasPerPubdataByte The price for pubdata byte in ergs.
+            /// @param gasPerPubdataByte The price for pubdata byte in gas.
             /// @param txEncodeLen The length of the ABI-encoding of the transaction
             function getVerifiedOperatorOverheadForTx(
                 transactionIndex,
@@ -1755,6 +1758,37 @@ object "Bootloader" {
             }
             <!-- @endif -->
 
+            /// @dev Given the callee and the data to be called with, 
+            /// this function returns whether the mimicCall should use the `isSystem` flag.
+            /// This flag should only be used for contract deployments and nothing else.
+            /// @param to The callee of the call.
+            /// @param dataPtr The pointer to the calldata of the transaction.
+            function shouldMsgValueMimicCallBeSystem(to, dataPtr) -> ret {
+                let dataLen := mload(dataPtr)
+                // Note, that this point it is not fully known whether it is indeed the selector 
+                // of the calldata (it might not be the case if the `dataLen` < 4), but it will be checked later on
+                let selector := shr(224, mload(add(dataPtr, 32)))
+
+                let isSelectorCreate := or(
+                    eq(selector, {{CREATE_SELECTOR}}),
+                    eq(selector, {{CREATE_ACCOUNT_SELECTOR}})
+                )
+                let isSelectorCreate2 := or(
+                    eq(selector, {{CREATE2_SELECTOR}}),
+                    eq(selector, {{CREATE2_ACCOUNT_SELECTOR}})
+                )
+
+                // Firstly, ensure that the selector is a valid deployment function 
+                ret := or(
+                    isSelectorCreate,
+                    isSelectorCreate2
+                )
+                // Secondly, ensure that the callee is ContractDeployer
+                ret := and(ret, eq(to, CONTRACT_DEPLOYER_ADDR()))
+                // Thirdly, ensure that the calldata is long enough to contain the selector
+                ret := and(ret, gt(dataLen, 3))
+            }
+
             /// @dev Given the pointer to the calldata, the value and to
             /// performs the call through the msg.value simulator.
             /// @param to Which contract to call
@@ -1764,7 +1798,7 @@ object "Bootloader" {
             /// the length of the calldata and the calldata itself right afterwards.
             function msgValueSimulatorMimicCall(to, from, value, dataPtr) -> success {
                 // Only calls to the deployer system contract are allowed to be system
-                let isSystem := eq(to, CONTRACT_DEPLOYER_ADDR())
+                let isSystem := shouldMsgValueMimicCallBeSystem(to, dataPtr)
 
                 success := mimicCallOnlyResult(
                     MSG_VALUE_SIMULATOR_ADDR(),
@@ -2515,7 +2549,7 @@ object "Bootloader" {
                 )
 
                 if iszero(success) {
-                    debugLog("Failed publish timestamp data to L1", 0)
+                    debugLog("Failed publish timestamp to L1", 0)
                     revertWithReason(FAILED_TO_PUBLISH_TIMESTAMP_DATA_TO_L1(), 1)
                 }
             }
@@ -2902,7 +2936,7 @@ object "Bootloader" {
 
                         <!-- @endif -->
                         
-                        <!-- @if BOOTLOADER_TYPE=='proved_block' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         
@@ -3255,7 +3289,7 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Returns the addition of two unsigned integers, reverting on overflow.
+            /// @dev Returns the subtraction of two unsigned integers, reverting on underflow.
             function safeSub(x, y, errMsg) -> ret {
                 if gt(y, x) {
                     assertionError(errMsg)
@@ -3431,19 +3465,19 @@ object "Bootloader" {
                 ret := 25
             }
 
-            function L1_MESSENGER_PUBLISHING_FAILED_ERR_CODE() -> ret {
+            function FAILED_TO_PUBLISH_TIMESTAMP_DATA_TO_L1() -> ret {
                 ret := 26
             }
 
-            function L1_MESSENGER_LOG_SENDING_FAILED_ERR_CODE() -> ret {
+            function L1_MESSENGER_PUBLISHING_FAILED_ERR_CODE() -> ret {
                 ret := 27
             }
 
-            function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
+            function L1_MESSENGER_LOG_SENDING_FAILED_ERR_CODE() -> ret {
                 ret := 28
             }
 
-            function FAILED_TO_PUBLISH_TIMESTAMP_DATA_TO_L1() -> ret {
+            function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
                 ret := 29
             }
 

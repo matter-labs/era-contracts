@@ -105,16 +105,32 @@ describe("AccountCodeStorage tests", function () {
       await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
     });
 
-    it("successfully marked", async () => {
-      await accountCodeStorage
-        .connect(deployerAccount)
-        .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
+    describe("getCodeHash", function () {
+      it("precompile", async () => {
+        // Check that the smallest precompile has EMPTY_STRING_KECCAK hash
+        expect(await accountCodeStorage.getCodeHash("0x0000000000000000000000000000000000000001")).to.be.eq(
+          EMPTY_STRING_KECCAK
+        );
 
-      await accountCodeStorage.connect(deployerAccount).markAccountCodeHashAsConstructed(RANDOM_ADDRESS);
+        // Check that the upper end of the precompile range has EMPTY_STRING_KECCAK hash
+        expect(await accountCodeStorage.getCodeHash("0x00000000000000000000000000000000000000ff")).to.be.eq(
+          EMPTY_STRING_KECCAK
+        );
+      });
 
-      expect(await accountCodeStorage.getRawCodeHash(RANDOM_ADDRESS)).to.be.eq(CONSTRUCTED_BYTECODE_HASH.toLowerCase());
+      it("successfully marked", async () => {
+        await accountCodeStorage
+          .connect(deployerAccount)
+          .storeAccountConstructingCodeHash(RANDOM_ADDRESS, CONSTRUCTING_BYTECODE_HASH);
 
-      await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
+        await accountCodeStorage.connect(deployerAccount).markAccountCodeHashAsConstructed(RANDOM_ADDRESS);
+
+        expect(await accountCodeStorage.getRawCodeHash(RANDOM_ADDRESS)).to.be.eq(
+          CONSTRUCTED_BYTECODE_HASH.toLowerCase()
+        );
+
+        await unsetCodeHash(accountCodeStorage, RANDOM_ADDRESS);
+      });
     });
   });
 

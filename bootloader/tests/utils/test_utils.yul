@@ -38,6 +38,7 @@ function testing_assertEq(a, b, message) {
         setTestHook(nonOptimized(101))
     }
 }
+
 function testing_testWillFailWith(message) {
     storeTestHookParam(0, unoptimized(message))
     setTestHook(nonOptimized(102))
