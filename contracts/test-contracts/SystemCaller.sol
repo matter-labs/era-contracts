@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8;
+pragma solidity 0.8.20;
 
 import {SystemContractsCaller} from "../libraries/SystemContractsCaller.sol";
 

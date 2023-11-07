@@ -1,25 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {ICompressor, OPERATION_BITMASK, LENGTH_BITS_OFFSET, MAX_ENUMERATION_INDEX_SIZE} from "./interfaces/ICompressor.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {
-    L1_MESSENGER_CONTRACT,
-    INITIAL_WRITE_STARTING_POSITION,
-    COMPRESSED_INITIAL_WRITE_SIZE,
-    STATE_DIFF_ENTRY_SIZE,
-    STATE_DIFF_ENUM_INDEX_OFFSET,
-    STATE_DIFF_FINAL_VALUE_OFFSET,
-    STATE_DIFF_DERIVED_KEY_OFFSET,
-    DERIVED_KEY_LENGTH,
-    VALUE_LENGTH,
-    ENUM_INDEX_LENGTH,
-    KNOWN_CODE_STORAGE_CONTRACT
-} from "./Constants.sol";
+import {L1_MESSENGER_CONTRACT, INITIAL_WRITE_STARTING_POSITION, COMPRESSED_INITIAL_WRITE_SIZE, STATE_DIFF_ENTRY_SIZE, STATE_DIFF_ENUM_INDEX_OFFSET, STATE_DIFF_FINAL_VALUE_OFFSET, STATE_DIFF_DERIVED_KEY_OFFSET, DERIVED_KEY_LENGTH, VALUE_LENGTH, ENUM_INDEX_LENGTH, KNOWN_CODE_STORAGE_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -96,7 +84,7 @@ contract Compressor is ICompressor, ISystemContract {
     ///     - 2 bytes: number of initial writes
     ///     - N bytes initial writes
     ///         - 32 bytes derived key
-    ///         - 1 byte metadata: 
+    ///         - 1 byte metadata:
     ///             - first 5 bits: length in bytes of compressed value
     ///             - last 3 bits: operation
     ///                 - 0 -> Nothing (32 bytes)
@@ -106,7 +94,7 @@ contract Compressor is ICompressor, ISystemContract {
     ///         - Len Bytes: Compressed Value
     ///     - M bytes repeated writes
     ///         - {_enumerationIndexSize} bytes for enumeration index
-    ///         - 1 byte metadata: 
+    ///         - 1 byte metadata:
     ///             - first 5 bits: length in bytes of compressed value
     ///             - last 3 bits: operation
     ///                 - 0 -> Nothing (32 bytes)
@@ -120,8 +108,8 @@ contract Compressor is ICompressor, ISystemContract {
         bytes calldata _stateDiffs,
         bytes calldata _compressedStateDiffs
     ) external payable onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32 stateDiffHash) {
-        // We do not enforce the operator to use the optimal, i.e. the minimally possible _enumerationIndexSize. 
-        // We do enforce however, that the _enumerationIndexSize is not larger than 8 bytes long, which is the 
+        // We do not enforce the operator to use the optimal, i.e. the minimally possible _enumerationIndexSize.
+        // We do enforce however, that the _enumerationIndexSize is not larger than 8 bytes long, which is the
         // maximal ever possible size for enumeration index.
         require(_enumerationIndexSize <= MAX_ENUMERATION_INDEX_SIZE, "enumeration index size is too large");
 
@@ -144,7 +132,7 @@ contract Compressor is ICompressor, ISystemContract {
             bytes32 derivedKey = stateDiff.readBytes32(52);
             uint256 initValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            require(derivedKey == _compressedStateDiffs.readBytes32(stateDiffPtr), "iw: initial key mismatch");            
+            require(derivedKey == _compressedStateDiffs.readBytes32(stateDiffPtr), "iw: initial key mismatch");
             stateDiffPtr += 32;
 
             uint8 metadata = uint8(bytes1(_compressedStateDiffs[stateDiffPtr]));
@@ -172,7 +160,9 @@ contract Compressor is ICompressor, ISystemContract {
 
             uint256 initValue = stateDiff.readUint256(92);
             uint256 finalValue = stateDiff.readUint256(124);
-            uint256 compressedEnumIndex = _sliceToUint256(_compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]);
+            uint256 compressedEnumIndex = _sliceToUint256(
+                _compressedStateDiffs[stateDiffPtr:stateDiffPtr + _enumerationIndexSize]
+            );
             require(enumIndex == compressedEnumIndex, "rw: enum key mismatch");
             stateDiffPtr += _enumerationIndexSize;
 
@@ -214,7 +204,7 @@ contract Compressor is ICompressor, ISystemContract {
     /// @param _initialValue Previous value of key/enumeration index.
     /// @param _finalValue Updated value of key/enumeration index.
     /// @param _operation The operation that was performed on value.
-    /// @param _compressedValue The slice of calldata with compressed value either representing the final 
+    /// @param _compressedValue The slice of calldata with compressed value either representing the final
     /// value or difference between initial and final value. It should be of arbitrary length less than or equal to 32 bytes.
     /// @dev It is the responsibility of the caller of this function to ensure that the `_compressedValue` has length no longer than 32 bytes.
     /// @dev Operation id mapping:
@@ -234,9 +224,15 @@ contract Compressor is ICompressor, ISystemContract {
             if (_operation == 0 || _operation == 3) {
                 require(convertedValue == _finalValue, "transform or no compression: compressed and final mismatch");
             } else if (_operation == 1) {
-                require(_initialValue + convertedValue == _finalValue, "add: initial plus converted not equal to final");
+                require(
+                    _initialValue + convertedValue == _finalValue,
+                    "add: initial plus converted not equal to final"
+                );
             } else if (_operation == 2) {
-                require(_initialValue - convertedValue == _finalValue, "sub: initial minus converted not equal to final");
+                require(
+                    _initialValue - convertedValue == _finalValue,
+                    "sub: initial minus converted not equal to final"
+                );
             } else {
                 revert("unsupported operation");
             }

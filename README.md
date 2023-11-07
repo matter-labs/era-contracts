@@ -10,57 +10,69 @@ write smart contracts in C++, Rust and other popular languages.
 ## system-contracts
 
 To keep the zero-knowledge circuits as simple as possible and enable simple extensions, we created the system contracts.
-These are privileged special-purpose contracts that instantiate some recurring actions on the protocol level. Some of the
-most commonly used contracts:
+These are privileged special-purpose contracts that instantiate some recurring actions on the protocol level. Some of
+the most commonly used contracts:
 
-`ContractDeployer` This contract is used to deploy new smart contracts. Its job is to make sure that the bytecode for each deployed 
-contract is known. This contract also defines the derivation address. Whenever a contract is deployed, a ContractDeployed 
+`ContractDeployer` This contract is used to deploy new smart contracts. Its job is to make sure that the bytecode for
+each deployed contract is known. This contract also defines the derivation address. Whenever a contract is deployed, a
+ContractDeployed event is emitted.
+
+`L1Messenger` This contract is used to send messages from zkSync to Ethereum. For each message sent, the L1MessageSent
 event is emitted.
 
-`L1Messenger` This contract is used to send messages from zkSync to Ethereum. For each message sent, the L1MessageSent event is emitted.
+`NonceHolder` This contract stores account nonces. The account nonces are stored in a single place for efficiency (the
+tx nonce and the deployment nonce are stored in a single place) and also for the ease of the operator.
 
-`NonceHolder` This contract stores account nonces. The account nonces are stored in a single place for efficiency (the tx nonce and
-the deployment nonce are stored in a single place) and also for the ease of the operator.
+`Bootloader` For greater extensibility and to lower the overhead, some parts of the protocol (e.g. account abstraction
+rules) were moved to an ephemeral contract called a bootloader.
 
-`Bootloader` For greater extensibility and to lower the overhead, some parts of the protocol (e.g. account abstraction rules) were
-moved to an ephemeral contract called a bootloader. 
-
-We call it ephemeral because it is not physically deployed and cannot be called, but it has a formal address that is used 
-on msg.sender, when it calls other contracts.
+We call it ephemeral because it is not physically deployed and cannot be called, but it has a formal address that is
+used on msg.sender, when it calls other contracts.
 
 ## Building
 
 This repository is used as a submodule of the [zksync-2-dev](https://github.com/matter-labs/zksync-2-dev).
 
-Compile the solidity contracts: `yarn build`
+Compile the solidity and yul contracts: `yarn build`
 
-Run the bootloader preprocessor: `yarn preprocess`
+Check the system contracts hashes: `yarn calculate-hashes:check`
 
-Compile the yul contracts: `yarn hardhat run ./scripts/compile-yul.ts`
+Update the system contracts hashes: `yarn calculate-hashes:fix`
 
 ## Update Process
 
-System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To ensure the highest level of security and reliability, these system contracts undergo an audit before any release.
+System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To
+ensure the highest level of security and reliability, these system contracts undergo an audit before any release.
 
-Here is an overview of the release process of the system contracts which is aimed to preserve agility and clarity on the order of the upgrades:
+Here is an overview of the release process of the system contracts which is aimed to preserve agility and clarity on the
+order of the upgrades:
 
 ### `main` branch
 
-The `main` branch contains the latest code that is ready to be deployed into production. It reflects the most stable and audited version of the protocol.
+The `main` branch contains the latest code that is ready to be deployed into production. It reflects the most stable and
+audited version of the protocol.
 
-### `dev` branch 
+### `dev` branch
 
-The `dev` branch is for active development & the latest code changes. Whenever a new PR with system contract changes is created it should be based on the `dev` branch.
+The `dev` branch is for active development & the latest code changes. Whenever a new PR with system contract changes is
+created it should be based on the `dev` branch.
 
-### Creating a new release:
+### Creating a new release
 
-Whenever a new release is planned, a new branch named `release-vX-<name>` should be created off the `dev` branch, where `X` represents the release version, and `<name>` is a short descriptive name for the release. The PR with the new release should point to either the `main` branch or to the release branch with a lower version (in case the previous branch has not been merged into `main` for some reason).
+Whenever a new release is planned, a new branch named `release-vX-<name>` should be created off the `dev` branch, where
+`X` represents the release version, and `<name>` is a short descriptive name for the release. The PR with the new
+release should point to either the `main` branch or to the release branch with a lower version (in case the previous
+branch has not been merged into `main` for some reason).
 
-Once the audit for the release branch is complete and all the fixes from the audit are applied, we need to merge the new changes into the `dev` branch. Once the release is final and merged into the `main` branch, the `main` branch should be merged back into the `dev` branch to keep it up-to-date.
+Once the audit for the release branch is complete and all the fixes from the audit are applied, we need to merge the new
+changes into the `dev` branch. Once the release is final and merged into the `main` branch, the `main` branch should be
+merged back into the `dev` branch to keep it up-to-date.
 
-### Updating Unaudited Code:
+### Updating Unaudited Code
 
-Since scripts, READMEs, etc., are code that is not subject to audits, these are to be merged directly into the `main` branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these changes.
+Since scripts, READMEs, etc., are code that is not subject to audits, these are to be merged directly into the `main`
+branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
+changes.
 
 ## License
 

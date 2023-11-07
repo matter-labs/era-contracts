@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0;
+pragma solidity 0.8.20;
 
 import "./EfficientCall.sol";
 
@@ -83,15 +83,15 @@ library Utils {
         // Note that the length of the bytecode must be provided in 32-byte words.
         require(_bytecode.length % 32 == 0, "po");
 
-        uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
-        require(bytecodeLenInWords % 2 == 1, "pr"); // bytecode length in words must be odd
+        uint256 lengthInWords = _bytecode.length / 32;
+        require(lengthInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
+        require(lengthInWords % 2 == 1, "pr"); // bytecode length in words must be odd
         hashedBytecode =
             EfficientCall.sha(_bytecode) &
             0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(1 << 248)));
         // Setting the length
-        hashedBytecode = hashedBytecode | bytes32(bytecodeLenInWords << 224);
+        hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
     }
 }

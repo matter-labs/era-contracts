@@ -1,21 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "./interfaces/IL1Messenger.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {
-    SystemLogKey,
-    SYSTEM_CONTEXT_CONTRACT,
-    KNOWN_CODE_STORAGE_CONTRACT,
-    COMPRESSOR_CONTRACT,
-    STATE_DIFF_ENTRY_SIZE,
-    MAX_ALLOWED_PUBDATA_PER_BATCH,
-    L2_TO_L1_LOGS_MERKLE_TREE_LEAVES
-} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -89,8 +81,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`:
         // - keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) and keccakGasCost(64) when reconstructing L2ToL1Log
-        // - at most 2 times keccakGasCost(64) (as merkle tree can contain ~2*N leaves)
-        uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 3 * keccakGasCost(64);
+        // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
+        // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
+        uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay));
     }
 
@@ -149,11 +142,12 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`:
         // - keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) and keccakGasCost(64) when reconstructing L2ToL1Log
         // - keccakGasCost(64) and gasSpentOnMessageHashing when reconstructing Messages
-        // - at most 2 times keccakGasCost(64) (as merkle tree can contain ~2*N leaves)
+        // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
+        // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = pubdataLen *
             gasPerPubdataBytes +
             keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
-            4 *
+            3 *
             keccakGasCost(64) +
             gasSpentOnMessageHashing;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay));
@@ -203,7 +197,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check logs
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        require(numberOfL2ToL1Logs <= numberOfL2ToL1Logs, "Too many L2->L1 logs");
+        require(numberOfL2ToL1Logs <= L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, "Too many L2->L1 logs");
         calldataPtr += 4;
 
         bytes32[] memory l2ToL1LogsTreeArray = new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_LEAVES);
@@ -278,7 +272,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check State Diffs
         /// encoding is as follows:
-        /// header (1 byte version, 2 bytes total len of compressed, 1 byte enumeration index size, 2 bytes number of initial writes)
+        /// header (1 byte version, 3 bytes total len of compressed, 1 byte enumeration index size, 2 bytes number of initial writes)
         /// body (N bytes of initial writes [32 byte derived key || compressed value], M bytes repeated writes [enumeration index || compressed value])
         /// encoded state diffs: [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
         require(
