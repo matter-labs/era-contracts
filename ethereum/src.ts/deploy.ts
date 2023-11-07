@@ -1,28 +1,28 @@
-import "@nomiclabs/hardhat-ethers";
 import * as hardhat from "hardhat";
+import "@nomiclabs/hardhat-ethers";
 
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
-import { hexlify, Interface } from "ethers/lib/utils";
-import {
-  getAddressFromEnv,
-  getHashFromEnv,
-  getNumberFromEnv,
-  getTokens,
-  hashL2Bytecode,
-  readBatchBootloaderBytecode,
-  readSystemContractsBytecode,
-} from "../scripts/utils";
-import { AllowListFactory } from "../typechain";
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
-import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { Interface, hexlify } from "ethers/lib/utils";
+import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
-import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
+import { AllowListFactory } from "../typechain";
+import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import {
+  readSystemContractsBytecode,
+  hashL2Bytecode,
+  getAddressFromEnv,
+  getHashFromEnv,
+  getNumberFromEnv,
+  readBatchBootloaderBytecode,
+  getTokens,
+} from "../scripts/utils";
 import { deployViaCreate2 } from "./deploy-utils";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
+import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
@@ -122,6 +122,7 @@ export class Deployer {
             recursionCircuitsSetVksHash: getHashFromEnv("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH"),
           };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+    const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
@@ -138,10 +139,10 @@ export class Deployer {
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
+        initialProtocolVersion,
       },
     ]);
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
   }
@@ -467,7 +468,7 @@ export class Deployer {
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
   }
 
   public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

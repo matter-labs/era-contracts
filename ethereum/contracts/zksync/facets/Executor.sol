@@ -85,7 +85,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
-        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BatchTimestamp].
+        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
         // So here we need to only double check that:
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
@@ -352,24 +352,26 @@ contract ExecutorFacet is Base, IExecutor {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
         if (_proof.serializedProof.length > 0) {
-            bool successVerifyProof = s.verifier.verify(
-                proofPublicInput,
-                _proof.serializedProof,
-                _proof.recursiveAggregationInput
-            );
-            require(successVerifyProof, "p"); // Proof verification fail
+            _verifyProof(proofPublicInput, _proof);
         }
         // #else
+        _verifyProof(proofPublicInput, _proof);
+        // #endif
+
+        emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
+        s.totalBatchesVerified = currentTotalBatchesVerified;
+    }
+
+    function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
+        // We can only process 1 batch proof at a time.
+        require(_proof.serializedProof.length == 1, "t4");
+
         bool successVerifyProof = s.verifier.verify(
             proofPublicInput,
             _proof.serializedProof,
             _proof.recursiveAggregationInput
         );
         require(successVerifyProof, "p"); // Proof verification fail
-        // #endif
-
-        emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
-        s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
     /// @dev Gets zk proof public input

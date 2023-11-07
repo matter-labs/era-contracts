@@ -70,11 +70,10 @@ async function deployFacetCuts(
 async function getFacetCuts(
   l1Rpc: string,
   zkSyncAddress: string,
-  diamondCutFacetAddress: string,
   gettersAddress: string,
   mailboxAddress: string,
   executorAddress: string,
-  governanceAddress: string,
+  adminAddress: string,
   file?: string
 ) {
   const provider = new ethers.providers.JsonRpcProvider(l1Rpc);
@@ -84,11 +83,10 @@ async function getFacetCuts(
   const facetCuts = await getFacetCutsForUpgrade(
     wallet,
     zkSyncAddress,
-    diamondCutFacetAddress,
+    adminAddress,
     gettersAddress,
     mailboxAddress,
-    executorAddress,
-    governanceAddress
+    executorAddress
   );
   console.log(JSON.stringify(facetCuts, null, 2));
   if (file) {
@@ -103,22 +101,20 @@ command
   .option("--l1Rpc <l1Rpc>")
   .option("--file <file>")
   .requiredOption("--zkSyncAddress <zkSyncAddress>")
-  .option("--diamond-cut-facet-address <diamondCutFacetAddress>")
   .option("--getters-address <gettersAddress>")
   .option("--mailbox-address <mailboxAddress>")
   .option("--executor-address <executorAddress>")
-  .option("--governance-address <governanceAddress>")
+  .option("--admin-address <adminAddress>")
   .description("get facet cuts for upgrade")
   .action(async (cmd) => {
     const l1Rpc = cmd.l1Rpc ?? web3Url();
     await getFacetCuts(
       l1Rpc,
       cmd.zkSyncAddress,
-      cmd.diamondCutFacetAddress,
       cmd.gettersAddress,
       cmd.mailboxAddress,
       cmd.executorAddress,
-      cmd.governanceAddress,
+      cmd.adminAddress,
       cmd.file
     );
   });
@@ -133,8 +129,7 @@ command
   .option("--gasPrice <gasPrice>")
   .option("--create2-salt <create2Salt>")
   .option("--executor")
-  .option("--governance")
-  .option("--diamondCut")
+  .option("--admin")
   .option("--getters")
   .option("--mailbox")
   .description("deploy facet cuts")
@@ -144,11 +139,8 @@ command
     if (cmd.executor) {
       facetsToDeploy.push("ExecutorFacet");
     }
-    if (cmd.governance) {
-      facetsToDeploy.push("GovernanceFacet");
-    }
-    if (cmd.diamondCut) {
-      facetsToDeploy.push("DiamondCutFacet");
+    if (cmd.admin) {
+      facetsToDeploy.push("AdminFacet");
     }
     if (cmd.getters) {
       facetsToDeploy.push("GettersFacet");

@@ -1,32 +1,32 @@
 import { expect } from "chai";
-import * as ethers from "ethers";
-import type { BigNumberish, BytesLike } from "ethers";
 import * as hardhat from "hardhat";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
-import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
-import type { AdminFacet, AllowList, ExecutorFacet, GettersFacet } from "../../typechain";
+import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
+import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain";
 import {
-  AdminFacetFactory,
-  AllowListFactory,
-  CustomUpgradeTestFactory,
-  DefaultUpgradeFactory,
   DiamondInitFactory,
+  AllowListFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
+  AdminFacetFactory,
+  DefaultUpgradeFactory,
+  CustomUpgradeTestFactory,
 } from "../../typechain";
-import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
+import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
+  getCallRevertReason,
   AccessMode,
   EMPTY_STRING_KECCAK,
-  L2_BOOTLOADER_ADDRESS,
+  genesisStoredBatchInfo,
   L2_SYSTEM_CONTEXT_ADDRESS,
+  L2_BOOTLOADER_ADDRESS,
+  createSystemLogs,
   SYSTEM_LOG_KEYS,
   constructL2Log,
-  createSystemLogs,
-  genesisStoredBatchInfo,
-  getCallRevertReason,
   packBatchTimestampAndBatchTimestamp,
 } from "./utils";
+import * as ethers from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -93,6 +93,7 @@ describe("L2 upgrade test", function () {
         l2BootloaderBytecodeHash: dummyHash,
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
+        initialProtocolVersion: 0,
       },
     ]);
 
@@ -206,6 +207,22 @@ describe("L2 upgrade test", function () {
     );
 
     expect(revertReason).to.equal("New protocol version is not greater than the current one");
+  });
+
+  it("Should ensure protocol version not increasing too much", async () => {
+    const wrongTx = buildL2CanonicalTransaction({
+      txType: 254,
+      nonce: 0,
+    });
+
+    const revertReason = await getCallRevertReason(
+      executeUpgrade(proxyGetters, proxyAdmin, {
+        l2ProtocolUpgradeTx: wrongTx,
+        newProtocolVersion: 100000,
+      })
+    );
+
+    expect(revertReason).to.equal("Too big protocol version difference");
   });
 
   it("Should validate upgrade transaction overhead", async () => {
@@ -356,7 +373,7 @@ describe("L2 upgrade test", function () {
           args: parsedArgs,
         };
       } catch (_) {
-        // ignore
+        // @ts-ignore
       }
     });
     l2UpgradeTxHash = upgradeEvents.find((event) => event.name == "UpgradeComplete").args.l2UpgradeTxHash;
@@ -651,7 +668,7 @@ describe("L2 upgrade test", function () {
           args: parsedArgs,
         };
       } catch (_) {
-        // ignore
+        // @ts-ignore
       }
     });
 
@@ -790,7 +807,7 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
     txType: SYSTEM_UPGRADE_TX_TYPE,
     from: ethers.constants.AddressZero,
     to: ethers.constants.AddressZero,
-    gasLimit: 3000000,
+    gasLimit: 5000000,
     gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
     maxFeePerGas: 0,
     maxPriorityFeePerGas: 0,

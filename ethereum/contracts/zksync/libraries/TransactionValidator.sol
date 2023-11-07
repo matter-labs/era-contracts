@@ -38,7 +38,7 @@ library TransactionValidator {
                 _encoded.length,
                 _transaction.factoryDeps.length,
                 _transaction.gasPerPubdataByteLimit
-            ) <= _transaction.gasLimit,
+            ) <= l2GasForTxBody,
             "up"
         );
     }
@@ -51,6 +51,8 @@ library TransactionValidator {
         require(_transaction.to <= type(uint160).max, "ub");
         require(_transaction.paymaster == 0, "uc");
         require(_transaction.value == 0, "ud");
+        require(_transaction.maxFeePerGas == 0, "uq");
+        require(_transaction.maxPriorityFeePerGas == 0, "ux");
         require(_transaction.reserved[0] == 0, "ue");
         require(_transaction.reserved[1] <= type(uint160).max, "uf");
         require(_transaction.reserved[2] == 0, "ug");
@@ -156,7 +158,7 @@ library TransactionValidator {
         // }
         // batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForPublicData);
 
-        // The overhead for ergs that could be used to use single-instance circuits
+        // The overhead for gas that could be used to use single-instance circuits
         uint256 overheadForGas;
         {
             uint256 numerator = batchOverheadGas * _totalGasLimit + L2_TX_MAX_GAS_LIMIT;

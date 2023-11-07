@@ -41,6 +41,11 @@ uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 /// @dev Denotes the type of the zkSync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
+/// @dev The maximal allowed difference between protocol versions in an upgrade. The 100 gap is needed
+/// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
+/// due to a bug found.
+uint256 constant MAX_ALLOWED_PROTOCOL_VERSION_DELTA = 100;
+
 /// @dev The amount of time in seconds the validator has to process the priority transaction
 /// NOTE: The constant is set to zero for the Alpha release period
 uint256 constant PRIORITY_EXPIRATION = 0 days;
@@ -50,16 +55,12 @@ uint256 constant PRIORITY_EXPIRATION = 0 days;
 /// operation and withdraw funds from it.
 uint256 constant UPGRADE_NOTICE_PERIOD = $$(defined(UPGRADE_NOTICE_PERIOD) ? UPGRADE_NOTICE_PERIOD : "14 days");
 
-/// @dev Timestamp - seconds since unix epoch
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = $$(
-    defined(COMMIT_TIMESTAMP_NOT_OLDER) ? COMMIT_TIMESTAMP_NOT_OLDER : "365 days"
-);
+/// @dev Timestamp - seconds since unix epoch.
+uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
 
-/// @dev Maximum available error between real commit block timestamp and analog used in the verifier (in seconds)
-/// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 15 seconds)
-uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = $$(
-    defined(COMMIT_TIMESTAMP_APPROXIMATION_DELTA) ? COMMIT_TIMESTAMP_APPROXIMATION_DELTA : "365 days"
-);
+/// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
+/// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 12 seconds)
+uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
