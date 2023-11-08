@@ -32,6 +32,7 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
         chainStorage.chainId = _initializeData.chainId;
         chainStorage.stateTransition = _initializeData.stateTransition;
         chainStorage.bridgehub = _initializeData.bridgehub;
+        chainStorage.protocolVersion = _initializeData.protocolVersion;
 
         chainStorage.verifier = _initializeData.verifier;
         chainStorage.governor = _initializeData.governor;

@@ -21,6 +21,7 @@ struct InitializeData {
     uint256 chainId;
     address bridgehub;
     address stateTransition;
+    uint256 protocolVersion;
     address governor;
     address admin;
     bytes32 storedBatchZero;
