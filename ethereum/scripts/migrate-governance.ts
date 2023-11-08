@@ -82,7 +82,9 @@ async function main() {
       console.log("Firstly, the current governor should transfer its ownership to the new governance contract.");
       console.log("All the transactions below can be executed in one batch");
 
-      // Step 1. Migrating the L1 contracts.
+      // Step 1. Transfer ownership of all the contracts to the new governor.
+      
+      // Below we are preparing the calldata for the L1 transactions
       const zkSync = deployer.zkSyncContract(deployWallet);
       const allowlist = deployer.l1AllowList(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
@@ -122,7 +124,7 @@ async function main() {
         to: validatorTimelock.address,
       });
 
-      // Step 2. Migrate the L2 contracts.
+      // Below, we prepare the transactions to migrate the L2 contracts.
 
       // Note that since these are L2 contracts, the governance must be aliased.
       const aliasedNewGovernor = applyL1ToL2Alias(governanceAddressFromEnv);
@@ -176,9 +178,9 @@ async function main() {
       // Small delimeter for better readability.
       console.log("\n\n\n", "-".repeat(20), "\n\n\n");
 
-      console.log("Secondly, the new governor needs to accept all the roles where the need to be accepted.");
+      console.log("Secondly, the new governor needs to accept all the roles where they need to be accepted.");
 
-      // Step 3. Accept the roles on L1. Transparent proxy and Beacon proxy contracts do NOT require accepting new ownership.
+      // Step 2. Accept the roles on L1. Transparent proxy and Beacon proxy contracts do NOT require accepting new ownership.
       // However, the following do require:
       // - zkSync Diamond Proxy
       // - ValidatorTimelock.
