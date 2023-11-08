@@ -62,7 +62,7 @@ async function getBeaconProxyUpgradeCalldata(target: string) {
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
 }
 
-async function getL1TxInfo(
+export async function getL1TxInfo(
   deployer: Deployer,
   to: string,
   l2Calldata: string,
