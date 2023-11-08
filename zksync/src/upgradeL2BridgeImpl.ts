@@ -33,7 +33,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-export async function getERC20BeaconAddress() {
+async function getERC20BeaconAddress() {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
   const bridge = (await provider.getDefaultBridgeAddresses()).erc20L2;
   const artifact = await hre.artifacts.readArtifact("L2ERC20Bridge");
