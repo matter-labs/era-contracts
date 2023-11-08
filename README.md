@@ -86,7 +86,7 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 - [GitHub](https://github.com/matter-labs)
 - [Twitter](https://twitter.com/zksync)
 - [Twitter for Devs](https://twitter.com/zkSyncDevs)
-- [Discord](https://discord.gg/nMaPGrDDwk)
+- [Discord](https://join.zksync.dev/)
 - [Mirror](https://zksync.mirror.xyz/)
 
 ## Disclaimer
