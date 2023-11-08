@@ -6,19 +6,22 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 import * as hre from "hardhat";
-import * as path from "path";
+import * as fs from "fs";
 
 import { getL1TxInfo } from "../../zksync/src/utils";
 
 import { UpgradeableBeaconFactory } from "../../zksync/typechain/UpgradeableBeaconFactory";
-import { Provider } from "zksync-web3";
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 
-const L2ERC20BridgeABI = require('../../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json').abi;
-
+const L2ERC20BridgeABI = JSON.parse(
+  fs
+    .readFileSync(
+      "../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json"
+    )
+    .toString()
+).abi;
 
 interface TxInfo {
   data: string;
@@ -33,7 +36,7 @@ async function getERC20BeaconAddress(erc20BridgeAddress: string) {
 
 function displayTx(msg: string, info: TxInfo) {
   console.log(msg);
-  console.log(JSON.stringify(info, null, 2), '\n');
+  console.log(JSON.stringify(info, null, 2), "\n");
 }
 
 async function main() {
@@ -70,7 +73,8 @@ async function main() {
 
       const expectedDeployedBytecode = hre.artifacts.readArtifactSync("Governance").deployedBytecode;
 
-      const isBytecodeCorrect = (await provider.getCode(userProvidedAddress)).toLowerCase() === expectedDeployedBytecode.toLowerCase();
+      const isBytecodeCorrect =
+        (await provider.getCode(userProvidedAddress)).toLowerCase() === expectedDeployedBytecode.toLowerCase();
       if (!isBytecodeCorrect) {
         throw new Error("The address does not contain governance bytecode");
       }
@@ -87,7 +91,6 @@ async function main() {
         deployer.addresses.Bridges.ERC20BridgeProxy,
         deployWallet
       );
-
 
       const erc20MigrationTx = erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
       displayTx("ERC20 migration calldata:", {

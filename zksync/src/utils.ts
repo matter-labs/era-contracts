@@ -1,12 +1,13 @@
 import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
-import { Deployer, deployedAddressesFromEnv } from "../../ethereum/src.ts/deploy";
+import type { Deployer } from "../../ethereum/src.ts/deploy";
+import { deployedAddressesFromEnv } from "../../ethereum/src.ts/deploy";
 import { IZkSyncFactory } from "../../ethereum/typechain/IZkSyncFactory";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
-import { Provider } from "zksync-web3";
+import type { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -137,7 +138,7 @@ export async function getL1TxInfo(
   refundRecipient: string,
   gasPrice: BigNumber,
   priorityTxMaxGasLimit: BigNumber,
-  provider: ethers.providers.JsonRpcProvider,
+  provider: ethers.providers.JsonRpcProvider
 ) {
   const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
@@ -163,4 +164,3 @@ export async function getL1TxInfo(
     gasPrice: gasPrice.toString(),
   };
 }
-
