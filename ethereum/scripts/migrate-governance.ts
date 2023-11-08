@@ -83,7 +83,7 @@ async function main() {
       console.log("All the transactions below can be executed in one batch");
 
       // Step 1. Transfer ownership of all the contracts to the new governor.
-      
+
       // Below we are preparing the calldata for the L1 transactions
       const zkSync = deployer.zkSyncContract(deployWallet);
       const allowlist = deployer.l1AllowList(deployWallet);
