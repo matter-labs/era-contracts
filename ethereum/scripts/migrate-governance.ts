@@ -143,7 +143,7 @@ async function main() {
       displayTx("L2 ERC20 bridge changeAdmin: ", l2TxForErc20Bridge);
 
       const wethToken = deployer.transparentUpgradableProxyContract(
-        process.env.CONTRACTS_L1_WETH_TOKEN_ADDR!,
+        process.env.CONTRACTS_L2_WETH_TOKEN_ADDR!,
         deployWallet
       );
       const l2WethUpgradeCalldata = wethToken.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
