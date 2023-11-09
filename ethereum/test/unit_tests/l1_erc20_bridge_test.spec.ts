@@ -130,7 +130,7 @@ describe("L1ERC20Bridge tests", function () {
           await randomSigner.getAddress(),
           testnetERC20TokenContract.address,
           0,
-          0,
+          1,
           0,
           ethers.constants.AddressZero
         )

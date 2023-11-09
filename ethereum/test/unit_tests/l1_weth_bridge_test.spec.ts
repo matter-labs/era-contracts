@@ -162,7 +162,7 @@ describe("WETH Bridge tests", () => {
           await randomSigner.getAddress(),
           await bridgeProxy.l1WethAddress(),
           0,
-          0,
+          1,
           0,
           ethers.constants.AddressZero
         )
