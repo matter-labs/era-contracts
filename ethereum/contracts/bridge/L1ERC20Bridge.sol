@@ -181,7 +181,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 l2TxHash) {
-        require(l2Bridge != address(0), "L2 bridge is not yet deployed");
         require(_l2Receiver != address(0), "L2 receiver address cannot be zero");
         require(_l2TxGasLimit != 0, "L2 gas limit cannot be zero");
         require(_amount != 0, "2T"); // empty deposit amount

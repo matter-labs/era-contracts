@@ -138,6 +138,38 @@ describe("L1ERC20Bridge tests", function () {
     expect(revertReason).equal("2T");
   });
 
+  it("Should not allow address(0) receiver", async () => {
+    const revertReason = await getCallRevertReason(
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .deposit(
+          ethers.constants.AddressZero,
+          testnetERC20TokenContract.address,
+          100,
+          1,
+          0,
+          ethers.constants.AddressZero
+        )
+    );
+    expect(revertReason).equal("L2 receiver address cannot be zero");
+  });
+
+  it("Should not allow zero gasLimit", async () => {
+    const revertReason = await getCallRevertReason(
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .deposit(
+          await randomSigner.getAddress(),
+          testnetERC20TokenContract.address,
+          100,
+          0,
+          0,
+          ethers.constants.AddressZero
+        )
+    );
+    expect(revertReason).equal("L2 gas limit cannot be zero");
+  });
+
   it("Should deposit successfully", async () => {
     const depositorAddress = await randomSigner.getAddress();
     await depositERC20(
