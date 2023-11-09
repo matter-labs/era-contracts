@@ -11,6 +11,7 @@ import * as fs from "fs";
 import { getL1TxInfo } from "../../zksync/src/utils";
 
 import { UpgradeableBeaconFactory } from "../../zksync/typechain/UpgradeableBeaconFactory";
+import { Provider } from "zksync-web3";
 
 const provider = web3Provider();
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
@@ -29,8 +30,9 @@ interface TxInfo {
   value?: string;
 }
 
-async function getERC20BeaconAddress(erc20BridgeAddress: string) {
-  const contract = new ethers.Contract(erc20BridgeAddress, L2ERC20BridgeABI, provider);
+async function getERC20BeaconAddress(l2Erc20BridgeAddress: string) {
+  const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+  const contract = new ethers.Contract(l2Erc20BridgeAddress, L2ERC20BridgeABI, provider);
   return await contract.l2TokenBeacon();
 }
 
@@ -89,15 +91,15 @@ async function main() {
       const allowlist = deployer.l1AllowList(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
 
-      const erc20Bridge = deployer.transparentUpgradableProxyContract(
+      const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
         deployer.addresses.Bridges.ERC20BridgeProxy,
         deployWallet
       );
 
-      const erc20MigrationTx = erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
-      displayTx("ERC20 migration calldata:", {
+      const erc20MigrationTx = l1Erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
+      displayTx("L1 ERC20 bridge migration calldata:", {
         data: erc20MigrationTx,
-        to: erc20Bridge.address,
+        to: l1Erc20Bridge.address,
       });
 
       const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingGovernor", [
@@ -130,10 +132,14 @@ async function main() {
       const aliasedNewGovernor = applyL1ToL2Alias(governanceAddressFromEnv);
 
       // L2 ERC20 bridge as well as Weth token are a transparent upgradable proxy.
-      const l2Erc20BridgeCalldata = erc20Bridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
+      const l2ERC20Bridge = deployer.transparentUpgradableProxyContract(
+        process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
+        deployWallet
+      );
+      const l2Erc20BridgeCalldata = l2ERC20Bridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
       const l2TxForErc20Bridge = await getL1TxInfo(
         deployer,
-        erc20Bridge.address,
+        l2ERC20Bridge.address,
         l2Erc20BridgeCalldata,
         refundRecipient,
         gasPrice,
@@ -142,14 +148,14 @@ async function main() {
       );
       displayTx("L2 ERC20 bridge changeAdmin: ", l2TxForErc20Bridge);
 
-      const wethToken = deployer.transparentUpgradableProxyContract(
-        process.env.CONTRACTS_L2_WETH_TOKEN_ADDR!,
+      const l2wethToken = deployer.transparentUpgradableProxyContract(
+        process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR!,
         deployWallet
       );
-      const l2WethUpgradeCalldata = wethToken.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
+      const l2WethUpgradeCalldata = l2wethToken.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
       const l2TxForWethUpgrade = await getL1TxInfo(
         deployer,
-        wethToken.address,
+        l2wethToken.address,
         l2WethUpgradeCalldata,
         refundRecipient,
         gasPrice,
@@ -159,21 +165,21 @@ async function main() {
       displayTx("L2 Weth upgrade: ", l2TxForWethUpgrade);
 
       // L2 Tokens are BeaconProxies
-      const beaconAddress: string = await getERC20BeaconAddress(erc20Bridge.address);
-      const erc20TokenBeacon = UpgradeableBeaconFactory.connect(beaconAddress, deployWallet);
-      const l2Erc20BeaconCalldata = erc20TokenBeacon.interface.encodeFunctionData("transferOwnership", [
+      const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2ERC20Bridge.address);
+      const l2Erc20TokenBeacon = UpgradeableBeaconFactory.connect(l2Erc20BeaconAddress, deployWallet);
+      const l2Erc20BeaconCalldata = l2Erc20TokenBeacon.interface.encodeFunctionData("transferOwnership", [
         aliasedNewGovernor,
       ]);
-      const l2TxForErc20Upgrade = await getL1TxInfo(
+      const l2TxForErc20BeaconUpgrade = await getL1TxInfo(
         deployer,
-        beaconAddress,
+        l2Erc20BeaconAddress,
         l2Erc20BeaconCalldata,
         refundRecipient,
         gasPrice,
         priorityTxMaxGasLimit,
         provider
       );
-      displayTx("L2 ERC20 beacon upgrade: ", l2TxForErc20Upgrade);
+      displayTx("L2 ERC20 beacon upgrade: ", l2TxForErc20BeaconUpgrade);
 
       // Small delimeter for better readability.
       console.log("\n\n\n", "-".repeat(20), "\n\n\n");
