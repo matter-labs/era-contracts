@@ -77,9 +77,9 @@ zkSync Era governed contracts.
 Each upgrade consists of two steps:
 
 - Upgrade Proposal - The governor can schedule upgrades in two different manners:
-    - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
+  - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
 for the timelock to execute the upgrade.
-    - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
+  - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
 approval without timelock.
 - Upgrade execution - perform the upgrade that was proposed.
 
@@ -166,6 +166,7 @@ The state transition is divided into three stages:
 - `executeBatches` - finalize the state, marking L1 -> L2 communication processing, and saving Merkle tree with L2 logs.
 
 Each L2 -> L1 system log will have a key that is part of the following:
+
 ```solidity
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -184,16 +185,16 @@ When a batch is committed, we process L2 -> L1 system logs. Here are the invaria
 - In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
 - There will be a single log for each key that is containted within `SystemLogKey`
 - Three logs from the `L2_TO_L1_MESSENGER` with keys:
- - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
- - `TOTAL_L2_TO_L1_PUBDATA_KEY`
- - `STATE_DIFF_HASH_KEY`
+- `L2_TO_L1_LOGS_TREE_ROOT_KEY`
+- `TOTAL_L2_TO_L1_PUBDATA_KEY`
+- `STATE_DIFF_HASH_KEY`
 - Two logs from `L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR` with keys:
   - `PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY`
   - `PREV_BATCH_HASH_KEY`
 - Two or three logs from `L2_BOOTLOADER_ADDRESS` with keys:
   - `CHAINED_PRIORITY_TXN_HASH_KEY`
   - `NUMBER_OF_LAYER_1_TXS_KEY`
-  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY` 
+  - `EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY`
 - None logs from other addresses (may be changed in the future).
 
 #### Bridges

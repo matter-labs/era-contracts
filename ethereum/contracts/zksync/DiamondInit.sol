@@ -44,6 +44,7 @@ contract DiamondInit is Base {
         bytes32 l2BootloaderBytecodeHash;
         bytes32 l2DefaultAccountBytecodeHash;
         uint256 priorityTxMaxGasLimit;
+        uint256 initialProtocolVersion;
     }
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
@@ -81,6 +82,7 @@ contract DiamondInit is Base {
         s.l2BootloaderBytecodeHash = _initalizeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initalizeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
+        s.protocolVersion = _initalizeData.initialProtocolVersion;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
