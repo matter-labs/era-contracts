@@ -13,7 +13,7 @@ contract AdminTest is Test {
     DiamondProxy internal diamondProxy;
     address internal owner;
     address internal securityCouncil;
-    Governance internal governor;
+    address internal governor;
     AdminFacet internal adminFacet;
     AdminFacet internal proxyAsAdmin;
 
@@ -35,7 +35,7 @@ contract AdminTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         securityCouncil = makeAddr("securityCouncil");
-        governor = new Governance(owner, securityCouncil, 10_000);
+        governor = makeAddr("governor");
         DiamondInit diamondInit = new DiamondInit();
 
         VerifierParams memory dummyVerifierParams = VerifierParams({
@@ -59,7 +59,8 @@ contract AdminTest is Test {
             false,
             0x0100000000000000000000000000000000000000000000000000000000000000,
             0x0100000000000000000000000000000000000000000000000000000000000000,
-            500000 // priority tx max L2 gas limit
+            500000, // priority tx max L2 gas limit
+            0
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
@@ -69,8 +70,6 @@ contract AdminTest is Test {
             isFreezable: false,
             selectors: getAdminSelectors()
         });
-
-        emit log_uint(facetCuts[0].selectors.length);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
