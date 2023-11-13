@@ -257,7 +257,9 @@ async function main() {
       wallet.connectToL1(providerL1);
 
       // TODO(EVM-392): refactor to avoid `any` here.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const deployer = new Deployer(hre, wallet as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       deployer.zkWallet = deployer.zkWallet.connect(providerL2 as any).connectToL1(providerL1);
       deployer.ethWallet = deployer.ethWallet.connect(providerL1);
       const ethWallet = deployer.ethWallet;
