@@ -76,8 +76,7 @@ export default {
         "*": {
           "*": ["storageLayout"],
         },
-      },
-      evmVersion: "shanghai",
+      }
     },
   },
   contractSizer: {
