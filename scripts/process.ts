@@ -2,6 +2,7 @@ import * as hre from "hardhat";
 
 import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 import { renderFile } from "template-file";
 import { utils } from "zksync-web3";
 import { SYSTEM_CONTRACTS, getRevertSelector, getTransactionUtils } from "./constants";
@@ -13,6 +14,10 @@ const SYSTEM_PARAMS = require("../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
 const OUTPUT_DIR = "bootloader/build";
+
+function path(...args: string[]): string {
+  return join(__dirname, ...args);
+}
 
 function getSelector(contractName: string, method: string): string {
   const artifact = hre.artifacts.readArtifactSync(contractName);
@@ -239,11 +244,11 @@ async function main() {
     mkdirSync(OUTPUT_DIR);
   }
 
-  writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
-  writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
-  writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
-  writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/bootloader_test.yul`), provedBootloaderWithTests);
+  writeFileSync(path(`../${OUTPUT_DIR}/proved_batch.yul`), provedBatchBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/playground_batch.yul`), playgroundBatchBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/gas_test.yul`), gasTestBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/fee_estimate.yul`), feeEstimationBootloader);
 
   console.log("Preprocessing done!");
 }
