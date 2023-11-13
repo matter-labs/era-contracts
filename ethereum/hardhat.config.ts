@@ -76,7 +76,7 @@ export default {
         "*": {
           "*": ["storageLayout"],
         },
-      }
+      },
     },
   },
   contractSizer: {
