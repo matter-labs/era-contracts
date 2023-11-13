@@ -1,9 +1,9 @@
 import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
-import { BigNumber, Wallet } from "ethers";
+import type { BigNumber } from "ethers";
+import { Wallet, ethers } from "ethers";
 import * as fs from "fs";
-import { ethers } from "ethers";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
