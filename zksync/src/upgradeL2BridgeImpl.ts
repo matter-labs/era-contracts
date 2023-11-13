@@ -27,6 +27,7 @@ function checkSupportedContract(contract: any): contract is SupportedContracts {
 
 const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
+const l2WethProxyAddress = getAddressFromEnv("CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 const provider = web3Provider();
@@ -94,15 +95,15 @@ async function getL1TxInfo(
   };
 }
 
-async function getBridgeUpgradeTxInfo(
+async function getTransparentProxyUpgradeTxInfo(
   deployer: Deployer,
+  proxyAddress: string,
   target: string,
   refundRecipient: string,
   gasPrice: BigNumber
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
-
-  return await getL1TxInfo(deployer, l2Erc20BridgeProxyAddress, l2Calldata, refundRecipient, gasPrice);
+  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice);
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -126,7 +127,9 @@ async function getTxInfo(
   l2ProxyAddress?: string
 ) {
   if (contract === "L2ERC20Bridge") {
-    return getBridgeUpgradeTxInfo(deployer, target, refundRecipient, gasPrice);
+    return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
+  } else if (contract == "L2Weth") {
+    return getTransparentProxyUpgradeTxInfo(deployer, target, l2WethProxyAddress, refundRecipient, gasPrice);
   } else if (contract == "L2StandardERC20") {
     if (!l2ProxyAddress) {
       console.log("Explicit beacon address is not supplied, requesting the one from L2 node");
@@ -238,7 +241,9 @@ async function main() {
     .option("--deployer-private-key <deployer-private-key>")
     .option("--refund-recipient <refund-recipient>")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.deployerPrivateKey
         ? new Wallet(cmd.deployerPrivateKey, provider)
         : Wallet.fromMnemonic(
@@ -272,7 +277,9 @@ async function main() {
     .option("--refund-recipient <refund-recipient>")
     .option("--no-l2-double-check")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.governorPrivateKey
         ? new Wallet(cmd.governorPrivateKey, provider)
         : Wallet.fromMnemonic(
@@ -328,7 +335,7 @@ async function main() {
         throw new Error("Gas price is not provided");
       }
 
-      const gasPrice = BigNumber.from(cmd.gasPrice);
+      const gasPrice = ethers.utils.parseUnits(cmd.gasPrice, "gwei");
 
       const deployer = new Deployer({ deployWallet: Wallet.createRandom().connect(provider) });
       const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
