@@ -634,6 +634,36 @@ object "Bootloader" {
                     }
             }
 
+            /// @dev Checks whether the code hash of the system context contract is correct and updates it if needed.
+            /// @dev The L1 contracts expect all the system logs to be present in the first boojum upgrade batch already. 
+            /// However, the old system context did not send the same system logs. Usually we upgrade system context
+            /// via an upgrade transaction, but in this case the transaction won't be even processed, because of failure to create an L2 block.
+            function upgradeSystemContextIfNeeded() {
+                let expectedCodeHash := {{SYSTEM_CONTEXT_EXPECTED_CODE_HASH}}
+                
+                let actualCodeHash := extcodehash(SYSTEM_CONTEXT_ADDR())
+                if iszero(eq(expectedCodeHash, actualCodeHash)) {
+                    // Preparing the calldata to upgrade the SystemContext contract
+                    {{UPGRADE_SYSTEM_CONTEXT_CALLDATA}}
+                    
+                    // We'll use a mimicCall to simulate the correct sender.
+                    let success := mimicCallOnlyResult(
+                        CONTRACT_DEPLOYER_ADDR(),
+                        FORCE_DEPLOYER(), 
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    )
+
+                    if iszero(success) {
+                        assertionError("system context upgrade fail")
+                    }
+                }
+            }
+
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
             /// sent to L1 as a message to the L1 contract that a certain operation has been processed.
             function getCanonicalL1TxHash(txDataOffset) -> ret {
@@ -3697,6 +3727,11 @@ object "Bootloader" {
 
                 <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
 
+                // This implementation of the bootloader relies on the correct version of the SystemContext
+                // and it can not be upgraded via a standard upgrade transaction, but needs to ensure 
+                // correctness itself before any transaction is executed. 
+                upgradeSystemContextIfNeeded()
+
                 // Only for the proved batch we enforce that the baseFee proposed 
                 // by the operator is equal to the expected one. For the playground batch, we allow
                 // the operator to provide any baseFee the operator wants.
@@ -3716,6 +3751,8 @@ object "Bootloader" {
                 baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
 
                 let SHOULD_SET_NEW_BATCH := mload(224)
+                
+                upgradeSystemContextIfNeeded()
 
                 switch SHOULD_SET_NEW_BATCH 
                 case 0 {    
