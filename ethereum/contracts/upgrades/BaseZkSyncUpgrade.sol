@@ -126,8 +126,8 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param _newVerifierParams New parameters for the verifier
     function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
         if (
-            _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) ||
-            _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) ||
+            _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) &&
+            _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) &&
             _newVerifierParams.recursionCircuitsSetVksHash == bytes32(0)
         ) {
             return;
