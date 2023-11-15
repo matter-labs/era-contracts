@@ -90,6 +90,7 @@ class CompilerPaths {
 async function main() {
     await compileYulFolder('contracts');
     await compileYulFolder('contracts/precompiles');
+    await compileYulFolder('contracts/precompiles/test-contracts');
     await compileYulFolder('bootloader/build');
     await compileYulFolder('bootloader/tests');
 }

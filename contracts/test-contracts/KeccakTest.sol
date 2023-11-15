@@ -111,6 +111,19 @@ contract KeccakTest {
         require(hash == EMPTY_STRING_KECCAK, "Keccak should start working again");
     }
 
+    function keccakPerformUpgrade(
+        bytes calldata upgradeCalldata
+    ) external {
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            upgradeCalldata,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
+    }
+
     function callKeccak(bytes calldata _data) external pure returns (bytes32 hash) {
         hash = keccak256(_data);
     }
@@ -144,7 +157,7 @@ contract KeccakTest {
             require(result[i] == expectedOutputs[i], "hash was not calculated correctly");
         }
 
-        // Upgrading it back to the correct version:
+        // Upgrading it back to the original version:
         EfficientCall.mimicCall(
             gasleft(),
             address(DEPLOYER_SYSTEM_CONTRACT),

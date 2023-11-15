@@ -7,7 +7,7 @@ import { readYulBytecode } from '../scripts/utils';
 import { Language } from '../scripts/constants';
 import { BytesLike, Wallet, providers } from 'ethers';
 import { expect } from 'chai';
-import { ECDH } from 'crypto';
+import * as hre from 'hardhat';
 
 describe('Keccak256 tests', function () {
     let testWallet: Wallet;
@@ -16,6 +16,7 @@ describe('Keccak256 tests', function () {
     let oldKeccakCodeHash: string;
     let correctKeccakCodeHash: string;
     let alwaysRevertCodeHash: string;
+    let keccakMockCodeHash: string;
 
     // Kernel space address, needed to enable mimicCall
     const KECCAK_TEST_ADDRESS = '0x0000000000000000000000000000000000009000';
@@ -30,6 +31,15 @@ describe('Keccak256 tests', function () {
 
         const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
         oldKeccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+
+        const keccakMockCode = readYulBytecode({
+            codeName: 'Keccak256Mock',
+            path: 'precompiles/test-contracts',
+            lang: Language.Yul,
+            address: ethers.constants.AddressZero
+        });
+
+        keccakMockCodeHash = ethers.utils.hexlify(hashBytecode(keccakMockCode));
 
         keccakTest = KeccakTest__factory.connect(KECCAK_TEST_ADDRESS,  getWallets()[0]);
         const correctKeccakCode = readYulBytecode({
@@ -47,6 +57,7 @@ describe('Keccak256 tests', function () {
         await publishBytecode(keccakCode);
         await publishBytecode(correctKeccakCode);
         await publishBytecode(emptyContractCode);
+        await publishBytecode(keccakMockCode);
 
         correctKeccakCodeHash = ethers.utils.hexlify(hashBytecode(correctKeccakCode));
         alwaysRevertCodeHash = ethers.utils.hexlify(hashBytecode(emptyContractCode));
@@ -138,6 +149,23 @@ describe('Keccak256 tests', function () {
             inputsToTest,
             expectedOutput
         );
+    })
+
+    it('keccak upgrade if needed test', async() => {
+        const deployerInterfact = new ethers.utils.Interface((await loadArtifact('ContractDeployer')).abi);
+
+        const mockKeccakInput = deployerInterfact.encodeFunctionData('forceDeployKeccak256', [
+            keccakMockCodeHash
+        ]);
+
+        await keccakTest.keccakPerformUpgrade(
+            mockKeccakInput
+        );
+
+        const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+        const keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+
+        expect(keccakCodeHash).to.eq(oldKeccakCodeHash);
     })
 });
 
