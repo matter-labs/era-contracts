@@ -162,10 +162,15 @@ describe('Keccak256 tests', function () {
             mockKeccakInput
         );
 
+        var keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+        var keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+
+        expect(keccakCodeHash).to.eq(keccakMockCodeHash);
+
         await hre.network.provider.send("hardhat_mine", ["0x100"]);
 
-        const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
-        const keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+        keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+        keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
         expect(keccakCodeHash).to.eq(oldKeccakCodeHash);
     })
