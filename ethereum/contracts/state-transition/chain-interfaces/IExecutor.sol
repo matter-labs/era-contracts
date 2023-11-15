@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {IStateTransitionChainBase} from "./IBase.sol";
 
@@ -76,8 +76,10 @@ interface IExecutor is IStateTransitionChainBase {
         uint256[] serializedProof;
     }
 
-    function commitBatches(StoredBatchInfo calldata _lastCommittedBatchData, CommitBatchInfo[] calldata _newBatchesData)
-        external;
+    function commitBatches(
+        StoredBatchInfo calldata _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external;
 
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,

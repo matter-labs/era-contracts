@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -70,11 +70,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @param _l1Receiver The account address that would receive the WETH on L1
     /// @param _l2Token Address of the L2 WETH token
     /// @param _amount Total amount of WETH to withdraw
-    function withdraw(
-        address _l1Receiver,
-        address _l2Token,
-        uint256 _amount
-    ) external override {
+    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
         require(_l2Token == l2WethAddress, "Only WETH can be withdrawn");
         require(_amount > 0, "Amount cannot be zero");
 

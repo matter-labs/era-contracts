@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.17;
+pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
@@ -28,6 +28,56 @@ contract L1WethBridgeTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         randomSigner = makeAddr("randomSigner");
+
+        GettersFacet gettersFacet = new GettersFacet();
+        MailboxFacet mailboxFacet = new MailboxFacet();
+        allowList = new AllowList(owner);
+        DiamondInit diamondInit = new DiamondInit();
+
+        bytes8 dummyHash = 0x1234567890123456;
+        address dummyAddress = makeAddr("dummyAddress");
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            dummyAddress,
+            owner,
+            owner,
+            0,
+            0,
+            0,
+            allowList,
+            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
+            false,
+            dummyHash,
+            dummyHash,
+            10000000,
+            0
+        );
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(gettersFacet),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getGettersSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(mailboxFacet),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMailboxSelectors()
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        uint256 chainId = block.chainid;
+        DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
+
+        vm.prank(owner);
+        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
 
         l1Weth = new WETH9();
 

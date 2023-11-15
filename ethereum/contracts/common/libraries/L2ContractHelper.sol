@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
@@ -23,7 +23,7 @@ library L2ContractHelper {
         require(_bytecode.length % 32 == 0, "pq");
 
         uint256 bytecodeLenInWords = _bytecode.length / 32;
-        require(bytecodeLenInWords < 2**16, "pp"); // bytecode length must be less than 2^16 words
+        require(bytecodeLenInWords < 2 ** 16, "pp"); // bytecode length must be less than 2^16 words
         require(bytecodeLenInWords % 2 == 1, "ps"); // bytecode length in words must be odd
         hashedBytecode = sha256(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash

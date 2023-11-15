@@ -144,11 +144,18 @@ export class Deployer {
         );
         facetCuts = facetCuts.concat(extraFacets ?? []);
 
-        const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH'),
-            recursionLeafLevelVkHash: getHashFromEnv('CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH'),
-            recursionCircuitsSetVksHash: getHashFromEnv('CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH')
-        };
+        const verifierParams =
+        process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
+        ? {
+            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
+            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
+            recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+          }
+        : {
+            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH"),
+            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH"),
+            recursionCircuitsSetVksHash: getHashFromEnv("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH"),
+          };
         const priorityTxMaxGasLimit = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
         const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync('DiamondInit').abi);
 
@@ -194,117 +201,55 @@ export class Deployer {
         return diamondCut(facetCuts, this.addresses.Bridgehub.BridgehubDiamondInit, diamondInitCalldata);
     }
 
-    public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
-        if (this.verbose) {
-            console.log('Deploying Create2 factory');
-        }
+  private async deployViaCreate2(
+    contractName: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    args: any[],
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    libraries?: any
+  ) {
+    const result = await deployViaCreate2(
+      this.deployWallet,
+      contractName,
+      args,
+      create2Salt,
+      ethTxOptions,
+      this.addresses.Create2Factory,
+      this.verbose,
+      libraries
+    );
+    return result[0];
+  }
 
-        const contractFactory = await hardhat.ethers.getContractFactory('SingletonFactory', {
-            signer: this.deployWallet
-        });
+  public async deployGovernance(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "Governance",
+      // TODO: load parameters from config
+      [this.ownerAddress, ethers.constants.AddressZero, 0],
+      create2Salt,
+      ethTxOptions
+    );
 
-        const create2Factory = await contractFactory.deploy(...[ethTxOptions]);
-        const rec = await create2Factory.deployTransaction.wait();
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${create2Factory.address}`);
-            console.log(`Create2 factory deployed, gasUsed: ${rec.gasUsed.toString()}`);
-        }
-
-        this.addresses.Create2Factory = create2Factory.address;
+    if (this.verbose) {
+      console.log(`CONTRACTS_GOVERNANCE_ADDR=${contractAddress}`);
     }
 
-    private async deployViaCreate2(
-        contractName: string,
-        args: any[],
-        create2Salt: string,
-        ethTxOptions: ethers.providers.TransactionRequest,
-        libraries?: any
-    ) {
-        let result = await deployViaCreate2(
-            this.deployWallet,
-            contractName,
-            args,
-            create2Salt,
-            ethTxOptions,
-            this.addresses.Create2Factory,
-            this.verbose,
-            libraries
-        );
-        return result[0];
+    this.addresses.Governance = contractAddress;
+  }
+
+  public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("AllowList", [this.ownerAddress], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_ALLOW_LIST_ADDR=${contractAddress}`);
     }
 
-    public async deployGovernance(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2(
-            'Governance',
-            // TODO: load parameters from config
-            [this.ownerAddress, ethers.constants.AddressZero, 0],
-            create2Salt,
-            ethTxOptions
-        );
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_GOVERNANCE_ADDR=${contractAddress}`);
-        }
-
-        this.addresses.Governance = contractAddress;
-    }
-
-    public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2(
-            'AllowList',
-            [this.ownerAddress],
-            create2Salt,
-            ethTxOptions
-        );
-
-        if (this.verbose) {
-            console.log(`CONTRACTS_L1_ALLOW_LIST_ADDR=${contractAddress}`);
-        }
-
-        this.addresses.AllowList = contractAddress;
-    }
-
-    // public async deployBridgehubChainProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     // we deploy a whole chainProxy, but we only store the admin and implementation addresses
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-
-    //     const Chain = await hardhat.ethers.getContractFactory('BridgehubChain');
-    //     const addressOne = '0x0000000000000000000000000000000000000001';
-    //     const instance: ethers.Contract = await hardhat.upgrades.deployProxy(Chain, [
-    //         0,
-    //         hardhat.ethers.constants.AddressZero,
-    //         addressOne,
-    //         this.addresses.AllowList
-    //     ]);
-
-    //     await instance.deployed();
-
-    //     const adminAddress = await hardhat.upgrades.erc1967.getAdminAddress(instance.address);
-
-    //     const implAddress = await hardhat.upgrades.erc1967.getImplementationAddress(instance.address);
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_BRIDGEHUB_CHAIN_IMPL_ADDR=${implAddress}`);
-    //     }
-
-    //     this.addresses.Bridgehub.ChainImplementation = implAddress;
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_BRIDGEHUB_CHAIN_PROXY_ADMIN_ADDR=${adminAddress}`);
-    //     }
-
-    //     if (this.verbose) {
-    //         console.log(
-    //             `Bridgehub Chain Proxy deployed, gas used: ${(
-    //                 await instance.deployTransaction.wait()
-    //             ).gasUsed.toString()}`
-    //         );
-    //     }
-    //     this.addresses.Bridgehub.ChainProxyAdmin = adminAddress;
-    // }
+    this.addresses.AllowList = contractAddress;
+  }
 
     public async deployBridgehubAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
@@ -419,6 +364,7 @@ export class Deployer {
         this.addresses.StateTransition.StateTransitionProxyAdmin = adminAddress;
     }
 
+    
     public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;
         const contractAddress = await this.deployViaCreate2('AdminFacet', [], create2Salt, ethTxOptions);
@@ -474,6 +420,7 @@ export class Deployer {
         this.addresses.StateTransition.Verifier = contractAddress;
     }
 
+
     public async deployERC20BridgeImplementation(
         create2Salt: string,
         ethTxOptions: ethers.providers.TransactionRequest
@@ -518,125 +465,82 @@ export class Deployer {
         }
     }
 
-    public async deployWethBridgeImplementation(
-        create2Salt: string,
-        ethTxOptions: ethers.providers.TransactionRequest
-    ) {
-        const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || 'localhost');
-        const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == 'WETH')!.address;
+  public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2(
-            'L1WethBridge',
-            [l1WethToken, this.addresses.Bridgehub.BridgehubDiamondProxy, this.addresses.AllowList],
-            create2Salt,
-            ethTxOptions
-        );
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "L1WethBridge",
+      [l1WethToken, this.addresses.StateTransition.DiamondProxy, this.addresses.AllowList],
+      create2Salt,
+      ethTxOptions
+    );
 
-        if (this.verbose) {
-            console.log(`CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR=${contractAddress}`);
-        }
-
-        this.addresses.Bridges.WethBridgeImplementation = contractAddress;
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR=${contractAddress}`);
     }
 
-    public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2(
-            'TransparentUpgradeableProxy',
-            [this.addresses.Bridges.WethBridgeImplementation, this.ownerAddress, '0x'],
-            create2Salt,
-            ethTxOptions
-        );
+    this.addresses.Bridges.WethBridgeImplementation = contractAddress;
+  }
 
-        if (this.verbose) {
-            console.log(`CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR=${contractAddress}`);
-        }
+  public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [this.addresses.Bridges.WethBridgeImplementation, this.ownerAddress, "0x"],
+      create2Salt,
+      ethTxOptions
+    );
 
-        this.addresses.Bridges.WethBridgeProxy = contractAddress;
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
 
-    public async deployStateTransitionDiamondInit(
-        create2Salt: string,
-        ethTxOptions: ethers.providers.TransactionRequest
-    ) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2('DiamondInit', [], create2Salt, ethTxOptions);
+    this.addresses.Bridges.WethBridgeProxy = contractAddress;
+  }
 
-        if (this.verbose) {
-            console.log(`CONTRACTS_DIAMOND_INIT_ADDR=${contractAddress}`);
-        }
+  public async deployStateTransitionDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("DiamondInit", [], create2Salt, ethTxOptions);
 
-        this.addresses.StateTransition.DiamondInit = contractAddress;
+    if (this.verbose) {
+      console.log(`CONTRACTS_STATE_TRANSITION_DIAMOND_INIT_ADDR=${contractAddress}`);
     }
 
-    public async deployDiamondUpgradeInit(
-        create2Salt: string,
-        contractVersion: number,
-        ethTxOptions: ethers.providers.TransactionRequest
-    ) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2(
-            `DiamondUpgradeInit${contractVersion}`,
-            [],
-            create2Salt,
-            ethTxOptions
-        );
+    this.addresses.StateTransition.DiamondInit = contractAddress;
+  }
 
-        if (this.verbose) {
-            console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
-        }
+  public async deployDiamondUpgradeInit(
+    create2Salt: string,
+    contractVersion: number,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      `DiamondUpgradeInit${contractVersion}`,
+      [],
+      create2Salt,
+      ethTxOptions
+    );
 
-        this.addresses.StateTransition.DiamondUpgradeInit = contractAddress;
+    if (this.verbose) {
+      console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
     }
 
-    public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-        ethTxOptions.gasLimit ??= 10_000_000;
-        const contractAddress = await this.deployViaCreate2('DefaultUpgrade', [], create2Salt, ethTxOptions);
+    this.addresses.StateTransition.DiamondUpgradeInit = contractAddress;
+  }
 
-        if (this.verbose) {
-            console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
-        }
+  public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("DefaultUpgrade", [], create2Salt, ethTxOptions);
 
-        this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+    if (this.verbose) {
+      console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    // public async deployBridgehubDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    //     ethTxOptions.gasLimit ??= 10_000_000;
-
-    //     const Bridgehub = await hardhat.ethers.getContractFactory('Bridgehub');
-    //     const instance = await hardhat.upgrades.deployProxy(Bridgehub, [
-    //         this.ownerAddress,
-    //         this.addresses.AllowList
-    //     ]);
-    //     await instance.deployed();
-
-    //     const implAddress = await hardhat.upgrades.erc1967.getImplementationAddress(instance.address);
-    //     const adminAddress = await hardhat.upgrades.erc1967.getAdminAddress(instance.address);
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${implAddress}`);
-    //     }
-
-    //     this.addresses.Bridgehub.BridgehubImplementation = implAddress;
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADDR=${instance.address}`);
-    //     }
-
-    //     this.addresses.Bridgehub.BridgehubDiamondProxy = instance.address;
-
-    //     if (this.verbose) {
-    //         console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADMIN_ADDR=${adminAddress}`);
-    //     }
-
-    //     if (this.verbose) {
-    //         console.log(
-    //             `Bridgehub Proxy deployed, gas used: ${(await instance.deployTransaction.wait()).gasUsed.toString()}`
-    //         );
-    //     }
-    //     this.addresses.Bridgehub.BridgehubDiamondProxyAdmin = adminAddress;
-    // }
+    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+  }
 
     public async deployBridgehubDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
         ethTxOptions.gasLimit ??= 10_000_000;

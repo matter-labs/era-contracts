@@ -45,25 +45,25 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
-describe('L2 upgrade test', function () {
-    let proxyExecutor: ExecutorFacet;
-    let proxyAdmin: AdminFacet;
-    let proxyGetters: GettersFacet;
+describe("L2 upgrade test", function () {
+  let proxyExecutor: ExecutorFacet;
+  let proxyAdmin: AdminFacet;
+  let proxyGetters: GettersFacet;
 
     let stateTransition: StateTransition;
 
     let owner: ethers.Signer;
 
-    let batch1Info: CommitBatchInfo;
-    let storedBatch1Info: StoredBatchInfo;
+  let batch1Info: CommitBatchInfo;
+  let storedBatch1Info: StoredBatchInfo;
 
     let verifier: string;
     const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
     // let priorityOperationsHash: string;
 
-    before(async () => {
-        [owner] = await hardhat.ethers.getSigners();
+  before(async () => {
+    [owner] = await hardhat.ethers.getSigners();
 
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
             owner.provider
@@ -106,7 +106,7 @@ describe('L2 upgrade test', function () {
     //     );
     });
 
-    it('Upgrade should work even if not all blocks are processed', async () => {
+    it('Upgrade should work even if not all batches are processed', async () => {
         batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
             batchNumber: 1,
             // priorityOperationsHash: priorityOperationsHash,
@@ -160,149 +160,166 @@ describe('L2 upgrade test', function () {
         });
         const revertReason = await getCallRevertReason(
             executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx
+                l2ProtocolUpgradeTx: wrongTx,
+                newProtocolVersion: 0
             })
         );
 
         expect(revertReason).to.equal('L2 sys upgrade tx type is wrong');
     });
 
-    it('Should include the new protocol version as part of nonce', async () => {
-        const wrongTx = buildL2CanonicalTransaction({
-            txType: 254,
-            nonce: 0
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('The new protocol version should be included in the L2 system upgrade tx');
+    it("Should include the new protocol version as part of nonce", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        txType: 254,
+        nonce: 0,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("The new protocol version should be included in the L2 system upgrade tx");
     });
 
-    it('Should ensure monotonic protocol version', async () => {
-        const wrongTx = buildL2CanonicalTransaction({
-            txType: 254,
-            nonce: 0
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                newProtocolVersion: 0
-            })
-        );
-
-        expect(revertReason).to.equal('New protocol version is not greater than the current one');
+    it("Should ensure monotonic protocol version", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        txType: 254,
+        nonce: 0,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 0,
+        })
+      );
+  
+      expect(revertReason).to.equal("New protocol version is not greater than the current one");
     });
-
-    it('Should validate upgrade transaction overhead', async () => {
-        const wrongTx = buildL2CanonicalTransaction({
-            nonce: 0,
-            gasLimit: 0
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('my');
+  
+    it("Should ensure protocol version not increasing too much", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        txType: 254,
+        nonce: 0,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 100000,
+        })
+      );
+  
+      expect(revertReason).to.equal("Too big protocol version difference");
     });
-
-    it('Should validate upgrade transaction gas max', async () => {
-        const wrongTx = buildL2CanonicalTransaction({
-            nonce: 0,
-            gasLimit: 1000000000000
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('ui');
+  
+    it("Should validate upgrade transaction overhead", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        nonce: 0,
+        gasLimit: 0,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("my");
     });
-
-    it('Should validate upgrade transaction cant output more pubdata than processable', async () => {
-        const wrongTx = buildL2CanonicalTransaction({
-            nonce: 0,
-            gasLimit: 10000000,
-            gasPerPubdataByteLimit: 1
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('uk');
+  
+    it("Should validate upgrade transaction gas max", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        nonce: 0,
+        gasLimit: 1000000000000,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("ui");
     });
-
-    it('Should validate factory deps', async () => {
-        const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-        const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-        const wrongTx = buildL2CanonicalTransaction({
-            factoryDeps: [wrongFactoryDepHash],
-            nonce: 3
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                factoryDeps: [myFactoryDep],
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('Wrong factory dep hash');
+  
+    it("Should validate upgrade transaction cant output more pubdata than processable", async () => {
+      const wrongTx = buildL2CanonicalTransaction({
+        nonce: 0,
+        gasLimit: 10000000,
+        gasPerPubdataByteLimit: 1,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("uk");
     });
-
-    it('Should validate factory deps length match', async () => {
-        const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-        const wrongTx = buildL2CanonicalTransaction({
-            factoryDeps: [],
-            nonce: 3
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                factoryDeps: [myFactoryDep],
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('Wrong number of factory deps');
+  
+    it("Should validate factory deps", async () => {
+      const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+      const wrongTx = buildL2CanonicalTransaction({
+        factoryDeps: [wrongFactoryDepHash],
+        nonce: 3,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          factoryDeps: [myFactoryDep],
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("Wrong factory dep hash");
     });
-
-    it('Should validate factory deps length isnt too large', async () => {
-        const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-        const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-
-        const wrongTx = buildL2CanonicalTransaction({
-            factoryDeps: Array(33).fill(randomDepHash),
-            nonce: 3
-        });
-
-        const revertReason = await getCallRevertReason(
-            executeUpgrade(chainId, proxyGetters, stateTransition, {
-                l2ProtocolUpgradeTx: wrongTx,
-                factoryDeps: Array(33).fill(myFactoryDep),
-                newProtocolVersion: 3
-            })
-        );
-
-        expect(revertReason).to.equal('Factory deps can be at most 32');
+  
+    it("Should validate factory deps length match", async () => {
+      const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const wrongTx = buildL2CanonicalTransaction({
+        factoryDeps: [],
+        nonce: 3,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          factoryDeps: [myFactoryDep],
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("Wrong number of factory deps");
+    });
+  
+    it("Should validate factory deps length isnt too large", async () => {
+      const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+  
+      const wrongTx = buildL2CanonicalTransaction({
+        factoryDeps: Array(33).fill(randomDepHash),
+        nonce: 3,
+      });
+  
+      const revertReason = await getCallRevertReason(
+        executeUpgrade(chainId, proxyGetters, stateTransition, {
+          l2ProtocolUpgradeTx: wrongTx,
+          factoryDeps: Array(33).fill(myFactoryDep),
+          newProtocolVersion: 3,
+        })
+      );
+  
+      expect(revertReason).to.equal("Factory deps can be at most 32");
     });
 
     let l2UpgradeTxHash: string;
@@ -385,51 +402,51 @@ describe('L2 upgrade test', function () {
         expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
         expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
     });
-
-    it('Should fail to upgrade when there is already a pending upgrade', async () => {
-        const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-        const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-        const verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-        const verifierParams = buildVerifierParams({
-            recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-            recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-            recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32))
-        });
-
-        const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-        const myFactoryDepHash = hashBytecode(myFactoryDep);
-        const upgradeTx = buildL2CanonicalTransaction({
-            factoryDeps: [myFactoryDepHash],
-            nonce: 4
-        });
-
-        const upgrade = {
-            bootloaderHash,
-            defaultAccountHash,
-            verifier: verifier,
-            verifierParams,
-            executeUpgradeTx: true,
-            l2ProtocolUpgradeTx: upgradeTx,
-            factoryDeps: [myFactoryDep],
-            newProtocolVersion: 5
-        };
-        const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
-
-        expect(revertReason).to.equal('Previous upgrade has not been finalized');
+  
+    it("Should fail to upgrade when there is already a pending upgrade", async () => {
+      const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+      const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+      const verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+      const verifierParams = buildVerifierParams({
+        recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+        recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+        recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+      });
+  
+      const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const myFactoryDepHash = hashBytecode(myFactoryDep);
+      const upgradeTx = buildL2CanonicalTransaction({
+        factoryDeps: [myFactoryDepHash],
+        nonce: 4,
+      });
+  
+      const upgrade = {
+        bootloaderHash,
+        defaultAccountHash,
+        verifier: verifier,
+        verifierParams,
+        executeUpgradeTx: true,
+        l2ProtocolUpgradeTx: upgradeTx,
+        factoryDeps: [myFactoryDep],
+        newProtocolVersion: 5,
+      };
+      const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
+  
+      expect(revertReason).to.equal("Previous upgrade has not been finalized");
     });
-
-    it('Should require that the next commit batches contains an upgrade tx', async () => {
-        if (!l2UpgradeTxHash) {
-            throw new Error('Can not perform this test without l2UpgradeTxHash');
-        }
-
-        const batch2InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch1Info, {
-            batchNumber: 2
-        });
-        const revertReason = await getCallRevertReason(
-            proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
-        );
-        expect(revertReason).to.equal('b8');
+  
+    it("Should require that the next commit batches contains an upgrade tx", async () => {
+      if (!l2UpgradeTxHash) {
+        throw new Error("Can not perform this test without l2UpgradeTxHash");
+      }
+  
+      const batch2InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch1Info, {
+        batchNumber: 2,
+      });
+      const revertReason = await getCallRevertReason(
+        proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
+      );
+      expect(revertReason).to.equal("b8");
     });
 
     it('Should ensure any additional upgrade logs go to the priority ops hash', async () => {
@@ -639,7 +656,9 @@ describe('L2 upgrade test', function () {
                     name: event.name,
                     args: parsedArgs
                 };
-            } catch (_) {}
+            } catch (_) {
+              // @ts-ignore
+            }
         });
 
         const timestamp = (await hardhat.ethers.provider.getBlock('latest')).timestamp;
@@ -675,7 +694,7 @@ describe('L2 upgrade test', function () {
 });
 
 type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
-    batchNumber: BigNumberish;
+  batchNumber: BigNumberish;
 };
 
 // An actual log should also contain shardId/isService and logIndex,
@@ -729,8 +748,8 @@ type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
 // }
 
 async function buildCommitBatchInfo(
-    prevInfo: StoredBatchInfo,
-    info: CommitBatchInfoWithTimestamp
+  prevInfo: StoredBatchInfo,
+  info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
     const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
     let systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs);
@@ -741,161 +760,161 @@ async function buildCommitBatchInfo(
         packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
     );
 
-    return {
-        timestamp,
-        indexRepeatedStorageChanges: 0,
-        newStateRoot: ethers.utils.randomBytes(32),
-        numberOfLayer1Txs: 0,
-        priorityOperationsHash: EMPTY_STRING_KECCAK,
-        systemLogs: ethers.utils.hexConcat(systemLogs),
-        totalL2ToL1Pubdata: ethers.constants.HashZero,
-        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-        eventsQueueStateHash: ethers.utils.randomBytes(32),
-        ...info
-    };
+  return {
+    timestamp,
+    indexRepeatedStorageChanges: 0,
+    newStateRoot: ethers.utils.randomBytes(32),
+    numberOfLayer1Txs: 0,
+    priorityOperationsHash: EMPTY_STRING_KECCAK,
+    systemLogs: ethers.utils.hexConcat(systemLogs),
+    totalL2ToL1Pubdata: ethers.constants.HashZero,
+    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    ...info,
+  };
 }
 
 async function buildCommitBatchInfoWithCustomLogs(
-    prevInfo: StoredBatchInfo,
-    info: CommitBatchInfoWithTimestamp,
-    systemLogs: string[]
+  prevInfo: StoredBatchInfo,
+  info: CommitBatchInfoWithTimestamp,
+  systemLogs: string[]
 ): Promise<CommitBatchInfo> {
-    const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock('latest')).timestamp;
-    systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
-        true,
-        L2_SYSTEM_CONTEXT_ADDRESS,
-        SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-        packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
-    );
+  const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+    true,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+  );
 
-    return {
-        timestamp,
-        indexRepeatedStorageChanges: 0,
-        newStateRoot: ethers.utils.randomBytes(32),
-        numberOfLayer1Txs: 0,
-        priorityOperationsHash: EMPTY_STRING_KECCAK,
-        systemLogs: ethers.utils.hexConcat(systemLogs),
-        totalL2ToL1Pubdata: ethers.constants.HashZero,
-        bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-        eventsQueueStateHash: ethers.utils.randomBytes(32),
-        ...info
-    };
+  return {
+    timestamp,
+    indexRepeatedStorageChanges: 0,
+    newStateRoot: ethers.utils.randomBytes(32),
+    numberOfLayer1Txs: 0,
+    priorityOperationsHash: EMPTY_STRING_KECCAK,
+    systemLogs: ethers.utils.hexConcat(systemLogs),
+    totalL2ToL1Pubdata: ethers.constants.HashZero,
+    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    ...info,
+  };
 }
 
 function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
-    return {
-        batchNumber: commitInfo.batchNumber,
-        batchHash: commitInfo.newStateRoot,
-        indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
-        numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
-        priorityOperationsHash: commitInfo.priorityOperationsHash,
-        l2LogsTreeRoot: ethers.constants.HashZero,
-        timestamp: commitInfo.timestamp,
-        commitment: commitment
-    };
+  return {
+    batchNumber: commitInfo.batchNumber,
+    batchHash: commitInfo.newStateRoot,
+    indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
+    numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
+    priorityOperationsHash: commitInfo.priorityOperationsHash,
+    l2LogsTreeRoot: ethers.constants.HashZero,
+    timestamp: commitInfo.timestamp,
+    commitment: commitment,
+  };
 }
 
 interface L2CanonicalTransaction {
-    txType: BigNumberish;
-    from: BigNumberish;
-    to: BigNumberish;
-    gasLimit: BigNumberish;
-    gasPerPubdataByteLimit: BigNumberish;
-    maxFeePerGas: BigNumberish;
-    maxPriorityFeePerGas: BigNumberish;
-    paymaster: BigNumberish;
-    nonce: BigNumberish;
-    value: BigNumberish;
-    // In the future, we might want to add some
-    // new fields to the struct. The `txData` struct
-    // is to be passed to account and any changes to its structure
-    // would mean a breaking change to these accounts. In order to prevent this,
-    // we should keep some fields as "reserved".
-    // It is also recommended that their length is fixed, since
-    // it would allow easier proof integration (in case we will need
-    // some special circuit for preprocessing transactions).
-    reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
-    data: BytesLike;
-    signature: BytesLike;
-    factoryDeps: BigNumberish[];
-    paymasterInput: BytesLike;
-    // Reserved dynamic type for the future use-case. Using it should be avoided,
-    // But it is still here, just in case we want to enable some additional functionality.
-    reservedDynamic: BytesLike;
+  txType: BigNumberish;
+  from: BigNumberish;
+  to: BigNumberish;
+  gasLimit: BigNumberish;
+  gasPerPubdataByteLimit: BigNumberish;
+  maxFeePerGas: BigNumberish;
+  maxPriorityFeePerGas: BigNumberish;
+  paymaster: BigNumberish;
+  nonce: BigNumberish;
+  value: BigNumberish;
+  // In the future, we might want to add some
+  // new fields to the struct. The `txData` struct
+  // is to be passed to account and any changes to its structure
+  // would mean a breaking change to these accounts. In order to prevent this,
+  // we should keep some fields as "reserved".
+  // It is also recommended that their length is fixed, since
+  // it would allow easier proof integration (in case we will need
+  // some special circuit for preprocessing transactions).
+  reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
+  data: BytesLike;
+  signature: BytesLike;
+  factoryDeps: BigNumberish[];
+  paymasterInput: BytesLike;
+  // Reserved dynamic type for the future use-case. Using it should be avoided,
+  // But it is still here, just in case we want to enable some additional functionality.
+  reservedDynamic: BytesLike;
 }
 
 function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
-    return {
-        txType: SYSTEM_UPGRADE_TX_TYPE,
-        from: ethers.constants.AddressZero,
-        to: ethers.constants.AddressZero,
-        gasLimit: 3000000,
-        gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-        maxFeePerGas: 0,
-        maxPriorityFeePerGas: 0,
-        paymaster: 0,
-        nonce: 0,
-        value: 0,
-        reserved: [0, 0, 0, 0],
-        data: '0x',
-        signature: '0x',
-        factoryDeps: [],
-        paymasterInput: '0x',
-        reservedDynamic: '0x',
-        ...tx
-    };
+  return {
+    txType: SYSTEM_UPGRADE_TX_TYPE,
+    from: ethers.constants.AddressZero,
+    to: ethers.constants.AddressZero,
+    gasLimit: 5000000,
+    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    maxFeePerGas: 0,
+    maxPriorityFeePerGas: 0,
+    paymaster: 0,
+    nonce: 0,
+    value: 0,
+    reserved: [0, 0, 0, 0],
+    data: "0x",
+    signature: "0x",
+    factoryDeps: [],
+    paymasterInput: "0x",
+    reservedDynamic: "0x",
+    ...tx,
+  };
 }
 
 interface VerifierParams {
-    recursionNodeLevelVkHash: BytesLike;
-    recursionLeafLevelVkHash: BytesLike;
-    recursionCircuitsSetVksHash: BytesLike;
+  recursionNodeLevelVkHash: BytesLike;
+  recursionLeafLevelVkHash: BytesLike;
+  recursionCircuitsSetVksHash: BytesLike;
 }
 
 function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
-    return {
-        recursionNodeLevelVkHash: ethers.constants.HashZero,
-        recursionLeafLevelVkHash: ethers.constants.HashZero,
-        recursionCircuitsSetVksHash: ethers.constants.HashZero,
-        ...params
-    };
+  return {
+    recursionNodeLevelVkHash: ethers.constants.HashZero,
+    recursionLeafLevelVkHash: ethers.constants.HashZero,
+    recursionCircuitsSetVksHash: ethers.constants.HashZero,
+    ...params,
+  };
 }
 
 interface ProposedUpgrade {
-    // The tx for the upgrade call to the l2 system upgrade contract
-    l2ProtocolUpgradeTx: L2CanonicalTransaction;
-    factoryDeps: BytesLike[];
-    executeUpgradeTx: boolean;
-    bootloaderHash: BytesLike;
-    defaultAccountHash: BytesLike;
-    verifier: string;
-    verifierParams: VerifierParams;
-    l1ContractsUpgradeCalldata: BytesLike;
-    postUpgradeCalldata: BytesLike;
-    upgradeTimestamp: ethers.BigNumber;
-    newProtocolVersion: BigNumberish;
-    newAllowList: string;
+  // The tx for the upgrade call to the l2 system upgrade contract
+  l2ProtocolUpgradeTx: L2CanonicalTransaction;
+  factoryDeps: BytesLike[];
+  executeUpgradeTx: boolean;
+  bootloaderHash: BytesLike;
+  defaultAccountHash: BytesLike;
+  verifier: string;
+  verifierParams: VerifierParams;
+  l1ContractsUpgradeCalldata: BytesLike;
+  postUpgradeCalldata: BytesLike;
+  upgradeTimestamp: ethers.BigNumber;
+  newProtocolVersion: BigNumberish;
+  newAllowList: string;
 }
 
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
 
 function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedUpgrade {
-    const newProtocolVersion = proposedUpgrade.newProtocolVersion || 0;
-    return {
-        l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
-        executeUpgradeTx: false,
-        bootloaderHash: ethers.constants.HashZero,
-        defaultAccountHash: ethers.constants.HashZero,
-        verifier: ethers.constants.AddressZero,
-        verifierParams: buildVerifierParams({}),
-        l1ContractsUpgradeCalldata: '0x',
-        postUpgradeCalldata: '0x',
-        upgradeTimestamp: ethers.constants.Zero,
-        factoryDeps: [],
-        newProtocolVersion,
-        newAllowList: ethers.constants.AddressZero,
-        ...proposedUpgrade
-    };
+  const newProtocolVersion = proposedUpgrade.newProtocolVersion || 0;
+  return {
+    l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
+    executeUpgradeTx: false,
+    bootloaderHash: ethers.constants.HashZero,
+    defaultAccountHash: ethers.constants.HashZero,
+    verifier: ethers.constants.AddressZero,
+    verifierParams: buildVerifierParams({}),
+    l1ContractsUpgradeCalldata: "0x",
+    postUpgradeCalldata: "0x",
+    upgradeTimestamp: ethers.constants.Zero,
+    factoryDeps: [],
+    newProtocolVersion,
+    newAllowList: ethers.constants.AddressZero,
+    ...proposedUpgrade,
+  };
 }
 
 async function executeUpgrade(
@@ -905,22 +924,22 @@ async function executeUpgrade(
     partialUpgrade: Partial<ProposedUpgrade>,
     contractFactory?: ethers.ethers.ContractFactory
 ) {
-    if (partialUpgrade.newProtocolVersion == null) {
-        const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
-        partialUpgrade.newProtocolVersion = newVersion;
-    }
-    const upgrade = buildProposeUpgrade(partialUpgrade);
+  if (partialUpgrade.newProtocolVersion == null) {
+    const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
+    partialUpgrade.newProtocolVersion = newVersion;
+  }
+  const upgrade = buildProposeUpgrade(partialUpgrade);
 
-    const defaultUpgradeFactory = contractFactory
-        ? contractFactory
-        : await hardhat.ethers.getContractFactory('DefaultUpgrade');
+  const defaultUpgradeFactory = contractFactory
+    ? contractFactory
+    : await hardhat.ethers.getContractFactory("DefaultUpgrade");
 
-    const defaultUpgrade = await defaultUpgradeFactory.deploy();
-    const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
+  const defaultUpgrade = await defaultUpgradeFactory.deploy();
+  const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [upgrade]);
+  const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
-    const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
     // This promise will be handled in the tests
     (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
@@ -934,22 +953,22 @@ async function executeCustomUpgrade(
     partialUpgrade: Partial<ProposedUpgrade>,
     contractFactory?: ethers.ethers.ContractFactory
 ) {
-    if (partialUpgrade.newProtocolVersion == null) {
-        const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
-        partialUpgrade.newProtocolVersion = newVersion;
-    }
-    const upgrade = buildProposeUpgrade(partialUpgrade);
+  if (partialUpgrade.newProtocolVersion == null) {
+    const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
+    partialUpgrade.newProtocolVersion = newVersion;
+  }
+  const upgrade = buildProposeUpgrade(partialUpgrade);
 
-    const upgradeFactory = contractFactory
-        ? contractFactory
-        : await hardhat.ethers.getContractFactory('CustomUpgradeTest');
+  const upgradeFactory = contractFactory
+    ? contractFactory
+    : await hardhat.ethers.getContractFactory("CustomUpgradeTest");
 
-    const customUpgrade = await upgradeFactory.deploy();
-    const diamondUpgradeInit = CustomUpgradeTestFactory.connect(customUpgrade.address, customUpgrade.signer);
+  const customUpgrade = await upgradeFactory.deploy();
+  const diamondUpgradeInit = CustomUpgradeTestFactory.connect(customUpgrade.address, customUpgrade.signer);
 
-    const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData('upgrade', [upgrade]);
+  const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
-    const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
     // This promise will be handled in the tests
     (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
@@ -957,19 +976,19 @@ async function executeCustomUpgrade(
 }
 
 async function makeExecutedEqualCommitted(
-    proxyExecutor: ExecutorFacet,
-    prevBatchInfo: StoredBatchInfo,
-    batchesToProve: StoredBatchInfo[],
-    batchesToExecute: StoredBatchInfo[]
+  proxyExecutor: ExecutorFacet,
+  prevBatchInfo: StoredBatchInfo,
+  batchesToProve: StoredBatchInfo[],
+  batchesToExecute: StoredBatchInfo[]
 ) {
-    batchesToExecute = [...batchesToProve, ...batchesToExecute];
+  batchesToExecute = [...batchesToProve, ...batchesToExecute];
 
-    await (
-        await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
-            recursiveAggregationInput: [],
-            serializedProof: []
-        })
-    ).wait();
+  await (
+    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
+      recursiveAggregationInput: [],
+      serializedProof: [],
+    })
+  ).wait();
 
-    await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
 }

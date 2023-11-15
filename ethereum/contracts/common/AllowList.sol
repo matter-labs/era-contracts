@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
@@ -129,6 +129,7 @@ contract AllowList is IAllowList, Ownable2Step {
     function setDepositLimit(address _l1Token, bool _depositLimitation, uint256 _depositCap) external onlyOwner {
         tokenDeposit[_l1Token].depositLimitation = _depositLimitation;
         tokenDeposit[_l1Token].depositCap = _depositCap;
+        emit UpdateDepositLimit(_l1Token, _depositLimitation, _depositCap);
     }
 
     /// @dev Get deposit limit data of a token

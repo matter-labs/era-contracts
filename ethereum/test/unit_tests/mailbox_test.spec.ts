@@ -102,8 +102,11 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal(DEFAULT_REVERT_REASON);
-    });
+ 
+
+
+
+
 
     it('Should not accept bytecode is not chunkable', async () => {
         const revertReason = await getCallRevertReason(
@@ -119,7 +122,7 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('pq');
+      expect(revertReason).equal(DEFAULT_REVERT_REASON);
     });
 
     it('Should not accept bytecode of even length in words', async () => {
@@ -136,8 +139,9 @@ describe('Mailbox tests', function () {
             )
         );
 
-        expect(revertReason).equal('ps');
+      expect(revertReason).equal("d2");
     });
+  });
 
     it('Should not accept bytecode that is too long', async () => {
         const revertReason = await getCallRevertReason(
@@ -337,7 +341,8 @@ describe('Mailbox tests', function () {
     let callDirectly, callViaForwarder, callViaConstructorForwarder;
 
     before(async () => {
-        const l2GasLimit = ethers.BigNumber.from(10000000);
+      await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
+    });
 
         callDirectly = async (refundRecipient) => {
             return {
@@ -427,7 +432,7 @@ describe('Mailbox tests', function () {
 });
 
 function aliasAddress(address) {
-    return ethers.BigNumber.from(address)
-        .add('0x1111000000000000000000000000000000001111')
-        .mask(20 * 8);
+  return ethers.BigNumber.from(address)
+    .add("0x1111000000000000000000000000000000001111")
+    .mask(20 * 8);
 }

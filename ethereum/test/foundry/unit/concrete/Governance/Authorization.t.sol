@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity 0.8.20;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
@@ -54,7 +54,7 @@ contract Authorization is GovernanceTest {
 
     function test_RevertWhen_CancelByUnauthorisedAddress() public {
         vm.prank(randomSigner);
-        vm.expectRevert("Only the owner and security council are allowed to call this function");
+        vm.expectRevert("Ownable: caller is not the owner");
         governance.cancel(bytes32(0));
     }
 

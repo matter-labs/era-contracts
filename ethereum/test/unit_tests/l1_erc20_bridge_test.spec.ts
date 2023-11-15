@@ -33,8 +33,8 @@ describe(`L1ERC20Bridge tests`, function () {
     let bridgehubMailboxFacet: BridgehubMailboxFacet;
     let chainId = 0;
 
-    before(async () => {
-        [owner, randomSigner] = await hardhat.ethers.getSigners();
+  before(async () => {
+    [owner, randomSigner] = await hardhat.ethers.getSigners();
 
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(
             owner.provider
@@ -42,7 +42,9 @@ describe(`L1ERC20Bridge tests`, function () {
         const ownerAddress = await deployWallet.getAddress();
         process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
-        const gasPrice = await owner.provider.getGasPrice();
+        const mailboxFactory = await hardhat.ethers.getContractFactory('MailboxFacet');
+        const mailboxContract = await mailboxFactory.deploy();
+        const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
         const tx = {
             from: owner.getAddress(),
@@ -73,12 +75,12 @@ describe(`L1ERC20Bridge tests`, function () {
         l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
         l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
 
-        const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory('TestnetERC20Token');
-        testnetERC20TokenContract = await testnetERC20TokenFactory.deploy('TestToken', 'TT', 18);
-        erc20TestToken = TestnetERC20TokenFactory.connect(
-            testnetERC20TokenContract.address,
-            testnetERC20TokenContract.signer
-        );
+    const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
+    testnetERC20TokenContract = await testnetERC20TokenFactory.deploy("TestToken", "TT", 18);
+    erc20TestToken = TestnetERC20TokenFactory.connect(
+      testnetERC20TokenContract.address,
+      testnetERC20TokenContract.signer
+    );
 
         await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits('10000', 18));
         await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits('10000', 18));
@@ -202,8 +204,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
 async function depositERC20(
     bridge: IL1Bridge,
-    bridgehubMailboxFacet: BridgehubMailboxFacet,
-    chainId: BigNumberish,
+    zksyncContract: IZkSync,
     l2Receiver: string,
     l1Token: string,
     amount: ethers.BigNumber,
@@ -212,10 +213,9 @@ async function depositERC20(
 ) {
     const gasPrice = await bridge.provider.getGasPrice();
     const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-    const neededValue = await bridgehubMailboxFacet.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
+    const neededValue = await zksyncContract.l2TransactionBaseCost(gasPrice, l2GasLimit, gasPerPubdata);
 
     await bridge.deposit(
-        chainId,
         l2Receiver,
         l1Token,
         amount,

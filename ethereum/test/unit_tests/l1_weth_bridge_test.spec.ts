@@ -67,8 +67,8 @@ describe('WETH Bridge tests', () => {
     let functionSignature = '0x0fdef251';
     let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
-    before(async () => {
-        [owner, randomSigner] = await hardhat.ethers.getSigners();
+  before(async () => {
+    [owner, randomSigner] = await hardhat.ethers.getSigners();
 
         const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(
             owner.provider
@@ -93,20 +93,17 @@ describe('WETH Bridge tests', () => {
         chainId = deployer.chainId;
         allowList = deployer.l1AllowList(deployWallet);
 
-        l1Weth = WETH9Factory.connect(
-            (await (await hardhat.ethers.getContractFactory('WETH9')).deploy()).address,
-            owner
-        );
+    l1Weth = WETH9Factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
 
-        // prepare the bridge
+    // prepare the bridge
 
         const bridge = await (
             await hardhat.ethers.getContractFactory('L1WethBridge')
         ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployer.addresses.AllowList);
 
-        // we don't test L2, so it is ok to give garbage factory deps and L2 address
-        const garbageBytecode = '0x1111111111111111111111111111111111111111111111111111111111111111';
-        const garbageAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+    // we don't test L2, so it is ok to give garbage factory deps and L2 address
+    const garbageBytecode = "0x1111111111111111111111111111111111111111111111111111111111111111";
+    const garbageAddress = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
 
         const _bridgeProxy = await (
             await hardhat.ethers.getContractFactory('ERC1967Proxy')
@@ -145,11 +142,11 @@ describe('WETH Bridge tests', () => {
                 )
         );
 
-        expect(revertReason).equal('nr');
+    expect(revertReason).equal("nr");
 
-        // This is only so the following tests don't need whitelisting
-        await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
-    });
+    // This is only so the following tests don't need whitelisting
+    await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
+  });
 
     it('Should not allow depositing zero WETH', async () => {
         const revertReason = await getCallRevertReason(
@@ -166,8 +163,8 @@ describe('WETH Bridge tests', () => {
                 )
         );
 
-        expect(revertReason).equal('Amount cannot be zero');
-    });
+    expect(revertReason).equal("Amount cannot be zero");
+  });
 
     it(`Should deposit successfully`, async () => {
         await l1Weth.connect(randomSigner).deposit({ value: 100 });

@@ -1,21 +1,21 @@
-import { Command } from 'commander';
-import { ethers, Wallet } from 'ethers';
-import { Deployer } from '../src.ts/deploy';
-import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider, getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import { Command } from "commander";
+import { ethers, Wallet } from "ethers";
+import { Deployer } from "../src.ts/deploy";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { web3Provider, getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, 'contracts/zksync/artifacts-zk/');
-const l2BridgeArtifactsPath = path.join(contractArtifactsPath, 'cache-zk/solpp-generated-contracts/bridge/');
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/zksync/artifacts-zk/");
+const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
-    contractArtifactsPath,
-    '@openzeppelin/contracts/proxy/transparent/'
+  contractArtifactsPath,
+  "@openzeppelin/contracts/proxy/transparent/"
 );
 
 function readInterface(path: string, fileName: string, solFileName?: string) {
@@ -24,17 +24,17 @@ function readInterface(path: string, fileName: string, solFileName?: string) {
     return new ethers.utils.Interface(abi);
 }
 
-const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv('CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT');
-const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, 'L2Weth');
+const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
+const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2Weth");
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
-    openzeppelinTransparentProxyArtifactsPath,
-    'ITransparentUpgradeableProxy',
-    'TransparentUpgradeableProxy'
+  openzeppelinTransparentProxyArtifactsPath,
+  "TransparentUpgradeableProxy",
+  "TransparentUpgradeableProxy"
 );
 
 function getL2Calldata(l2WethBridgeAddress: string, l1WethTokenAddress: string, l2WethTokenImplAddress: string) {
-    const upgradeData = L2_WETH_INTERFACE.encodeFunctionData('initializeV2', [l2WethBridgeAddress, l1WethTokenAddress]);
-    return TRANSPARENT_UPGRADEABLE_PROXY.encodeFunctionData('upgradeToAndCall', [l2WethTokenImplAddress, upgradeData]);
+  const upgradeData = L2_WETH_INTERFACE.encodeFunctionData("initializeV2", [l2WethBridgeAddress, l1WethTokenAddress]);
+  return TRANSPARENT_UPGRADEABLE_PROXY.encodeFunctionData("upgradeToAndCall", [l2WethTokenImplAddress, upgradeData]);
 }
 
 async function getL1TxInfo(
@@ -64,24 +64,24 @@ async function getL1TxInfo(
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     );
 
-    return {
-        to: zksync.address,
-        data: l1Calldata,
-        value: neededValue.toString(),
-        gasPrice: gasPrice.toString()
-    };
+  return {
+    to: zksync.address,
+    data: l1Calldata,
+    value: neededValue.toString(),
+    gasPrice: gasPrice.toString(),
+  };
 }
 
 async function main() {
-    const program = new Command();
+  const program = new Command();
 
-    program.version('0.1.0').name('initialize-l2-weth-token');
+  program.version("0.1.0").name("initialize-l2-weth-token");
 
-    const l2WethBridgeAddress = process.env.CONTRACTS_L2_WETH_BRIDGE_ADDR;
-    const l2WethTokenProxyAddress = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
-    const l2WethTokenImplAddress = process.env.CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR;
-    const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || 'localhost');
-    const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == 'WETH')!.address;
+  const l2WethBridgeAddress = process.env.CONTRACTS_L2_WETH_BRIDGE_ADDR;
+  const l2WethTokenProxyAddress = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
+  const l2WethTokenImplAddress = process.env.CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR;
+  const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
+  const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
     program
         .command('prepare-calldata')
@@ -95,21 +95,21 @@ async function main() {
                 return;
             }
 
-            const deployWallet = cmd.privateKey
-                ? new Wallet(cmd.privateKey, provider)
-                : Wallet.fromMnemonic(
-                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                      "m/44'/60'/0'/0/1"
-                  ).connect(provider);
-            console.log(`Using deployer wallet: ${deployWallet.address}`);
+      const deployWallet = cmd.privateKey
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
+      console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-            const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
-            console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-            const deployer = new Deployer({
-                deployWallet,
-                verbose: true
-            });
+      const deployer = new Deployer({
+        deployWallet,
+        verbose: true,
+      });
 
             const l2Calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
             const l1TxInfo = await getL1TxInfo(
@@ -137,24 +137,24 @@ async function main() {
                 return;
             }
 
-            const deployWallet = cmd.privateKey
-                ? new Wallet(cmd.privateKey, provider)
-                : Wallet.fromMnemonic(
-                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                      "m/44'/60'/0'/0/1"
-                  ).connect(provider);
-            console.log(`Using deployer wallet: ${deployWallet.address}`);
+      const deployWallet = cmd.privateKey
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
+      console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-            const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
-            console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
-            console.log(`Using deployer nonce: ${nonce}`);
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      console.log(`Using deployer nonce: ${nonce}`);
 
-            const deployer = new Deployer({
-                deployWallet,
-                verbose: true
-            });
+      const deployer = new Deployer({
+        deployWallet,
+        verbose: true,
+      });
 
             const zkSync = deployer.bridgehubContract(deployWallet);
             const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
@@ -180,19 +180,19 @@ async function main() {
                 }
             );
 
-            console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+      console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
 
-            const receipt = await tx.wait();
+      const receipt = await tx.wait();
 
-            console.log(`L2 WETH token initialized, gasUsed: ${receipt.gasUsed.toString()}`);
-        });
+      console.log(`L2 WETH token initialized, gasUsed: ${receipt.gasUsed.toString()}`);
+    });
 
-    await program.parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
 
 main()
-    .then(() => process.exit(0))
-    .catch((err) => {
-        console.error('Error:', err);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error:", err);
+    process.exit(1);
+  });

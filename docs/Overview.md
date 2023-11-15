@@ -78,10 +78,11 @@ upgrades and changes in all zkSync Era governed contracts.
 
 Each upgrade consists of two steps:
 
-- Upgrade Proposal - The governor can schedule upgrades in two different manners: - Fully transparent data. All
-  implementation contracts and migration contracts are known to the community. The governor must wait for the timelock
-  to execute the upgrade. - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be
-  executed only with security council approval without timelock.
+- Upgrade Proposal - The governor can schedule upgrades in two different manners:
+  - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
+for the timelock to execute the upgrade.
+  - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
+approval without timelock.
 - Upgrade execution - perform the upgrade that was proposed.
 
 #### MailboxFacet

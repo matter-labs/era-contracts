@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../state-transition/chain-deps/facets/Base.sol";
 import "../state-transition/chain-interfaces/IMailbox.sol";
@@ -8,7 +8,7 @@ import "../state-transition/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/Messaging.sol";
 import "../state-transition/libraries/TransactionValidator.sol";
-import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -219,6 +219,10 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
         require(
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
+        );
+        require(
+            _newProtocolVersion - previousProtocolVersion <= MAX_ALLOWED_PROTOCOL_VERSION_DELTA,
+            "Too big protocol version difference"
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.

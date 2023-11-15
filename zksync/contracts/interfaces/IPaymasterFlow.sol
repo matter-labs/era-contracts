@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
@@ -13,9 +13,5 @@ pragma solidity ^0.8.0;
 interface IPaymasterFlow {
     function general(bytes calldata input) external;
 
-    function approvalBased(
-        address _token,
-        uint256 _minAllowance,
-        bytes calldata _innerInput
-    ) external;
+    function approvalBased(address _token, uint256 _minAllowance, bytes calldata _innerInput) external;
 }

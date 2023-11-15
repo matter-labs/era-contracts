@@ -1,4 +1,4 @@
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 import {VerifierParams} from "../../state-transition/chain-deps/StateTransitionChainStorage.sol";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {MSG_VALUE_SYSTEM_CONTRACT} from "./L2ContractHelper.sol";
 
@@ -34,12 +34,7 @@ library Utils {
 /// @notice The library contains the functions to make system calls.
 /// @dev A more detailed description of the library and its methods can be found in the `system-contracts` repo.
 library SystemContractsCaller {
-    function systemCall(
-        uint32 gasLimit,
-        address to,
-        uint256 value,
-        bytes memory data
-    ) internal returns (bool success) {
+    function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
         address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
         uint32 dataStart;

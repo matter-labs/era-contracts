@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
@@ -151,7 +151,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev Cancel the scheduled operation.
     /// @dev Both the owner and security council may cancel an operation.
     /// @param _id Proposal id value (see `hashOperation`)
-    function cancel(bytes32 _id) external onlyOwnerOrSecurityCouncil {
+    function cancel(bytes32 _id) external onlyOwner {
         require(isOperationPending(_id), "Operation must be pending");
         delete timestamps[_id];
         emit OperationCancelled(_id);
@@ -164,7 +164,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @notice Executes the scheduled operation after the delay passed.
     /// @dev Both the owner and security council may execute delayed operations.
     /// @param _operation The operation parameters will be executed with the upgrade.
-    function execute(Operation calldata _operation) external onlyOwnerOrSecurityCouncil {
+    function execute(Operation calldata _operation) external payable onlyOwnerOrSecurityCouncil {
         bytes32 id = hashOperation(_operation);
         // Check if the predecessor operation is completed.
         _checkPredecessorDone(_operation.predecessor);
@@ -183,7 +183,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @notice Executes the scheduled operation with the security council instantly.
     /// @dev Only the security council may execute an operation instantly.
     /// @param _operation The operation parameters will be executed with the upgrade.
-    function executeInstant(Operation calldata _operation) external onlySecurityCouncil {
+    function executeInstant(Operation calldata _operation) external payable onlySecurityCouncil {
         bytes32 id = hashOperation(_operation);
         // Check if the predecessor operation is completed.
         _checkPredecessorDone(_operation.predecessor);

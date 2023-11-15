@@ -1,25 +1,25 @@
-import { Command } from 'commander';
-import { Wallet, ethers } from 'ethers';
-import * as fs from 'fs';
-import { Deployer } from '../../ethereum/src.ts/deploy';
-import * as path from 'path';
-import { getNumberFromEnv, web3Provider } from '../../ethereum/scripts/utils';
-import * as hre from 'hardhat';
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from './utils';
+import { Command } from "commander";
+import { Wallet, ethers } from "ethers";
+import * as fs from "fs";
+import { Deployer } from "../../ethereum/src.ts/deploy";
+import * as path from "path";
+import { getNumberFromEnv, web3Provider } from "../../ethereum/scripts/utils";
+import * as hre from "hardhat";
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
-const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv('CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT');
+const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 function getContractBytecode(contractName: string) {
-    return hre.artifacts.readArtifactSync(contractName).bytecode;
+  return hre.artifacts.readArtifactSync(contractName).bytecode;
 }
 
 async function main() {
-    const program = new Command();
+  const program = new Command();
 
-    program.version('0.1.0').name('publish-bridge-preimages');
+  program.version("0.1.0").name("publish-bridge-preimages");
 
     program
         .option('--private-key <private-key>')
@@ -36,11 +36,11 @@ async function main() {
                   ).connect(provider);
             console.log(`Using wallet: ${wallet.address}`);
 
-            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await wallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await wallet.getTransactionCount();
+      console.log(`Using nonce: ${nonce}`);
 
-            const gasPrice = cmd.gasPrice ? parseInt(cmd.gasPrice) : await wallet.getGasPrice();
-            console.log(`Using gas price: ${gasPrice}`);
+      const gasPrice = cmd.gasPrice ? parseInt(cmd.gasPrice) : await wallet.getGasPrice();
+      console.log(`Using gas price: ${gasPrice}`);
 
             const deployer = new Deployer({ deployWallet: wallet });
             const zkSync = deployer.bridgehubContract(wallet);
@@ -59,12 +59,12 @@ async function main() {
             await publishL2ERC20BridgeTx.wait();
         });
 
-    await program.parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
 
 main()
-    .then(() => process.exit(0))
-    .catch((err) => {
-        console.error('Error:', err);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error:", err);
+    process.exit(1);
+  });

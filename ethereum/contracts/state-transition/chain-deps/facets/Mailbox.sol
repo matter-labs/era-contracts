@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -481,11 +481,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(bytes[] calldata _factoryDeps)
-        internal
-        pure
-        returns (uint256[] memory hashedFactoryDeps)
-    {
+    function _hashFactoryDeps(
+        bytes[] calldata _factoryDeps
+    ) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
@@ -499,11 +497,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     }
 
     /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(bytes memory _message)
-        internal
-        pure
-        returns (address l1Receiver, uint256 amount)
-    {
+    function _parseL2WithdrawalMessage(
+        bytes memory _message
+    ) internal pure returns (address l1Receiver, uint256 amount) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`

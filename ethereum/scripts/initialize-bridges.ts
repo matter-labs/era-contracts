@@ -19,8 +19,8 @@ import * as path from 'path';
 import { L1ERC20Bridge } from '../typechain';
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, `etc/test_config/constant`);
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: 'utf-8' }));
+const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 
 
@@ -99,7 +99,7 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
 }
 
 async function main() {
-    const program = new Command();
+  const program = new Command();
 
     program.version('0.1.0').name('initialize-bridges-chain');
 
@@ -119,11 +119,11 @@ async function main() {
                   ).connect(provider);
             console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-            const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, 'gwei') : await provider.getGasPrice();
-            console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-            const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
-            console.log(`Using nonce: ${nonce}`);
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      console.log(`Using nonce: ${nonce}`);
 
             const deployer = new Deployer({
                 deployWallet,
@@ -136,12 +136,12 @@ async function main() {
             }
         });
 
-    await program.parseAsync(process.argv);
+  await program.parseAsync(process.argv);
 }
 
 main()
-    .then(() => process.exit(0))
-    .catch((err) => {
-        console.error('Error:', err);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error:", err);
+    process.exit(1);
+  });

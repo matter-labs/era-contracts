@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "../../state-transition/libraries/TransactionValidator.sol";
 import "../../bridgehub/bridgehub-interfaces/IBridgehubMailbox.sol";

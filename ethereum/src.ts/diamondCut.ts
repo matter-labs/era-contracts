@@ -1,27 +1,30 @@
-import { Interface } from 'ethers/lib/utils';
+import type { Interface } from 'ethers/lib/utils';
 import * as hardhat from 'hardhat';
 import '@nomiclabs/hardhat-ethers';
 import { ethers, Wallet, BigNumberish } from 'ethers';
 import { IStateTransitionChainFactory } from '../typechain/IStateTransitionChainFactory';
 import { IStateTransitionChainBaseFactory } from '../typechain/IStateTransitionChainBaseFactory';
 
+// Some of the facets are to be removed with the upcoming upgrade.
+const UNCONDITIONALLY_REMOVED_FACETS = ["DiamondCutFacet", "GovernanceFacet"];
+
 export enum Action {
-    Add = 0,
-    Replace = 1,
-    Remove = 2
+  Add = 0,
+  Replace = 1,
+  Remove = 2,
 }
 
 export interface FacetCut {
-    facet: string;
-    selectors: string[];
-    action: Action;
-    isFreezable: boolean;
+  facet: string;
+  selectors: string[];
+  action: Action;
+  isFreezable: boolean;
 }
 
 export interface DiamondCut {
-    facetCuts: FacetCut[];
-    initAddress: string;
-    initCalldata: string;
+  facetCuts: FacetCut[];
+  initAddress: string;
+  initCalldata: string;
 }
 
 export interface InitializeData {
@@ -39,35 +42,35 @@ export interface InitializeData {
 }
 
 export function facetCut(address: string, contract: Interface, action: Action, isFreezable: boolean): FacetCut {
-    return {
-        facet: address,
-        selectors: getAllSelectors(contract),
-        action,
-        isFreezable
-    };
+  return {
+    facet: address,
+    selectors: getAllSelectors(contract),
+    action,
+    isFreezable,
+  };
 }
 
 export function diamondCut(facetCuts: FacetCut[], initAddress: string, initCalldata: string): DiamondCut {
-    return {
-        facetCuts,
-        initAddress,
-        initCalldata
-    };
+  return {
+    facetCuts,
+    initAddress,
+    initCalldata,
+  };
 }
 
 export function getAllSelectors(contractInterface: Interface) {
-    return Object.keys(contractInterface.functions)
-        .filter((signature) => {
-            return signature !== 'getName()';
-        })
-        .map((signature) => contractInterface.getSighash(signature));
+  return Object.keys(contractInterface.functions)
+    .filter((signature) => {
+      return signature !== "getName()";
+    })
+    .map((signature) => contractInterface.getSighash(signature));
 }
 
 export async function getCurrentFacetCutsForAdd(
-    adminAddress: string,
-    gettersAddress: string,
-    mailboxAddress: string,
-    executorAddress: string
+  adminAddress: string,
+  gettersAddress: string,
+  mailboxAddress: string,
+  executorAddress: string
 ) {
     const facetsCuts = {};
     // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
@@ -94,7 +97,7 @@ export async function getCurrentFacetCutsForAdd(
         facetsCuts['ExecutorFacet'] = facetCut(executor.address, executor.interface, Action.Add, true);
     }
 
-    return facetsCuts;
+  return facetsCuts;
 }
 
 export async function getBridgehubCurrentFacetCutsForAdd(
@@ -148,18 +151,20 @@ export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddres
             });
         }
     }
-    return result;
+  }
+  return result;
 }
 
 export async function getFacetCutsForUpgrade(
-    wallet: Wallet,
-    zkSyncAddress: string,
-    adminAddress: string,
-    gettersAddress: string,
-    mailboxAddress: string,
-    executorAddress: string
+  wallet: Wallet,
+  zkSyncAddress: string,
+  adminAddress: string,
+  gettersAddress: string,
+  mailboxAddress: string,
+  executorAddress: string
 ) {
-    const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress, executorAddress);
-    const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, Object.keys(newFacetCuts));
-    return [...oldFacetCuts, ...Object.values(newFacetCuts)];
+  const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress, executorAddress);
+  const namesOfFacetsToBeRemoved = [...UNCONDITIONALLY_REMOVED_FACETS, ...Object.keys(newFacetCuts)];
+  const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, namesOfFacetsToBeRemoved);
+  return [...oldFacetCuts, ...Object.values(newFacetCuts)];
 }
