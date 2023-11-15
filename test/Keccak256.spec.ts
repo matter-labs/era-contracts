@@ -162,6 +162,8 @@ describe('Keccak256 tests', function () {
             mockKeccakInput
         );
 
+        await hre.network.provider.send("hardhat_mine", ["0x100"]);
+
         const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
         const keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
