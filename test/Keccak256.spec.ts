@@ -1,7 +1,7 @@
 import { CONTRACT_DEPLOYER_ADDRESS, hashBytecode } from 'zksync-web3/build/src/utils';
 import { KeccakTest, KeccakTest__factory } from '../typechain-types';
 import { KECCAK256_CONTRACT_ADDRESS } from './shared/constants';
-import { getWallets, loadArtifact, publishBytecode, setCode } from './shared/utils';
+import { getWallets, loadArtifact, publishBytecode, setCode, getCode } from './shared/utils';
 import { ethers } from 'hardhat';
 import { readYulBytecode } from '../scripts/utils';
 import { Language } from '../scripts/constants';
@@ -13,6 +13,7 @@ describe('Keccak256 tests', function () {
     let testWallet: Wallet;
     let keccakTest: KeccakTest;
 
+    let oldKeccakCodeHash: string;
     let correctKeccakCodeHash: string;
     let alwaysRevertCodeHash: string;
 
@@ -27,6 +28,9 @@ describe('Keccak256 tests', function () {
             (await loadArtifact('KeccakTest')).bytecode
         );
 
+        const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+        oldKeccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+
         keccakTest = KeccakTest__factory.connect(KECCAK_TEST_ADDRESS,  getWallets()[0]);
         const correctKeccakCode = readYulBytecode({
             codeName: 'Keccak256',
@@ -40,6 +44,7 @@ describe('Keccak256 tests', function () {
 
         const emptyContractCode = (await loadArtifact('AlwaysRevert')).bytecode;
         
+        await publishBytecode(keccakCode);
         await publishBytecode(correctKeccakCode);
         await publishBytecode(emptyContractCode);
 
@@ -95,6 +100,43 @@ describe('Keccak256 tests', function () {
         await keccakTest.keccakUpgradeTest(
             eraseInput,
             upgradeInput
+        );
+    })
+
+    it('keccak validation test', async() => {
+        const deployerInterfact = new ethers.utils.Interface((await loadArtifact('ContractDeployer')).abi);
+
+        const upgradeInput = deployerInterfact.encodeFunctionData('forceDeployKeccak256', [
+            correctKeccakCodeHash
+        ]);
+
+        const resetInput = deployerInterfact.encodeFunctionData('forceDeployKeccak256', [
+            oldKeccakCodeHash
+        ]);
+
+        const BLOCK_SIZE = 136;
+        const seed = ethers.utils.randomBytes(32);
+        const input1 = randomHexFromSeed(seed, BLOCK_SIZE + 0);
+        const input2 = randomHexFromSeed(seed, BLOCK_SIZE - 1);
+        const input3 = randomHexFromSeed(seed, BLOCK_SIZE - 2);
+        const input4 = randomHexFromSeed(seed, BLOCK_SIZE + 1);
+        const input5 = randomHexFromSeed(seed, BLOCK_SIZE + 2);
+
+        const inputsToTest = [
+            input1,
+            input2,
+            input3,
+            input4,
+            input5
+        ]
+
+        const expectedOutput = inputsToTest.map((e) => ethers.utils.keccak256(e));
+
+        await keccakTest.keccakValidationTest(
+            upgradeInput,
+            resetInput,
+            inputsToTest,
+            expectedOutput
         );
     })
 });
