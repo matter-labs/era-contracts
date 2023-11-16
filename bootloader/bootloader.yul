@@ -56,7 +56,7 @@ object "Bootloader" {
                 // todo: enforce limit for maxComputeGasPerBatch if we decide that this field is at all needed.
                 // MAybe we say that `fairL2GasPrice` MUST take into account the proof verification cost
 
-                let batchOverheadETH := getBatchOverheadEth(l1GasPrice, fairL2GasPrice)
+                let batchOverheadETH := getBatchOverheadEth(l1GasPrice)
                 // let pubdataPriceETH := safeAdd(
                 //     pubdataPrice,
                 //     // This is equivalent to safeDiv as maxPubdataPerBatch > 0
@@ -124,14 +124,6 @@ object "Bootloader" {
             /// able to send `GUARANTEED_PUBDATA_PER_TX` onchain.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
                 ret := div(MAX_GAS_PER_TRANSACTION(), GUARANTEED_PUBDATA_PER_TX())
-            }
-
-            /// @dev The computational overhead for a batch.
-            /// It includes the combined price for 1 instance of all the circuits 
-            /// (since they might be partially filled), the price for running
-            /// the common parts of the bootloader as well as general maintainance of the system.
-            function BATCH_OVERHEAD_L2_GAS() -> ret {
-                ret := {{BATCH_OVERHEAD_L2_GAS}}
             }
 
             /// @dev The overhead for the interaction with L1.
@@ -2032,15 +2024,9 @@ object "Bootloader" {
             }
 
             /// Returns the batch overhead to be paid, assuming a certain value of gasPerPubdata
-            function getBatchOverheadEth(l1GasPrice, fairL2GasPrice) -> ret {
-                let computationOverhead := BATCH_OVERHEAD_L2_GAS()
+            function getBatchOverheadEth(l1GasPrice) -> ret {
                 let l1GasOverhead := BATCH_OVERHEAD_L1_GAS()
-
-                ret := safeAdd(
-                    safeMul(computationOverhead, fairL2GasPrice, "aak"), 
-                    safeMul(l1GasOverhead, l1GasPrice, "aa"),
-                    "ab"
-                )
+                ret := safeMul(l1GasOverhead, l1GasPrice, "aa")
             }
 
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
@@ -3846,6 +3832,7 @@ object "Bootloader" {
 
                 /// @notice The minimal gas price that the operator agrees upon. 
                 /// In the future, it will have an EIP1559-like lower bound.
+                /// todo: rename to something like "operator minimal gas price"
                 let FAIR_L2_GAS_PRICE := mload(160)
 
                 /// @notice The expected base fee by the operator.
