@@ -1,0 +1,17 @@
+node_modules
+cache
+artifacts
+cache-zk
+artifacts-zk
+typechain-types
+typechain
+build
+yarn-debug.log*
+yarn-error.log*
+
+# Yarn files
+.yarn/
+.yarnrc.yml
+
+.vscode
+target/
