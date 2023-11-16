@@ -1,5 +1,6 @@
 import * as hre from 'hardhat';
 import * as fs from 'fs';
+import { Command } from 'commander';
 import { exec as _exec, spawn as _spawn } from 'child_process';
 
 import { getZksolcUrl, saltFromUrl } from '@matterlabs/hardhat-zksync-solc';
@@ -88,11 +89,27 @@ class CompilerPaths {
 
 
 async function main() {
-    await compileYulFolder('contracts');
-    await compileYulFolder('contracts/precompiles');
-    await compileYulFolder('contracts/precompiles/test-contracts');
-    await compileYulFolder('bootloader/build');
-    await compileYulFolder('bootloader/tests');
+
+    const program = new Command();
+
+    program.version('0.1.0').name('compile yul').description('publish preimages for the L2 contracts');
+ 
+    program
+        .command('compile-bootloader')
+        .action(async () => {
+            await compileYulFolder('bootloader/build');
+            await compileYulFolder('bootloader/tests');
+        });
+
+    program
+        .command('compile-precompiles')
+        .action(async () => {
+            await compileYulFolder('contracts');
+            await compileYulFolder('contracts/precompiles');
+            await compileYulFolder('contracts/precompiles/test-contracts');
+        });
+
+    await program.parseAsync(process.argv);
 }
 
 main()

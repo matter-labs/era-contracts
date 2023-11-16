@@ -67,36 +67,6 @@ describe('Keccak256 tests', function () {
         await keccakTest.zeroPointerTest()
     });
 
-    it('general functionality test', async () => {
-        // We currently do not have fussing support, so we generate random data using
-        // hash function. 
-
-        const seed = ethers.utils.randomBytes(32);
-        // Displaying seed for reproducible tests
-        console.log('Keccak256 fussing seed', ethers.utils.hexlify(seed));
-
-        // Testing empty array
-        await compareCorrectHash('0x', testWallet.provider!);
-        const BLOCK_SIZE = 136;
-
-        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE - 1), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE - 2), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE + 1), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, BLOCK_SIZE + 2), testWallet.provider!);
-
-        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE - 1), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE - 2), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE + 1), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, 101 * BLOCK_SIZE + 2), testWallet.provider!);
-
-        // In order to get random length, we use modulo operation
-        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(113).toNumber()), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(1101).toNumber()), testWallet.provider!);
-        await compareCorrectHash(randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(17).toNumber()), testWallet.provider!);
-    });
-
     it('keccak upgrade test', async() => {
         const deployerInterfact = new ethers.utils.Interface((await loadArtifact('ContractDeployer')).abi);
 
@@ -125,20 +95,28 @@ describe('Keccak256 tests', function () {
             oldKeccakCodeHash
         ]);
 
-        const BLOCK_SIZE = 136;
         const seed = ethers.utils.randomBytes(32);
-        const input1 = randomHexFromSeed(seed, BLOCK_SIZE + 0);
-        const input2 = randomHexFromSeed(seed, BLOCK_SIZE - 1);
-        const input3 = randomHexFromSeed(seed, BLOCK_SIZE - 2);
-        const input4 = randomHexFromSeed(seed, BLOCK_SIZE + 1);
-        const input5 = randomHexFromSeed(seed, BLOCK_SIZE + 2);
+        // Displaying seed for reproducible tests
+        console.log('Keccak256 fussing seed', ethers.utils.hexlify(seed));
+
+        const BLOCK_SIZE = 136;
 
         const inputsToTest = [
-            input1,
-            input2,
-            input3,
-            input4,
-            input5
+            '0x',
+            randomHexFromSeed(seed, BLOCK_SIZE),
+            randomHexFromSeed(seed, BLOCK_SIZE - 1),
+            randomHexFromSeed(seed, BLOCK_SIZE - 2),
+            randomHexFromSeed(seed, BLOCK_SIZE + 1),
+            randomHexFromSeed(seed, BLOCK_SIZE + 2),
+            randomHexFromSeed(seed, 101 * BLOCK_SIZE),
+            randomHexFromSeed(seed, 101 * BLOCK_SIZE - 1),
+            randomHexFromSeed(seed, 101 * BLOCK_SIZE - 2),
+            randomHexFromSeed(seed, 101 * BLOCK_SIZE + 1),
+            randomHexFromSeed(seed, 101 * BLOCK_SIZE + 2),
+            // In order to get random length, we use modulo operation
+            randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(113).toNumber()),
+            randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(1101).toNumber()),
+            randomHexFromSeed(seed, ethers.BigNumber.from(seed).mod(17).toNumber()),
         ]
 
         const expectedOutput = inputsToTest.map((e) => ethers.utils.keccak256(e));
@@ -167,6 +145,9 @@ describe('Keccak256 tests', function () {
 
         expect(keccakCodeHash).to.eq(keccakMockCodeHash);
 
+        // Needed to create a new batch & thus start the bootloader once more.
+        // After this, the bootloader should automatically return the code hash to the 
+        // previous one.
         await hre.network.provider.send("hardhat_mine", ["0x100"]);
 
         keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
