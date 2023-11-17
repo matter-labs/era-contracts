@@ -1039,15 +1039,15 @@ object "Bootloader" {
                     //     assertionError("L1 tx gas per pubdata mismatch")
                     // }
 
-                    gasLimitForTx, reservedGas := getGasLimitForTx(
-                        innerTxDataOffset,
-                        transactionIndex, 
-                        gasPerPubdata,
-                        TX_SLOT_OVERHEAD_GAS(),
-                        MEMORY_OVERHEAD_GAS(),
-                        L1_TX_INTRINSIC_L2_GAS(),
-                        L1_TX_INTRINSIC_PUBDATA()
-                    )
+                gasLimitForTx, reservedGas := getGasLimitForTx(
+                    innerTxDataOffset,
+                    transactionIndex, 
+                    gasPerPubdata,
+                    TX_SLOT_OVERHEAD_GAS(),
+                    MEMORY_OVERHEAD_GAS(),
+                    L1_TX_INTRINSIC_L2_GAS(),
+                    L1_TX_INTRINSIC_PUBDATA()
+                )
                 // }
             }
 
