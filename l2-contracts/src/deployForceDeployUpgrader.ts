@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { computeL2Create2Address, create2DeployFromL1, getNumberFromEnv } from "./utils";
-import { web3Provider } from "../../ethereum/scripts/utils";
+import { web3Provider } from "../../l1-contracts/scripts/utils";
 import * as fs from "fs";
 import * as path from "path";
 import * as hre from "hardhat";

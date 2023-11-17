@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { Deployer } from "../../ethereum/src.ts/deploy";
+import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { getTokens, web3Provider } from "../../ethereum/scripts/utils";
+import { getTokens, web3Provider } from "../../l1-contracts/scripts/utils";
 
 import { getNumberFromEnv, applyL1ToL2Alias, create2DeployFromL1, computeL2Create2Address } from "./utils";
 
