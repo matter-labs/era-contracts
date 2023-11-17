@@ -1,0 +1,11 @@
+{
+  "name": "era-contracts",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "l1-contracts",
+    "l2-contracts",
+    "system-contracts"
+  ]
+}
