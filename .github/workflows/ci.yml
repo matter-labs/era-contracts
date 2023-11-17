@@ -35,7 +35,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: zksync
+        working-directory: l2-contracts
 
     steps:
       - name: Checkout the repository
@@ -46,7 +46,7 @@ jobs:
         with:
           node-version: 18.18.0
           cache: yarn
-          cache-dependency-path: zksync/yarn.lock
+          cache-dependency-path: l2-contracts/yarn.lock
 
       - name: Install yarn
         run: npm install -g yarn
@@ -98,7 +98,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: zksync
+        working-directory: l2-contracts
 
     steps:
       - name: Checkout the repository
@@ -109,7 +109,7 @@ jobs:
         with:
           node-version: 18.18.0
           cache: yarn
-          cache-dependency-path: zksync/yarn.lock
+          cache-dependency-path: l2-contracts/yarn.lock
 
       - name: Install yarn
         run: npm install -g yarn
@@ -125,9 +125,9 @@ jobs:
         with:
           key: artifacts-zk-${{ github.sha }}
           path: |
-            zksync/artifacts-zk
-            zksync/cache-zk
-            zksync/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
   test-hardhat-l1:
     needs: [build-l1, lint-l1]
@@ -216,7 +216,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: zksync
+        working-directory: l2-contracts
 
     steps:
       - name: Checkout the repository
@@ -229,7 +229,7 @@ jobs:
         with:
           node-version: 18.18.0
           cache: yarn
-          cache-dependency-path: zksync/yarn.lock
+          cache-dependency-path: l2-contracts/yarn.lock
 
       - name: Install yarn
         run: npm install -g yarn
@@ -243,9 +243,9 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-zk-${{ github.sha }}
           path: |
-            zksync/artifacts-zk
-            zksync/cache-zk
-            zksync/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
       - name: Run Era test node
         uses: dutterbutter/era-test-node-action@latest
