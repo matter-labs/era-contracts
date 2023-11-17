@@ -1,5 +1,5 @@
 {
-  "name": "l2-zksync-contracts",
+  "name": "l2-contracts",
   "version": "0.1.0",
   "license": "MIT",
   "devDependencies": {
