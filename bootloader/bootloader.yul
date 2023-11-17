@@ -1021,30 +1021,30 @@ object "Bootloader" {
                 //     reservedGas := safeSub(getGasLimit(innerTxDataOffset), gasLimitForTx, "l2g")
                 // }
                 // default {
-                    let pubdataPriceETH := safeMul(gasPerPubdata, getMaxFeePerGas(innerTxDataOffset), "l1g")
+                    // let pubdataPriceETH := safeMul(gasPerPubdata, getMaxFeePerGas(innerTxDataOffset), "l1g")
 
-                    getFeeParams(
-                        // todo: remove as l1 gas price is no longer used there
-                        0,
-                        pubdataPriceETH,
-                        getMaxFeePerGas(innerTxDataOffset)
-                    )
-                
-                    let baseFee := mload(0)
-                    let calculatedGasPricePerPubdata := mload(32)
-                    let memorySlotOverhead := mload(64)
-                    let setTxSlotOverhead := mload(96)
+                    // getFeeParams(
+                    //     // todo: remove as l1 gas price is no longer used there
+                    //     0,
+                    //     pubdataPriceETH,
+                    //     getMaxFeePerGas(innerTxDataOffset)
+                    // )
 
-                    if iszero(eq(calculatedGasPricePerPubdata, gasPerPubdata)) {
-                        assertionError("L1 tx gas per pubdata mismatch")
-                    }
+                    // let baseFee := mload(0)
+                    // let calculatedGasPricePerPubdata := mload(32)
+                    // let memorySlotOverhead := mload(64)
+                    // let setTxSlotOverhead := mload(96)
+
+                    // if iszero(eq(calculatedGasPricePerPubdata, gasPerPubdata)) {
+                    //     assertionError("L1 tx gas per pubdata mismatch")
+                    // }
 
                     gasLimitForTx, reservedGas := getGasLimitForTx(
                         innerTxDataOffset,
                         transactionIndex, 
                         gasPerPubdata,
-                        setTxSlotOverhead,
-                        memorySlotOverhead,
+                        TX_SLOT_OVERHEAD_GAS(),
+                        MEMORY_OVERHEAD_GAS(),
                         L1_TX_INTRINSIC_L2_GAS(),
                         L1_TX_INTRINSIC_PUBDATA()
                     )
