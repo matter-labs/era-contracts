@@ -85,7 +85,7 @@ object "Bootloader" {
                     ceilDiv(pubdataPrice, MAX_L2_GAS_PER_PUBDATA())
                 )
 
-                let gasPricePerPubdata := ceilDiv(pubdataPrice, baseFee)
+                let gasPricePerPubdata := gasPerPubdataFromBaseFee(baseFee, pubdataPrice)
 
                 // // Per byte
                 // let memoryOverheadGas := ceilDiv(batchOverheadETH, safeMul(BOOTLOADER_MEMORY_FOR_TXS(), baseFee, "opp"))
@@ -99,6 +99,10 @@ object "Bootloader" {
                 mstore(32, gasPricePerPubdata)
                 mstore(64, MEMORY_OVERHEAD_GAS())
                 mstore(96, TX_SLOT_OVERHEAD_GAS())
+            }
+
+            function gasPerPubdataFromBaseFee(baseFee, pubdataPrice) -> ret {
+                ret := ceilDiv(pubdataPrice, baseFee)
             }
 
             /// @dev Returns the baseFee for this batch based on the
@@ -3893,6 +3897,8 @@ object "Bootloader" {
                 default {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
+
+                GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, PUBDATA_PRICE)
 
                 <!-- @endif -->
             }
