@@ -44,11 +44,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @param _l1WethAddress The address of the L1 WETH token.
     /// @param _governor The address of the L1 governor aliased.
     /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
-    function initialize(
-        address _l1Bridge,
-        address _l1WethAddress,
-        address _governor
-    ) external initializer {
+    function initialize(address _l1Bridge, address _l1WethAddress, address _governor) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
         require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
 

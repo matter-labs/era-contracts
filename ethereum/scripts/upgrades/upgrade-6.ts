@@ -136,12 +136,12 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
 
-            const deployer = new Deployer({
-                deployWallet,
-                ownerAddress: ZERO_ADDRESS,
-                verbose: true
-            });
-            const zkSyncContract = deployer.bridgehubContract(deployWallet);
+      const deployer = new Deployer({
+        deployWallet,
+        ownerAddress: ZERO_ADDRESS,
+        verbose: true,
+      });
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

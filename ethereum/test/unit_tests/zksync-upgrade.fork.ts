@@ -2,26 +2,26 @@ import * as hardhat from "hardhat";
 import { expect } from "chai";
 import { facetCut, Action, getAllSelectors } from "../../src.ts/diamondCut";
 
-import { IDiamondCutFactory } from '../../typechain/IDiamondCutFactory';
+import { IDiamondCutFactory } from "../../typechain/IDiamondCutFactory";
 import type { IDiamondCut } from "../../typechain/IDiamondCut";
-import { IExecutorFactory } from '../../typechain/IExecutorFactory';
-import { IExecutor } from '../../typechain/IExecutor';
-import { IGettersFactory } from '../../typechain/IGettersFactory';
-import { IGetters } from '../../typechain/IGetters';
-import { IGovernanceFactory } from '../../typechain/IGovernanceFactory';
-import { IGovernance } from '../../typechain/IGovernance';
-import { IMailboxFactory } from '../../typechain/IMailboxFactory';
-import { IMailbox } from '../../typechain/IMailbox';
-import { IBridgehubFactory } from '../../typechain/IBridgehubFactory';
-import { IBridgehub } from '../../typechain/IBridgehub';
-import { ethers } from 'ethers';
+import { IExecutorFactory } from "../../typechain/IExecutorFactory";
+import { IExecutor } from "../../typechain/IExecutor";
+import { IGettersFactory } from "../../typechain/IGettersFactory";
+import { IGetters } from "../../typechain/IGetters";
+import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
+import { IGovernance } from "../../typechain/IGovernance";
+import { IMailboxFactory } from "../../typechain/IMailboxFactory";
+import { IMailbox } from "../../typechain/IMailbox";
+import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
+import { IBridgehub } from "../../typechain/IBridgehub";
+import { ethers } from "ethers";
 
 // TODO: change to the mainet config
 const DIAMOND_PROXY_ADDRESS = "0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319";
 
-describe('Diamond proxy upgrade fork test', function () {
-    let governor: ethers.Signer;
-    let diamondProxy: IBridgehub;
+describe("Diamond proxy upgrade fork test", function () {
+  let governor: ethers.Signer;
+  let diamondProxy: IBridgehub;
 
   let newDiamondCutFacet: IDiamondCut;
   let newExecutorFacet: IExecutor;
@@ -31,10 +31,10 @@ describe('Diamond proxy upgrade fork test', function () {
 
   let diamondCutData;
 
-    before(async () => {
-        const signers = await hardhat.ethers.getSigners();
-        diamondProxy = IBridgehubFactory.connect(DIAMOND_PROXY_ADDRESS, signers[0]);
-        const governorAddress = await diamondProxy.getGovernor();
+  before(async () => {
+    const signers = await hardhat.ethers.getSigners();
+    diamondProxy = IBridgehubFactory.connect(DIAMOND_PROXY_ADDRESS, signers[0]);
+    const governorAddress = await diamondProxy.getGovernor();
 
     await hardhat.network.provider.request({ method: "hardhat_impersonateAccount", params: [governorAddress] });
     governor = await hardhat.ethers.provider.getSigner(governorAddress);
@@ -57,9 +57,9 @@ describe('Diamond proxy upgrade fork test', function () {
     const governanceFacet = await governanceFacetFactory.deploy();
     newGovernanceFacet = IGovernanceFactory.connect(governanceFacet.address, governanceFacet.signer);
 
-        const mailboxFacetFactory = await hardhat.ethers.getContractFactory('Mailbox');
-        const mailboxFacet = await mailboxFacetFactory.deploy();
-        newMailboxFacet = IMailboxFactory.connect(mailboxFacet.address, mailboxFacet.signer);
+    const mailboxFacetFactory = await hardhat.ethers.getContractFactory("Mailbox");
+    const mailboxFacet = await mailboxFacetFactory.deploy();
+    newMailboxFacet = IMailboxFactory.connect(mailboxFacet.address, mailboxFacet.signer);
 
     // If the upgrade is already running, then cancel it to start upgrading over.
     const currentUpgradeStatus = await diamondProxy.getUpgradeProposalState();

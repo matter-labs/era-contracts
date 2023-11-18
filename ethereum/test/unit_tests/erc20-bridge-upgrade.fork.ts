@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 
-import { ethers } from 'ethers';
-import { L1ERC20BridgeTestFactory, L1ERC20Bridge } from '../../typechain';
+import { ethers } from "ethers";
+import { L1ERC20BridgeTestFactory, L1ERC20Bridge } from "../../typechain";
 
 import type { ITransparentUpgradeableProxy } from "../../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../../typechain/ITransparentUpgradeableProxyFactory";

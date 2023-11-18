@@ -7,11 +7,7 @@ import "../../common/libraries/Diamond.sol";
 
 interface IStateTransitionRegistry {
     /// @notice
-    function newChain(
-        uint256 _chainId,
-        address _governor,
-        Diamond.DiamondCutData memory _diamondCut
-    ) external;
+    function newChain(uint256 _chainId, address _governor, Diamond.DiamondCutData memory _diamondCut) external;
 
     // when a new Chain is added
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionChainContract);

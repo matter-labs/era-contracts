@@ -19,9 +19,9 @@ const openzeppelinTransparentProxyArtifactsPath = path.join(
 );
 
 function readInterface(path: string, fileName: string, solFileName?: string) {
-    solFileName ??= fileName;
-    const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
-    return new ethers.utils.Interface(abi);
+  solFileName ??= fileName;
+  const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
+  return new ethers.utils.Interface(abi);
 }
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
@@ -38,31 +38,31 @@ function getL2Calldata(l2WethBridgeAddress: string, l1WethTokenAddress: string, 
 }
 
 async function getL1TxInfo(
-    deployer: Deployer,
-    chainId: string,
-    to: string,
-    l2Calldata: string,
-    refundRecipient: string,
-    gasPrice: ethers.BigNumber
+  deployer: Deployer,
+  chainId: string,
+  to: string,
+  l2Calldata: string,
+  refundRecipient: string,
+  gasPrice: ethers.BigNumber
 ) {
-    const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-    const l1Calldata = zksync.interface.encodeFunctionData('requestL2Transaction', [
-        chainId,
-        to,
-        0,
-        l2Calldata,
-        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        [], // It is assumed that the target has already been deployed
-        refundRecipient
-    ]);
+  const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
+  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
+    chainId,
+    to,
+    0,
+    l2Calldata,
+    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    [], // It is assumed that the target has already been deployed
+    refundRecipient,
+  ]);
 
-    const neededValue = await zksync.l2TransactionBaseCost(
-        chainId,
-        gasPrice,
-        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    );
+  const neededValue = await zksync.l2TransactionBaseCost(
+    chainId,
+    gasPrice,
+    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );
 
   return {
     to: zksync.address,
@@ -83,17 +83,17 @@ async function main() {
   const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
   const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
-    program
-        .command('prepare-calldata')
-        .option('--private-key <private-key>')
-        .option('--chain-id <chain-id>')
-        .option('--gas-price <gas-price>')
-        .action(async (cmd) => {
-            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
-            if (!l1WethTokenAddress) {
-                console.log(`Base Layer WETH address not provided. Skipping.`);
-                return;
-            }
+  program
+    .command("prepare-calldata")
+    .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
+    .option("--gas-price <gas-price>")
+    .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      if (!l1WethTokenAddress) {
+        console.log(`Base Layer WETH address not provided. Skipping.`);
+        return;
+      }
 
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -111,31 +111,31 @@ async function main() {
         verbose: true,
       });
 
-            const l2Calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
-            const l1TxInfo = await getL1TxInfo(
-                deployer,
-                chainId,
-                l2WethTokenProxyAddress,
-                l2Calldata,
-                ethers.constants.AddressZero,
-                gasPrice
-            );
-            console.log(JSON.stringify(l1TxInfo, null, 4));
-            console.log('IMPORTANT: gasPrice that you provide in the transaction should <= to the one provided above.');
-        });
+      const l2Calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
+      const l1TxInfo = await getL1TxInfo(
+        deployer,
+        chainId,
+        l2WethTokenProxyAddress,
+        l2Calldata,
+        ethers.constants.AddressZero,
+        gasPrice
+      );
+      console.log(JSON.stringify(l1TxInfo, null, 4));
+      console.log("IMPORTANT: gasPrice that you provide in the transaction should <= to the one provided above.");
+    });
 
-    program
-        .command('instant-call')
-        .option('--private-key <private-key>')
-        .option('--chain-id <chain-id>')
-        .option('--gas-price <gas-price>')
-        .option('--nonce <nonce>')
-        .action(async (cmd) => {
-            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
-            if (!l1WethTokenAddress) {
-                console.log(`Base Layer WETH address not provided. Skipping.`);
-                return;
-            }
+  program
+    .command("instant-call")
+    .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
+    .option("--gas-price <gas-price>")
+    .option("--nonce <nonce>")
+    .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      if (!l1WethTokenAddress) {
+        console.log(`Base Layer WETH address not provided. Skipping.`);
+        return;
+      }
 
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -156,29 +156,29 @@ async function main() {
         verbose: true,
       });
 
-            const zkSync = deployer.bridgehubContract(deployWallet);
-            const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
-                chainId,
-                gasPrice,
-                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-            );
-            const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
+      const zkSync = deployer.bridgehubContract(deployWallet);
+      const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
+        chainId,
+        gasPrice,
+        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+      );
+      const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
-            const tx = await zkSync.requestL2Transaction(
-                chainId,
-                l2WethTokenProxyAddress,
-                0,
-                calldata,
-                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                [],
-                deployWallet.address,
-                {
-                    gasPrice,
-                    value: requiredValueToInitializeBridge
-                }
-            );
+      const tx = await zkSync.requestL2Transaction(
+        chainId,
+        l2WethTokenProxyAddress,
+        0,
+        calldata,
+        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        [],
+        deployWallet.address,
+        {
+          gasPrice,
+          value: requiredValueToInitializeBridge,
+        }
+      );
 
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
 

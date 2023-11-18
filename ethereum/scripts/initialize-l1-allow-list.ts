@@ -39,17 +39,17 @@ async function main() {
 
       const allowListContract = deployer.l1AllowList(wallet);
       const tx = await allowListContract.setBatchAccessMode(
-          [
-              deployer.addresses.Bridgehub.BridgehubDiamondProxy,
-              deployer.addresses.StateTransition.StateTransitionProxy,
-              deployer.addresses.StateTransition.DiamondProxy,
-              deployer.addresses.Bridges.ERC20BridgeProxy,
-              deployer.addresses.Bridges.WethBridgeProxy
-          ],
-          [AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public],
-          { nonce }
+        [
+          deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+          deployer.addresses.StateTransition.StateTransitionProxy,
+          deployer.addresses.StateTransition.DiamondProxy,
+          deployer.addresses.Bridges.ERC20BridgeProxy,
+          deployer.addresses.Bridges.WethBridgeProxy,
+        ],
+        [AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public],
+        { nonce }
       );
-          await tx.wait();
+      await tx.wait();
     });
 
   await program.parseAsync(process.argv);

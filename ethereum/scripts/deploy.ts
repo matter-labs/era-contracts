@@ -16,22 +16,22 @@ async function main() {
   program.version("0.1.0").name("deploy").description("deploy L1 contracts");
 
   program
-      .option('--private-key <private-key>')
-      .option('--chain-id <chain-id>')
-      .option('--gas-price <gas-price>')
-      .option('--nonce <nonce>')
-      .option('--owner-address <owner-address>')
-      .option('--create2-salt <create2-salt>')
-      .option('--diamond-upgrade-init <version>')
-      .option('--only-verifier')
-      .action(async (cmd) => {
-          const deployWallet = cmd.privateKey
-              ? new Wallet(cmd.privateKey, provider)
-              : Wallet.fromMnemonic(
-                    process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                    "m/44'/60'/0'/0/1"
-                ).connect(provider);
-          console.log(`Using deployer wallet: ${deployWallet.address}`);
+    .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
+    .option("--gas-price <gas-price>")
+    .option("--nonce <nonce>")
+    .option("--owner-address <owner-address>")
+    .option("--create2-salt <create2-salt>")
+    .option("--diamond-upgrade-init <version>")
+    .option("--only-verifier")
+    .action(async (cmd) => {
+      const deployWallet = cmd.privateKey
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
+      console.log(`Using deployer wallet: ${deployWallet.address}`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);

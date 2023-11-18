@@ -14,7 +14,8 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         uint256 _l2TxNumberInBlock
     ) external view override returns (bool) {
         address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
-        return IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
+        return
+            IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
     }
 
     function proveL2MessageInclusion(
@@ -25,7 +26,8 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
-        return IStateTransitionChain(stateTransitionChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+        return
+            IStateTransitionChain(stateTransitionChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(
@@ -70,7 +72,11 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
 
         address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
         return
-            IStateTransitionChain(stateTransitionChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
+            IStateTransitionChain(stateTransitionChain).l2TransactionBaseCost(
+                _gasPrice,
+                _l2GasLimit,
+                _l2GasPerPubdataByteLimit
+            );
     }
 
     function requestL2Transaction(
@@ -124,11 +130,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
 
     /// @notice Transfer ether from the contract to the receiver
     /// @dev Reverts only if the transfer call failed
-    function withdrawFunds(
-        uint256 _chainId,
-        address _to,
-        uint256 _amount
-    ) external onlyStateTransitionChain(_chainId) {
+    function withdrawFunds(uint256 _chainId, address _to, uint256 _amount) external onlyStateTransitionChain(_chainId) {
         bool callSuccess;
         // Low-level assembly call, to avoid any memory copying (save gas)
         assembly {

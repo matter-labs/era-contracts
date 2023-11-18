@@ -12,15 +12,17 @@ contract ExecutorProvingTest is ExecutorFacet {
         return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
     }
 
-    function createBatchCommitment(CommitBatchInfo calldata _newBatchData, bytes32 _stateDiffHash)
-        external
-        view
-        returns (bytes32)
-    {
+    function createBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash
+    ) external view returns (bytes32) {
         return _createBatchCommitment(_newBatchData, _stateDiffHash);
     }
 
-    function processL2Logs(CommitBatchInfo calldata _newBatch, bytes32 _expectedSystemContractUpgradeTxHash)
+    function processL2Logs(
+        CommitBatchInfo calldata _newBatch,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    )
         external
         pure
         returns (

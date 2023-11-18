@@ -21,13 +21,19 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
 
     /// @notice
     // KL todo make _chainId
-    function newChain(uint256 _chainId, address _stateTransition, uint256 _salt) external onlyGovernor returns (uint256 chainId) {
+    function newChain(
+        uint256 _chainId,
+        address _stateTransition,
+        uint256 _salt
+    ) external onlyGovernor returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
         // KL Todo: uint16 until the server can take bigger numbers.
         if (_chainId == 0) {
             chainId = uint16(
                 uint256(
-                    keccak256(abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt))
+                    keccak256(
+                        abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
+                    )
                 )
             );
         } else {
@@ -41,10 +47,10 @@ contract BridgehubRegistryFacet is IRegistry, BridgehubBase {
         emit NewChain(uint16(chainId), _stateTransition, msg.sender);
     }
 
-    function setStateTransitionChainContract(uint256 _chainId, address _stateTransitionChainContract)
-        external
-        onlyStateTransition(_chainId)
-    {
+    function setStateTransitionChainContract(
+        uint256 _chainId,
+        address _stateTransitionChainContract
+    ) external onlyStateTransition(_chainId) {
         bridgehubStorage.stateTransitionChain[_chainId] = _stateTransitionChainContract;
     }
 }

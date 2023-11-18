@@ -21,20 +21,20 @@ async function main() {
 
   program.version("0.1.0").name("publish-bridge-preimages");
 
-    program
-        .option('--private-key <private-key>')
-        .option('--chain-id <chain-id>')
-        .option('--nonce <nonce>')
-        .option('--gas-price <gas-price>')
-        .action(async (cmd) => {
-            const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
-            const wallet = cmd.privateKey
-                ? new Wallet(cmd.privateKey, provider)
-                : Wallet.fromMnemonic(
-                      process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                      "m/44'/60'/0'/0/1"
-                  ).connect(provider);
-            console.log(`Using wallet: ${wallet.address}`);
+  program
+    .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
+    .option("--nonce <nonce>")
+    .option("--gas-price <gas-price>")
+    .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      const wallet = cmd.privateKey
+        ? new Wallet(cmd.privateKey, provider)
+        : Wallet.fromMnemonic(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+            "m/44'/60'/0'/0/1"
+          ).connect(provider);
+      console.log(`Using wallet: ${wallet.address}`);
 
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await wallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
@@ -42,22 +42,22 @@ async function main() {
       const gasPrice = cmd.gasPrice ? parseInt(cmd.gasPrice) : await wallet.getGasPrice();
       console.log(`Using gas price: ${gasPrice}`);
 
-            const deployer = new Deployer({ deployWallet: wallet });
-            const zkSync = deployer.bridgehubContract(wallet);
+      const deployer = new Deployer({ deployWallet: wallet });
+      const zkSync = deployer.bridgehubContract(wallet);
 
-            const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
-                chainId,
-                ethers.constants.AddressZero,
-                0,
-                '0x',
-                PRIORITY_TX_MAX_GAS_LIMIT,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                [getContractBytecode('L2ERC20Bridge')],
-                wallet.address,
-                { nonce, gasPrice }
-            );
-            await publishL2ERC20BridgeTx.wait();
-        });
+      const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
+        chainId,
+        ethers.constants.AddressZero,
+        0,
+        "0x",
+        PRIORITY_TX_MAX_GAS_LIMIT,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        [getContractBytecode("L2ERC20Bridge")],
+        wallet.address,
+        { nonce, gasPrice }
+      );
+      await publishL2ERC20BridgeTx.wait();
+    });
 
   await program.parseAsync(process.argv);
 }

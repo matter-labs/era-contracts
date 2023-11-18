@@ -18,21 +18,21 @@ const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LI
 async function main() {
   const program = new Command();
 
-    program
-        .version('0.1.0')
-        .name('deploy-force-deploy-upgrader')
-        .option('--chain-id <chain-id>')
-        .description('Deploys the force deploy upgrader contract to L2');
+  program
+    .version("0.1.0")
+    .name("deploy-force-deploy-upgrader")
+    .option("--chain-id <chain-id>")
+    .description("Deploys the force deploy upgrader contract to L2");
 
-    program.option('--private-key <private-key>').action(async (cmd: Command) => {
-        const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
-        const deployWallet = cmd.privateKey
-            ? new Wallet(cmd.privateKey, provider)
-            : Wallet.fromMnemonic(
-                  process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-                  "m/44'/60'/0'/0/1"
-              ).connect(provider);
-        console.log(`Using deployer wallet: ${deployWallet.address}`);
+  program.option("--private-key <private-key>").action(async (cmd: Command) => {
+    const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+    const deployWallet = cmd.privateKey
+      ? new Wallet(cmd.privateKey, provider)
+      : Wallet.fromMnemonic(
+          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+          "m/44'/60'/0'/0/1"
+        ).connect(provider);
+    console.log(`Using deployer wallet: ${deployWallet.address}`);
 
     const forceDeployUpgraderBytecode = hre.artifacts.readArtifactSync("ForceDeployUpgrader").bytecode;
     const create2Salt = ethers.constants.HashZero;
@@ -43,15 +43,15 @@ async function main() {
       create2Salt
     );
 
-        // TODO: request from API how many L2 gas needs for the transaction.
-        await create2DeployFromL1(
-            chainId,
-            deployWallet,
-            forceDeployUpgraderBytecode,
-            '0x',
-            create2Salt,
-            priorityTxMaxGasLimit
-        );
+    // TODO: request from API how many L2 gas needs for the transaction.
+    await create2DeployFromL1(
+      chainId,
+      deployWallet,
+      forceDeployUpgraderBytecode,
+      "0x",
+      create2Salt,
+      priorityTxMaxGasLimit
+    );
 
     console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
   });

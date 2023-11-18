@@ -58,7 +58,6 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
         uint256[] memory uintEmptyArray;
 
-        
         L2CanonicalTransaction memory l2Transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_BOOTLOADER_ADDRESS)),
@@ -79,27 +78,27 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
             reservedDynamic: new bytes(0)
         });
 
-    //     ProposedUpgrade memory upgrade = ProposedUpgrade({
-    //         l2ProtocolUpgradeTx: l2Transaction,
-    //         factoryDeps:empty,
-    //         bootloaderHash:0 ,
-    //         defaultAccountHash:0,
-    //         verifier:address(0),
-    //         verifierParams:,
-    //         l1ContractsUpgradeCalldata:,
-    //         postUpgradeCalldata:bytes,
-    //         upgradeTimestamp:0,
-    //         newProtocolVersion:0,
-    //         newAllowList:address(0),
-    // })
-        
+        //     ProposedUpgrade memory upgrade = ProposedUpgrade({
+        //         l2ProtocolUpgradeTx: l2Transaction,
+        //         factoryDeps:empty,
+        //         bootloaderHash:0 ,
+        //         defaultAccountHash:0,
+        //         verifier:address(0),
+        //         verifierParams:,
+        //         l1ContractsUpgradeCalldata:,
+        //         postUpgradeCalldata:bytes,
+        //         upgradeTimestamp:0,
+        //         newProtocolVersion:0,
+        //         newAllowList:address(0),
+        // })
+
         bytes memory encodedTransaction = abi.encode(l2Transaction);
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
 
         emit SetChainIdUpgrade(l2Transaction, block.timestamp, _protocolVersion);
 
-        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;    
+        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

@@ -95,10 +95,10 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint256 _latestProtocolVersion)
-        external
-        onlyStateTransition
-    {
+    function executeUpgrade(
+        Diamond.DiamondCutData calldata _diamondCut,
+        uint256 _latestProtocolVersion
+    ) external onlyStateTransition {
         Diamond.diamondCut(_diamondCut);
         if (chainStorage.protocolVersion == _latestProtocolVersion) {
             chainStorage.upToDate = true;

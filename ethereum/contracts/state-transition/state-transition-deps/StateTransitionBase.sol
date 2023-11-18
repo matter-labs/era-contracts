@@ -29,7 +29,11 @@ contract StateTransitionBase is ReentrancyGuard, AllowListed {
     }
 
     modifier onlyChainGovernor(uint256 _chainId) {
-        require(IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]).getGovernor() == msg.sender, "1j"); // wrong chainId
+        require(
+            IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]).getGovernor() ==
+                msg.sender,
+            "1j"
+        ); // wrong chainId
         _;
     }
 }

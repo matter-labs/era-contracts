@@ -1,8 +1,8 @@
-import { Command } from 'commander';
-import { ethers, Wallet } from 'ethers';
-import { Deployer } from '../src.ts/deploy';
-import { formatUnits, parseUnits } from 'ethers/lib/utils';
-import { web3Provider } from './utils';
+import { Command } from "commander";
+import { ethers, Wallet } from "ethers";
+import { Deployer } from "../src.ts/deploy";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -43,12 +43,12 @@ async function main() {
       const governance = deployer.governanceContract(deployWallet);
 
       const erc20Bridge = deployer.transparentUpgradableProxyContract(
-          deployer.addresses.Bridges.ERC20BridgeProxy,
-          deployWallet
+        deployer.addresses.Bridges.ERC20BridgeProxy,
+        deployWallet
       );
       const wethBridge = deployer.transparentUpgradableProxyContract(
-          deployer.addresses.Bridges.WethBridgeProxy,
-          deployWallet
+        deployer.addresses.Bridges.WethBridgeProxy,
+        deployWallet
       );
 
       await (await erc20Bridge.changeAdmin(governance.address)).wait();

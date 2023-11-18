@@ -76,7 +76,7 @@ const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x000000000000000000000000000000000000
 async function main() {
   const program = new Command();
 
-    program.version('0.1.0').name('force-deploy-upgrade-4');
+  program.version("0.1.0").name("force-deploy-upgrade-4");
 
   program
     .command("prepare-calldata")
@@ -111,12 +111,12 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
 
-            const deployer = new Deployer({
-                deployWallet,
-                ownerAddress: ZERO_ADDRESS,
-                verbose: true
-            });
-            const zkSyncContract = deployer.stateTransitionChainContract(deployWallet);
+      const deployer = new Deployer({
+        deployWallet,
+        ownerAddress: ZERO_ADDRESS,
+        verbose: true,
+      });
+      const zkSyncContract = deployer.stateTransitionChainContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

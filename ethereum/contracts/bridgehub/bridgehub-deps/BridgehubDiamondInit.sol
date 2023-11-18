@@ -7,11 +7,10 @@ import "./BridgehubBase.sol";
 import "../../common/libraries/Diamond.sol";
 
 contract BridgehubDiamondInit is BridgehubBase {
-    function initialize(address _governor, IAllowList _allowList)
-        external
-        reentrancyGuardInitializer
-        returns (bytes32)
-    {
+    function initialize(
+        address _governor,
+        IAllowList _allowList
+    ) external reentrancyGuardInitializer returns (bytes32) {
         require(bridgehubStorage.governor == address(0), "bridgehub1");
         bridgehubStorage.governor = _governor;
         bridgehubStorage.allowList = _allowList;

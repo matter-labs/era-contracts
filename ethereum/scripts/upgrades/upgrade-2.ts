@@ -1,13 +1,13 @@
-import { Command } from 'commander';
-import { diamondCut } from '../../src.ts/diamondCut';
-import { BigNumberish, Wallet } from 'ethers';
-import { ethers } from 'hardhat';
-import { Provider } from 'zksync-web3';
-import '@nomiclabs/hardhat-ethers';
-import { web3Provider } from '../utils';
-import { Deployer } from '../../src.ts/deploy';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Command } from "commander";
+import { diamondCut } from "../../src.ts/diamondCut";
+import { BigNumberish, Wallet } from "ethers";
+import { ethers } from "hardhat";
+import { Provider } from "zksync-web3";
+import "@nomiclabs/hardhat-ethers";
+import { web3Provider } from "../utils";
+import { Deployer } from "../../src.ts/deploy";
+import * as fs from "fs";
+import * as path from "path";
 
 type ForceDeployment = {
   bytecodeHash: string;
@@ -93,12 +93,12 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
 
-            const deployer = new Deployer({
-                deployWallet,
-                ownerAddress: ZERO_ADDRESS,
-                verbose: true
-            });
-            const zkSyncContract = deployer.bridgehubContract(deployWallet);
+      const deployer = new Deployer({
+        deployWallet,
+        ownerAddress: ZERO_ADDRESS,
+        verbose: true,
+      });
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

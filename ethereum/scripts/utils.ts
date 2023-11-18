@@ -77,12 +77,12 @@ export function applyL1ToL2Alias(address: string): string {
 }
 
 export function readBytecode(path: string, fileName: string) {
-    return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).bytecode;
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).bytecode;
 }
 
 export function readInterface(path: string, fileName: string) {
-    const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: 'utf-8' })).abi;
-    return new ethers.utils.Interface(abi);
+  const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
+  return new ethers.utils.Interface(abi);
 }
 
 export function readBatchBootloaderBytecode() {
@@ -183,12 +183,12 @@ export type L1Token = {
 };
 
 export function getTokens(network: string): L1Token[] {
-    const configPath = process.env.ZKSYNC_HOME
-        ? `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`
-        : `./test/test_config/constant/${network}.json`;
-    return JSON.parse(
-        fs.readFileSync(configPath, {
-            encoding: 'utf-8'
-        })
-    );
+  const configPath = process.env.ZKSYNC_HOME
+    ? `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`
+    : `./test/test_config/constant/${network}.json`;
+  return JSON.parse(
+    fs.readFileSync(configPath, {
+      encoding: "utf-8",
+    })
+  );
 }
