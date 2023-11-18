@@ -23,41 +23,16 @@ async function main() {
   const addresses = deployedAddressesFromEnv();
   const promises = [];
 
-    // Contracts without constructor parameters
-    for (const address of [
-        addresses.StateTransition.GettersFacet,
-        addresses.StateTransition.DiamondInit,
-        addresses.StateTransition.AdminFacet,
-        addresses.StateTransition.MailboxFacet,
-        addresses.StateTransition.ExecutorFacet,
-        addresses.StateTransition.Verifier
-    ]) {
-        const promise = verifyPromise(address);
-        promises.push(promise);
-    }
-
-    // TODO: Restore after switching to hardhat tasks (SMA-1711).
-    // promises.push(verifyPromise(addresses.AllowList, [governor]));
-
-    // // Proxy
-    // {
-    //     // Create dummy deployer to get constructor parameters for diamond proxy
-    //     const deployer = new Deployer({
-    //         deployWallet: ethers.Wallet.createRandom(),
-    //         governorAddress: governor
-    //     });
-
-    //     const chainId = process.env.ETH_CLIENT_CHAIN_ID;
-    //     const constructorArguments = [chainId, await deployer.initialProxyDiamondCut()];
-    //     const promise = verifyPromise(addresses.ZkSync.DiamondProxy, constructorArguments);
-    //     promises.push(promise);
-    // }
-
-    // Bridges
-    const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [
-        addresses.StateTransition.DiamondProxy,
-        addresses.AllowList
-    ]);
+  // Contracts without constructor parameters
+  for (const address of [
+    addresses.StateTransition.GettersFacet,
+    addresses.StateTransition.DiamondInit,
+    addresses.StateTransition.AdminFacet,
+    addresses.StateTransition.MailboxFacet,
+    addresses.StateTransition.ExecutorFacet,
+    addresses.StateTransition.Verifier,
+  ]) {
+    const promise = verifyPromise(address);
     promises.push(promise);
   }
 
@@ -80,7 +55,7 @@ async function main() {
 
   // Bridges
   const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [
-    addresses.ZkSync.DiamondProxy,
+    addresses.StateTransition.DiamondProxy,
     addresses.AllowList,
   ]);
   promises.push(promise);
