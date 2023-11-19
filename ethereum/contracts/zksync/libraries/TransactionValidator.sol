@@ -141,7 +141,7 @@ library TransactionValidator {
         // The overhead from taking up the transaction's slot
 
         // todo: use constants here
-        uint256 txSlotOverhead = 150000;
+        uint256 txSlotOverhead = 80000;
         uint256 overheadForLengthByte = 35;
 
         batchOverheadForTransaction = Math.max(batchOverheadForTransaction, txSlotOverhead);
