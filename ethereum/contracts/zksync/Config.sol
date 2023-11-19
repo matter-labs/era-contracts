@@ -131,7 +131,7 @@ uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffff
 /// need to pay to compensate for the batch being closed.
 /// @dev It is expected that the L1 contracts will enforce that the L2 gas price will be high enough to compensate
 /// the operator in case the batch is closed because of tx slots filling up.
-uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 800000;
+uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 80000;
 
 /// @dev The overhead for each byte of the bootloader memory that the encoding of the transaction.
 /// It is roughly equal to 80kk/BOOTLOADER_MEMORY_FOR_TXS, i.e. how many gas would an L1->L2 transaction
