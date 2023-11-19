@@ -141,41 +141,6 @@ object "Bootloader" {
                 ret := 32
             }
 
-            /// todo
-            function CACHED_FEE_PARAMS_SLOTS() -> ret {
-                ret := 2
-            }
-
-            /// todo
-            function CACHED_FEE_PARAMS_BEGIN_SLOT() -> ret {
-                ret := add(SCRATCH_SPACE_BEGIN_SLOT(), SCRATCH_SPACE_SLOTS())
-            }
-
-            /// todo
-            function CACHED_FEE_PARAMS_BEGIN_BYTE() -> ret {
-                ret := mul(CACHED_FEE_PARAMS_BEGIN_SLOT(), 32)
-            }
-
-            /// todo
-            function SET_TX_SLOT_OVERHEAD(value) -> ret {
-                mstore(CACHED_FEE_PARAMS_BEGIN_BYTE(), value)
-            }
-
-            /// todo
-            function GET_TX_SLOT_OVERHEAD() -> ret {
-                ret := mload(CACHED_FEE_PARAMS_BEGIN_BYTE())
-            }
-
-            /// todo
-            function SET_MEMORY_OVERHEAD(value) -> ret {
-                mstore(add(CACHED_FEE_PARAMS_BEGIN_BYTE(), 32), value)
-            }
-
-            /// todo
-            function GET_MEMORY_OVERHEAD() -> ret {
-                ret := mload(add(CACHED_FEE_PARAMS_BEGIN_BYTE(), 32))
-            }
-
             /// @dev Slots reserved for saving the paymaster context
             /// @dev The paymasters are allowed to consume at most 
             /// 32 slots (1024 bytes) for their context.
@@ -191,7 +156,7 @@ object "Bootloader" {
 
             /// @dev Slot from which the paymaster context starts
             function PAYMASTER_CONTEXT_BEGIN_SLOT() -> ret {
-                ret := add(CACHED_FEE_PARAMS_BEGIN_SLOT(), CACHED_FEE_PARAMS_SLOTS())
+                ret := add(SCRATCH_SPACE_BEGIN_SLOT(), SCRATCH_SPACE_SLOTS())
             }
 
             /// @dev The byte from which the paymaster context starts
