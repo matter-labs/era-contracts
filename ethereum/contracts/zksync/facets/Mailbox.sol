@@ -15,7 +15,7 @@ import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IAllowList} from "../../common/interfaces/IAllowList.sol";
 import {Base} from "./Base.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, BATCH_OVERHEAD_L1_GAS, L2_TX_MAX_GAS_LIMIT, MAX_PUBDATA_PER_BATCH} from "../Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MINIMAL_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, BATCH_OVERHEAD_L1_GAS, L2_TX_MAX_GAS_LIMIT, MAX_PUBDATA_PER_BATCH} from "../Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -164,13 +164,12 @@ contract MailboxFacet is Base, IMailbox {
     /// @param _gasPricePerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
     function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPricePerPubdata) internal pure returns (uint256) {
-        // TODO: once the protoco danksharding support is enabled, we should use a different formula for pubdata price
         uint256 pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
         
         uint256 batchOverheadETH = BATCH_OVERHEAD_L1_GAS * _l1GasPrice;
         uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / MAX_PUBDATA_PER_BATCH;
 
-        uint256 l2GasPrice = FAIR_L2_GAS_PRICE + batchOverheadETH / L2_TX_MAX_GAS_LIMIT;
+        uint256 l2GasPrice = MINIMAL_L2_GAS_PRICE + batchOverheadETH / L2_TX_MAX_GAS_LIMIT;
         uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPricePerPubdata - 1) / _gasPricePerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceETH);
@@ -357,7 +356,6 @@ contract MailboxFacet is Base, IMailbox {
 
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
-            tx.gasprice,
             transactionEncoding, 
             s.priorityTxMaxGasLimit
         );

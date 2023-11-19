@@ -77,7 +77,7 @@ uint256 constant MAX_PUBDATA_PER_BATCH = $(MAX_PUBDATA_PER_BATCH);
 uint256 constant PRIORITY_TX_MAX_PUBDATA = $(PRIORITY_TX_MAX_PUBDATA);
 
 /// @dev The default price per L2 gas to be used for L1->L2 transactions
-uint256 constant FAIR_L2_GAS_PRICE = $(FAIR_L2_GAS_PRICE);
+uint256 constant MINIMAL_L2_GAS_PRICE = $(MINIMAL_L2_GAS_PRICE);
 
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased
 /// value.
@@ -125,3 +125,17 @@ uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev The overhead for a transaction slot in L2 gas. 
+/// It is roughly equal to 80kk/MAX_TRANSACTIONS_PER_BATCH, i.e. how many gas would an L1->L2 transaction
+/// need to pay to compensate for the batch being closed.
+/// @dev It is expected that the L1 contracts will enforce that the L2 gas price will be high enough to compensate
+/// the operator in case the batch is closed because of tx slots filling up.
+uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 800000;
+
+/// @dev The overhead for each byte of the bootloader memory that the encoding of the transaction.
+/// It is roughly equal to 80kk/BOOTLOADER_MEMORY_FOR_TXS, i.e. how many gas would an L1->L2 transaction
+/// need to pay to compensate for the batch being closed.
+/// @dev It is expected that the L1 contracts will enforce that the L2 gas price will be high enough to compensate
+/// the operator in case the batch is closed because of the memory for transactions being filled up.
+uint256 constant MEMORY_OVERHEAD_GAS = 10;

@@ -17,14 +17,11 @@ library TransactionValidator {
     /// @param _priorityTxMaxGasLimit The max gas limit, generally provided from Storage.sol
     function validateL1ToL2Transaction(
         IMailbox.L2CanonicalTransaction memory _transaction,
-        uint256 _l1GasPrice,
         bytes memory _encoded,
         uint256 _priorityTxMaxGasLimit
     ) internal pure {
         uint256 l2GasForTxBody = getTransactionBodyGasLimit(
             _transaction.gasLimit,
-            _transaction.maxFeePerGas,
-            _l1GasPrice,
             _encoded.length
         );
 
@@ -78,7 +75,7 @@ library TransactionValidator {
         uint256 costForComputation;
         {
             // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
-            costForComputation = 0;//L1_TX_INTRINSIC_L2_GAS;
+            costForComputation = L1_TX_INTRINSIC_L2_GAS;
 
             // Taking into account the hashing costs that depend on the length of the transaction
             // Note that L1_TX_DELTA_544_ENCODING_BYTES is the delta in the price for every 544 bytes of
@@ -112,11 +109,9 @@ library TransactionValidator {
     /// @param _encodingLength The length of the ABI-encoding of the transaction.
     function getTransactionBodyGasLimit(
         uint256 _totalGasLimit,
-        uint256 _l1GasPrice,
-        uint256 _l2GasPrice,
         uint256 _encodingLength
     ) internal pure returns (uint256 txBodyGasLimit) {
-        uint256 overhead = getOverheadForTransaction(_l1GasPrice, _l2GasPrice, _encodingLength);
+        uint256 overhead = getOverheadForTransaction(_encodingLength);
 
         require(_totalGasLimit >= overhead, "my"); // provided gas limit doesn't cover transaction overhead
         unchecked {
@@ -132,23 +127,13 @@ library TransactionValidator {
     /// in the Rust implementation description of function `get_maximal_allowed_overhead`.
     /// @param _encodingLength The length of the binary encoding of the transaction in bytes
     function getOverheadForTransaction(
-        uint256 _l1GasPrice,
-        uint256 _l2GasPrice,
         uint256 _encodingLength
     ) internal pure returns (uint256 batchOverheadForTransaction) {
-        // uint256 batchOverheadEth = BATCH_OVERHEAD_L1_GAS * _l1GasPrice;
-
         // The overhead from taking up the transaction's slot
-
-        // todo: use constants here
-        uint256 txSlotOverhead = 80000;
-        uint256 overheadForLengthByte = 35;
-
-        batchOverheadForTransaction = Math.max(batchOverheadForTransaction, txSlotOverhead);
+        batchOverheadForTransaction = TX_SLOT_OVERHEAD_L2_GAS;
 
         // The overhead for occupying the bootloader memory can be derived from encoded_len
-        // uint256 overheadForLengthByte = Math.ceilDiv(batchOverheadEth, (BOOTLOADER_TX_ENCODING_SPACE * _l2GasPrice));
-        uint256 overheadForLength = overheadForLengthByte * _encodingLength;
+        uint256 overheadForLength = MEMORY_OVERHEAD_GAS * _encodingLength;
         batchOverheadForTransaction = Math.max(batchOverheadForTransaction, overheadForLength);
     }
 }
