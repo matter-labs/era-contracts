@@ -23,11 +23,7 @@ object "Bootloader" {
 
             /// @dev This method ensures that the prices provided by the operator
             /// are not absurdly high
-            function validateOperatorProvidedPrices(l1GasPrice, fairL2GasPrice, pubdataPrice) {
-                if gt(l1GasPrice, MAX_ALLOWED_L1_GAS_PRICE()) {
-                    assertionError("L1 gas price too high")
-                }
-
+            function validateOperatorProvidedPrices(fairL2GasPrice, pubdataPrice) {
                 // The limit is the same for pubdata price and L1 gas price
                 if gt(pubdataPrice, MAX_ALLOWED_L1_GAS_PRICE()) {
                     assertionError("Pubdata price too high")
@@ -48,90 +44,27 @@ object "Bootloader" {
                 ret := 35
             }
 
-            /// todo remove l1GasPrice
+            // todo: comment 
             function getFeeParams(
-                l1GasPrice, 
                 pubdataPrice,
                 fairL2GasPrice,
-                // we allow operator to provide it because of validium support
-                // maxPubdataPerBatch,
-                // // we allow operator to provide it because of potentially better future values
-                // maxComputeGasPerBatch
-            ) {
-                // todo: think about the L1Messenger
-                // if lt(maxPubdataPerBatch, GUARANTEED_PUBDATA_PER_BATCH()) {
-                //     assertionError("maxPubdataPerBatch too low")
-                // }
-
-                // todo: enforce limit for maxComputeGasPerBatch if we decide that this field is at all needed.
-                // MAybe we say that `fairL2GasPrice` MUST take into account the proof verification cost
-
-                // let batchOverheadETH := getBatchOverheadEth(l1GasPrice)
-                // let pubdataPriceETH := safeAdd(
-                //     pubdataPrice,
-                //     // This is equivalent to safeDiv as maxPubdataPerBatch > 0
-                //     // Due to floor division in theory the operator might get underpaid, but
-                //     // it is negligible
-                //     div(batchOverheadETH, maxPubdataPerBatch),
-                //     "ll"
-                // )
-
-                // includes the overhead cost
-                // let baseComputeCost := safeAdd(
-                //     fairL2GasPrice, div(batchOverheadETH, maxComputeGasPerBatch)
-                // )
-                let baseFee := max(
+            ) -> baseFee, gasPerPubdata {
+                baseFee := max(
                     fairL2GasPrice,
                     ceilDiv(pubdataPrice, MAX_L2_GAS_PER_PUBDATA())
                 )
 
-                let gasPricePerPubdata := gasPerPubdataFromBaseFee(baseFee, pubdataPrice)
-
-                // // Per byte
-                // let memoryOverheadGas := ceilDiv(batchOverheadETH, safeMul(BOOTLOADER_MEMORY_FOR_TXS(), baseFee, "opp"))
-
-                // // Per tx slot
-                // let txSlotOverheadGas := ceilDiv(batchOverheadETH, safeMul(MAX_TRANSACTIONS_IN_BATCH(), baseFee, "opl")) 
-
-                // Save it all into memory
-                // todo: maybe use local vars
-                mstore(0, baseFee)
-                mstore(32, gasPricePerPubdata)
-                mstore(64, MEMORY_OVERHEAD_GAS())
-                mstore(96, TX_SLOT_OVERHEAD_GAS())
+                gasPerPubdata := gasPerPubdataFromBaseFee(baseFee, pubdataPrice)
             }
 
             function gasPerPubdataFromBaseFee(baseFee, pubdataPrice) -> ret {
                 ret := ceilDiv(pubdataPrice, baseFee)
             }
 
-            /// @dev Returns the baseFee for this batch based on the
-            /// L1 gas price and the fair L2 gas price.
-            function getBaseFee(l1GasPrice, fairL2GasPrice) -> baseFee, gasPricePerPubdata {
-                // By default, we want to provide the fair L2 gas price.
-                // That it means that the operator controls
-                // what the value of the baseFee will be. In the future, 
-                // a better system, aided by EIP1559 should be added. 
-
-                let pubdataBytePriceETH := safeMul(l1GasPrice, L1_GAS_PER_PUBDATA_BYTE(), "aoa")
-
-                baseFee := max(
-                    fairL2GasPrice,
-                    ceilDiv(pubdataBytePriceETH, MAX_L2_GAS_PER_PUBDATA())
-                )
-                gasPricePerPubdata := ceilDiv(pubdataBytePriceETH, baseFee)
-            }
-
             /// @dev It should be always possible to submit a transaction 
             /// that consumes such amount of public data.
             function GUARANTEED_PUBDATA_PER_TX() -> ret {
                 ret := {{GUARANTEED_PUBDATA_BYTES}}
-            }
-
-            /// todo
-            function GUARANTEED_PUBDATA_PER_BATCH() -> ret {
-                // todo: rename var
-                ret := {{MAX_PUBDATA_PER_BATCH}}
             }
 
             /// @dev The maximal gasPerPubdata, which allows users to still be 
@@ -990,71 +923,6 @@ object "Bootloader" {
                 returndatacopy(PAYMASTER_CONTEXT_BEGIN_BYTE(), returnedContextOffset, add(32, returnedContextLen))
             }
 
-            /// todo
-            function PRIORITY_TX_LEGACY_MAX_GAS_LIMIT() -> ret {
-                ret := 72000000   
-            }
-
-            /// todo
-            function getGasLimitForL1Tx(
-                innerTxDataOffset, 
-                transactionIndex, 
-                gasPerPubdata,
-            ) -> gasLimitForTx, reservedGas {
-                // todo think about Validiums for L1->L2 transactions
-
-                // The L1 gas price that was used on L1 in order to calculate the ovehead 
-                // on L1.
-                // Note, that for the pre-upgrade transactions, this field was never set.
-                // In this case, we use a different formula
-                // let l1GasPrice := getReserved2(innerTxDataOffset)
-
-                // switch l1GasPrice 
-                // case 0 {
-                //     // It is assumed that l1GasPrice is 0 for legacy L1->L2 transactions. 
-                //     // We could in theory duplicate the previous logic for such transactions, but 
-                //     // in order to avoid maintaining big edge cases, the following approach is chosen:
-                //     // - We assume that their overhead is 0 and we let `PRIORITY_TX_LEGACY_MAX_GAS_LIMIT` 
-                //     // gasLimit into the transaction. The rest are to be refunded via reservedGas.
-                //     // This situation is strictly not worse for the users (i.e. they anyway receive as much gas as possible).
-                //     // 
-                //     // Even if these transactions do try to make our batch close, they will still pay at least for the execution 
-                //     // itself, so it should be fine.
-
-                //     gasLimitForTx := min(getGasLimit(innerTxDataOffset), PRIORITY_TX_LEGACY_MAX_GAS_LIMIT())
-                //     reservedGas := safeSub(getGasLimit(innerTxDataOffset), gasLimitForTx, "l2g")
-                // }
-                // default {
-                    // let pubdataPriceETH := safeMul(gasPerPubdata, getMaxFeePerGas(innerTxDataOffset), "l1g")
-
-                    // getFeeParams(
-                    //     // todo: remove as l1 gas price is no longer used there
-                    //     0,
-                    //     pubdataPriceETH,
-                    //     getMaxFeePerGas(innerTxDataOffset)
-                    // )
-
-                    // let baseFee := mload(0)
-                    // let calculatedGasPricePerPubdata := mload(32)
-                    // let memorySlotOverhead := mload(64)
-                    // let setTxSlotOverhead := mload(96)
-
-                    // if iszero(eq(calculatedGasPricePerPubdata, gasPerPubdata)) {
-                    //     assertionError("L1 tx gas per pubdata mismatch")
-                    // }
-
-                gasLimitForTx, reservedGas := getGasLimitForTx(
-                    innerTxDataOffset,
-                    transactionIndex, 
-                    gasPerPubdata,
-                    TX_SLOT_OVERHEAD_GAS(),
-                    MEMORY_OVERHEAD_GAS(),
-                    L1_TX_INTRINSIC_L2_GAS(),
-                    L1_TX_INTRINSIC_PUBDATA()
-                )
-                // }
-            }
-
             /// @dev The function responsible for processing L1->L2 transactions.
             /// @param txDataOffset The offset to the transaction's information
             /// @param resultPtr The pointer at which the result of the execution of this transaction
@@ -1077,10 +945,12 @@ object "Bootloader" {
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                let gasLimitForTx, reservedGas := getGasLimitForL1Tx(
-                    innerTxDataOffset, 
+                let gasLimitForTx, reservedGas := getGasLimitForTx(
+                    innerTxDataOffset,
                     transactionIndex, 
                     gasPerPubdata,
+                    L1_TX_INTRINSIC_L2_GAS(),
+                    L1_TX_INTRINSIC_PUBDATA()
                 )
 
                 let gasUsedOnPreparation := 0
@@ -1272,14 +1142,10 @@ object "Bootloader" {
                 // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
                 // bytecodes usually form the bulk of the L2 gas prices.
 
-                /// todo: maybe supply gas price to be used for overhead.
-                /// it is not needed right now per se, but more robust long term
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
                     innerTxDataOffset, 
                     transactionIndex, 
                     gasPerPubdata,
-                    GET_TX_SLOT_OVERHEAD(),
-                    GET_MEMORY_OVERHEAD(),
                     L2_TX_INTRINSIC_GAS(), 
                     L2_TX_INTRINSIC_PUBDATA()
                 )
@@ -1338,8 +1204,6 @@ object "Bootloader" {
                 innerTxDataOffset,
                 transactionIndex,
                 gasPerPubdata,
-                txSlotOverheadGas,
-                txLengthEncodingOverheadGas,
                 intrinsicGas,
                 intrinsicPubdata,
             ) -> gasLimitForTx, reservedGas {
@@ -1365,9 +1229,7 @@ object "Bootloader" {
                 let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
                     transactionIndex,
                     totalGasLimit,
-                    txEncodingLen,
-                    txSlotOverheadGas,
-                    txLengthEncodingOverheadGas
+                    txEncodingLen
                 )
                 gasLimitForTx := safeSub(totalGasLimit, operatorOverheadForTransaction, "qr")
 
@@ -1814,22 +1676,15 @@ object "Bootloader" {
             function getVerifiedOperatorOverheadForTx(
                 transactionIndex,
                 txTotalGasLimit,
-                txEncodeLen,
-                txSlotOverheadGas,
-                txLengthEncodingOverheadGas
+                txEncodeLen
             ) -> ret {
-                // TODO: maybe remove/amend as we use too few params now
                 let operatorOverheadForTransaction := getOperatorOverheadForTx(transactionIndex)
                 if gt(operatorOverheadForTransaction, txTotalGasLimit) {
                     assertionError("Overhead higher than gasLimit")
                 }
                 let txGasLimit := min(safeSub(txTotalGasLimit, operatorOverheadForTransaction, "www"), MAX_GAS_PER_TRANSACTION())
 
-                let requiredOverhead := getTransactionUpfrontOverhead(
-                    txEncodeLen,
-                    txSlotOverheadGas,
-                    txLengthEncodingOverheadGas
-                )
+                let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
 
                 debugLog("txTotalGasLimit", txTotalGasLimit)
                 debugLog("requiredOverhead", requiredOverhead)
@@ -2056,13 +1911,11 @@ object "Bootloader" {
             /// 2. Overhead for taking up a slot for the transaction. Since each batch has the limited number of transactions in it, the user must pay 
             /// at least 1/MAX_TRANSACTIONS_IN_BATCH part of the overhead.
             function getTransactionUpfrontOverhead(
-                txEncodeLen,
-                txSlotOverheadGas,
-                txLengthEncodingOverheadGas
+                txEncodeLen
             ) -> ret {
                 ret := max(
-                    mul(txEncodeLen, txLengthEncodingOverheadGas),
-                    txSlotOverheadGas
+                    safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"),
+                    TX_SLOT_OVERHEAD_GAS()
                 )
             }
 
@@ -3841,13 +3694,13 @@ object "Bootloader" {
                 /// of the VM and the state of the operator.
                 let NEW_BATCH_NUMBER := mload(96)
 
-                /// @notice The gas price on L1 for ETH. In the future, a trustless value will be enforced.
+                /// @notice The minimal price per pubdata byte in ETH that the operator agrees on. 
+                /// In the future, a trustless value will be enforced.
                 /// For now, this value is trusted to be fairly provided by the operator.
-                let L1_GAS_PRICE := mload(128)
+                let FAIR_PUBDATA_PRICE := mload(128)
 
                 /// @notice The minimal gas price that the operator agrees upon. 
                 /// In the future, it will have an EIP1559-like lower bound.
-                /// todo: rename to something like "operator minimal gas price"
                 let FAIR_L2_GAS_PRICE := mload(160)
 
                 /// @notice The expected base fee by the operator.
@@ -3855,21 +3708,14 @@ object "Bootloader" {
                 /// the operator still provides it to make sure that its data is in sync. 
                 let EXPECTED_BASE_FEE := mload(192)
 
-                /// TODO
-                let PUBDATA_PRICE := mload(224)
+                validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
-                validateOperatorProvidedPrices(L1_GAS_PRICE, FAIR_L2_GAS_PRICE, PUBDATA_PRICE)
+                let baseFee := 0
 
-                getFeeParams(
-                    L1_GAS_PRICE,
-                    PUBDATA_PRICE,
+                baseFee, GAS_PRICE_PER_PUBDATA := getFeeParams(
+                    FAIR_PUBDATA_PRICE,
                     FAIR_L2_GAS_PRICE
                 )
-
-                let baseFee := mload(0)
-                let GAS_PRICE_PER_PUBDATA := mload(32)
-                SET_MEMORY_OVERHEAD(mload(64))
-                SET_TX_SLOT_OVERHEAD(mload(96))
 
                 <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
 
@@ -3888,7 +3734,7 @@ object "Bootloader" {
 
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
 
-                let SHOULD_SET_NEW_BATCH := mload(288)
+                let SHOULD_SET_NEW_BATCH := mload(224)
                 
                 switch SHOULD_SET_NEW_BATCH 
                 case 0 {    
@@ -3898,7 +3744,7 @@ object "Bootloader" {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
 
-                GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, PUBDATA_PRICE)
+                GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
             }
