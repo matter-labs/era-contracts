@@ -11,7 +11,7 @@ object "Bootloader" {
 
             // While we definitely cannot control the gas price on L1,
             // we need to check the operator does not provide any absurd numbers there
-            function MAX_ALLOWED_L1_GAS_PRICE() -> ret {
+            function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
                 // 100k gwei
                 ret := 100000000000000
             }
@@ -25,8 +25,8 @@ object "Bootloader" {
             /// are not absurdly high
             function validateOperatorProvidedPrices(fairL2GasPrice, pubdataPrice) {
                 // The limit is the same for pubdata price and L1 gas price
-                if gt(pubdataPrice, MAX_ALLOWED_L1_GAS_PRICE()) {
-                    assertionError("Pubdata price too high")
+                if gt(pubdataPrice, MAX_ALLOWED_FAIR_PUBDATA_PRICE()) {
+                    assertionError("Fair pubdata price too high")
                 }
 
                 if gt(fairL2GasPrice, MAX_ALLOWED_FAIR_L2_GAS_PRICE()) {
@@ -34,29 +34,42 @@ object "Bootloader" {
                 }
             }
 
-            // todo: explain how this constant was created
+            /// @dev The overhead for a transaction slot in L2 gas. 
+            /// It is roughly equal to 80kk/MAX_TRANSACTIONS_PER_BATCH, i.e. how many gas would an L1->L2 transaction
+            /// need to pay to compensate for the batch being closed.
+            /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is 
+            /// compensated enough in case the batch might be prematurely sealed because of the memory being filled up.
             function TX_SLOT_OVERHEAD_GAS() -> ret {
                 ret := 80000
             }
 
-            // todo: explain how this constant was created
+            /// @dev The overhead for each byte of the bootloader memory that the encoding of the transaction.
+            /// It is roughly equal to 80kk/BOOTLOADER_MEMORY_FOR_TXS, i.e. how many gas would an L1->L2 transaction
+            /// need to pay to compensate for the batch being closed.
+            /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is
+            /// compensated enough in case the batch might be prematurely sealed because of the memory being filled up.
             function MEMORY_OVERHEAD_GAS() -> ret {
-                ret := 35
+                ret := 10
             }
 
-            // todo: comment 
+            /// @dev Returns the base fee and gas per pubdata based on the fair pubdata price and L2 gas price provided by the operator
+            /// @param pubdataPrice The price of a single byte of pubdata in Wei
+            /// @param fairL2GasPrice The price of an L2 gas in Wei
+            /// @return baseFee and gasPerPubdata The base fee and the gas per pubdata to be used by L2 transactions in this batch.
             function getFeeParams(
-                pubdataPrice,
+                fairPubdataPrice,
                 fairL2GasPrice,
             ) -> baseFee, gasPerPubdata {
                 baseFee := max(
                     fairL2GasPrice,
-                    ceilDiv(pubdataPrice, MAX_L2_GAS_PER_PUBDATA())
+                    ceilDiv(fairPubdataPrice, MAX_L2_GAS_PER_PUBDATA())
                 )
 
-                gasPerPubdata := gasPerPubdataFromBaseFee(baseFee, pubdataPrice)
+                gasPerPubdata := gasPerPubdataFromBaseFee(baseFee, fairPubdataPrice)
             }
 
+            /// @dev Calculates the gas per pubdata based on the pubdata price provided by the operator
+            /// as well the the fixed baseFee.
             function gasPerPubdataFromBaseFee(baseFee, pubdataPrice) -> ret {
                 ret := ceilDiv(pubdataPrice, baseFee)
             }
@@ -3697,10 +3710,12 @@ object "Bootloader" {
                 /// @notice The minimal price per pubdata byte in ETH that the operator agrees on. 
                 /// In the future, a trustless value will be enforced.
                 /// For now, this value is trusted to be fairly provided by the operator.
+                /// It is expected of the operator to already include the L1 batch overhead costs into the value.
                 let FAIR_PUBDATA_PRICE := mload(128)
 
                 /// @notice The minimal gas price that the operator agrees upon. 
                 /// In the future, it will have an EIP1559-like lower bound.
+                /// It is expected of the operator to already include the L1 batch overhead costs into the value.
                 let FAIR_L2_GAS_PRICE := mload(160)
 
                 /// @notice The expected base fee by the operator.
