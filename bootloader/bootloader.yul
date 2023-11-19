@@ -40,7 +40,7 @@ object "Bootloader" {
 
             // todo: explain how this constant was created
             function TX_SLOT_OVERHEAD_GAS() -> ret {
-                ret := 150000
+                ret := 80000
             }
 
             // todo: explain how this constant was created
