@@ -71,6 +71,22 @@ struct VerifierParams {
     bytes32 recursionCircuitsSetVksHash;
 }
 
+enum PubdataPricingMode {
+    Rollup,
+    Validium
+}
+
+/// @notice The fee params for L1->L2 transactions for the network 
+struct FeeParams {
+    PubdataPricingMode pubdataPricingMode;
+    uint32 batchOverheadL1Gas;
+    uint32 maxPubdataPerBatch;
+    // The amount of L2 gas required to close the batch
+    uint32 maxL2GasPerBatch;
+    /// @dev The minimal L2 gas price to be used by L1->L2 transactions
+    uint64 minimalL2GasPrice;
+}
+
 /// @dev storing all storage variables for zkSync facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -143,4 +159,7 @@ struct AppStorage {
     address admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
     address pendingAdmin;
+    /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
+    /// the bootloader gives enough freedom to the operator.
+    FeeParams feeParams;
 }

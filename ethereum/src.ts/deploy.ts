@@ -125,6 +125,15 @@ export class Deployer {
     const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
+    // TODO: use config variables
+    const feeParams = {
+      pubdataPricingMode: 0,
+      batchOverheadL1Gas: 1_000_000,
+      maxPubdataPerBatch: 110_000,
+      maxL2GasPerBatch: 80_000_000,
+      minimalL2GasPrice: 250_000_000 // 0.25 gwei
+    };
+
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
       {
         verifier: this.addresses.ZkSync.Verifier,
@@ -140,6 +149,7 @@ export class Deployer {
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         initialProtocolVersion,
+        feeParams
       },
     ]);
 

@@ -8,7 +8,7 @@ import {IMailbox, TxStatus} from "../interfaces/IMailbox.sol";
 import {Merkle} from "../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../libraries/TransactionValidator.sol";
-import {L2Message, L2Log} from "../Storage.sol";
+import {L2Message, L2Log, FeeParams} from "../Storage.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
@@ -154,7 +154,7 @@ contract MailboxFacet is Base, IMailbox {
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) public pure returns (uint256) {
+    ) public view returns (uint256) {
         uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
         return l2GasPrice * _l2GasLimit;
     }
@@ -163,13 +163,18 @@ contract MailboxFacet is Base, IMailbox {
     /// @param _l1GasPrice The gas price on L1.
     /// @param _gasPricePerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
-    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPricePerPubdata) internal pure returns (uint256) {
-        uint256 pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
-        
-        uint256 batchOverheadETH = BATCH_OVERHEAD_L1_GAS * _l1GasPrice;
-        uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / MAX_PUBDATA_PER_BATCH;
+    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPricePerPubdata) internal view returns (uint256) {
+        FeeParams memory feeParams = s.feeParams;
 
-        uint256 l2GasPrice = MINIMAL_L2_GAS_PRICE + batchOverheadETH / L2_TX_MAX_GAS_LIMIT;
+        uint256 pubdataPriceETH;
+        if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+           pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
+        }
+
+        uint256 batchOverheadETH = uint256(feeParams.batchOverheadL1Gas) * _l1GasPrice;
+        uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / uint256(feeParams.maxPubdataPerBatch);
+
+        uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadETH / uint256(feeParams.maxL2GasPerBatch);
         uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPricePerPubdata - 1) / _gasPricePerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceETH);

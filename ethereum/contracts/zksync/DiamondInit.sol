@@ -8,7 +8,7 @@ import {IExecutor} from "./interfaces/IExecutor.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {Base} from "./facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
-import {VerifierParams} from "./Storage.sol";
+import {VerifierParams, FeeParams} from "./Storage.sol";
 /* solhint-disable max-line-length */
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
 
@@ -45,6 +45,7 @@ contract DiamondInit is Base {
         bytes32 l2DefaultAccountBytecodeHash;
         uint256 priorityTxMaxGasLimit;
         uint256 initialProtocolVersion;
+        FeeParams feeParams;
     }
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
@@ -83,6 +84,7 @@ contract DiamondInit is Base {
         s.l2DefaultAccountBytecodeHash = _initalizeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
         s.protocolVersion = _initalizeData.initialProtocolVersion;
+        s.feeParams = _initalizeData.feeParams;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
