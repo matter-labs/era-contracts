@@ -8,7 +8,6 @@ import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
-import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {VerifierParams} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
@@ -98,7 +97,10 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev The logs processed here should line up such that only one log for each key from the
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
     /// @dev Data returned from here will be used to form the batch commitment.
-    function _processL2Logs(CommitBatchInfo calldata _newBatch, bytes32 _expectedSystemContractUpgradeTxHash)
+    function _processL2Logs(
+        CommitBatchInfo calldata _newBatch,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    )
         internal
         pure
         returns (
@@ -174,12 +176,10 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice 1. Checks timestamp.
     /// @notice 2. Process L2 logs.
     /// @notice 3. Store batch commitments.
-    function commitBatches(StoredBatchInfo memory _lastCommittedBatchData, CommitBatchInfo[] calldata _newBatchesData)
-        external
-        override
-        nonReentrant
-        onlyValidator
-    {
+    function commitBatches(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external override nonReentrant onlyValidator {
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
         require(_newBatchesData.length > 0, "No batches to commit");
@@ -352,26 +352,17 @@ contract ExecutorFacet is Base, IExecutor {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
         if (_proof.serializedProof.length > 0) {
-            _verifyProof(
-                proofPublicInput,
-                _proof
-            );
+            _verifyProof(proofPublicInput, _proof);
         }
         // #else
-        _verifyProof(
-            proofPublicInput,
-            _proof
-        );
+        _verifyProof(proofPublicInput, _proof);
         // #endif
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(
-        uint256[] memory proofPublicInput,
-        ProofInput calldata _proof
-    ) internal view {
+    function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
         // We can only process 1 batch proof at a time.
         require(_proof.serializedProof.length == 1, "t4");
 
@@ -430,11 +421,10 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @dev Creates batch commitment from its data
-    function _createBatchCommitment(CommitBatchInfo calldata _newBatchData, bytes32 _stateDiffHash)
-        internal
-        view
-        returns (bytes32)
-    {
+    function _createBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash
+    ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
         bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash));
@@ -456,11 +446,10 @@ contract ExecutorFacet is Base, IExecutor {
         return abi.encodePacked(s.zkPorterIsAvailable, s.l2BootloaderBytecodeHash, s.l2DefaultAccountBytecodeHash);
     }
 
-    function _batchAuxiliaryOutput(CommitBatchInfo calldata _batch, bytes32 _stateDiffHash)
-        internal
-        pure
-        returns (bytes memory)
-    {
+    function _batchAuxiliaryOutput(
+        CommitBatchInfo calldata _batch,
+        bytes32 _stateDiffHash
+    ) internal pure returns (bytes memory) {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);

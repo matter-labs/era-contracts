@@ -33,11 +33,7 @@ library LibMap {
     /// @param _map The Uint32Map instance containing the packed uint32 values.
     /// @param _index The index of the uint32 value to retrieve.
     /// @param _value The new value at the specified index.
-    function set(
-        Uint32Map storage _map,
-        uint256 _index,
-        uint32 _value
-    ) internal {
+    function set(Uint32Map storage _map, uint256 _index, uint32 _value) internal {
         unchecked {
             // Each storage slot can store 256 bits of data.
             // As uint32 is 32 bits long, 8 uint32s can be packed into one storage slot.

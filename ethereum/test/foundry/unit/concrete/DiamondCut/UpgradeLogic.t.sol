@@ -80,7 +80,8 @@ contract UpgradeLogicTest is DiamondCutTest {
             false,
             0x0100000000000000000000000000000000000000000000000000000000000000,
             0x0100000000000000000000000000000000000000000000000000000000000000,
-            500000 // priority tx max L2 gas limit
+            500000, // priority tx max L2 gas limit
+            0
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

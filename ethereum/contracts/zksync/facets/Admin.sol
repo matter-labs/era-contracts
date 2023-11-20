@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 
 import "../interfaces/IAdmin.sol";
 import "../libraries/Diamond.sol";
-import "../../common/libraries/L2ContractHelper.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
 import "./Base.sol";
 
@@ -41,7 +40,7 @@ contract AdminFacet is Base, IAdmin {
     /// @notice Starts the transfer of admin rights. Only the current governor or admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
-    function setPendingAdmin(address _newPendingAdmin) external onlyGovernorOrAdmin {
+    function setPendingAdmin(address _newPendingAdmin) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = s.pendingAdmin;
         // Change pending admin
