@@ -1183,7 +1183,7 @@ object "Bootloader" {
                 transactionIndex,
                 gasPerPubdata,
                 intrinsicGas,
-                intrinsicPubdata,
+                intrinsicPubdata
             ) -> gasLimitForTx, reservedGas {
                 let totalGasLimit := getGasLimit(innerTxDataOffset)
 
