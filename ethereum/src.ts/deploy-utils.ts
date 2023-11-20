@@ -1,6 +1,6 @@
+import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
-import * as hardhat from "hardhat";
 import { SingletonFactoryFactory } from "../typechain";
 
 export async function deployViaCreate2(
