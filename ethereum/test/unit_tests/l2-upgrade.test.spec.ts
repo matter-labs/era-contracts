@@ -13,7 +13,6 @@ import {
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
   getCallRevertReason,
-  AccessMode,
   EMPTY_STRING_KECCAK,
   genesisStoredBatchInfo,
   L2_SYSTEM_CONTEXT_ADDRESS,
@@ -843,7 +842,6 @@ interface ProposedUpgrade {
   postUpgradeCalldata: BytesLike;
   upgradeTimestamp: ethers.BigNumber;
   newProtocolVersion: BigNumberish;
-  newAllowList: string;
 }
 
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
@@ -862,7 +860,6 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     upgradeTimestamp: ethers.constants.Zero,
     factoryDeps: [],
     newProtocolVersion,
-    newAllowList: ethers.constants.AddressZero,
     ...proposedUpgrade,
   };
 }

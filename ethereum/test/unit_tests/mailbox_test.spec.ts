@@ -2,19 +2,8 @@ import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
 import type { MailboxFacet, MockExecutorFacet, Forwarder } from "../../typechain";
-import {
-  MailboxFacetFactory,
-  MockExecutorFacetFactory,
-  DiamondInitFactory,
-  ForwarderFactory,
-} from "../../typechain";
-import {
-  DEFAULT_REVERT_REASON,
-  getCallRevertReason,
-  AccessMode,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  requestExecute,
-} from "./utils";
+import { MailboxFacetFactory, MockExecutorFacetFactory, DiamondInitFactory, ForwarderFactory } from "../../typechain";
+import { DEFAULT_REVERT_REASON, getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, requestExecute } from "./utils";
 import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
@@ -22,13 +11,12 @@ describe("Mailbox tests", function () {
   let proxyAsMockExecutor: MockExecutorFacet;
   let diamondProxyContract: ethers.Contract;
   let owner: ethers.Signer;
-  let randomSigner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   let forwarder: Forwarder;
 
   before(async () => {
-    [owner, randomSigner] = await hardhat.ethers.getSigners();
+    [owner] = await hardhat.ethers.getSigners();
 
     const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailboxFactory.deploy();

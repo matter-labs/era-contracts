@@ -23,8 +23,8 @@ async function isPromiseFailed(promise: Promise<any>): Promise<boolean> {
   return failed;
 }
 
-describe('L1 ERC20 proxy upgrade fork test', function () {
-    const mailboxOnNewImplementation = '0x1234567890123456789012345678901234567890';
+describe("L1 ERC20 proxy upgrade fork test", function () {
+  const mailboxOnNewImplementation = "0x1234567890123456789012345678901234567890";
 
   let governor: ethers.Signer;
   let randomSigner: ethers.Signer;

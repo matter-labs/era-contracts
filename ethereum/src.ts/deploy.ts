@@ -10,7 +10,6 @@ import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { AllowListFactory } from "../typechain";
 import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
 import {
   readSystemContractsBytecode,
@@ -46,7 +45,6 @@ export interface DeployedAddresses {
     WethBridgeProxy: string;
   };
   Governance: string;
-  AllowList: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
 }
@@ -76,7 +74,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
       WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
     },
-    AllowList: getAddressFromEnv("CONTRACTS_L1_ALLOW_LIST_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
@@ -203,17 +200,6 @@ export class Deployer {
     }
 
     this.addresses.Governance = contractAddress;
-  }
-
-  public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("AllowList", [this.ownerAddress], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_L1_ALLOW_LIST_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.AllowList = contractAddress;
   }
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -484,10 +470,6 @@ export class Deployer {
 
   public validatorTimelock(signerOrProvider: Signer | providers.Provider) {
     return ValidatorTimelockFactory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
-  }
-
-  public l1AllowList(signerOrProvider: Signer | providers.Provider) {
-    return AllowListFactory.connect(this.addresses.AllowList, signerOrProvider);
   }
 
   public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {
