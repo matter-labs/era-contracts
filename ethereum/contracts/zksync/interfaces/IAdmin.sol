@@ -5,6 +5,7 @@ pragma solidity 0.8.20;
 import "./IBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
+import {FeeParams} from "../Storage.sol";
 
 interface IAdmin is IBase {
     function setPendingGovernor(address _newPendingGovernor) external;
@@ -49,6 +50,9 @@ interface IAdmin is IBase {
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
+
+    /// @notice Fee params for L1->L2 transactions changed
+    event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

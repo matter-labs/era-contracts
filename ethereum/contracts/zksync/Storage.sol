@@ -83,6 +83,8 @@ struct FeeParams {
     uint32 maxPubdataPerBatch;
     // The amount of L2 gas required to close the batch
     uint32 maxL2GasPerBatch;
+    // The maximal amount of pubdata a priority transaction is allowed to publish
+    uint32 priorityTxMaxPubdata;
     /// @dev The minimal L2 gas price to be used by L1->L2 transactions
     uint64 minimalL2GasPrice;
 }

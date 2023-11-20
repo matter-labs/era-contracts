@@ -8,7 +8,7 @@ import {IMailbox, TxStatus} from "../interfaces/IMailbox.sol";
 import {Merkle} from "../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../libraries/TransactionValidator.sol";
-import {L2Message, L2Log, FeeParams} from "../Storage.sol";
+import {L2Message, L2Log, FeeParams, PubdataPricingMode} from "../Storage.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
@@ -362,7 +362,8 @@ contract MailboxFacet is Base, IMailbox {
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding, 
-            s.priorityTxMaxGasLimit
+            s.priorityTxMaxGasLimit,
+            s.feeParams.priorityTxMaxPubdata
         );
 
         canonicalTxHash = keccak256(transactionEncoding);

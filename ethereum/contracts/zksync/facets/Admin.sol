@@ -87,6 +87,14 @@ contract AdminFacet is Base, IAdmin {
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 
+    /// @notice Change the fee params for L1->L2 transactions
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernor() {
+        FeeParams memory oldFeeParams = s.feeParams;
+        s.feeParams = _newFeeParams;
+
+        emit NewFeeParams(oldFeeParams, _newFeeParams);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/

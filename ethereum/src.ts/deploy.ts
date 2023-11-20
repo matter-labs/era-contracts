@@ -130,6 +130,7 @@ export class Deployer {
       pubdataPricingMode: 0,
       batchOverheadL1Gas: 1_000_000,
       maxPubdataPerBatch: 110_000,
+      priorityTxMaxPubdata: 99_000,
       maxL2GasPerBatch: 80_000_000,
       minimalL2GasPrice: 250_000_000 // 0.25 gwei
     };

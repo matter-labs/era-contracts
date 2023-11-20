@@ -18,7 +18,8 @@ library TransactionValidator {
     function validateL1ToL2Transaction(
         IMailbox.L2CanonicalTransaction memory _transaction,
         bytes memory _encoded,
-        uint256 _priorityTxMaxGasLimit
+        uint256 _priorityTxMaxGasLimit,
+        uint256 _priorityTxMaxPubdata
     ) internal pure {
         uint256 l2GasForTxBody = getTransactionBodyGasLimit(
             _transaction.gasLimit,
@@ -28,7 +29,7 @@ library TransactionValidator {
         // Ensuring that the transaction is provable
         require(l2GasForTxBody <= _priorityTxMaxGasLimit, "ui");
         // Ensuring that the transaction cannot output more pubdata than is processable
-        require(l2GasForTxBody / _transaction.gasPerPubdataByteLimit <= PRIORITY_TX_MAX_PUBDATA, "uk");
+        require(l2GasForTxBody / _transaction.gasPerPubdataByteLimit <= _priorityTxMaxPubdata, "uk");
 
         // Ensuring that the transaction covers the minimal costs for its processing:
         // hashing its content, publishing the factory dependencies, etc.

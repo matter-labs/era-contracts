@@ -175,7 +175,8 @@ abstract contract BaseZkSyncUpgrade is Base {
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
             encodedTransaction,
-            s.priorityTxMaxGasLimit
+            s.priorityTxMaxGasLimit,
+            s.feeParams.priorityTxMaxPubdata
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);
