@@ -1,5 +1,5 @@
-import type { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
+import type { Interface } from "ethers/lib/utils";
 import "@nomiclabs/hardhat-ethers";
 import type { Wallet } from "ethers";
 import { ethers } from "ethers";
