@@ -444,10 +444,6 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000008001
             }
 
-            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000000ffff
-            }
-
             function ACCOUNT_CODE_STORAGE_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008002
             }
@@ -466,6 +462,10 @@ object "Bootloader" {
             
             function FORCE_DEPLOYER() -> ret {
                 ret := 0x0000000000000000000000000000000000008007
+            }
+
+            function L1_MESSENGER_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008008
             }
 
             function MSG_VALUE_SIMULATOR_ADDR() -> ret {
@@ -492,8 +492,8 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000008010
             }
 
-            function L1_MESSENGER_ADDR() -> ret {
-                ret := 0x0000000000000000000000000000000000008008
+            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000ffff
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
