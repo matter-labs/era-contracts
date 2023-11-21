@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {IAllowList} from "../common/interfaces/IAllowList.sol";
 import {IVerifier} from "./interfaces/IVerifier.sol";
 import {IExecutor} from "./interfaces/IExecutor.sol";
 import {Diamond} from "./libraries/Diamond.sol";
@@ -25,7 +24,6 @@ contract DiamondInit is Base {
     /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
     /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
     /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
-    /// @param _allowList The address of the allow list smart contract
     /// @param _verifierParams Verifier config parameters that describes the circuit to be verified
     /// @param _zkPorterIsAvailable The availability of zk porter shard
     /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
@@ -38,7 +36,6 @@ contract DiamondInit is Base {
         bytes32 genesisBatchHash;
         uint64 genesisIndexRepeatedStorageChanges;
         bytes32 genesisBatchCommitment;
-        IAllowList allowList;
         VerifierParams verifierParams;
         bool zkPorterIsAvailable;
         bytes32 l2BootloaderBytecodeHash;
@@ -76,7 +73,6 @@ contract DiamondInit is Base {
         );
 
         s.storedBatchHashes[0] = keccak256(abi.encode(storedBatchZero));
-        s.allowList = _initalizeData.allowList;
         s.verifierParams = _initalizeData.verifierParams;
         s.zkPorterIsAvailable = _initalizeData.zkPorterIsAvailable;
         s.l2BootloaderBytecodeHash = _initalizeData.l2BootloaderBytecodeHash;

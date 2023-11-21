@@ -5,9 +5,8 @@ import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/u
 import type { IZkSync } from "zksync-web3/build/typechain";
 import { IZkSyncFactory } from "zksync-web3/build/typechain";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
-import type { AllowList, TestnetERC20Token } from "../../typechain";
+import type { TestnetERC20Token } from "../../typechain";
 import {
-  AllowListFactory,
   DiamondInitFactory,
   GettersFacetFactory,
   MailboxFacetFactory,
@@ -15,12 +14,11 @@ import {
 } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { AccessMode, getCallRevertReason } from "./utils";
+import { getCallRevertReason } from "./utils";
 
 describe("L1ERC20Bridge tests", function () {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
-  let allowList: AllowList;
   let l1ERC20Bridge: IL1Bridge;
   let erc20TestToken: TestnetERC20Token;
   let testnetERC20TokenContract: ethers.Contract;
@@ -38,10 +36,6 @@ describe("L1ERC20Bridge tests", function () {
     const mailboxContract = await mailboxFactory.deploy();
     const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
-    const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
-
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
     const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
@@ -57,7 +51,6 @@ describe("L1ERC20Bridge tests", function () {
         genesisBatchHash: ethers.constants.HashZero,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.constants.HashZero,
-        allowList: allowList.address,
         verifierParams: {
           recursionCircuitsSetVksHash: ethers.constants.HashZero,
           recursionLeafLevelVkHash: ethers.constants.HashZero,
@@ -83,7 +76,7 @@ describe("L1ERC20Bridge tests", function () {
     const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
-    l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(diamondProxyContract.address, allowListContract.address);
+    l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(diamondProxyContract.address);
     l1ERC20Bridge = IL1BridgeFactory.connect(l1Erc20BridgeContract.address, l1Erc20BridgeContract.signer);
 
     const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
@@ -98,28 +91,8 @@ describe("L1ERC20Bridge tests", function () {
       .connect(randomSigner)
       .approve(l1Erc20BridgeContract.address, ethers.utils.parseUnits("10000", 18));
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
-
     // Exposing the methods of IZkSync to the diamond proxy
     zksyncContract = IZkSyncFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
-  });
-
-  it("Should not allow an un-whitelisted address to deposit", async () => {
-    const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .deposit(
-          await randomSigner.getAddress(),
-          testnetERC20TokenContract.address,
-          0,
-          0,
-          0,
-          ethers.constants.AddressZero
-        )
-    );
-    expect(revertReason).equal("nr");
-
-    await (await allowList.setAccessMode(l1Erc20BridgeContract.address, AccessMode.Public)).wait();
   });
 
   it("Should not allow depositing zero amount", async () => {

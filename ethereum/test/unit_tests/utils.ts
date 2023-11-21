@@ -39,12 +39,6 @@ export class DummyOp {
   ) {}
 }
 
-export enum AccessMode {
-  Closed = 0,
-  SpecialAccessOnly = 1,
-  Public = 2,
-}
-
 export async function getCallRevertReason(promise) {
   let revertReason = DEFAULT_REVERT_REASON;
   try {
