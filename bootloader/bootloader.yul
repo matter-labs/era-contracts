@@ -2024,7 +2024,11 @@ object "Bootloader" {
             /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
-                ret := iszero(getRawCodeHash(addr, false))
+                ret := 0
+
+                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                    ret := iszero(getRawCodeHash(addr, false))
+                }
             }
 
             /// @dev Calls the `payForTransaction` method of an account
