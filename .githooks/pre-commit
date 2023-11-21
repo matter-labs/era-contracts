@@ -1,0 +1,16 @@
+#!/bin/sh
+
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+RED='\033[0;31m'
+
+# Check that the code is formatted in the given directory provided in the first argument
+function check_prettier {
+    if ! yarn prettier:check; then
+        echo "${RED}Commit error! Cannot commit unformatted code!${NC}"
+        echo "Prettier errors found. Please format the code via ${CYAN}yarn prettier:fix${NC}!"
+        exit 1
+    fi
+}
+
+check_prettier

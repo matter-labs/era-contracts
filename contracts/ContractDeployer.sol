@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
@@ -44,7 +44,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         }
 
         // It is an EOA, it is still an account.
-        if (ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0) {
+        if (
+            _address > address(MAX_SYSTEM_CONTRACT_ADDRESS) &&
+            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0
+        ) {
             return AccountAbstractionVersion.Version1;
         }
 
@@ -214,6 +217,9 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     function forceDeployOnAddress(ForceDeployment calldata _deployment, address _sender) external payable onlySelf {
         _ensureBytecodeIsKnown(_deployment.bytecodeHash);
 
+        // Since the `forceDeployOnAddress` function is called only during upgrades, the Governance is trusted to correctly select
+        // the addresses to deploy the new bytecodes to and to assess whether overriding the AccountInfo for the "force-deployed"
+        // contract is acceptable.
         AccountInfo memory newAccountInfo;
         newAccountInfo.supportedAAVersion = AccountAbstractionVersion.None;
         // Accounts have sequential nonces by default.

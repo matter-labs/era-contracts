@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
@@ -216,14 +216,14 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         require(_l2BlockNumber > 0, "L2 block number is never expected to be zero");
 
         unchecked {
-            bytes32 correctPrevBlockHash = _calculateLegacyL2BlockHash(uint128(_l2BlockNumber - 1));
+            bytes32 correctPrevBlockHash = _calculateLegacyL2BlockHash(_l2BlockNumber - 1);
             require(correctPrevBlockHash == _expectedPrevL2BlockHash, "The previous L2 block hash is incorrect");
 
             // Whenever we'll be queried about the hashes of the blocks before the upgrade,
             // we'll use batches' hashes, so we don't need to store 256 previous hashes.
             // However, we do need to store the last previous hash in order to be able to correctly calculate the
             // hash of the new L2 block.
-            _setL2BlockHash(uint128(_l2BlockNumber - 1), correctPrevBlockHash);
+            _setL2BlockHash(_l2BlockNumber - 1, correctPrevBlockHash);
         }
     }
 
@@ -382,7 +382,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         // The structure of the "setNewBatch" implies that currentBatchNumber > 0, but we still double check it
         require(currentBatchNumber > 0, "The current batch number must be greater than 0");
-        bytes32 prevBatchHash = batchHash[currentBatchNumber - 1];
 
         // In order to spend less pubdata, the packed version is published
         uint256 packedTimestamps = (uint256(currentBatchTimestamp) << 128) | currentL2BlockTimestamp;

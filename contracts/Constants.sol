@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.20;
 
-import {IAccountCodeStorage}  from "./interfaces/IAccountCodeStorage.sol";
+import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
@@ -27,12 +27,10 @@ address constant SHA256_SYSTEM_CONTRACT = address(0x02);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 
-/// @dev The current maximum deployed precompile address.
-/// Note: currently only two precompiles are deployed:
-/// 0x01 - ecrecover
-/// 0x02 - sha256
-/// Important! So the constant should be updated if more precompiles are deployed.
-uint256 constant CURRENT_MAX_PRECOMPILE_ADDRESS = uint256(uint160(SHA256_SYSTEM_CONTRACT));
+/// @dev The maximal possible address of an L1-like precompie. These precompiles maintain the following properties:
+/// - Their extcodehash is EMPTY_STRING_KECCAK
+/// - Their extcodesize is 0 despite having a bytecode formally deployed there.
+uint256 constant CURRENT_MAX_PRECOMPILE_ADDRESS = 0xff;
 
 address payable constant BOOTLOADER_FORMAL_ADDRESS = payable(address(SYSTEM_CONTRACTS_OFFSET + 0x01));
 IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
@@ -97,7 +95,7 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-/// @dev The number of leaves in the L2->L1 log Merkle tree. 
+/// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 2048 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 2048;
 

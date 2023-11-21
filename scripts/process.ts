@@ -1,49 +1,54 @@
-const preprocess = require('preprocess');
+import * as hre from "hardhat";
 
-import { existsSync, mkdirSync, write, writeFileSync } from 'fs';
-import { SYSTEM_CONTRACTS, getRevertSelector, getTransactionUtils } from './constants';
-import * as hre from 'hardhat';
-import * as fs from 'fs';
-import { ethers } from 'ethers';
-import { renderFile } from 'template-file';
-import { utils } from 'zksync-web3';
-import { ForceDeployment } from './utils';
-const OUTPUT_DIR = 'bootloader/build';
+import { ethers } from "ethers";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { join } from "path";
+import { renderFile } from "template-file";
+import { utils } from "zksync-web3";
+import { getRevertSelector, getTransactionUtils } from "./constants";
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+const preprocess = require("preprocess");
+const SYSTEM_PARAMS = require("../SystemConfig.json");
+/* eslint-enable@typescript-eslint/no-var-requires */
+
+const OUTPUT_DIR = "bootloader/build";
+
+function path(...args: string[]): string {
+  return join(__dirname, ...args);
+}
 
 function getSelector(contractName: string, method: string): string {
-    const artifact = hre.artifacts.readArtifactSync(contractName);
-    const contractInterface = new ethers.utils.Interface(artifact.abi);
+  const artifact = hre.artifacts.readArtifactSync(contractName);
+  const contractInterface = new ethers.utils.Interface(artifact.abi);
 
-    return contractInterface.getSighash(method);
+  return contractInterface.getSighash(method);
 }
 
 // Methods from ethers do zero pad from left, but we need to pad from the right
 function padZeroRight(hexData: string, length: number): string {
-    while (hexData.length < length) {
-        hexData += '0';
-    }
+  while (hexData.length < length) {
+    hexData += "0";
+  }
 
-    return hexData;
+  return hexData;
 }
 
 const PADDED_SELECTOR_LENGTH = 32 * 2 + 2;
 function getPaddedSelector(contractName: string, method: string): string {
-    let result = getSelector(contractName, method);
+  const result = getSelector(contractName, method);
 
-    return padZeroRight(result, PADDED_SELECTOR_LENGTH)
+  return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-const SYSTEM_PARAMS = require('../SystemConfig.json');
-
 function getKeccak256ExpectedHash() {
-    const bytecode = fs.readFileSync('contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin');
+    const bytecode = readFileSync('contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin');
     return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
 
 // Maybe in the future some of these params will be passed
 // in a JSON file. For now, a simple object is ok here.
-let params = {
+const params = {
     MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector('KnownCodesStorage', 'markFactoryDeps'),
     VALIDATE_TX_SELECTOR: getSelector('IAccount', 'validateTransaction'),
     EXECUTE_TX_SELECTOR: getSelector('DefaultAccount', 'executeTransaction'),
@@ -97,32 +102,28 @@ let params = {
     ...SYSTEM_PARAMS
 };
 
-
 function extractTestFunctionNames(sourceCode: string): string[] {
-    // Remove single-line comments
-    sourceCode = sourceCode.replace(/\/\/[^\n]*/g, '');
+  // Remove single-line comments
+  sourceCode = sourceCode.replace(/\/\/[^\n]*/g, "");
 
-    // Remove multi-line comments
-    sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove multi-line comments
+  sourceCode = sourceCode.replace(/\/\*[\s\S]*?\*\//g, "");
 
+  const regexPatterns = [/function\s+(TEST\w+)/g];
 
-    const regexPatterns = [
-        /function\s+(TEST\w+)/g,
-    ];
-
-    let results: string[] = [];
-    for (const pattern of regexPatterns) {
-        let match;
-        while ((match = pattern.exec(sourceCode)) !== null) {
-            results.push(match[1]);
-        }
+  const results: string[] = [];
+  for (const pattern of regexPatterns) {
+    let match;
+    while ((match = pattern.exec(sourceCode)) !== null) {
+      results.push(match[1]);
     }
+  }
 
-    return [...new Set(results)]; // Remove duplicates
+  return [...new Set(results)]; // Remove duplicates
 }
 
 function createTestFramework(tests: string[]): string {
-    let testFramework = `
+  let testFramework = `
     let test_id:= mload(0)
 
     switch test_id 
@@ -131,90 +132,80 @@ function createTestFramework(tests: string[]): string {
     }
     `;
 
-    tests.forEach((value, index) => {
-        testFramework += `
+  tests.forEach((value, index) => {
+    testFramework += `
         case ${index + 1} {
             testing_start("${value}")
             ${value}()
         }
-        `
-    });
+        `;
+  });
 
-    testFramework += `
+  testFramework += `
         default {
         }
     return (0, 0)
-    `
+    `;
 
-    return testFramework;
+  return testFramework;
 }
 
 async function main() {
-    const bootloader = await renderFile('bootloader/bootloader.yul', params);
-    // The overhead is unknown for gas tests and so it should be zero to calculate it 
-    const gasTestBootloaderTemplate = await renderFile('bootloader/bootloader.yul', {
-        ...params,
-        L2_TX_INTRINSIC_GAS: 0,
-        L2_TX_INTRINSIC_PUBDATA: 0,
-        L1_TX_INTRINSIC_L2_GAS: 0,
-        L1_TX_INTRINSIC_PUBDATA: 0,
-        FORBID_ZERO_GAS_PER_PUBDATA: 0
-    })
+  const bootloader = await renderFile("bootloader/bootloader.yul", params);
+  // The overhead is unknown for gas tests and so it should be zero to calculate it
+  const gasTestBootloaderTemplate = await renderFile("bootloader/bootloader.yul", {
+    ...params,
+    L2_TX_INTRINSIC_GAS: 0,
+    L2_TX_INTRINSIC_PUBDATA: 0,
+    L1_TX_INTRINSIC_L2_GAS: 0,
+    L1_TX_INTRINSIC_PUBDATA: 0,
+    FORBID_ZERO_GAS_PER_PUBDATA: 0,
+  });
 
-    const feeEstimationBootloaderTemplate = await renderFile('bootloader/bootloader.yul', {
-        ...params,
-        ENSURE_RETURNED_MAGIC: 0
-    });
+  const feeEstimationBootloaderTemplate = await renderFile("bootloader/bootloader.yul", {
+    ...params,
+    ENSURE_RETURNED_MAGIC: 0,
+  });
 
-    console.log('Preprocessing production bootloader');
-    const provedBatchBootloader = preprocess.preprocess(
-        bootloader,
-        { BOOTLOADER_TYPE: 'proved_batch' }
-    );
-    console.log('Preprocessing playground block bootloader');
-    const playgroundBatchBootloader = preprocess.preprocess(
-        bootloader,
-        { BOOTLOADER_TYPE: 'playground_batch' }
-    );
-    console.log('Preprocessing gas test bootloader');
-    const gasTestBootloader = preprocess.preprocess(
-        gasTestBootloaderTemplate,
-        { BOOTLOADER_TYPE: 'proved_batch' }
-    );
-    console.log('Preprocessing fee estimation bootloader');
-    const feeEstimationBootloader = preprocess.preprocess(
-        feeEstimationBootloaderTemplate,
-        { BOOTLOADER_TYPE: 'playground_batch' }
-    );
+  console.log("Preprocessing production bootloader");
+  const provedBatchBootloader = preprocess.preprocess(bootloader, { BOOTLOADER_TYPE: "proved_batch" });
+  console.log("Preprocessing playground block bootloader");
+  const playgroundBatchBootloader = preprocess.preprocess(bootloader, { BOOTLOADER_TYPE: "playground_batch" });
+  console.log("Preprocessing gas test bootloader");
+  const gasTestBootloader = preprocess.preprocess(gasTestBootloaderTemplate, { BOOTLOADER_TYPE: "proved_batch" });
+  console.log("Preprocessing fee estimation bootloader");
+  const feeEstimationBootloader = preprocess.preprocess(feeEstimationBootloaderTemplate, {
+    BOOTLOADER_TYPE: "playground_batch",
+  });
 
-    console.log('Preprocessing bootloader tests');
-    const bootloaderTests = await renderFile('bootloader/tests/bootloader/bootloader_test.yul', {});
+  console.log("Preprocessing bootloader tests");
+  const bootloaderTests = await renderFile("bootloader/tests/bootloader/bootloader_test.yul", {});
 
-    const testMethods = extractTestFunctionNames(bootloaderTests)
+  const testMethods = extractTestFunctionNames(bootloaderTests);
 
-    console.log("Found tests: " + testMethods);
+  console.log("Found tests: " + testMethods);
 
-    const testFramework = createTestFramework(testMethods);
+  const testFramework = createTestFramework(testMethods);
 
-    const bootloaderTestUtils = await renderFile('bootloader/tests/utils/test_utils.yul', {});
+  const bootloaderTestUtils = await renderFile("bootloader/tests/utils/test_utils.yul", {});
 
-    const bootloaderWithTests = await renderFile('bootloader/bootloader.yul', {
-        ...params,
-        CODE_START_PLACEHOLDER: "\n" + bootloaderTestUtils + "\n" + bootloaderTests + "\n" + testFramework
-    });
-    const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: 'proved_batch' });
+  const bootloaderWithTests = await renderFile("bootloader/bootloader.yul", {
+    ...params,
+    CODE_START_PLACEHOLDER: "\n" + bootloaderTestUtils + "\n" + bootloaderTests + "\n" + testFramework,
+  });
+  const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "proved_batch" });
 
-    if (!existsSync(OUTPUT_DIR)) {
-        mkdirSync(OUTPUT_DIR);
-    }
+  if (!existsSync(OUTPUT_DIR)) {
+    mkdirSync(OUTPUT_DIR);
+  }
 
-    writeFileSync(`${OUTPUT_DIR}/bootloader_test.yul`, provedBootloaderWithTests);
-    writeFileSync(`${OUTPUT_DIR}/proved_batch.yul`, provedBatchBootloader);
-    writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
-    writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
-    writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/bootloader_test.yul`), provedBootloaderWithTests);
+  writeFileSync(path(`../${OUTPUT_DIR}/proved_batch.yul`), provedBatchBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/playground_batch.yul`), playgroundBatchBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/gas_test.yul`), gasTestBootloader);
+  writeFileSync(path(`../${OUTPUT_DIR}/fee_estimate.yul`), feeEstimationBootloader);
 
-    console.log('Preprocessing done!');
+  console.log("Preprocessing done!");
 }
 
 main();
