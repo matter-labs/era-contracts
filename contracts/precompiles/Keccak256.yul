@@ -2,7 +2,7 @@
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice The contract used to emulate EVM's keccak256 opcode.
- * @dev It accepts the data to be hashed in the calldata, propagate it to the zkEVM built-in circuit precompile via `precompileCall` and burn .
+ * @dev It accepts the data to be hashed in the calldata, propagates it to the zkEVM built-in circuit precompile via `precompileCall`, and burns the gas.
  */
 object "Keccak256" {
     code { 
