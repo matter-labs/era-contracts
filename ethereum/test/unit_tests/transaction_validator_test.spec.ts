@@ -15,7 +15,7 @@ describe("TransactionValidator tests", function () {
 
   describe("validateL1ToL2Transaction", function () {
     it("Should not revert when all parameters are valid", async () => {
-      await tester.validateL1ToL2Transaction(createTestTransaction({}), 500000);
+      await tester.validateL1ToL2Transaction(createTestTransaction({}), 500000, 100000);
     });
 
     it("Should revert when provided gas limit doesnt cover transaction overhead", async () => {
@@ -24,14 +24,15 @@ describe("TransactionValidator tests", function () {
           createTestTransaction({
             gasLimit: 0,
           }),
-          500000
+          500000,
+          100000
         )
       );
       expect(result).equal("my");
     });
 
     it("Should revert when needed gas is higher than the max", async () => {
-      const result = await getCallRevertReason(tester.validateL1ToL2Transaction(createTestTransaction({}), 0));
+      const result = await getCallRevertReason(tester.validateL1ToL2Transaction(createTestTransaction({}), 0, 100000));
       expect(result).equal("ui");
     });
 
@@ -41,7 +42,8 @@ describe("TransactionValidator tests", function () {
           createTestTransaction({
             gasPerPubdataByteLimit: 1,
           }),
-          500000
+          500000,
+          100000
         )
       );
       expect(result).equal("uk");
@@ -53,7 +55,8 @@ describe("TransactionValidator tests", function () {
           createTestTransaction({
             gasLimit: 200000,
           }),
-          500000
+          500000,
+          100000
         )
       );
       expect(result).equal("up");

@@ -3,7 +3,7 @@ import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
 import type { MailboxFacet, MockExecutorFacet, Forwarder } from "../../typechain";
 import { MailboxFacetFactory, MockExecutorFacetFactory, DiamondInitFactory, ForwarderFactory } from "../../typechain";
-import { DEFAULT_REVERT_REASON, getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, requestExecute } from "./utils";
+import { DEFAULT_REVERT_REASON, getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, requestExecute, defaultFeeParams } from "./utils";
 import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
@@ -56,6 +56,7 @@ describe("Mailbox tests", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
+        feeParams: defaultFeeParams()
       },
     ]);
 

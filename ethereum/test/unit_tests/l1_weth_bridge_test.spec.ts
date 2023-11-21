@@ -12,7 +12,7 @@ import {
   WETH9Factory,
 } from "../../typechain";
 import type { IZkSync } from "../../typechain/IZkSync";
-import { getCallRevertReason } from "./utils";
+import { defaultFeeParams, getCallRevertReason } from "./utils";
 
 import { Interface } from "ethers/lib/utils";
 import type { Address } from "zksync-web3/build/src/types";
@@ -92,6 +92,7 @@ describe("WETH Bridge tests", () => {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
+        feeParams: defaultFeeParams()
       },
     ]);
 

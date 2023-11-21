@@ -7,7 +7,7 @@ import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
@@ -100,6 +100,17 @@ contract ExecutorTest is Test {
         return selectors;
     }
 
+    function defaultFeeParams() private pure returns (FeeParams memory feeParams) {
+        feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+    }
+
     constructor() {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
@@ -127,7 +138,8 @@ contract ExecutorTest is Test {
             dummyHash,
             dummyHash,
             1000000,
-            0
+            0,
+            defaultFeeParams()
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);

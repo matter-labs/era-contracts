@@ -8,7 +8,7 @@ import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contr
 import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {Utils} from "../../Utils/Utils.sol";
@@ -21,6 +21,17 @@ contract L1WethBridgeTest is Test {
     L1WethBridge internal bridgeProxy;
     WETH9 internal l1Weth;
     bytes4 internal functionSignature = 0x6c0960f9;
+
+    function defaultFeeParams() private pure returns (FeeParams memory feeParams) {
+        feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+    }
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -45,7 +56,8 @@ contract L1WethBridgeTest is Test {
             dummyHash,
             dummyHash,
             10000000,
-            0
+            0,
+            defaultFeeParams()
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);

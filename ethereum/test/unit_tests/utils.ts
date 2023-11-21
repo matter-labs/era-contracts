@@ -142,6 +142,17 @@ export function packBatchTimestampAndBatchTimestamp(
   return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
 
+export function defaultFeeParams(): FeeParams {
+  return {
+    pubdataPricingMode: PubdataPricingMode.Rollup,
+    batchOverheadL1Gas: 1_000_000,
+    maxPubdataPerBatch: 110_000,
+    maxL2GasPerBatch: 80_000_000,
+    priorityTxMaxPubdata: 99_000,
+    minimalL2GasPrice: 250_000_000 // 0.25 gwei
+  }
+}
+
 export interface StoredBatchInfo {
   batchNumber: BigNumberish;
   batchHash: BytesLike;
@@ -164,4 +175,18 @@ export interface CommitBatchInfo {
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
   totalL2ToL1Pubdata: BytesLike;
+}
+
+enum PubdataPricingMode {
+  Rollup,
+  Validium
+}
+
+export interface FeeParams {
+  pubdataPricingMode: PubdataPricingMode;
+  batchOverheadL1Gas: number;
+  maxPubdataPerBatch: number;
+  maxL2GasPerBatch: number;
+  priorityTxMaxPubdata: number;
+  minimalL2GasPrice: BigNumberish;
 }

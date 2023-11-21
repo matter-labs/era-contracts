@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {DiamondProxy} from "solpp/zksync/DiamondProxy.sol";
 import {DiamondInit} from "solpp/zksync/DiamondInit.sol";
-import {VerifierParams} from "solpp/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/zksync/Storage.sol";
 import {Diamond} from "solpp/zksync/libraries/Diamond.sol";
 import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
 import {Governance} from "solpp/governance/Governance.sol";
@@ -44,6 +44,15 @@ contract AdminTest is Test {
             recursionCircuitsSetVksHash: 0
         });
 
+        FeeParams memory feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+
         adminFacet = new AdminFacet();
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(
@@ -59,7 +68,8 @@ contract AdminTest is Test {
             0x0100000000000000000000000000000000000000000000000000000000000000,
             0x0100000000000000000000000000000000000000000000000000000000000000,
             500000, // priority tx max L2 gas limit
-            0
+            0,
+            feeParams
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);

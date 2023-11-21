@@ -7,7 +7,7 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
@@ -68,6 +68,15 @@ contract UpgradeLogicTest is DiamondCutTest {
             recursionCircuitsSetVksHash: 0
         });
 
+        FeeParams memory feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+
         bytes memory diamondInitCalldata = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             0x03752D8252d67f99888E741E3fB642803B29B155,
@@ -81,7 +90,8 @@ contract UpgradeLogicTest is DiamondCutTest {
             0x0100000000000000000000000000000000000000000000000000000000000000,
             0x0100000000000000000000000000000000000000000000000000000000000000,
             500000, // priority tx max L2 gas limit
-            0
+            0,
+            feeParams
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
