@@ -19,18 +19,20 @@ import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_R
 contract DiamondInit is Base {
     /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
     /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
-    /// @param _verifier address of Verifier contract
-    /// @param _governor address who can manage critical updates in the contract
-    /// @param _admin address who can manage non-critical updates in the contract
-    /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
-    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
-    /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
-    /// @param _allowList The address of the allow list smart contract
-    /// @param _verifierParams Verifier config parameters that describes the circuit to be verified
-    /// @param _zkPorterIsAvailable The availability of zk porter shard
-    /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+    /// @param verifier address of Verifier contract
+    /// @param governor address who can manage critical updates in the contract
+    /// @param admin address who can manage non-critical updates in the contract
+    /// @param genesisBatchHash Batch hash of the genesis (initial) batch
+    /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
+    /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
+    /// @param allowList The address of the allow list smart contract
+    /// @param verifierParams Verifier config parameters that describes the circuit to be verified
+    /// @param zkPorterIsAvailable The availability of zk porter shard
+    /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
+    /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+    /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+    /// @param initialProtocolVersion initial protocol version
+    /// @param feeParams Fee parameters to be used for L1->L2 transactions
     struct InitializeData {
         IVerifier verifier;
         address governor;

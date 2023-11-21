@@ -71,21 +71,28 @@ struct VerifierParams {
     bytes32 recursionCircuitsSetVksHash;
 }
 
+/// @notice The struct that describes for the users will be charged for pubdata for L1->L2 transactions.
+/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
+/// @param Validium The pubdata is considered free with regard to the L1 gas price.
 enum PubdataPricingMode {
     Rollup,
     Validium
 }
 
-/// @notice The fee params for L1->L2 transactions for the network 
+/// @notice The fee params for L1->L2 transactions for the network.
+/// @param pubdataPricingMode How the users will charged for pubdata in L1->L2 transactions.
+/// @param batchOverheadL1Gas The amount of L1 gas required to process the batch (except for the calldata).
+/// @param maxPubdataPerBatch The maximal number of pubdata that can be emitted per batch.
+/// @param priorityTxMaxPubdata The maximal amount of pubdata a priority transaction is allowed to publish.
+/// It can be slightly less than maxPubdataPerBatch in order to have some margin for the bootloader execution. 
+/// @param minimalL2GasPrice The minimal L2 gas price to be used by L1->L2 transactions. It should represent
+/// the price that a single unit of compute costs.
 struct FeeParams {
     PubdataPricingMode pubdataPricingMode;
     uint32 batchOverheadL1Gas;
     uint32 maxPubdataPerBatch;
-    // The amount of L2 gas required to close the batch
     uint32 maxL2GasPerBatch;
-    // The maximal amount of pubdata a priority transaction is allowed to publish
     uint32 priorityTxMaxPubdata;
-    /// @dev The minimal L2 gas price to be used by L1->L2 transactions
     uint64 minimalL2GasPrice;
 }
 

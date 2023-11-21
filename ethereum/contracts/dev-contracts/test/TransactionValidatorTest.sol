@@ -10,7 +10,7 @@ contract TransactionValidatorTest {
         IMailbox.L2CanonicalTransaction memory _transaction,
         uint256 _priorityTxMaxGasLimit,
         uint256 _priorityTxMaxPubdata
-    ) external view {
+    ) external pure {
         TransactionValidator.validateL1ToL2Transaction(_transaction, abi.encode(_transaction), _priorityTxMaxGasLimit, _priorityTxMaxPubdata);
     }
 

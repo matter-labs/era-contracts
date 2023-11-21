@@ -15,6 +15,7 @@ library TransactionValidator {
     /// @param _transaction The transaction to validate
     /// @param _encoded The abi encoded bytes of the transaction
     /// @param _priorityTxMaxGasLimit The max gas limit, generally provided from Storage.sol
+    /// @param _priorityTxMaxPubdata The maximal amount of pubdata that a single L1->L2 transaction can emit
     function validateL1ToL2Transaction(
         IMailbox.L2CanonicalTransaction memory _transaction,
         bytes memory _encoded,

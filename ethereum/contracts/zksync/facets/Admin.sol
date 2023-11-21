@@ -88,6 +88,7 @@ contract AdminFacet is Base, IAdmin {
     }
 
     /// @notice Change the fee params for L1->L2 transactions
+    /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernor() {
         FeeParams memory oldFeeParams = s.feeParams;
         s.feeParams = _newFeeParams;
