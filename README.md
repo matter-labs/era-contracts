@@ -62,7 +62,7 @@ Since scripts, READMEs, etc., are code that is not subject to audits, these are 
 
 ## Testing
 
-The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following command in the root of hte repository:
+The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following command in the root of the repository:
 
 ```
 bash ./scripts/quick-setup.sh
