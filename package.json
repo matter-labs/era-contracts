@@ -48,6 +48,8 @@
     "fmt": "prettier --config prettier.js --write contracts/*.sol contracts/**/*.sol",
     "preprocess": "rm -rf ./bootloader/build && yarn ts-node scripts/process.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
-    "compile-yul": "ts-node scripts/compile-yul.ts"
+    "compile-precompiles": "ts-node scripts/compile-yul.ts compile-precompiles",
+    "compile-bootloader": "ts-node scripts/compile-yul.ts compile-bootloader",
+    "build-yul": "yarn compile-precompiles && yarn preprocess && yarn compile-bootloader"
   }
 }

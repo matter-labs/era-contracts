@@ -22,7 +22,7 @@ jobs:
         run: yarn build
 
       - name: Build yul artifacts
-        run: yarn preprocess && yarn compile-yul
+        run: yarn build-yul
 
       - name: Create cache
         uses: actions/cache/save@v3

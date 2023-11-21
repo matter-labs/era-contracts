@@ -11,15 +11,13 @@ contract KeccakTest {
     bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Just some computation-heavy function, it will be used to test out of gas
-    function infiniteFuction(uint256 n) pure public returns (uint256 sumOfSquares) {
-        for(uint i = 0; i < n; i++) {
+    function infiniteFuction(uint256 n) public pure returns (uint256 sumOfSquares) {
+        for (uint i = 0; i < n; i++) {
             sumOfSquares += i * i;
         }
     }
 
-    function _loadFarCallABIIntoActivePtr(
-        uint256 _gas
-    ) private view {
+    function _loadFarCallABIIntoActivePtr(uint256 _gas) private view {
         uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer(
             uint32(_gas),
             // Only rollup is supported for now
@@ -78,7 +76,7 @@ contract KeccakTest {
     }
 
     function keccakUpgradeTest(
-        bytes calldata eraseCallData, 
+        bytes calldata eraseCallData,
         bytes calldata upgradeCalldata
     ) external returns (bytes32 hash) {
         // Firstly, we reset keccak256 bytecode to be some random bytecode
@@ -111,9 +109,62 @@ contract KeccakTest {
         // Now it should work again
         hash = this.callKeccak(msg.data[0:0]);
         require(hash == EMPTY_STRING_KECCAK, "Keccak should start working again");
-    }   
-    
+    }
+
+    function keccakPerformUpgrade(
+        bytes calldata upgradeCalldata
+    ) external {
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            upgradeCalldata,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
+    }
+
     function callKeccak(bytes calldata _data) external pure returns (bytes32 hash) {
         hash = keccak256(_data);
+    }
+
+    function keccakValidationTest(
+        bytes calldata upgradeCalldata,
+        bytes calldata resetCalldata,
+        bytes[] calldata testInputs,
+        bytes32[] calldata expectedOutputs
+    ) external {
+        require(testInputs.length == expectedOutputs.length, "mismatch between number of inputs and outputs");
+
+        // Firstly, we upgrade keccak256 bytecode to the correct version.
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            upgradeCalldata,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
+
+        bytes32[] memory result = new bytes32[](testInputs.length);
+
+        for (uint256 i = 0; i < testInputs.length; i++) {
+            bytes32 res = this.callKeccak(testInputs[i]);
+            result[i] = res;
+        }
+
+        for (uint256 i = 0; i < result.length; i++) {
+            require(result[i] == expectedOutputs[i], "hash was not calculated correctly");
+        }
+
+        // Upgrading it back to the original version:
+        EfficientCall.mimicCall(
+            gasleft(),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            resetCalldata,
+            FORCE_DEPLOYER,
+            false,
+            false
+        );
     }
 }
