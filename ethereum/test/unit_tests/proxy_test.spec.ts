@@ -83,7 +83,7 @@ describe("Diamond proxy tests", function () {
         l2DefaultAccountBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000,
         initialProtocolVersion: 0,
-        feeParams: defaultFeeParams()
+        feeParams: defaultFeeParams(),
       },
     ]);
 

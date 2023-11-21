@@ -61,7 +61,7 @@ describe("L1ERC20Bridge tests", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
-        feeParams: defaultFeeParams()
+        feeParams: defaultFeeParams(),
       },
     ]);
 

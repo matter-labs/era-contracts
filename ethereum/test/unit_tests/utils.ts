@@ -149,8 +149,8 @@ export function defaultFeeParams(): FeeParams {
     maxPubdataPerBatch: 110_000,
     maxL2GasPerBatch: 80_000_000,
     priorityTxMaxPubdata: 99_000,
-    minimalL2GasPrice: 250_000_000 // 0.25 gwei
-  }
+    minimalL2GasPrice: 250_000_000, // 0.25 gwei
+  };
 }
 
 export interface StoredBatchInfo {
@@ -179,7 +179,7 @@ export interface CommitBatchInfo {
 
 enum PubdataPricingMode {
   Rollup,
-  Validium
+  Validium,
 }
 
 export interface FeeParams {

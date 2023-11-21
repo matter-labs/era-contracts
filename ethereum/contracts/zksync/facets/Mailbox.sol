@@ -167,7 +167,7 @@ contract MailboxFacet is Base, IMailbox {
 
         uint256 pubdataPriceETH;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-           pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
+            pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
         }
 
         uint256 batchOverheadETH = uint256(feeParams.batchOverheadL1Gas) * _l1GasPrice;
@@ -349,7 +349,7 @@ contract MailboxFacet is Base, IMailbox {
 
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
-            transactionEncoding, 
+            transactionEncoding,
             s.priorityTxMaxGasLimit,
             s.feeParams.priorityTxMaxPubdata
         );

@@ -102,7 +102,7 @@ uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
 
-/// @dev The overhead for a transaction slot in L2 gas. 
+/// @dev The overhead for a transaction slot in L2 gas.
 /// It is roughly equal to 80kk/MAX_TRANSACTIONS_PER_BATCH, i.e. how many gas would an L1->L2 transaction
 /// need to pay to compensate for the batch being closed.
 /// @dev It is expected that the L1 contracts will enforce that the L2 gas price will be high enough to compensate

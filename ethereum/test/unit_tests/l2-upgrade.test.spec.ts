@@ -87,7 +87,7 @@ describe("L2 upgrade test", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
-        feeParams: defaultFeeParams()
+        feeParams: defaultFeeParams(),
       },
     ]);
 

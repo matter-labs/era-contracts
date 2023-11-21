@@ -92,7 +92,7 @@ describe("WETH Bridge tests", () => {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
-        feeParams: defaultFeeParams()
+        feeParams: defaultFeeParams(),
       },
     ]);
 

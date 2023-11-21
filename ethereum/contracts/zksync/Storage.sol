@@ -83,7 +83,7 @@ enum PubdataPricingMode {
 /// @param batchOverheadL1Gas The amount of L1 gas required to process the batch (except for the calldata).
 /// @param maxPubdataPerBatch The maximal number of pubdata that can be emitted per batch.
 /// @param priorityTxMaxPubdata The maximal amount of pubdata a priority transaction is allowed to publish.
-/// It can be slightly less than maxPubdataPerBatch in order to have some margin for the bootloader execution. 
+/// It can be slightly less than maxPubdataPerBatch in order to have some margin for the bootloader execution.
 /// @param minimalL2GasPrice The minimal L2 gas price to be used by L1->L2 transactions. It should represent
 /// the price that a single unit of compute costs.
 struct FeeParams {

@@ -22,10 +22,7 @@ library TransactionValidator {
         uint256 _priorityTxMaxGasLimit,
         uint256 _priorityTxMaxPubdata
     ) internal pure {
-        uint256 l2GasForTxBody = getTransactionBodyGasLimit(
-            _transaction.gasLimit,
-            _encoded.length
-        );
+        uint256 l2GasForTxBody = getTransactionBodyGasLimit(_transaction.gasLimit, _encoded.length);
 
         // Ensuring that the transaction is provable
         require(l2GasForTxBody <= _priorityTxMaxGasLimit, "ui");
