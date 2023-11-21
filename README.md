@@ -34,9 +34,7 @@ This repository is used as a submodule of the [zksync-2-dev](https://github.com/
 
 Compile the solidity contracts: `yarn build`
 
-Run the bootloader preprocessor: `yarn preprocess`
-
-Compile the yul contracts: `yarn hardhat run ./scripts/compile-yul.ts`
+Compile the yul contracts: `yarn build-yul`
 
 ## Update Process
 
