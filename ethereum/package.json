@@ -73,7 +73,6 @@
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
     "initialize-weth-bridges": "ts-node scripts/initialize-weth-bridges.ts",
     "initialize-l2-weth-token": "ts-node scripts/initialize-l2-weth-token.ts",
-    "allow-list-manager": "ts-node scripts/allow-list-manager.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
