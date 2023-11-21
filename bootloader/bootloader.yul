@@ -638,6 +638,8 @@ object "Bootloader" {
                     }
             }
 
+            /// @dev The function that is temporarily needed to upgrade the Keccak256 precompile. This function and `ContractDeployer:forceDeployKeccak256`
+            /// are to be removed once the upgrade is complete.
             /// @dev Checks whether the code hash of the Keccak256 precompile contract is correct and updates it if needed.
             /// @dev When we upgrade to the new version of the Keccak256 precompile contract, the keccak precompile will not work correctly 
             /// and so the upgrade it should be done before any `keccak` calls. 
