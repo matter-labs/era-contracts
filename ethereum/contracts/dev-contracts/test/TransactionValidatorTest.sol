@@ -22,4 +22,10 @@ contract TransactionValidatorTest {
     function validateUpgradeTransaction(IMailbox.L2CanonicalTransaction memory _transaction) external pure {
         TransactionValidator.validateUpgradeTransaction(_transaction);
     }
+
+    function getOverheadForTransaction(
+        uint256 _encodingLength
+    ) external pure returns (uint256) {
+        return TransactionValidator.getOverheadForTransaction(_encodingLength);
+    }
 }

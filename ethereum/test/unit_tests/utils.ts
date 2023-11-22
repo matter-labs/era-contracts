@@ -177,7 +177,7 @@ export interface CommitBatchInfo {
   totalL2ToL1Pubdata: BytesLike;
 }
 
-enum PubdataPricingMode {
+export enum PubdataPricingMode {
   Rollup,
   Validium,
 }

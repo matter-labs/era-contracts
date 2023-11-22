@@ -47,6 +47,15 @@ describe("TransactionValidator tests", function () {
         )
       );
       expect(result).equal("uk");
+
+      const result = await getCallRevertReason(
+        tester.validateL1ToL2Transaction(
+          createTestTransaction({}),
+          500000,
+          1
+        )
+      );
+      expect(result).equal("uk");
     });
 
     it("Should revert when transaction gas doesnt pay the minimum costs", async () => {
@@ -60,6 +69,15 @@ describe("TransactionValidator tests", function () {
         )
       );
       expect(result).equal("up");
+    });
+
+    it("Should allow large transactions if the caller is fine with it", async () => {
+      // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically 
+      // allowed in the production system
+      await tester.validateL1ToL2Transaction(createTestTransaction({
+        gasPergasPerPubdataByteLimit: 1,
+        gasLimit: 2_000_000_000,
+      }), 2_000_000_000, 2_000_000_000);
     });
   });
 
@@ -189,6 +207,16 @@ describe("TransactionValidator tests", function () {
       expect(result).equal("um");
     });
   });
+
+  describe("getOverheadForTransaction", function () {
+    it("Should return the correct overhead for a transaction", async () => {
+      // For small lengths, the overhead is for tx slot
+      expect(await tester.getOverheadForTransaction(32)).to.eq(getCorrectOverheadForTransaction(32));
+
+      // For large transaction lengths, the overhead is for the memory
+      expect(await tester.getOverheadForTransaction(1000000)).to.eq(getCorrectOverheadForTransaction(1000000));
+    });
+  });
 });
 
 function createTestTransaction(overrides) {
@@ -213,4 +241,11 @@ function createTestTransaction(overrides) {
     },
     overrides
   );
+}
+
+function getCorrectOverheadForTransaction(len: number) {
+  const MEMORY_BYTE_OVERHEAD = 10;
+  const TX_SLOT_OVERHEAD = 80000;
+
+  return Math.max(len * MEMORY_BYTE_OVERHEAD, TX_SLOT_OVERHEAD);
 }
