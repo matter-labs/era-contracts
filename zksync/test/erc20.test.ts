@@ -114,17 +114,18 @@ describe("ERC20Bridge", function () {
   it("Governance should not be able to skip initializer versions", async () => {
     const erc20TokenWithGovernor = L2StandardERC20Factory.connect(erc20Token.address, governorWallet);
 
-    expect(erc20TokenWithGovernor.reinitializeToken(
-        {
-            ignoreName: false,
-            ignoreSymbol: false,
-            ignoreDecimals: false,
-        },
-        "TestTokenNewNasme",
-        "TTN",
-        12,
-        2
-    )).to.be.revertedWith('v');
+    await expect(erc20TokenWithGovernor.reinitializeToken(
+      {
+          ignoreName: false,
+          ignoreSymbol: false,
+          ignoreDecimals: false,
+      },
+      "TestTokenNewName",
+      "TTN",
+      12,
+      20,
+      { gasLimit: 10000000 }
+  )).to.be.reverted;
   });
 
 

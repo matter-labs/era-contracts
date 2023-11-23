@@ -35,10 +35,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
-    /// @dev The last initialized version. This is neded to prevent governor from accidentally disabling reinitialization for token.
-    /// This variable serves as a mirror to the Initializable._initialized variable, which is private, so can not be accessed directly.
-    uint256 private lastReinitializedVersion;
-
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -111,19 +107,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         string memory _newSymbol,
         uint8 _newDecimals,
         uint8 _version
-    ) external reinitializer(_version) {
-        uint256 previousVersion = lastReinitializedVersion;
-        
-        // In case this variable is not set, the correct value is 1.
-        if (previousVersion == 0) {
-            previousVersion = 1;
-        }
-
-        // The version should be incremented by 1. Otherwise, the governor risks disabling 
-        // future reinitialization of the token by providing too large a version.
-        require(_version == previousVersion + 1, "v");
-
-        previousVersion = _version + 1;
+    ) external onlyNextVersion(_version) reinitializer(_version) {
 
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
@@ -140,6 +124,13 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
     modifier onlyBridge() {
         require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
+        _;
+    }
+
+    modifier onlyNextVersion(uint8 _version) {
+        // The version should be incremented by 1. Otherwise, the governor risks disabling 
+        // future reinitialization of the token by providing too large a version.
+        require(_version == _getInitializedVersion() + 1, "v");
         _;
     }
 
