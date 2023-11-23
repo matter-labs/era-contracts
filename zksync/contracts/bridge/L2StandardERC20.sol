@@ -3,12 +3,15 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
+
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
-contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
+contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade {
     /// @dev Describes whether there is a specific getter in the token.
     /// @notice Used to explicitly separate which getters the token has and which it does not.
     /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
@@ -31,6 +34,10 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
 
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
+
+    /// @dev The last initialized version. This is neded to prevent governor from accidentally disabling reinitialization for token.
+    /// This variable serves as a mirror to the Initializable._initialized variable, which is private, so can not be accessed directly.
+    uint256 private lastReinitializedVersion;
 
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
@@ -98,13 +105,31 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     }
 
     // Method which is to be used by bridge if a token needs to change its name, symbol or decimals.
-    function bridgeReinitialize(
+    function reinitializeToken(
         ERC20Getters calldata _availableGetters,
         string memory _newName,
         string memory _newSymbol,
         uint8 _newDecimals,
         uint8 _version
-    ) external onlyBridge reinitializer(_version) {
+    ) external reinitializer(_version) {
+        uint256 previousVersion = lastReinitializedVersion;
+        
+        // In case this variable is not set, the correct value is 1.
+        if (previousVersion == 0) {
+            previousVersion = 1;
+        }
+
+        // The version should be incremented by 1. Otherwise, the governor risks disabling 
+        // future reinitialization of the token by providing too large a version.
+        require(_version == previousVersion + 1, "v");
+
+        previousVersion = _version + 1;
+
+        // It is expected that this token is deployed as a beacon proxy, so we'll
+        // allow the governor of the beacon to reinitialize the token.
+        address beaconAddress = _getBeacon();
+        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), "tt");
+
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);
         decimals_ = _newDecimals;
