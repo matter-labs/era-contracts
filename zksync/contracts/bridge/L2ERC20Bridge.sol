@@ -50,6 +50,26 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         l2TokenBeacon.transferOwnership(_governor);
     }
 
+    function reinitializeToken(
+        address _l2Token,
+        L2StandardERC20.ERC20Getters calldata _availableGetters,
+        string memory _newName,
+        string memory _newSymbol,
+        uint8 _newDecimals,
+        uint8 _version
+    ) external {
+        // Generally it is expected that the governor of the bridge is the owner of the beacon too.
+        // However, even in case of a system where it would be the case, it is better to allow only the
+        // owner of the beacon to reinitialize the token, since it could do it by other means anyway.
+        require(msg.sender == l2TokenBeacon.owner(), "tt");
+
+        // Double checking that it is indeed a token from this bridge
+        address l1Token = l1TokenAddress[_l2Token];
+        require(l1Token != address(0), "yk");
+
+        L2StandardERC20(_l2Token).bridgeReinitialize(_availableGetters, _newName, _newSymbol, _newDecimals, _version);
+    }
+
     /// @notice Finalize the deposit and mint funds
     /// @param _l1Sender The account address that initiated the deposit on L1
     /// @param _l2Receiver The account address that would receive minted ether

@@ -97,6 +97,22 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
     }
 
+    // Method which is to be used by bridge if a token needs to change its name, symbol or decimals.
+    function bridgeReinitialize(
+        ERC20Getters calldata _availableGetters,
+        string memory _newName,
+        string memory _newSymbol,
+        uint8 _newDecimals,
+        uint8 _version
+    ) external onlyBridge reinitializer(_version) {
+        __ERC20_init_unchained(_newName, _newSymbol);
+        __ERC20Permit_init(_newName);
+        decimals_ = _newDecimals;
+        availableGetters = _availableGetters;
+
+        emit BridgeInitialize(l1Address, _newName, _newSymbol, _newDecimals);
+    }
+
     modifier onlyBridge() {
         require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
         _;
