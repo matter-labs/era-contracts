@@ -108,7 +108,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         uint8 _newDecimals,
         uint8 _version
     ) external onlyNextVersion(_version) reinitializer(_version) {
-
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
@@ -128,7 +127,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     }
 
     modifier onlyNextVersion(uint8 _version) {
-        // The version should be incremented by 1. Otherwise, the governor risks disabling 
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
         require(_version == _getInitializedVersion() + 1, "v");
         _;
