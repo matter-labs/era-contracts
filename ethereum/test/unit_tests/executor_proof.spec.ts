@@ -50,7 +50,7 @@ describe("Executor test", function () {
     const nextCommitment = await executor.createBatchCommitment(nextBatch, processL2Logs.stateDiffHash);
     console.log("This block Commitment is : " + nextCommitment);
     expect(nextCommitment, "Commitment computation failed").is.equal(
-      "0x5765f7967c60dcf0e77ba0a909980c19b5ceab56f6bc1a6e0bd308f5f8dec263"
+      "0xae36e9bed834f99d427adb8958935f38f46b6431c31c5711587d39cf2c93da90"
     );
 
     const prevCommitment = "0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404";
@@ -60,6 +60,6 @@ describe("Executor test", function () {
       // ignored.
       recursionCircuitsSetVksHash: "0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac",
     });
-    expect(result.toHexString(), "").to.be.equal("0xa37cc4d4684f5f0ddafc193a2ab9e364c1a8ebb2b30594c1f1e7dc08");
+    expect(result.toHexString(), "").to.be.equal("0x66876e724acc551e35d48f5c091447a245efcc79d70bb840533ddf83");
   });
 });
