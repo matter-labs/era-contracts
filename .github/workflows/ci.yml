@@ -242,7 +242,6 @@ jobs:
         run: yarn install
 
       - name: Restore L1 artifacts cache
-        working-directory: ethereum
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
