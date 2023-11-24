@@ -211,7 +211,7 @@ jobs:
         run: forge test
 
   test-hardhat-l2:
-    needs: [build-l2, lint-l2]
+    needs: [build-l1, build-l2, lint-l2]
     runs-on: ubuntu-latest
 
     defaults:
@@ -236,6 +236,21 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+
+      - name: Install L1 dependencies
+        working-directory: ethereum
+        run: yarn install
+
+      - name: Restore L1 artifacts cache
+        working-directory: ethereum
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-${{ github.sha }}
+          path: |
+            ethereum/artifacts
+            ethereum/cache
+            ethereum/typechain
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
