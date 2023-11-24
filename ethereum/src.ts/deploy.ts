@@ -11,6 +11,7 @@ import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import type { DeployedAddresses } from "../scripts/utils";
 import {
   readSystemContractsBytecode,
   hashL2Bytecode,
@@ -19,7 +20,6 @@ import {
   getNumberFromEnv,
   readBatchBootloaderBytecode,
   getTokens,
-  DeployedAddresses,
   deployedAddressesFromEnv,
 } from "../scripts/utils";
 import { deployViaCreate2 } from "./deploy-utils";
