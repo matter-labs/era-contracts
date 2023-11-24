@@ -5,8 +5,8 @@ import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import { unapplyL1ToL2Alias } from "../src/utils";
-import type { L2ERC20Bridge, L2StandardERC20 } from "../typechain";
 import { L2ERC20BridgeFactory, L2StandardERC20Factory } from "../typechain";
+import type { L2ERC20Bridge, L2StandardERC20 } from "../typechain";
 
 const richAccount = [
   {
