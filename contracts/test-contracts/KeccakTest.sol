@@ -111,9 +111,7 @@ contract KeccakTest {
         require(hash == EMPTY_STRING_KECCAK, "Keccak should start working again");
     }
 
-    function keccakPerformUpgrade(
-        bytes calldata upgradeCalldata
-    ) external {
+    function keccakPerformUpgrade(bytes calldata upgradeCalldata) external {
         EfficientCall.mimicCall(
             gasleft(),
             address(DEPLOYER_SYSTEM_CONTRACT),

@@ -88,26 +88,22 @@ class CompilerPaths {
 }
 
 async function main() {
-    const program = new Command();
+  const program = new Command();
 
-    program.version('0.1.0').name('compile yul').description('publish preimages for the L2 contracts');
- 
-    program
-        .command('compile-bootloader')
-        .action(async () => {
-            await compileYulFolder('bootloader/build');
-            await compileYulFolder('bootloader/tests');
-        });
+  program.version("0.1.0").name("compile yul").description("publish preimages for the L2 contracts");
 
-    program
-        .command('compile-precompiles')
-        .action(async () => {
-            await compileYulFolder('contracts');
-            await compileYulFolder('contracts/precompiles');
-            await compileYulFolder('contracts/precompiles/test-contracts');
-        });
+  program.command("compile-bootloader").action(async () => {
+    await compileYulFolder("bootloader/build");
+    await compileYulFolder("bootloader/tests");
+  });
 
-    await program.parseAsync(process.argv);
+  program.command("compile-precompiles").action(async () => {
+    await compileYulFolder("contracts");
+    await compileYulFolder("contracts/precompiles");
+    await compileYulFolder("contracts/precompiles/test-contracts");
+  });
+
+  await program.parseAsync(process.argv);
 }
 
 main()

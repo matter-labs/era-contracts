@@ -42,64 +42,67 @@ function getPaddedSelector(contractName: string, method: string): string {
 }
 
 function getKeccak256ExpectedHash() {
-    const bytecode = readFileSync('contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin');
-    return ethers.utils.hexlify(utils.hashBytecode(bytecode));
+  const bytecode = readFileSync("contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin");
+  return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
 
 // Maybe in the future some of these params will be passed
 // in a JSON file. For now, a simple object is ok here.
 const params = {
-    MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector('KnownCodesStorage', 'markFactoryDeps'),
-    VALIDATE_TX_SELECTOR: getSelector('IAccount', 'validateTransaction'),
-    EXECUTE_TX_SELECTOR: getSelector('DefaultAccount', 'executeTransaction'),
-    RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector('ContractDeployer', 'extendedAccountVersion'),
-    RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector('AccountCodeStorage', 'getRawCodeHash'),
-    PAY_FOR_TX_SELECTOR: getSelector('DefaultAccount', 'payForTransaction'),
-    PRE_PAYMASTER_SELECTOR: getSelector('DefaultAccount', 'prepareForPaymaster'),
-    VALIDATE_AND_PAY_PAYMASTER: getSelector('IPaymaster', 'validateAndPayForPaymasterTransaction'),
-    // It doesn't used directly now but is important to keep the way to regenerate it when needed
-    TX_UTILITIES: getTransactionUtils(),
-    RIGHT_PADDED_POST_TRANSACTION_SELECTOR: getPaddedSelector('IPaymaster', 'postTransaction'),
-    RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector('SystemContext', 'setTxOrigin'),
-    RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector('SystemContext', 'setGasPrice'),
-    RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'incrementTxNumberInBatch'),
-    RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'resetTxNumberInBatch'),
-    RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector('L1Messenger', 'sendL2ToL1Log'),
-    PUBLISH_PUBDATA_SELECTOR: getSelector('L1Messenger', 'publishPubdataAndClearState'),
-    RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector('SystemContext', 'setNewBatch'),
-    RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector('SystemContext', 'unsafeOverrideBatch'),
-    // Error
-    REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
-    RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector('INonceHolder', 'validateNonceUsage'),
-    RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector('L2EthToken', 'mint'),
-    GET_TX_HASHES_SELECTOR: getSelector('BootloaderUtilities', 'getTransactionHashes'),
-    CREATE_SELECTOR: getSelector('ContractDeployer', 'create'),
-    CREATE2_SELECTOR: getSelector('ContractDeployer', 'create2'),
-    CREATE_ACCOUNT_SELECTOR: getSelector('ContractDeployer', 'createAccount'),
-    CREATE2_ACCOUNT_SELECTOR: getSelector('ContractDeployer', 'create2Account'),
-    PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector('L2EthToken', 'transferFromTo'),
-    SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector('IAccount', 'validateTransaction'),
-    SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector('IPaymaster', 'validateAndPayForPaymasterTransaction'),
-    PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector('Compressor', 'publishCompressedBytecode'),
-    GET_MARKER_PADDED_SELECTOR: getPaddedSelector('KnownCodesStorage', 'getMarker'),
-    RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'setL2Block'),
-    RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector('SystemContext', 'appendTransactionToCurrentL2Block'),
-    RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector('SystemContext', 'publishTimestampDataToL1'),
-    COMPRESSED_BYTECODES_SLOTS: 32768,
-    ENSURE_RETURNED_MAGIC: 1,
-    FORBID_ZERO_GAS_PER_PUBDATA: 1,
-    KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
-    PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR: getPaddedSelector('ContractDeployer', 'forceDeployKeccak256'),
-    // One of "worst case" scenarios for the number of state diffs in a batch is when 120kb of pubdata is spent 
-    // on repeated writes, that are all zeroed out. In this case, the number of diffs is 120k / 5 = 24k. This means that they will have
-    // accoomdate 6528000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with 
-    // roughly 6650000 bytes needed for calldata. 207813 slots are needed to accomodate this amount of data.
-    // We round up to 208000 slots just in case.
-    //
-    // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the 
-    // operator to ensure that it can form the correct calldata for the L1Messenger.
-    OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 208000,
-    ...SYSTEM_PARAMS
+  MARK_BATCH_AS_REPUBLISHED_SELECTOR: getSelector("KnownCodesStorage", "markFactoryDeps"),
+  VALIDATE_TX_SELECTOR: getSelector("IAccount", "validateTransaction"),
+  EXECUTE_TX_SELECTOR: getSelector("DefaultAccount", "executeTransaction"),
+  RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),
+  RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "getRawCodeHash"),
+  PAY_FOR_TX_SELECTOR: getSelector("DefaultAccount", "payForTransaction"),
+  PRE_PAYMASTER_SELECTOR: getSelector("DefaultAccount", "prepareForPaymaster"),
+  VALIDATE_AND_PAY_PAYMASTER: getSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
+  // It doesn't used directly now but is important to keep the way to regenerate it when needed
+  TX_UTILITIES: getTransactionUtils(),
+  RIGHT_PADDED_POST_TRANSACTION_SELECTOR: getPaddedSelector("IPaymaster", "postTransaction"),
+  RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector("SystemContext", "setTxOrigin"),
+  RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector("SystemContext", "setGasPrice"),
+  RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "incrementTxNumberInBatch"),
+  RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "resetTxNumberInBatch"),
+  RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
+  PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
+  RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
+  RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
+  // Error
+  REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
+  RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
+  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2EthToken", "mint"),
+  GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
+  CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
+  CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
+  CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
+  CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
+  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2EthToken", "transferFromTo"),
+  SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector("IAccount", "validateTransaction"),
+  SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
+  PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
+  GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
+  RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
+    "SystemContext",
+    "appendTransactionToCurrentL2Block"
+  ),
+  RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
+  COMPRESSED_BYTECODES_SLOTS: 32768,
+  ENSURE_RETURNED_MAGIC: 1,
+  FORBID_ZERO_GAS_PER_PUBDATA: 1,
+  KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
+  PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployKeccak256"),
+  // One of "worst case" scenarios for the number of state diffs in a batch is when 120kb of pubdata is spent
+  // on repeated writes, that are all zeroed out. In this case, the number of diffs is 120k / 5 = 24k. This means that they will have
+  // accoomdate 6528000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with
+  // roughly 6650000 bytes needed for calldata. 207813 slots are needed to accomodate this amount of data.
+  // We round up to 208000 slots just in case.
+  //
+  // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
+  // operator to ensure that it can form the correct calldata for the L1Messenger.
+  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 208000,
+  ...SYSTEM_PARAMS,
 };
 
 function extractTestFunctionNames(sourceCode: string): string[] {
