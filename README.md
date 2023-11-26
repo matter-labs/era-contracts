@@ -74,6 +74,16 @@ Since scripts, READMEs, etc., are code that is not subject to audits, these are 
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
 
+## Testing
+
+The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following command in the root of the repository:
+
+```
+bash ./scripts/quick-setup.sh
+```
+
+The `quick-setup.sh` script will proceeed to install all the necessary dependencies and will run the tests.
+
 ## License
 
 The zkSync Era system-contracts are distributed under the terms of the MIT license.

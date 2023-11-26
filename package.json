@@ -56,7 +56,9 @@
   "scripts": {
     "build": "yarn build:sol && yarn build:yul",
     "build:sol": "hardhat compile",
-    "build:yul": "yarn preprocess:yul && yarn compile-yul",
+    "build:precompiles": "ts-node scripts/compile-yul.ts compile-precompiles",
+    "build:bootloader": "ts-node scripts/compile-yul.ts compile-bootloader",
+    "build:yul": "yarn build:precompiles && yarn preprocess:yul && yarn build:bootloader",
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "clean": "yarn clean:sol && yarn clean:yul",

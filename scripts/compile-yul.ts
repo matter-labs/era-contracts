@@ -5,6 +5,7 @@ import { spawn as _spawn } from "child_process";
 import * as fs from "fs";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
 import path from "path";
+import { Command } from "commander";
 
 const COMPILER_VERSION = "1.3.14";
 const IS_COMPILER_PRE_RELEASE = false;
@@ -87,10 +88,22 @@ class CompilerPaths {
 }
 
 async function main() {
-  await compileYulFolder("contracts");
-  await compileYulFolder("contracts/precompiles");
-  await compileYulFolder("bootloader/build");
-  await compileYulFolder("bootloader/tests");
+  const program = new Command();
+
+  program.version("0.1.0").name("compile yul").description("publish preimages for the L2 contracts");
+
+  program.command("compile-bootloader").action(async () => {
+    await compileYulFolder("bootloader/build");
+    await compileYulFolder("bootloader/tests");
+  });
+
+  program.command("compile-precompiles").action(async () => {
+    await compileYulFolder("contracts");
+    await compileYulFolder("contracts/precompiles");
+    await compileYulFolder("contracts/precompiles/test-contracts");
+  });
+
+  await program.parseAsync(process.argv);
 }
 
 main()
