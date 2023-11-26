@@ -459,7 +459,12 @@ contract ExecutorFacet is Base, IExecutor {
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash
+                _batch.eventsQueueStateHash,
+                // The following will be commitments to the EIP4844 blobs once they are supported on L1.
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0)
             );
     }
 
