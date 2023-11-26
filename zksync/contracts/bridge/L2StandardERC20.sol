@@ -113,13 +113,13 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         uint8 _version
     ) external reinitializer(_version) {
         uint256 previousVersion = lastReinitializedVersion;
-        
+
         // In case this variable is not set, the correct value is 1.
         if (previousVersion == 0) {
             previousVersion = 1;
         }
 
-        // The version should be incremented by 1. Otherwise, the governor risks disabling 
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
         require(_version == previousVersion + 1, "v");
 
