@@ -3,12 +3,15 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
+
 import "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
-contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
+contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade {
     /// @dev Describes whether there is a specific getter in the token.
     /// @notice Used to explicitly separate which getters the token has and which it does not.
     /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
@@ -97,8 +100,36 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
     }
 
+    // Method which is to be used by bridge if a token needs to change its name, symbol or decimals.
+    function reinitializeToken(
+        ERC20Getters calldata _availableGetters,
+        string memory _newName,
+        string memory _newSymbol,
+        uint8 _newDecimals,
+        uint8 _version
+    ) external onlyNextVersion(_version) reinitializer(_version) {
+        // It is expected that this token is deployed as a beacon proxy, so we'll
+        // allow the governor of the beacon to reinitialize the token.
+        address beaconAddress = _getBeacon();
+        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), "tt");
+
+        __ERC20_init_unchained(_newName, _newSymbol);
+        __ERC20Permit_init(_newName);
+        decimals_ = _newDecimals;
+        availableGetters = _availableGetters;
+
+        emit BridgeInitialize(l1Address, _newName, _newSymbol, _newDecimals);
+    }
+
     modifier onlyBridge() {
         require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
+        _;
+    }
+
+    modifier onlyNextVersion(uint8 _version) {
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
+        // future reinitialization of the token by providing too large a version.
+        require(_version == _getInitializedVersion() + 1, "v");
         _;
     }
 

@@ -151,3 +151,51 @@ export function getTokens(network: string): L1Token[] {
     })
   );
 }
+
+export interface DeployedAddresses {
+  ZkSync: {
+    MailboxFacet: string;
+    AdminFacet: string;
+    ExecutorFacet: string;
+    GettersFacet: string;
+    Verifier: string;
+    DiamondInit: string;
+    DiamondUpgradeInit: string;
+    DefaultUpgrade: string;
+    DiamondProxy: string;
+  };
+  Bridges: {
+    ERC20BridgeImplementation: string;
+    ERC20BridgeProxy: string;
+    WethBridgeImplementation: string;
+    WethBridgeProxy: string;
+  };
+  Governance: string;
+  ValidatorTimeLock: string;
+  Create2Factory: string;
+}
+
+export function deployedAddressesFromEnv(): DeployedAddresses {
+  return {
+    ZkSync: {
+      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
+      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
+      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
+      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
+      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
+      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
+      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
+      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
+      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
+    },
+    Bridges: {
+      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
+      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
+      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
+      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
+    },
+    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
+    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+  };
+}
