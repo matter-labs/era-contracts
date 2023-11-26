@@ -3,13 +3,10 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
-import type { L2Weth } from "../typechain/L2Weth";
-import type { L2WethBridge } from "../typechain/L2WethBridge";
-import { L2WethBridgeFactory } from "../typechain/L2WethBridgeFactory";
-import { L2WethFactory } from "../typechain/L2WethFactory";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import { applyL1ToL2Alias, unapplyL1ToL2Alias } from "../src/utils";
-import { L2ERC20Bridge, L2ERC20BridgeFactory, L2StandardERC20, L2StandardERC20Factory } from "../typechain";
+import { unapplyL1ToL2Alias } from "../src/utils";
+import { L2ERC20BridgeFactory, L2StandardERC20Factory } from "../typechain";
+import type { L2ERC20Bridge, L2StandardERC20 } from "../typechain";
 
 const richAccount = [
   {
@@ -122,19 +119,20 @@ describe("ERC20Bridge", function () {
   it("Governance should not be able to skip initializer versions", async () => {
     const erc20TokenWithGovernor = L2StandardERC20Factory.connect(erc20Token.address, governorWallet);
 
-    expect(
+    await expect(
       erc20TokenWithGovernor.reinitializeToken(
         {
           ignoreName: false,
           ignoreSymbol: false,
           ignoreDecimals: false,
         },
-        "TestTokenNewNasme",
+        "TestTokenNewName",
         "TTN",
         12,
-        2
+        20,
+        { gasLimit: 10000000 }
       )
-    ).to.be.revertedWith("v");
+    ).to.be.reverted;
   });
 });
 

@@ -1,7 +1,7 @@
 import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
-import { deployedAddressesFromEnv } from "../../ethereum/src.ts/deploy";
+import { deployedAddressesFromEnv } from "../../ethereum/scripts/utils";
 import { IZkSyncFactory } from "../../ethereum/typechain/IZkSyncFactory";
 
 import type { BytesLike, Wallet } from "ethers";
