@@ -10,7 +10,7 @@
     "ethers": "^5.7.0",
     "hardhat": "=2.16.0",
     "preprocess": "^3.2.0",
-    "zksync-web3": "^0.14.3"
+    "zksync-web3": "file:../../../zksync2-js"
   },
   "devDependencies": {
     "@matterlabs/eslint-config-typescript": "^1.1.2",

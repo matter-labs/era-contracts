@@ -120,7 +120,8 @@ contract L2EthToken is IEthToken, ISystemContract {
         address _sender,
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
-        return abi.encodePacked(IBridgehubMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+        return
+            abi.encodePacked(IBridgehubMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 
     /// @dev This method has not been stabilized and might be
