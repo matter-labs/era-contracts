@@ -4,7 +4,7 @@ import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 
-import { IBridgehub } from "../../typechain/IBridgehub";
+import { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
 import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from "../../typechain";
 import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
 import { hashL2Bytecode } from "../../scripts/utils";
@@ -26,7 +26,7 @@ const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../../SystemConfig.json").
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 export async function create2DeployFromL1(
-  bridgehub: IBridgehub,
+  bridgehub: IBridgehubMailbox,
   chainId: ethers.BigNumberish,
   walletAddress: Address,
   bytecode: ethers.BytesLike,
@@ -99,9 +99,6 @@ describe("WETH Bridge tests", () => {
       await hardhat.ethers.getContractFactory("L1WethBridge")
     ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployer.addresses.AllowList);
 
-    // we don't test L2, so it is ok to give garbage factory deps and L2 address
-    const garbageBytecode = "0x1111111111111111111111111111111111111111111111111111111111111111";
-    const garbageAddress = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
 
     const _bridgeProxy = await (await hardhat.ethers.getContractFactory("ERC1967Proxy")).deploy(bridge.address, "0x");
 

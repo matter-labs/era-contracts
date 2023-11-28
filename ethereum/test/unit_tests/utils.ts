@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish, BytesLike, ethers, Wallet } from "ethers";
+import { BigNumber, BigNumberish, BytesLike, ethers, Wallet} from "ethers";
 import { Address } from "zksync-web3/build/src/types";
 import { FacetCut } from "../../src.ts/diamondCut";
 
@@ -179,7 +179,39 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
   ]);
 }
 
-export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish) {
+export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish, previousBatchHash?: BytesLike) {
+  return [
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_TO_L1_MESSENGER,
+      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
+      `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
+    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, previousBatchHash? ethers.utils.hexlify(previousBatchHash): ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY,
+      chainedPriorityTxHashKey ? chainedPriorityTxHashKey.toString() : EMPTY_STRING_KECCAK
+    ),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
+      numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
+    ),
+  ];
+}
+
+export function createSystemLogsWithUpgrade(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish, upgradeTxHash?: string) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
     constructL2Log(
@@ -207,6 +239,12 @@ export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfL
       L2_BOOTLOADER_ADDRESS,
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      L2_BOOTLOADER_ADDRESS,
+      SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
+      upgradeTxHash
     ),
   ];
 }
@@ -261,6 +299,7 @@ export async function initialDeployment(
   // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
   // nonce++;
 
+  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
   process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
   process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
   process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = zeroHash;

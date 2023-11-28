@@ -11,10 +11,13 @@ import {
   TestnetERC20TokenFactory,
   BridgehubMailboxFacet,
   BridgehubMailboxFacetFactory,
+  MailboxFacet,
+  MailboxFacetFactory,
 } from "../../typechain";
 import { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
+import { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -31,10 +34,12 @@ describe(`L1ERC20Bridge tests`, function () {
   let testnetERC20TokenContract: ethers.Contract;
   let l1Erc20BridgeContract: ethers.Contract;
   let bridgehubMailboxFacet: BridgehubMailboxFacet;
-  let chainId = 0;
+  let chainId = "0";
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
+
+    const gasPrice = await owner.provider.getGasPrice();
 
     const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
@@ -57,7 +62,7 @@ describe(`L1ERC20Bridge tests`, function () {
 
     let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
-    chainId = deployer.chainId;
+    chainId = deployer.chainId.toString();
     allowList = deployer.l1AllowList(deployWallet);
 
     bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(
@@ -202,7 +207,8 @@ describe(`L1ERC20Bridge tests`, function () {
 
 async function depositERC20(
   bridge: IL1Bridge,
-  zksyncContract: IZkSync,
+  zksyncContract: IBridgehubMailbox,
+  chainId: string,
   l2Receiver: string,
   l1Token: string,
   amount: ethers.BigNumber,
@@ -211,9 +217,10 @@ async function depositERC20(
 ) {
   const gasPrice = await bridge.provider.getGasPrice();
   const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-  const neededValue = await zksyncContract.l2TransactionBaseCost(gasPrice, l2GasLimit, gasPerPubdata);
+  const neededValue = await zksyncContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
 
   await bridge.deposit(
+    chainId,
     l2Receiver,
     l1Token,
     amount,
