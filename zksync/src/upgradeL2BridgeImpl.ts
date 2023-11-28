@@ -97,8 +97,8 @@ async function getL1TxInfo(
 
 async function getTransparentProxyUpgradeTxInfo(
   deployer: Deployer,
-  proxyAddress: string,
   target: string,
+  proxyAddress: string,
   refundRecipient: string,
   gasPrice: BigNumber
 ) {
