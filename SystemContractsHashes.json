@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/cache-zk/solpp-generated-contracts/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "cache-zk/solpp-generated-contracts/ContractDeployer.sol",
-    "bytecodeHash": "0x010006091341955c8f76409de00549fb00b275166b5a0d0d7b82cbd629bb4212",
-    "sourceCodeHash": "0x660e9a188006f9e6086214f8aefa7bc9dc434ce6ff220bfec98327c42953dda4"
+    "bytecodeHash": "0x0100060979b132ab8099217a507b897f5fb6d553a59c904c8804155c7f5df0d9",
+    "sourceCodeHash": "0xb014c683908ffe22c519249915622e551229429c441e845ebf3f30ac4dfd69a2"
   },
   {
     "contractName": "DefaultAccount",
@@ -129,8 +129,8 @@
     "contractName": "Keccak256",
     "bytecodePath": "contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin",
     "sourceCodePath": "contracts/precompiles/Keccak256.yul",
-    "bytecodeHash": "0x0100001fb52ca33668d01c230a1c3b13ede90fe2e37d77222410e9f183cb7a89",
-    "sourceCodeHash": "0x6415e127a4e07907fb87d0cbdf480fff8c70326c4f2f670af0cf3248862e4df4"
+    "bytecodeHash": "0x0100000ff07e0447e5fc9b78f38f23439c2c6fcabe123a88d9822b60cb469fb2",
+    "sourceCodeHash": "0x6984ae0b234765ce272a30beee73323bde70df5f0d0584bb87ef723b2c6bb0cc"
   },
   {
     "contractName": "SHA256",
@@ -143,35 +143,35 @@
     "contractName": "bootloader_test",
     "bytecodePath": "bootloader/build/artifacts/bootloader_test.yul/bootloader_test.yul.zbin",
     "sourceCodePath": "bootloader/build/bootloader_test.yul",
-    "bytecodeHash": "0x0100038548508a2a29b0c6e8a86fc0ec5c512baf563155e8171afd1a060c81fa",
-    "sourceCodeHash": "0x8a2f1171cb02b1500e75e607a7a16ea8782b54800fb3396d0aea241117539265"
+    "bytecodeHash": "0x01000387a79b481d237d79d556fc67a39ebc3a568519722795bfbd9abb2ffdab",
+    "sourceCodeHash": "0x54e88df0f5fc2270bddfad0ded0b3d8176330cc9f26611c877fadf923c4a92f2"
   },
   {
     "contractName": "fee_estimate",
     "bytecodePath": "bootloader/build/artifacts/fee_estimate.yul/fee_estimate.yul.zbin",
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
-    "bytecodeHash": "0x01000989a967ab5b446c084adf05e13399a24e5cf37e9cf7db05a5dd6d7c5e0b",
-    "sourceCodeHash": "0xf8d6ef018c46d562d4473628c4b13af322320a4c24015c884083bf5654ce7408"
+    "bytecodeHash": "0x0100098d0cc21dc89ddcdcb4099848bdc5c9a5062211c23c52297a64c6e0a835",
+    "sourceCodeHash": "0xb788c7d357a1a49d943ae73ec07646d40d0a89794fa455466cbf57c226212fad"
   },
   {
     "contractName": "gas_test",
     "bytecodePath": "bootloader/build/artifacts/gas_test.yul/gas_test.yul.zbin",
     "sourceCodePath": "bootloader/build/gas_test.yul",
-    "bytecodeHash": "0x0100096912f983649836f812c6db81c814cc0a5ff24b80ecffbf79ca01e7946c",
-    "sourceCodeHash": "0xc130da5db5af59763a518394dddf96358664eef53b11260d4c4f86ae967c454d"
+    "bytecodeHash": "0x0100096f71bd6415bba3ff20d90f72ea413146ad15696d9ee4a893eae071fc7f",
+    "sourceCodeHash": "0x18036e240b01c6323e24d877c5e3881e8aa018a8d6849537a508fab396cf05cd"
   },
   {
     "contractName": "playground_batch",
     "bytecodePath": "bootloader/build/artifacts/playground_batch.yul/playground_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x0100099308cc5367de190e240aa355df7d0cfacb6a752726bad8f3100044629f",
-    "sourceCodeHash": "0x7fd1d118ecb97b79a2bb9d66e132638344d6ad333486f8ee520455679ae5aaaa"
+    "bytecodeHash": "0x01000999b9b17ebf060b49c79a2d54db2806ae66841333b851ac32fcfd34acdc",
+    "sourceCodeHash": "0xe97177eab3cb932eed5279fa19f1e1d1d9e003208cb21a73b82ccff2fcb40a11"
   },
   {
     "contractName": "proved_batch",
     "bytecodePath": "bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/proved_batch.yul",
-    "bytecodeHash": "0x01000983d4ac4f797cf5c077e022f72284969b13248c2a8e9846f574bdeb5b88",
-    "sourceCodeHash": "0x444b9dad3a29511c5a80d6f50e1ccf4500031452d2ef3edb4f63593b7070a24d"
+    "bytecodeHash": "0x01000989939be72b6adff6864ccbc9ad7f8b2738552ab823fc945a5587c04197",
+    "sourceCodeHash": "0x28826c1f6af835ff6fcd8c1a66757dfd997ab37436c081c470cf5674a7580b58"
   }
 ]
