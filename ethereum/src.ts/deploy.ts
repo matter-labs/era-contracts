@@ -338,32 +338,50 @@ export class Deployer {
     this.addresses.StateTransition.StateTransitionImplementation = contractAddress;
   }
 
+  public async deployStateTransitionAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("ProxyAdmin", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADMIN_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.StateTransitionProxyAdmin = contractAddress;
+  }
+
   public async deployStateTransitionProxy(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     extraFacets?: FacetCut[]
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-
-    const genesisBlockHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
+    const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
-    const genesisBlockCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
+    const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
     const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
+
+    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("StateTransition").abi);
+
+    const initCalldata = stateTransition.encodeFunctionData("initialize", [
+      {
+        bridgehub: this.addresses.Bridgehub.BridgehubDiamondProxy,
+        governor: this.ownerAddress,
+        diamondInit: this.addresses.StateTransition.DiamondInit,
+        genesisBatchHash,
+        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+        genesisBatchCommitment,
+        diamondCut,
+        protocolVersion,
+      },
+    ]);
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
       [
-        {
-          bridgehub: this.addresses.Bridgehub.BridgehubDiamondProxy,
-          governor: this.ownerAddress,
-          diamondInit: this.addresses.StateTransition.DiamondInit,
-          genesisBatchHash: genesisBlockHash,
-          genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
-          genesisBatchCommitment: genesisBlockCommitment,
-          diamondCut,
-          protocolVersion,
-        },
+        this.addresses.StateTransition.StateTransitionImplementation,
+        this.addresses.StateTransition.StateTransitionProxyAdmin,
+        initCalldata,
       ],
       create2Salt,
       ethTxOptions
@@ -479,7 +497,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.StateTransition.DiamondProxy, this.addresses.AllowList],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubDiamondProxy, this.addresses.AllowList],
       create2Salt,
       ethTxOptions
     );
@@ -515,7 +533,7 @@ export class Deployer {
     const contractAddress = await this.deployViaCreate2("DiamondInit", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_STATE_TRANSITION_DIAMOND_INIT_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_DIAMOND_INIT_ADDR=${contractAddress}`);
     }
 
     this.addresses.StateTransition.DiamondInit = contractAddress;
@@ -598,12 +616,14 @@ export class Deployer {
   ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployStateTransitionDiamond(create2Salt, gasPrice, nonce);
+    await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
+    await this.deployStateTransitionImplementation(create2Salt, { gasPrice });
+    await this.deployStateTransitionAdmin(create2Salt, { gasPrice });
     await this.deployStateTransitionProxy(create2Salt, { gasPrice }, extraFacets);
     await this.registerStateTransition();
   }
 
-  public async deployStateTransitionDiamond(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     await this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce });

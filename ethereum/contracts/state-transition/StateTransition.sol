@@ -6,7 +6,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 import "../common/DiamondProxy.sol";
-import {ProofInitializeData} from "./state-transition-interfaces/IStateTransitionDiamondInit.sol";
+import {StateTransitionInitializeData} from "./state-transition-interfaces/IStateTransitionDiamondInit.sol";
 import {IStateTransition} from "./state-transition-interfaces/IStateTransition.sol";
 import "./state-transition-deps/StateTransitionBase.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
@@ -19,7 +19,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     using UncheckedMath for uint256;
 
     /// initialize
-    function initialize(ProofInitializeData calldata _initializeData) external reentrancyGuardInitializer {
+    function initialize(StateTransitionInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         require(_initializeData.governor != address(0), "vy");
 
         stateTransitionStorage.bridgehub = _initializeData.bridgehub;
@@ -53,12 +53,51 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         return stateTransitionStorage.governor;
     }
 
+    /// @return The address of the current governor
+    function getPendingGovernor() external view returns (address) {
+        return stateTransitionStorage.pendingGovernor;
+    }
+
     function getBridgehub() external view returns (address) {
         return stateTransitionStorage.bridgehub;
     }
 
+    /// @return The address of the current governor
+    function getTotalChains() external view returns (uint256) {
+        return stateTransitionStorage.totalChains;
+    }
+
+    function getChainNumberToContract(uint256 _chainNumber) external view returns (address) {
+        return stateTransitionStorage.stateTransitionChainContract[_chainNumber];
+    }
+
     function getStateTransitionChainContract(uint256 _chainId) external view returns (address) {
         return stateTransitionStorage.stateTransitionChainContract[_chainId];
+    }
+
+    /// @return The address of the current governor
+    function getStoredBatchZero() external view returns (bytes32) {
+        return stateTransitionStorage.storedBatchZero;
+    }
+
+    /// @return The address of the current governor
+    function getCutHash() external view returns (bytes32) {
+        return stateTransitionStorage.cutHash;
+    }
+
+    /// @return The address of the current governor
+    function getDiamondInit() external view returns (address) {
+        return stateTransitionStorage.diamondInit;
+    }
+
+    /// @return The address of the current governor
+    function getUpgradeCutHash(uint256 _protocolVersion) external view returns (bytes32) {
+        return stateTransitionStorage.upgradeCutHash[_protocolVersion];
+    }
+
+    /// @return The address of the current governor
+    function getProtocolVersion() external view returns (uint256) {
+        return stateTransitionStorage.protocolVersion;
     }
 
     /// registry

@@ -103,6 +103,6 @@
     "solhint-plugin-prettier": "^0.0.5"
   },
   "optionalDependencies": {
-    "zksync-web3": "^0.14.3"
+    "zksync-web3": "file:../../../zksync2-js"
   }
 }
