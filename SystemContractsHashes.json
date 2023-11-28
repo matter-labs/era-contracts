@@ -31,8 +31,8 @@
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/cache-zk/solpp-generated-contracts/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "cache-zk/solpp-generated-contracts/ContractDeployer.sol",
-    "bytecodeHash": "0x010006091341955c8f76409de00549fb00b275166b5a0d0d7b82cbd629bb4212",
-    "sourceCodeHash": "0x660e9a188006f9e6086214f8aefa7bc9dc434ce6ff220bfec98327c42953dda4"
+    "bytecodeHash": "0x0100060979b132ab8099217a507b897f5fb6d553a59c904c8804155c7f5df0d9",
+    "sourceCodeHash": "0xb014c683908ffe22c519249915622e551229429c441e845ebf3f30ac4dfd69a2"
   },
   {
     "contractName": "DefaultAccount",
@@ -129,8 +129,8 @@
     "contractName": "Keccak256",
     "bytecodePath": "contracts/precompiles/artifacts/Keccak256.yul/Keccak256.yul.zbin",
     "sourceCodePath": "contracts/precompiles/Keccak256.yul",
-    "bytecodeHash": "0x0100001fb52ca33668d01c230a1c3b13ede90fe2e37d77222410e9f183cb7a89",
-    "sourceCodeHash": "0x6415e127a4e07907fb87d0cbdf480fff8c70326c4f2f670af0cf3248862e4df4"
+    "bytecodeHash": "0x0100000ff07e0447e5fc9b78f38f23439c2c6fcabe123a88d9822b60cb469fb2",
+    "sourceCodeHash": "0x6984ae0b234765ce272a30beee73323bde70df5f0d0584bb87ef723b2c6bb0cc"
   },
   {
     "contractName": "SHA256",
@@ -143,35 +143,35 @@
     "contractName": "bootloader_test",
     "bytecodePath": "bootloader/build/artifacts/bootloader_test.yul/bootloader_test.yul.zbin",
     "sourceCodePath": "bootloader/build/bootloader_test.yul",
-    "bytecodeHash": "0x0100038565d307509535f5857460173abfee8953c6797da1ebe641c3c8c77919",
-    "sourceCodeHash": "0xbf0a19c4484b310dc93a7e302d609ddbe0ea97a05bcb13fb51b1fd472a2231e4"
+    "bytecodeHash": "0x010003871d9dbf8cdc9c25d97d725dca2bbd658c551628fbe77458cf64626b63",
+    "sourceCodeHash": "0x5b2cb43a2a83ba657187efb7377ff8858ba9a51485c421b3055f511169cd1a65"
   },
   {
     "contractName": "fee_estimate",
     "bytecodePath": "bootloader/build/artifacts/fee_estimate.yul/fee_estimate.yul.zbin",
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
-    "bytecodeHash": "0x010009093c1b6ae32a78c2c9621866c92a78e7cce4fbe9ff476da7bd40cf253d",
-    "sourceCodeHash": "0xe08a1d1863a5a0bb210519a30cfaad07224b617c6cc393814d968e408d8a2fb8"
+    "bytecodeHash": "0x0100092d7d402dca4a77c8e5f47c143e5779ee7edc25c2cbe0e1abff183d5833",
+    "sourceCodeHash": "0xc03a9aabafce234d655e622cff7b9736b61a1d08862b7a0e5afd30cffc222bb1"
   },
   {
     "contractName": "gas_test",
     "bytecodePath": "bootloader/build/artifacts/gas_test.yul/gas_test.yul.zbin",
     "sourceCodePath": "bootloader/build/gas_test.yul",
-    "bytecodeHash": "0x010008ebd1415a5ee442d6fe93840fdcb546281548ae66911208396eac61e635",
-    "sourceCodeHash": "0xe8adf65d3d38e2f4c556cdd03d9c982a2f59d39cae702eb745098927a30eb92c"
+    "bytecodeHash": "0x0100090ff9e5ef7642f9793acf34ba31c12bc05960be06d53e20637dd9265312",
+    "sourceCodeHash": "0x1d3df4312992f5d5f544f673f78651643f8b164c632ca7ff7287d917483b4eb7"
   },
   {
     "contractName": "playground_batch",
     "bytecodePath": "bootloader/build/artifacts/playground_batch.yul/playground_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x01000913389644733f0a1aecfdd625a622bec1623bf5d4d3367e0b6bc2f3a0ce",
-    "sourceCodeHash": "0x5656d2f077d8cece040ff70c06b987633c375d397f3ecc07e948cad6a755ed38"
+    "bytecodeHash": "0x01000937833ef6f01f1c15e7c7b28a3ac366474794ea1e1d9baed3a5df3e4149",
+    "sourceCodeHash": "0x1467ad390de5a71f6a0ecb126e6ad8961d25282e9718d550c5896d189f368715"
   },
   {
     "contractName": "proved_batch",
     "bytecodePath": "bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/proved_batch.yul",
-    "bytecodeHash": "0x010008fb85e4ba8937946e844cddf049b41042c1721aa4c8aade0ebb4e6047f7",
-    "sourceCodeHash": "0xe474593d1225b9143c33b8ca7fe15329910b2429020982968af0d2ccec9ff4dd"
+    "bytecodeHash": "0x0100091db35bd842092fa15c510ceeda10fe2335d4fa227d401bcc3acfe76919",
+    "sourceCodeHash": "0xaeec797f935e752e6f97de079bea605c6ff03369f9c98adbf9012747d1b5d3e4"
   }
 ]

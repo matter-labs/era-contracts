@@ -1010,9 +1010,6 @@ object "Bootloader" {
 
                 let payToOperator := safeMul(gasPrice, safeSub(gasLimit, refundGas, "lpah"), "mnk")
 
-                // Note, that for now, the L1->L2 transactions are free, i.e. the gasPrice
-                // for such transactions is always zero, so the `refundGas` is not used anywhere
-                // except for notifications for the operator for API purposes. 
                 notifyAboutRefund(refundGas)
 
                 // Paying the fee to the operator
