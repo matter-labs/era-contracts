@@ -1,16 +1,16 @@
 import { CONTRACT_DEPLOYER_ADDRESS, hashBytecode } from "zksync-web3/build/src/utils";
-import { KeccakTest, KeccakTest__factory } from "../typechain-types";
+import type { KeccakTest } from "../typechain-types";
+import { KeccakTest__factory } from "../typechain-types";
 import { KECCAK256_CONTRACT_ADDRESS } from "./shared/constants";
 import { getWallets, loadArtifact, publishBytecode, setCode, getCode } from "./shared/utils";
 import { ethers } from "hardhat";
 import { readYulBytecode } from "../scripts/utils";
 import { Language } from "../scripts/constants";
-import { BytesLike, Wallet, providers } from "ethers";
+import type { BytesLike } from "ethers";
 import { expect } from "chai";
 import * as hre from "hardhat";
 
 describe("Keccak256 tests", function () {
-  let testWallet: Wallet;
   let keccakTest: KeccakTest;
 
   let oldKeccakCodeHash: string;
@@ -22,8 +22,6 @@ describe("Keccak256 tests", function () {
   const KECCAK_TEST_ADDRESS = "0x0000000000000000000000000000000000009000";
 
   before(async () => {
-    testWallet = getWallets()[0];
-
     await setCode(KECCAK_TEST_ADDRESS, (await loadArtifact("KeccakTest")).bytecode);
 
     const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
@@ -117,8 +115,8 @@ describe("Keccak256 tests", function () {
 
     await keccakTest.keccakPerformUpgrade(mockKeccakInput);
 
-    var keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
-    var keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
+    let keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+    let keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
     expect(keccakCodeHash).to.eq(keccakMockCodeHash);
 
@@ -133,15 +131,6 @@ describe("Keccak256 tests", function () {
     expect(keccakCodeHash).to.eq(oldKeccakCodeHash);
   });
 });
-
-async function compareCorrectHash(data: BytesLike, provider: providers.Provider) {
-  const correctHash = ethers.utils.keccak256(data);
-  const hashFromPrecompile = await provider.call({
-    to: KECCAK256_CONTRACT_ADDRESS,
-    data,
-  });
-  expect(hashFromPrecompile).to.equal(correctHash, "Hash is incorrect");
-}
 
 function randomHexFromSeed(seed: BytesLike, len: number) {
   const hexLen = len * 2 + 2;
