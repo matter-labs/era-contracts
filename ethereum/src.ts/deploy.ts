@@ -10,7 +10,7 @@ import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import type { DeployedAddresses } from "../scripts/utils";
 import {
   readSystemContractsBytecode,
@@ -407,7 +407,7 @@ export class Deployer {
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
   }
 
   public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
