@@ -161,7 +161,9 @@ library TransactionHelper {
             encodedGasParam = bytes.concat(encodedGasPrice, encodedGasLimit);
         }
 
-        bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+        bytes memory encodedTo = _transaction.reserved[1] == 0
+            ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+            : bytes(hex"80");
         bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
         // Encode only the length of the transaction data, and not the data itself,
         // so as not to copy to memory a potentially huge transaction data twice.
