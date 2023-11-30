@@ -1,4 +1,4 @@
-import { BigNumber, BigNumberish, BytesLike, ethers, Wallet} from "ethers";
+import { BigNumber, BigNumberish, BytesLike, ethers, Wallet } from "ethers";
 import { Address } from "zksync-web3/build/src/types";
 import { FacetCut } from "../../src.ts/diamondCut";
 
@@ -179,7 +179,11 @@ export function constructL2Log(isService: boolean, sender: string, key: number |
   ]);
 }
 
-export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish, previousBatchHash?: BytesLike) {
+export function createSystemLogs(
+  chainedPriorityTxHashKey?: BytesLike,
+  numberOfLayer1Txs?: BigNumberish,
+  previousBatchHash?: BytesLike
+) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
     constructL2Log(
@@ -195,7 +199,12 @@ export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfL
       SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
       ethers.constants.HashZero
     ),
-    constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, previousBatchHash? ethers.utils.hexlify(previousBatchHash): ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      L2_SYSTEM_CONTEXT_ADDRESS,
+      SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
+      previousBatchHash ? ethers.utils.hexlify(previousBatchHash) : ethers.constants.HashZero
+    ),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -211,7 +220,11 @@ export function createSystemLogs(chainedPriorityTxHashKey?: BytesLike, numberOfL
   ];
 }
 
-export function createSystemLogsWithUpgrade(chainedPriorityTxHashKey?: BytesLike, numberOfLayer1Txs?: BigNumberish, upgradeTxHash?: string) {
+export function createSystemLogsWithUpgrade(
+  chainedPriorityTxHashKey?: BytesLike,
+  numberOfLayer1Txs?: BigNumberish,
+  upgradeTxHash?: string
+) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
     constructL2Log(

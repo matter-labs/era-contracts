@@ -108,42 +108,43 @@ describe("L2 upgrade test", function () {
     //     priorityOperationsHash = keccak256(
     //         ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
     //     );
-    
-    // do initial setChainIdUpgrade 
+
+    // do initial setChainIdUpgrade
     const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
     batch1InfoChainIdUpgrade = await buildCommitBatchInfoWithUpgrade(
-      genesisStoredBatchInfo(), 
+      genesisStoredBatchInfo(),
       {
         batchNumber: 1,
         // priorityOperationsHash: priorityOperationsHash,
         // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
-        priorityOperationsHash: (EMPTY_STRING_KECCAK),
+        priorityOperationsHash: EMPTY_STRING_KECCAK,
         numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
         // systemLogs
       },
       upgradeTxHash
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+    ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
     storedBatch1InfoChainIdUpgrade = getBatchStoredInfo(batch1InfoChainIdUpgrade, commitment);
     await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1InfoChainIdUpgrade], []);
   });
 
   it("Upgrade should work even if not all batches are processed", async () => {
-    batch2Info = await buildCommitBatchInfo(
-      storedBatch1InfoChainIdUpgrade, 
-      {
-        batchNumber: 2,
-        // priorityOperationsHash: priorityOperationsHash,
-        // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
-        priorityOperationsHash: (EMPTY_STRING_KECCAK),
-        numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
-        // systemLogs
-      }
-    );
+    batch2Info = await buildCommitBatchInfo(storedBatch1InfoChainIdUpgrade, {
+      batchNumber: 2,
+      // priorityOperationsHash: priorityOperationsHash,
+      // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+      priorityOperationsHash: EMPTY_STRING_KECCAK,
+      numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      // systemLogs
+    });
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1InfoChainIdUpgrade, [batch2Info])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatches(storedBatch1InfoChainIdUpgrade, [batch2Info])
+    ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
 
     expect(await proxyGetters.getProtocolVersion()).to.equal(initialProtocolVersion);
@@ -204,7 +205,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3 +1 + initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -252,7 +253,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3 +1 + initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -268,7 +269,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3 +1 + initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -285,7 +286,7 @@ describe("L2 upgrade test", function () {
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3+1 + initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -297,14 +298,14 @@ describe("L2 upgrade test", function () {
     const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [wrongFactoryDepHash],
-      nonce: 3+ 1+ initialProtocolVersion,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
-        newProtocolVersion: 3+ 1+ initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -315,14 +316,14 @@ describe("L2 upgrade test", function () {
     const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [],
-      nonce: 3 + 1+ initialProtocolVersion,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
-        newProtocolVersion: 3 + 1+ initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -335,14 +336,14 @@ describe("L2 upgrade test", function () {
 
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: Array(33).fill(randomDepHash),
-      nonce: 3+ 1+ initialProtocolVersion,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
       executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: Array(33).fill(myFactoryDep),
-        newProtocolVersion: 3+ 1+ initialProtocolVersion,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -364,7 +365,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
-      nonce: 4+ 1+ initialProtocolVersion,
+      nonce: 4 + 1 + initialProtocolVersion,
     });
 
     const upgrade = {
@@ -375,7 +376,7 @@ describe("L2 upgrade test", function () {
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       factoryDeps: [myFactoryDep],
-      newProtocolVersion: 4+ 1+ initialProtocolVersion,
+      newProtocolVersion: 4 + 1 + initialProtocolVersion,
     };
 
     const upgradeReceipt = await (await executeUpgrade(chainId, proxyGetters, stateTransition, upgrade)).wait();
@@ -398,7 +399,7 @@ describe("L2 upgrade test", function () {
     expect(await proxyGetters.getL2BootloaderBytecodeHash()).to.equal(bootloaderHash);
     expect(await proxyGetters.getL2DefaultAccountBytecodeHash()).to.equal(defaultAccountHash);
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
-    expect(await proxyGetters.getProtocolVersion()).to.equal(4+ 1+ initialProtocolVersion);
+    expect(await proxyGetters.getProtocolVersion()).to.equal(4 + 1 + initialProtocolVersion);
 
     const newVerifierParams = await proxyGetters.getVerifierParams();
     expect(newVerifierParams.recursionNodeLevelVkHash).to.equal(newerVerifierParams.recursionNodeLevelVkHash);
@@ -406,8 +407,8 @@ describe("L2 upgrade test", function () {
     expect(newVerifierParams.recursionCircuitsSetVksHash).to.equal(newerVerifierParams.recursionCircuitsSetVksHash);
 
     expect(upgradeEvents[0].name).to.eq("NewProtocolVersion");
-    expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq((2+ initialProtocolVersion ).toString());
-    expect(upgradeEvents[0].args.newProtocolVersion.toString()).to.eq((4+ 1+ initialProtocolVersion).toString());
+    expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq((2 + initialProtocolVersion).toString());
+    expect(upgradeEvents[0].args.newProtocolVersion.toString()).to.eq((4 + 1 + initialProtocolVersion).toString());
 
     expect(upgradeEvents[1].name).to.eq("NewVerifier");
     expect(upgradeEvents[1].args.oldVerifier.toLowerCase()).to.eq(verifier.toLowerCase());
@@ -444,7 +445,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
-      nonce: 4+ 1+ initialProtocolVersion,
+      nonce: 4 + 1 + initialProtocolVersion,
     });
 
     const upgrade = {
@@ -455,7 +456,7 @@ describe("L2 upgrade test", function () {
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       factoryDeps: [myFactoryDep],
-      newProtocolVersion: 5+ 1+ initialProtocolVersion,
+      newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
     const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
 
@@ -625,7 +626,7 @@ describe("L2 upgrade test", function () {
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
     await (
       await executeUpgrade(chainId, proxyGetters, stateTransition, {
-        newProtocolVersion: 5+ 1 + initialProtocolVersion,
+        newProtocolVersion: 5 + 1 + initialProtocolVersion,
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     ).wait();
@@ -717,7 +718,6 @@ describe("L2 upgrade test", function () {
 type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
   batchNumber: BigNumberish;
 };
-
 
 async function buildCommitBatchInfo(
   prevInfo: StoredBatchInfo,

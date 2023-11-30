@@ -99,7 +99,6 @@ describe("WETH Bridge tests", () => {
       await hardhat.ethers.getContractFactory("L1WethBridge")
     ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubDiamondProxy, deployer.addresses.AllowList);
 
-
     const _bridgeProxy = await (await hardhat.ethers.getContractFactory("ERC1967Proxy")).deploy(bridge.address, "0x");
 
     bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
