@@ -16,7 +16,7 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
 
 ## Glossary
 
-- **Governor** - a privileged address that controls the upgradability of the network and sets other privileged
+- **Governor** - a privileged address that controls the upgradeability of the network and sets other privileged
   addresses.
 - **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
 - **Validator/Operator** - a privileged address that can commit/verify/execute L2 batches.
