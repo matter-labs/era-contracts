@@ -5,8 +5,8 @@ pragma solidity ^0.8.13;
 import "../../common/Messaging.sol";
 
 import "./IBridgehubMailbox.sol";
-import "./IRegistry.sol";
+import "./IBridgehubRegistry.sol";
 import "./IBridgehubGetters.sol";
-import "./IBridgehubAdmin.sol";
+import "./IBridgehubBase.sol";
 
-interface IBridgehub is IBridgehubMailbox, IBridgehubGetters, IRegistry, IBridgehubAdmin {}
+interface IBridgehub is IBridgehubBase, IBridgehubMailbox, IBridgehubGetters, IBridgehubRegistry {}

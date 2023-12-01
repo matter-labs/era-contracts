@@ -322,6 +322,7 @@ export async function initialDeployment(
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
   await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
   await deployer.deployBridgeContracts(create2Salt, gasPrice);
@@ -333,7 +334,7 @@ export async function initialDeployment(
 
   const allowTx = await allowList.setBatchAccessMode(
     [
-      deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+      deployer.addresses.Bridgehub.BridgehubProxy,
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployer.addresses.StateTransition.DiamondProxy,
       deployer.addresses.Bridges.ERC20BridgeProxy,

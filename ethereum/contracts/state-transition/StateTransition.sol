@@ -6,7 +6,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
 
 import "../common/DiamondProxy.sol";
-import {StateTransitionInitializeData} from "./state-transition-interfaces/IStateTransitionDiamondInit.sol";
+import {StateTransitionInitializeData} from "./state-transition-interfaces/IStateTransitionInit.sol";
 import {IStateTransition} from "./state-transition-interfaces/IStateTransition.sol";
 import "./state-transition-deps/StateTransitionBase.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
@@ -17,6 +17,8 @@ import "./chain-interfaces/IDiamondInit.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract StateTransition is IStateTransition, StateTransitionBase {
     using UncheckedMath for uint256;
+
+    string public constant override getName = "EraStateTransition";
 
     /// initialize
     function initialize(StateTransitionInitializeData calldata _initializeData) external reentrancyGuardInitializer {
@@ -71,7 +73,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         return stateTransitionStorage.stateTransitionChainContract[_chainNumber];
     }
 
-    function getStateTransitionChainContract(uint256 _chainId) external view returns (address) {
+    function getStateTransitionChain(uint256 _chainId) external view returns (address) {
         return stateTransitionStorage.stateTransitionChainContract[_chainId];
     }
 
@@ -127,7 +129,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         // check not registered
         address bridgehub = stateTransitionStorage.bridgehub;
         require(stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0), "PRegistry 1");
-        require(IBridgehub(bridgehub).getChainStateTransition(_chainId) == address(this), "PRegsitry 2");
+        require(IBridgehub(bridgehub).getStateTransition(_chainId) == address(this), "PRegsitry 2");
 
         // check input
         bytes32 cutHash = keccak256(abi.encode(_diamondCut));
@@ -159,8 +161,6 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         stateTransitionStorage.stateTransitionChainContract[_chainId] = stateTransitionChainAddress;
         stateTransitionStorage.chainNumberToContract[stateTransitionStorage.totalChains] = stateTransitionChainAddress;
         ++stateTransitionStorage.totalChains;
-
-        IBridgehub(bridgehub).setStateTransitionChainContract(_chainId, stateTransitionChainAddress);
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionChainAddress);

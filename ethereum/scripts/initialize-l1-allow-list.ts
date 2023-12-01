@@ -40,7 +40,7 @@ async function main() {
       const allowListContract = deployer.l1AllowList(wallet);
       const tx = await allowListContract.setBatchAccessMode(
         [
-          deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+          deployer.addresses.Bridgehub.BridgehubProxy,
           deployer.addresses.StateTransition.StateTransitionProxy,
           deployer.addresses.StateTransition.DiamondProxy,
           deployer.addresses.Bridges.ERC20BridgeProxy,

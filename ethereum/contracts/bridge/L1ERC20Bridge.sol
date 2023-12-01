@@ -137,7 +137,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
 
         // Deploy L2 bridge implementation contract
-        // KL todo we need to make the bridge L2 independent
         address bridgeImplementationAddr = BridgeInitializationHelper.requestDeployTransaction(
             _chainId,
             bridgehub,
@@ -409,6 +408,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         }
 
         {
+            // Preventing the stack too deep error
             isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
         }
 

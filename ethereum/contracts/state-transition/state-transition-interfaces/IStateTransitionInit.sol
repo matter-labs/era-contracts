@@ -22,6 +22,6 @@ struct StateTransitionInitializeData {
     uint256 protocolVersion;
 }
 
-interface IStateTransitionDiamondInit {
+interface IStateTransitionInit {
     function initialize(StateTransitionInitializeData calldata _initalizeData) external;
 }

@@ -33,17 +33,12 @@ let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 
 export interface DeployedAddresses {
   Bridgehub: {
-    BridgehubDiamondProxy: string;
-    BridgehubDiamondInit: string;
-    BridgehubAdminFacet: string;
-    BridgehubGettersFacet: string;
-    BridgehubMailboxFacet: string;
-    BridgehubRegistryFacet: string;
+    BridgehubProxy: string;
+    BridgehubImplementation: string;
   };
   StateTransition: {
     StateTransitionProxy: string;
     StateTransitionImplementation: string;
-    StateTransitionProxyAdmin: string;
     Verifier: string;
     AdminFacet: string;
     MailboxFacet: string;
@@ -60,6 +55,7 @@ export interface DeployedAddresses {
     WethBridgeImplementation: string;
     WethBridgeProxy: string;
   };
+  TransparentProxyAdmin: string;
   Governance: string;
   AllowList: string;
   ValidatorTimeLock: string;
@@ -78,17 +74,12 @@ export interface DeployerConfig {
 export function deployedAddressesFromEnv(): DeployedAddresses {
   return {
     Bridgehub: {
-      BridgehubAdminFacet: getAddressFromEnv("CONTRACTS_BRIDGEHUB_ADMIN_FACET_ADDR"),
-      BridgehubGettersFacet: getAddressFromEnv("CONTRACTS_BRIDGEHUB_GETTERS_FACET_ADDR"),
-      BridgehubMailboxFacet: getAddressFromEnv("CONTRACTS_BRIDGEHUB_MAILBOX_FACET_ADDR"),
-      BridgehubRegistryFacet: getAddressFromEnv("CONTRACTS_BRIDGEHUB_REGISTRY_FACET_ADDR"),
-      BridgehubDiamondInit: getAddressFromEnv("CONTRACTS_BRIDGEHUB_DIAMOND_INIT_ADDR"),
-      BridgehubDiamondProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_DIAMOND_PROXY_ADDR"),
+      BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
+      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
     },
     StateTransition: {
       StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
       StateTransitionImplementation: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_IMPL_ADDR"),
-      StateTransitionProxyAdmin: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADMIN_ADDR"),
       Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
       AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
       MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
@@ -105,6 +96,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
       WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
     },
+    TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     AllowList: getAddressFromEnv("CONTRACTS_L1_ALLOW_LIST_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
@@ -180,25 +172,25 @@ export class Deployer {
     return diamondCut(facetCuts, this.addresses.StateTransition.DiamondInit, diamondInitCalldata);
   }
 
-  public async initialBridgehubProxyDiamondCut() {
-    const facetCuts: FacetCut[] = Object.values(
-      await getBridgehubCurrentFacetCutsForAdd(
-        this.addresses.Bridgehub.BridgehubAdminFacet,
-        this.addresses.Bridgehub.BridgehubGettersFacet,
-        this.addresses.Bridgehub.BridgehubMailboxFacet,
-        this.addresses.Bridgehub.BridgehubRegistryFacet
-      )
-    );
+  // public async initialBridgehubProxyDiamondCut() {
+  //   const facetCuts: FacetCut[] = Object.values(
+  //     await getBridgehubCurrentFacetCutsForAdd(
+  //       this.addresses.Bridgehub.BridgehubAdminFacet,
+  //       this.addresses.Bridgehub.BridgehubGettersFacet,
+  //       this.addresses.Bridgehub.BridgehubMailboxFacet,
+  //       this.addresses.Bridgehub.BridgehubRegistryFacet
+  //     )
+  //   );
 
-    const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("BridgehubDiamondInit").abi);
+  //   const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("BridgehubDiamondInit").abi);
 
-    const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      this.ownerAddress,
-      this.addresses.AllowList,
-    ]);
+  //   const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
+  //     this.ownerAddress,
+  //     this.addresses.AllowList,
+  //   ]);
 
-    return diamondCut(facetCuts, this.addresses.Bridgehub.BridgehubDiamondInit, diamondInitCalldata);
-  }
+  //   return diamondCut(facetCuts, this.addresses.Bridgehub.BridgehubDiamondInit, diamondInitCalldata);
+  // }
 
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
     if (this.verbose) {
@@ -270,58 +262,113 @@ export class Deployer {
     this.addresses.AllowList = contractAddress;
   }
 
-  public async deployBridgehubAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  // public async deployBridgehubAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  //   ethTxOptions.gasLimit ??= 10_000_000;
+  //   const contractAddress = await this.deployViaCreate2("BridgehubAdminFacet", [], create2Salt, ethTxOptions);
+
+  //   if (this.verbose) {
+  //     console.log(`CONTRACTS_BRIDGEHUB_ADMIN_FACET_ADDR=${contractAddress}`);
+  //   }
+
+  //   this.addresses.Bridgehub.BridgehubAdminFacet = contractAddress;
+  // }
+
+  // public async deployBridgehubGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  //   ethTxOptions.gasLimit ??= 10_000_000;
+  //   const contractAddress = await this.deployViaCreate2("BridgehubGettersFacet", [], create2Salt, ethTxOptions);
+
+  //   if (this.verbose) {
+  //     console.log(`CONTRACTS_BRIDGEHUB_GETTERS_FACET_ADDR=${contractAddress}`);
+  //   }
+
+  //   this.addresses.Bridgehub.BridgehubGettersFacet = contractAddress;
+  // }
+
+  // public async deployBridgehubMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  //   ethTxOptions.gasLimit ??= 10_000_000;
+  //   const contractAddress = await this.deployViaCreate2("BridgehubMailboxFacet", [], create2Salt, ethTxOptions);
+
+  //   if (this.verbose) {
+  //     console.log(`CONTRACTS_BRIDGEHUB_MAILBOX_FACET_ADDR=${contractAddress}`);
+  //   }
+
+  //   this.addresses.Bridgehub.BridgehubMailboxFacet = contractAddress;
+  // }
+
+  // public async deployBridgehubRegistryFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  //   ethTxOptions.gasLimit ??= 10_000_000;
+  //   const contractAddress = await this.deployViaCreate2("BridgehubRegistryFacet", [], create2Salt, ethTxOptions);
+
+  //   if (this.verbose) {
+  //     console.log(`CONTRACTS_BRIDGEHUB_REGISTRY_FACET_ADDR=${contractAddress}`);
+  //   }
+
+  //   this.addresses.Bridgehub.BridgehubRegistryFacet = contractAddress;
+  // }
+  // public async deployBridgehubDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  //   ethTxOptions.gasLimit ??= 10_000_000;
+  //   const contractAddress = await this.deployViaCreate2("BridgehubDiamondInit", [], create2Salt, ethTxOptions);
+
+  //   if (this.verbose) {
+  //     console.log(`CONTRACTS_BRIDGEHUB_DIAMOND_INIT_ADDR=${contractAddress}`);
+  //   }
+
+  //   this.addresses.Bridgehub.BridgehubDiamondInit = contractAddress;
+  // }
+
+  public async deployBridgehubImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("BridgehubAdminFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_ADMIN_FACET_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.BridgehubAdminFacet = contractAddress;
+    this.addresses.Bridgehub.BridgehubImplementation = contractAddress;
   }
 
-  public async deployBridgehubGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("BridgehubGettersFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("ProxyAdmin", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_GETTERS_FACET_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.BridgehubGettersFacet = contractAddress;
+    this.addresses.TransparentProxyAdmin = contractAddress;
   }
 
-  public async deployBridgehubMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployBridgehubProxy(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest,
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("BridgehubMailboxFacet", [], create2Salt, ethTxOptions);
+
+    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
+
+    const initCalldata = bridgehub.encodeFunctionData("initialize", [      
+        this.ownerAddress
+    ]);
+
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [
+        this.addresses.Bridgehub.BridgehubImplementation,
+        this.addresses.TransparentProxyAdmin,
+        initCalldata,
+      ],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_MAILBOX_FACET_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridgehub.BridgehubMailboxFacet = contractAddress;
-  }
-
-  public async deployBridgehubRegistryFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("BridgehubRegistryFacet", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_REGISTRY_FACET_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.BridgehubRegistryFacet = contractAddress;
-  }
-  public async deployBridgehubDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("BridgehubDiamondInit", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_DIAMOND_INIT_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.BridgehubDiamondInit = contractAddress;
+    this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
   public async deployStateTransitionImplementation(
@@ -336,17 +383,6 @@ export class Deployer {
     }
 
     this.addresses.StateTransition.StateTransitionImplementation = contractAddress;
-  }
-
-  public async deployStateTransitionAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ProxyAdmin", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADMIN_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.StateTransition.StateTransitionProxyAdmin = contractAddress;
   }
 
   public async deployStateTransitionProxy(
@@ -365,7 +401,7 @@ export class Deployer {
 
     const initCalldata = stateTransition.encodeFunctionData("initialize", [
       {
-        bridgehub: this.addresses.Bridgehub.BridgehubDiamondProxy,
+        bridgehub: this.addresses.Bridgehub.BridgehubProxy,
         governor: this.ownerAddress,
         diamondInit: this.addresses.StateTransition.DiamondInit,
         genesisBatchHash,
@@ -380,7 +416,7 @@ export class Deployer {
       "TransparentUpgradeableProxy",
       [
         this.addresses.StateTransition.StateTransitionImplementation,
-        this.addresses.StateTransition.StateTransitionProxyAdmin,
+        this.addresses.TransparentProxyAdmin,
         initCalldata,
       ],
       create2Salt,
@@ -453,7 +489,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.Bridgehub.BridgehubDiamondProxy, this.addresses.AllowList],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList],
       create2Salt,
       ethTxOptions
     );
@@ -497,7 +533,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubDiamondProxy, this.addresses.AllowList],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList],
       create2Salt,
       ethTxOptions
     );
@@ -570,42 +606,17 @@ export class Deployer {
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 
-  public async deployBridgehubDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
 
-    const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
-    const initialDiamondCut = await this.initialBridgehubProxyDiamondCut();
-    const contractAddress = await this.deployViaCreate2(
-      "DiamondProxy",
-      [chainId, initialDiamondCut],
-      create2Salt,
-      ethTxOptions
-    );
 
-    if (this.verbose) {
-      console.log(`CONTRACTS_BRIDGEHUB_DIAMOND_PROXY_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridgehub.BridgehubDiamondProxy = contractAddress;
-  }
-
-  public async deployBridgehubContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deployBridgehubContract(
+    create2Salt: string,
+    gasPrice?: BigNumberish,
+    nonce?
+  ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    // await this.deployBridgehubChainProxy(create2Salt, { gasPrice, nonce: nonce + 0 });
-    await this.deployBridgehubDiamond(create2Salt, gasPrice, nonce);
-    nonce = await this.deployWallet.getTransactionCount();
-    await this.deployBridgehubDiamondProxy(create2Salt, { gasPrice, nonce: nonce });
-  }
-
-  public async deployBridgehubDiamond(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
-    await this.deployBridgehubAdminFacet(create2Salt, { gasPrice, nonce: nonce + 0 });
-    await this.deployBridgehubMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.deployBridgehubGettersFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
-    await this.deployBridgehubRegistryFacet(create2Salt, { gasPrice, nonce: nonce + 3 });
-    await this.deployBridgehubDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
+    await this.deployBridgehubImplementation(create2Salt, { gasPrice });
+    await this.deployBridgehubProxy(create2Salt, { gasPrice });
   }
 
   public async deployStateTransitionContract(
@@ -618,7 +629,6 @@ export class Deployer {
 
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionImplementation(create2Salt, { gasPrice });
-    await this.deployStateTransitionAdmin(create2Salt, { gasPrice });
     await this.deployStateTransitionProxy(create2Salt, { gasPrice }, extraFacets);
     await this.registerStateTransition();
   }
@@ -740,7 +750,7 @@ export class Deployer {
   }
 
   public bridgehubContract(signerOrProvider: Signer | providers.Provider) {
-    return IBridgehubFactory.connect(this.addresses.Bridgehub.BridgehubDiamondProxy, signerOrProvider);
+    return IBridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {

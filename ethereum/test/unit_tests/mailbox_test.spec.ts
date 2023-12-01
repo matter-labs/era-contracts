@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import {
-  BridgehubMailboxFacetFactory,
+  BridgehubFactory,
   MailboxFacetFactory,
   AllowList,
   Forwarder,
@@ -32,7 +32,7 @@ process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSIO
 
 describe("Mailbox tests", function () {
   let allowList: AllowList;
-  let bridgehubMailboxFacet: ethers.Contract;
+  let bridgehub: ethers.Contract;
   let mailbox: ethers.Contract;
   let proxyAsMockExecutor: MockExecutorFacet;
   let owner: ethers.Signer;
@@ -70,8 +70,8 @@ describe("Mailbox tests", function () {
     chainId = deployer.chainId;
     allowList = deployer.l1AllowList(deployWallet);
 
-    bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(
-      deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+    bridgehub = BridgehubFactory.connect(
+      deployer.addresses.Bridgehub.BridgehubProxy,
       deployWallet
     );
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
@@ -90,7 +90,7 @@ describe("Mailbox tests", function () {
     const revertReason = await getCallRevertReason(
       requestExecute(
         chainId,
-        bridgehubMailboxFacet,
+        bridgehub,
         ethers.constants.AddressZero,
         ethers.BigNumber.from(0),
         "0x",
@@ -104,7 +104,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet,
+          bridgehub,
           ethers.constants.AddressZero,
           ethers.BigNumber.from(0),
           "0x",
@@ -121,7 +121,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet,
+          bridgehub,
           ethers.constants.AddressZero,
           ethers.BigNumber.from(0),
           "0x",
@@ -165,7 +165,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet,
+          bridgehub,
           ethers.constants.AddressZero,
           ethers.utils.parseEther("12"),
           "0x",
@@ -179,9 +179,9 @@ describe("Mailbox tests", function () {
     });
 
     it("Should accept depositing less than or equal to the deposit limit", async () => {
-      const gasPrice = await bridgehubMailboxFacet.provider.getGasPrice();
+      const gasPrice = await bridgehub.provider.getGasPrice();
       const l2GasLimit = ethers.BigNumber.from(1000000);
-      const l2Cost = await bridgehubMailboxFacet.l2TransactionBaseCost(
+      const l2Cost = await bridgehub.l2TransactionBaseCost(
         chainId,
         gasPrice,
         l2GasLimit,
@@ -191,7 +191,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet,
+          bridgehub,
           ethers.constants.AddressZero,
           DEPOSIT_LIMIT.sub(l2Cost),
           "0x",
@@ -209,7 +209,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet,
+          bridgehub,
           ethers.constants.AddressZero,
           ethers.BigNumber.from(1),
           "0x",
@@ -298,7 +298,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet.connect(randomSigner),
+          bridgehub.connect(randomSigner),
           ethers.constants.AddressZero,
           ethers.BigNumber.from(0),
           "0x",
@@ -317,7 +317,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           chainId,
-          bridgehubMailboxFacet.connect(owner),
+          bridgehub.connect(owner),
           ethers.constants.AddressZero,
           ethers.BigNumber.from(0),
           "0x",
@@ -339,7 +339,7 @@ describe("Mailbox tests", function () {
       return {
         transaction: await requestExecute(
           chainId,
-          bridgehubMailboxFacet.connect(owner),
+          bridgehub.connect(owner),
           ethers.constants.AddressZero,
           ethers.BigNumber.from(0),
           "0x",
@@ -352,7 +352,7 @@ describe("Mailbox tests", function () {
     };
 
     const encodeRequest = (refundRecipient) =>
-      bridgehubMailboxFacet.interface.encodeFunctionData("requestL2Transaction", [
+      bridgehub.interface.encodeFunctionData("requestL2Transaction", [
         chainId,
         ethers.constants.AddressZero,
         0,
@@ -364,8 +364,8 @@ describe("Mailbox tests", function () {
       ]);
 
     let overrides: ethers.PayableOverrides = {};
-    overrides.gasPrice = await bridgehubMailboxFacet.provider.getGasPrice();
-    overrides.value = await bridgehubMailboxFacet.l2TransactionBaseCost(
+    overrides.gasPrice = await bridgehub.provider.getGasPrice();
+    overrides.value = await bridgehub.l2TransactionBaseCost(
       chainId,
       overrides.gasPrice,
       l2GasLimit,
@@ -375,7 +375,7 @@ describe("Mailbox tests", function () {
 
     callViaForwarder = async (refundRecipient) => {
       return {
-        transaction: await forwarder.forward(bridgehubMailboxFacet.address, encodeRequest(refundRecipient), overrides),
+        transaction: await forwarder.forward(bridgehub.address, encodeRequest(refundRecipient), overrides),
         expectedSender: aliasAddress(forwarder.address),
       };
     };
@@ -383,7 +383,7 @@ describe("Mailbox tests", function () {
     callViaConstructorForwarder = async (refundRecipient) => {
       const constructorForwarder = await (
         await hardhat.ethers.getContractFactory("ConstructorForwarder")
-      ).deploy(bridgehubMailboxFacet.address, encodeRequest(refundRecipient), overrides);
+      ).deploy(bridgehub.address, encodeRequest(refundRecipient), overrides);
 
       return {
         transaction: constructorForwarder.deployTransaction,
@@ -395,8 +395,8 @@ describe("Mailbox tests", function () {
   it("Should only alias externally-owned addresses", async () => {
     const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
-      [bridgehubMailboxFacet.address, false],
-      [await bridgehubMailboxFacet.signer.getAddress(), true],
+      [bridgehub.address, false],
+      [await bridgehub.signer.getAddress(), true],
     ];
 
     for (const sendTransaction of indirections) {

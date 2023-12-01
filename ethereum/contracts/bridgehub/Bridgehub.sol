@@ -3,17 +3,84 @@
 pragma solidity ^0.8.13;
 
 // import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
-import "./BridgehubBase.sol";
-import "../bridgehub-interfaces/IBridgehubMailbox.sol";
-import "../../state-transition/chain-interfaces/IStateTransitionChain.sol";
+import "./bridgehub-deps/BridgehubBase.sol";
+import "./bridgehub-interfaces/IBridgehub.sol";
+import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
-contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
+contract Bridgehub is BridgehubBase, IBridgehub{
+
+    string public constant override getName = "Bridgehub";
+
+    function initialize(
+        address _governor
+    ) external reentrancyGuardInitializer returns (bytes32) {
+        require(bridgehubStorage.governor == address(0), "bridgehub1");
+        bridgehubStorage.governor = _governor;
+    }
+    
+    ///// Getters
+
+    /// @return The address of the current governor
+    function getGovernor() external view returns (address) {
+        return bridgehubStorage.governor;
+    }
+
+    /// @return The total number of batches that were committed & verified & executed
+    function getIsStateTransition(address _stateTransition) external view returns (bool) {
+        return bridgehubStorage.stateTransitionIsRegistered[_stateTransition];
+    }
+
+    function getStateTransition(uint256 _chainId) external view returns (address) {
+        return bridgehubStorage.stateTransition[_chainId];
+    }
+
+    function getStateTransitionChain(uint256 _chainId) public view returns (address) {
+        return IStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId);
+    }
+    
+    //// Registry 
+
+        /// @notice Proof system can be any contract with the appropriate interface, functionality
+        function newStateTransition(address _stateTransition) external onlyGovernor {
+            // KL todo add checks here
+            require(!bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "r35");
+            bridgehubStorage.stateTransitionIsRegistered[_stateTransition] = true;
+        }
+    
+        /// @notice
+        function newChain(
+            uint256 _chainId,
+            address _stateTransition,
+            uint256 _salt
+        ) external onlyGovernor returns (uint256 chainId) {
+            // KL TODO: clear up this formula for chainId generation
+            // KL Todo: uint16 until the server can take bigger numbers.
+            if (_chainId == 0) {
+                chainId = uint16(
+                    uint256(
+                        keccak256(
+                            abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
+                        )
+                    )
+                );
+            } else {
+                chainId = _chainId;
+            }
+    
+            require(bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "r19");
+    
+            bridgehubStorage.stateTransition[chainId] = _stateTransition;
+    
+            emit NewChain(uint16(chainId), _stateTransition, msg.sender);
+        }
+
+    //// Mailbox forwarder
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,
         uint256 _l2TxNumberInBlock
     ) external view override returns (bool) {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
     }
@@ -25,7 +92,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
@@ -37,7 +104,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return IStateTransitionChain(stateTransitionChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
@@ -50,7 +117,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).proveL1ToL2TransactionStatus(
                 _l2TxHash,
@@ -70,7 +137,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
     ) external view returns (uint256) {
         require(address(1) != address(0), "zero addres");
 
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).l2TransactionBaseCost(
                 _gasPrice,
@@ -89,7 +156,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) public payable override returns (bytes32 canonicalTxHash) {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         canonicalTxHash = IStateTransitionChain(stateTransitionChain).requestL2TransactionBridgehub(
             msg.value,
             msg.sender,
@@ -111,7 +178,7 @@ contract BridgehubMailboxFacet is BridgehubBase, IBridgehubMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        address stateTransitionChain = bridgehubStorage.stateTransitionChain[_chainId];
+        address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).finalizeEthWithdrawalBridgehub(
                 msg.sender,

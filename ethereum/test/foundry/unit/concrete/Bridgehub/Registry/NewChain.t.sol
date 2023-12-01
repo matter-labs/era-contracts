@@ -155,7 +155,7 @@ contract NewChainTest is RegistryTest {
 
         // === Storage checks ===
         assertEq(
-            bridgehub.getChainStateTransition(chainId),
+            bridgehub.getStateTransition(chainId),
             stateTransitionAddress,
             "saved chainStateTransition is wrong"
         );
@@ -247,7 +247,7 @@ contract NewChainTest is RegistryTest {
 
         // === Storage checks ===
         assertEq(
-            bridgehub.getChainStateTransition(chainId),
+            bridgehub.getStateTransition(chainId),
             stateTransitionAddress,
             "saved chainStateTransition is wrong"
         );

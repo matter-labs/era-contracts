@@ -9,8 +9,8 @@ import {
   AllowList,
   TestnetERC20Token,
   TestnetERC20TokenFactory,
-  BridgehubMailboxFacet,
-  BridgehubMailboxFacetFactory,
+  Bridgehub,
+  BridgehubFactory,
   MailboxFacet,
   MailboxFacetFactory,
 } from "../../typechain";
@@ -33,7 +33,7 @@ describe(`L1ERC20Bridge tests`, function () {
   let erc20TestToken: TestnetERC20Token;
   let testnetERC20TokenContract: ethers.Contract;
   let l1Erc20BridgeContract: ethers.Contract;
-  let bridgehubMailboxFacet: BridgehubMailboxFacet;
+  let bridgehub: Bridgehub;
   let chainId = "0";
 
   before(async () => {
@@ -65,14 +65,14 @@ describe(`L1ERC20Bridge tests`, function () {
     chainId = deployer.chainId.toString();
     allowList = deployer.l1AllowList(deployWallet);
 
-    bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(
-      deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+    bridgehub = BridgehubFactory.connect(
+      deployer.addresses.Bridgehub.BridgehubProxy,
       deployWallet
     );
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
     l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(
-      deployer.addresses.Bridgehub.BridgehubDiamondProxy,
+      deployer.addresses.Bridgehub.BridgehubProxy,
       allowList.address
     );
     l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
@@ -132,7 +132,7 @@ describe(`L1ERC20Bridge tests`, function () {
     const depositorAddress = await randomSigner.getAddress();
     await depositERC20(
       l1ERC20Bridge.connect(randomSigner),
-      bridgehubMailboxFacet,
+      bridgehub,
       chainId,
       depositorAddress,
       testnetERC20TokenContract.address,

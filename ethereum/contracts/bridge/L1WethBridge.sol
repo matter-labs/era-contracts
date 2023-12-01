@@ -64,7 +64,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
-    /// @dev L1 address that governs the L2 bridges. (if EOA then L1toL2 alias is applied)
+    /// @dev L1 address that governs the L2 bridges. (if not EOA then L1toL2 alias is applied)
     address public l2Governor;
 
     /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge
