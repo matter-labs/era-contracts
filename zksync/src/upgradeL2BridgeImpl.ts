@@ -129,7 +129,7 @@ async function getTxInfo(
   if (contract === "L2ERC20Bridge") {
     return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
   } else if (contract == "L2Weth") {
-    return getTransparentProxyUpgradeTxInfo(deployer, target, l2WethProxyAddress, refundRecipient, gasPrice);
+    throw new Error('The latest L2Weth implementation requires L2WethBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed.');
   } else if (contract == "L2StandardERC20") {
     if (!l2ProxyAddress) {
       console.log("Explicit beacon address is not supplied, requesting the one from L2 node");
