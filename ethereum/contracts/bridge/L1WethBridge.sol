@@ -122,12 +122,12 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
     ) external payable {
+        require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
+        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WethBridge: Invalid factory deps");
         require(
             msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee,
             "Miscalculated deploy transactions fees"
         );
-        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "Incorrect factory deps provided");
-        require(_factoryDeps.length == 2, "Invalid factory deps length provided");
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2WethBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);

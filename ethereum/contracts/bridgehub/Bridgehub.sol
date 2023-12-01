@@ -14,7 +14,7 @@ contract Bridgehub is BridgehubBase, IBridgehub{
     function initialize(
         address _governor
     ) external reentrancyGuardInitializer returns (bytes32) {
-        require(bridgehubStorage.governor == address(0), "bridgehub1");
+        require(bridgehubStorage.governor == address(0), "Bridgehub: governor zero");
         bridgehubStorage.governor = _governor;
     }
     
@@ -43,7 +43,7 @@ contract Bridgehub is BridgehubBase, IBridgehub{
         /// @notice Proof system can be any contract with the appropriate interface, functionality
         function newStateTransition(address _stateTransition) external onlyGovernor {
             // KL todo add checks here
-            require(!bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "r35");
+            require(!bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
             bridgehubStorage.stateTransitionIsRegistered[_stateTransition] = true;
         }
     
@@ -67,7 +67,7 @@ contract Bridgehub is BridgehubBase, IBridgehub{
                 chainId = _chainId;
             }
     
-            require(bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "r19");
+            require(bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition not registered");
     
             bridgehubStorage.stateTransition[chainId] = _stateTransition;
     
@@ -135,8 +135,6 @@ contract Bridgehub is BridgehubBase, IBridgehub{
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256) {
-        require(address(1) != address(0), "zero addres");
-
         address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).l2TransactionBaseCost(
@@ -203,6 +201,6 @@ contract Bridgehub is BridgehubBase, IBridgehub{
         assembly {
             callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
         }
-        require(callSuccess, "pz");
+        require(callSuccess, "Bridgehub: withdraw failed");
     }
 }

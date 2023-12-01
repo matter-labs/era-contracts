@@ -127,10 +127,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _deployBridgeProxyFee
     ) external payable {
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-        require(_factoryDeps.length == 3, "mk1");
-        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "mk2");
+        require(_factoryDeps.length == 3, "L1ERC20Bridge: invalid number of factory deps");
+        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1ERC20Bridge: invalid factory deps");
         // The caller miscalculated deploy transactions fees
-        require(msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee, "fee");
+        require(msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1ERC20Bridge: invalid fee");
         l2TokenProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[2]);
 
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);

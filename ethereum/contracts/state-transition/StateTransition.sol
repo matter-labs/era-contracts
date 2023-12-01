@@ -22,7 +22,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
 
     /// initialize
     function initialize(StateTransitionInitializeData calldata _initializeData) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "vy");
+        require(_initializeData.governor != address(0), "StateTransition: governor zero");
 
         stateTransitionStorage.bridgehub = _initializeData.bridgehub;
         stateTransitionStorage.governor = _initializeData.governor;
@@ -128,12 +128,12 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     ) external onlyGovernor {
         // check not registered
         address bridgehub = stateTransitionStorage.bridgehub;
-        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0), "PRegistry 1");
-        require(IBridgehub(bridgehub).getStateTransition(_chainId) == address(this), "PRegsitry 2");
+        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0), "StateTransition: chainId exists");
+        require(IBridgehub(bridgehub).getStateTransition(_chainId) == address(this), "StateTransition: not registered in Bridgehub");
 
         // check input
         bytes32 cutHash = keccak256(abi.encode(_diamondCut));
-        require(cutHash == stateTransitionStorage.cutHash, "PRegistry 3");
+        require(cutHash == stateTransitionStorage.cutHash, "StateTransition: initial cutHash mismatch");
 
         // construct init data
         bytes memory initData;
@@ -181,7 +181,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData calldata _cutData
     ) external onlyChainGovernor(_chainId) {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
-        require(cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion], "r25");
+        require(cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion], "StateTransition: cutHash mismatch");
 
         IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
             stateTransitionStorage.stateTransitionChainContract[_chainId]

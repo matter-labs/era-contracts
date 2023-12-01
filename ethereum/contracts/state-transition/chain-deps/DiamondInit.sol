@@ -78,20 +78,6 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
             reservedDynamic: new bytes(0)
         });
 
-        //     ProposedUpgrade memory upgrade = ProposedUpgrade({
-        //         l2ProtocolUpgradeTx: l2Transaction,
-        //         factoryDeps:empty,
-        //         bootloaderHash:0 ,
-        //         defaultAccountHash:0,
-        //         verifier:address(0),
-        //         verifierParams:,
-        //         l1ContractsUpgradeCalldata:,
-        //         postUpgradeCalldata:bytes,
-        //         upgradeTimestamp:0,
-        //         newProtocolVersion:0,
-        //         newAllowList:address(0),
-        // })
-
         bytes memory encodedTransaction = abi.encode(l2Transaction);
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);

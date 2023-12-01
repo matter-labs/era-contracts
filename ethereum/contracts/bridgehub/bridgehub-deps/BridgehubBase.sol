@@ -14,17 +14,17 @@ contract BridgehubBase is ReentrancyGuard, AllowListed {
 
     /// @notice Checks that the message sender is an active governor
     modifier onlyGovernor() {
-        require(msg.sender == bridgehubStorage.governor, "12g"); // only by governor
+        require(msg.sender == bridgehubStorage.governor, "Bridgehub: not governor"); // only by governor
         _;
     }
 
     modifier onlyStateTransition(uint256 _chainId) {
-        require(msg.sender == bridgehubStorage.stateTransition[_chainId], "12c");
+        require(msg.sender == bridgehubStorage.stateTransition[_chainId], "Bridgehub: not state transition");
         _;
     }
 
     modifier onlyStateTransitionChain(uint256 _chainId) {
-        require(msg.sender == IStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId), "12e");
+        require(msg.sender == IStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId), "Bridgehub: not state transition chain");
         _;
     }
 }

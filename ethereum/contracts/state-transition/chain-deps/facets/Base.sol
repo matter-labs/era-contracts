@@ -16,37 +16,37 @@ contract StateTransitionChainBase is ReentrancyGuard, AllowListed {
 
     /// @notice Checks that the message sender is an active governor
     modifier onlyGovernor() {
-        require(msg.sender == chainStorage.governor, "PCBase 1"); // only by governor
+        require(msg.sender == chainStorage.governor, "StateTransition Chain: not governor"); 
         _;
     }
 
     /// @notice Checks if validator is active
     modifier onlyValidator() {
-        require(chainStorage.validators[msg.sender], "PCBase 2"); // validator is not active
+        require(chainStorage.validators[msg.sender], "StateTransition Chain: not validator"); 
         _;
     }
 
     modifier onlyStateTransition() {
-        require(msg.sender == chainStorage.stateTransition, "PCBase 3"); // message not sent by state transition
+        require(msg.sender == chainStorage.stateTransition, "StateTransition Chain: not state transition"); 
         _;
     }
 
     modifier onlyBridgehub() {
-        require(msg.sender == chainStorage.bridgehub, "PCBase 4"); // message not sent by bridgehub
+        require(msg.sender == chainStorage.bridgehub, "StateTransition Chain: not bridgehub"); 
         _;
     }
 
     modifier onlyGovernorOrStateTransition() {
         require(
             msg.sender == chainStorage.governor || msg.sender == chainStorage.stateTransition,
-            "Only by governor or proof system"
+            "StateTransition Chain: Only by governor or state transition"
         );
         _;
     }
 
     /// @notice Checks that the message sender is an active governor or admin
     modifier onlyGovernorOrAdmin() {
-        require(msg.sender == chainStorage.governor || msg.sender == chainStorage.admin, "Only by governor or admin");
+        require(msg.sender == chainStorage.governor || msg.sender == chainStorage.admin, "StateTransition chain: Only by governor or admin");
         _;
     }
 }
