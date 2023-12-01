@@ -17,7 +17,7 @@ import "./interfaces/IL2StandardToken.sol";
 /// - It implements `permit` method to allow users to sign a message instead of calling `approve`.
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
-/// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
+/// But for now, when the Rollup has instant upgradeability, we leave the possibility of upgrading to improve the contract if needed.
 contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @dev Address of the L2 WETH Bridge.
     address public override l2Bridge;
