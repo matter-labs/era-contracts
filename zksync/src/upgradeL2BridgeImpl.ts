@@ -27,7 +27,6 @@ function checkSupportedContract(contract: any): contract is SupportedContracts {
 
 const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
-const l2WethProxyAddress = getAddressFromEnv("CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 const provider = web3Provider();
@@ -129,7 +128,9 @@ async function getTxInfo(
   if (contract === "L2ERC20Bridge") {
     return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
   } else if (contract == "L2Weth") {
-    return getTransparentProxyUpgradeTxInfo(deployer, target, l2WethProxyAddress, refundRecipient, gasPrice);
+    throw new Error(
+      "The latest L2Weth implementation requires L2WethBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed."
+    );
   } else if (contract == "L2StandardERC20") {
     if (!l2ProxyAddress) {
       console.log("Explicit beacon address is not supplied, requesting the one from L2 node");
