@@ -34,12 +34,12 @@ library BridgeInitializationHelper {
         bytes32 _bytecodeHash,
         bytes memory _constructorData,
         bytes[] memory _factoryDeps
-    ) internal returns (address deployedAddress) {
+    ) internal returns (address deployedAddress, bytes32 txHash) {
         bytes memory deployCalldata = abi.encodeCall(
             IL2ContractDeployer.create2,
             (bytes32(0), _bytecodeHash, _constructorData)
         );
-        _zkSync.requestL2Transaction{value: _deployTransactionFee}(
+        txHash = _zkSync.requestL2Transaction{value: _deployTransactionFee}(
             _chainId,
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,

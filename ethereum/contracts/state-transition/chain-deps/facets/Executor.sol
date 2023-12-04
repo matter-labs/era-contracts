@@ -181,6 +181,8 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external override nonReentrant onlyValidator {
+        // check that we have the right protocol version
+        require(StataTransition(chainStorage.stateTransition).getProtocolVersion() == chainStorage.protocolVersion, "Executor facet: wrong protocol version");
         // Check that we commit batches after last committed batch
         require(
             chainStorage.storedBatchHashes[chainStorage.totalBatchesCommitted] ==

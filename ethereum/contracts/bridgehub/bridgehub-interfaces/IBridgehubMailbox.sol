@@ -13,7 +13,7 @@ interface IBridgehubMailbox {
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,
-        uint256 _l2TxNumberInBlock
+        uint256 _l2TxNumberInBatch
     ) external view returns (bool);
 
     function proveL2MessageInclusion(
@@ -35,18 +35,18 @@ interface IBridgehubMailbox {
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view returns (bool);
 
     function finalizeEthWithdrawal(
         uint256 _chainId,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;

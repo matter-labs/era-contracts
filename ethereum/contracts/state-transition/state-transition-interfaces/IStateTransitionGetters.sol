@@ -22,5 +22,4 @@ interface IStateTransitionGetters {
     function getUpgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
     function getProtocolVersion() external view returns (uint256);
-
 }

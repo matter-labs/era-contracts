@@ -7,5 +7,9 @@ import "./IStateTransitionRegistry.sol";
 import "./IStateTransitionGetters.sol";
 import "./IStateTransitionInit.sol";
 
-
-interface IStateTransition is IStateTransitionBase, IStateTransitionGetters, IStateTransitionInit, IStateTransitionRegistry {}
+interface IStateTransition is
+    IStateTransitionBase,
+    IStateTransitionGetters,
+    IStateTransitionInit,
+    IStateTransitionRegistry
+{}

@@ -70,10 +70,7 @@ describe("Mailbox tests", function () {
     chainId = deployer.chainId;
     allowList = deployer.l1AllowList(deployWallet);
 
-    bridgehub = BridgehubFactory.connect(
-      deployer.addresses.Bridgehub.BridgehubProxy,
-      deployWallet
-    );
+    bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(

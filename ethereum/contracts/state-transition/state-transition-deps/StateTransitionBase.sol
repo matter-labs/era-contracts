@@ -14,17 +14,20 @@ contract StateTransitionBase is ReentrancyGuard, AllowListed {
 
     /// @notice Checks that the message sender is an active governor
     modifier onlyGovernor() {
-        require(msg.sender == stateTransitionStorage.governor, "StateTransition: only governor"); 
+        require(msg.sender == stateTransitionStorage.governor, "StateTransition: only governor");
         _;
     }
 
     modifier onlyBridgehub() {
-        require(msg.sender == stateTransitionStorage.bridgehub, "StateTransition: only bridgehub"); 
+        require(msg.sender == stateTransitionStorage.bridgehub, "StateTransition: only bridgehub");
         _;
     }
 
     modifier onlyChain(uint256 _chainId) {
-        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == msg.sender, "StateTransition: only chain");
+        require(
+            stateTransitionStorage.stateTransitionChainContract[_chainId] == msg.sender,
+            "StateTransition: only chain"
+        );
         _;
     }
 
@@ -33,7 +36,7 @@ contract StateTransitionBase is ReentrancyGuard, AllowListed {
             IStateTransitionChain(stateTransitionStorage.stateTransitionChainContract[_chainId]).getGovernor() ==
                 msg.sender,
             "StateTransition: only chain governor"
-        ); 
+        );
         _;
     }
 }

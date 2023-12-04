@@ -17,7 +17,6 @@ struct BridgehubStorage {
     address governor;
     /// @notice Address that the governor proposed as one that will replace it
     address pendingGovernor;
-    
     /// new fields
     /// @notice we store registered stateTransitions
     mapping(address => bool) stateTransitionIsRegistered;

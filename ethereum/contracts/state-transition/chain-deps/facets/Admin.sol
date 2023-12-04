@@ -72,7 +72,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
 
     /// @notice Change zk porter availability
     /// @param _zkPorterIsAvailable The availability of zk porter shard
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyGovernor {
+    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransition {
         // Change the porter availability
         chainStorage.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
@@ -96,33 +96,15 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(
-        Diamond.DiamondCutData calldata _diamondCut,
-        uint256 _latestProtocolVersion
+        Diamond.DiamondCutData calldata _diamondCut
     ) external onlyStateTransition {
         Diamond.diamondCut(_diamondCut);
-        if (chainStorage.protocolVersion == _latestProtocolVersion) {
-            chainStorage.upToDate = true;
-        }
         emit ExecuteUpgrade(_diamondCut);
     }
 
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Instantly pause the functionality of all freezable facets & their selectors
-    /// @dev Only the governance mechanism may freeze Diamond Proxy
-    function freezeNotUpdated(uint256 _protocolVersion) external onlyStateTransition {
-        Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
-
-        if (chainStorage.protocolVersion == _protocolVersion) {
-            return;
-        }
-        chainStorage.upToDate = false;
-        diamondStorage.isFrozen = true;
-
-        emit Freeze();
-    }
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
@@ -140,7 +122,6 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     function unfreezeDiamond() external onlyGovernorOrAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
-        require(chainStorage.upToDate, "a8"); // diamond proxy is not up to date
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen
         diamondStorage.isFrozen = false;
 

@@ -316,10 +316,7 @@ export class Deployer {
   //   this.addresses.Bridgehub.BridgehubDiamondInit = contractAddress;
   // }
 
-  public async deployBridgehubImplementation(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
+  public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
 
@@ -341,25 +338,16 @@ export class Deployer {
     this.addresses.TransparentProxyAdmin = contractAddress;
   }
 
-  public async deployBridgehubProxy(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest,
-  ) {
+  public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
 
-    const initCalldata = bridgehub.encodeFunctionData("initialize", [      
-        this.ownerAddress
-    ]);
+    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.ownerAddress]);
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [
-        this.addresses.Bridgehub.BridgehubImplementation,
-        this.addresses.TransparentProxyAdmin,
-        initCalldata,
-      ],
+      [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
     );
@@ -606,13 +594,7 @@ export class Deployer {
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 
-
-
-  public async deployBridgehubContract(
-    create2Salt: string,
-    gasPrice?: BigNumberish,
-    nonce?
-  ) {
+  public async deployBridgehubContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     await this.deployBridgehubImplementation(create2Salt, { gasPrice });

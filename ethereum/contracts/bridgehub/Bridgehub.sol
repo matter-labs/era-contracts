@@ -7,17 +7,14 @@ import "./bridgehub-deps/BridgehubBase.sol";
 import "./bridgehub-interfaces/IBridgehub.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
-contract Bridgehub is BridgehubBase, IBridgehub{
-
+contract Bridgehub is BridgehubBase, IBridgehub {
     string public constant override getName = "Bridgehub";
 
-    function initialize(
-        address _governor
-    ) external reentrancyGuardInitializer returns (bytes32) {
+    function initialize(address _governor) external reentrancyGuardInitializer returns (bytes32) {
         require(bridgehubStorage.governor == address(0), "Bridgehub: governor zero");
         bridgehubStorage.governor = _governor;
     }
-    
+
     ///// Getters
 
     /// @return The address of the current governor
@@ -37,52 +34,58 @@ contract Bridgehub is BridgehubBase, IBridgehub{
     function getStateTransitionChain(uint256 _chainId) public view returns (address) {
         return IStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId);
     }
-    
-    //// Registry 
 
-        /// @notice Proof system can be any contract with the appropriate interface, functionality
-        function newStateTransition(address _stateTransition) external onlyGovernor {
-            // KL todo add checks here
-            require(!bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
-            bridgehubStorage.stateTransitionIsRegistered[_stateTransition] = true;
-        }
-    
-        /// @notice
-        function newChain(
-            uint256 _chainId,
-            address _stateTransition,
-            uint256 _salt
-        ) external onlyGovernor returns (uint256 chainId) {
-            // KL TODO: clear up this formula for chainId generation
-            // KL Todo: uint16 until the server can take bigger numbers.
-            if (_chainId == 0) {
-                chainId = uint16(
-                    uint256(
-                        keccak256(
-                            abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
-                        )
+    //// Registry
+
+    /// @notice Proof system can be any contract with the appropriate interface, functionality
+    function newStateTransition(address _stateTransition) external onlyGovernor {
+        // KL todo add checks here
+        require(
+            !bridgehubStorage.stateTransitionIsRegistered[_stateTransition],
+            "Bridgehub: state transition already registered"
+        );
+        bridgehubStorage.stateTransitionIsRegistered[_stateTransition] = true;
+    }
+
+    /// @notice
+    function newChain(
+        uint256 _chainId,
+        address _stateTransition,
+        uint256 _salt
+    ) external onlyGovernor returns (uint256 chainId) {
+        // KL TODO: clear up this formula for chainId generation
+        // KL Todo: uint16 until the server can take bigger numbers.
+        if (_chainId == 0) {
+            chainId = uint16(
+                uint256(
+                    keccak256(
+                        abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
                     )
-                );
-            } else {
-                chainId = _chainId;
-            }
-    
-            require(bridgehubStorage.stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition not registered");
-    
-            bridgehubStorage.stateTransition[chainId] = _stateTransition;
-    
-            emit NewChain(uint16(chainId), _stateTransition, msg.sender);
+                )
+            );
+        } else {
+            chainId = _chainId;
         }
+
+        require(
+            bridgehubStorage.stateTransitionIsRegistered[_stateTransition],
+            "Bridgehub: state transition not registered"
+        );
+
+        bridgehubStorage.stateTransition[chainId] = _stateTransition;
+
+        emit NewChain(uint16(chainId), _stateTransition, msg.sender);
+    }
 
     //// Mailbox forwarder
     function isEthWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2MessageIndex,
-        uint256 _l2TxNumberInBlock
+        uint256 _l2TxNumberInBatch
     ) external view override returns (bool) {
         address stateTransitionChain = getStateTransitionChain(_chainId);
         return
-            IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBlock);
+            IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBatch);
     }
 
     function proveL2MessageInclusion(
@@ -111,9 +114,9 @@ contract Bridgehub is BridgehubBase, IBridgehub{
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
@@ -121,9 +124,9 @@ contract Bridgehub is BridgehubBase, IBridgehub{
         return
             IStateTransitionChain(stateTransitionChain).proveL1ToL2TransactionStatus(
                 _l2TxHash,
-                _l2BlockNumber,
+                _l2BatchNumber,
                 _l2MessageIndex,
-                _l2TxNumberInBlock,
+                _l2TxNumberInBatch,
                 _merkleProof,
                 _status
             );
@@ -170,9 +173,9 @@ contract Bridgehub is BridgehubBase, IBridgehub{
 
     function finalizeEthWithdrawal(
         uint256 _chainId,
-        uint256 _l2BlockNumber,
+        uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBlock,
+        uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
@@ -180,9 +183,9 @@ contract Bridgehub is BridgehubBase, IBridgehub{
         return
             IStateTransitionChain(stateTransitionChain).finalizeEthWithdrawalBridgehub(
                 msg.sender,
-                _l2BlockNumber,
+                _l2BatchNumber,
                 _l2MessageIndex,
-                _l2TxNumberInBlock,
+                _l2TxNumberInBatch,
                 _message,
                 _merkleProof
             );

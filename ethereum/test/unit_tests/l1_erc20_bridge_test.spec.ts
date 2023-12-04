@@ -65,10 +65,7 @@ describe(`L1ERC20Bridge tests`, function () {
     chainId = deployer.chainId.toString();
     allowList = deployer.l1AllowList(deployWallet);
 
-    bridgehub = BridgehubFactory.connect(
-      deployer.addresses.Bridgehub.BridgehubProxy,
-      deployWallet
-    );
+    bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
     l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(

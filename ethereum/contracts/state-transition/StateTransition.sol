@@ -128,8 +128,14 @@ contract StateTransition is IStateTransition, StateTransitionBase {
     ) external onlyGovernor {
         // check not registered
         address bridgehub = stateTransitionStorage.bridgehub;
-        require(stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0), "StateTransition: chainId exists");
-        require(IBridgehub(bridgehub).getStateTransition(_chainId) == address(this), "StateTransition: not registered in Bridgehub");
+        require(
+            stateTransitionStorage.stateTransitionChainContract[_chainId] == address(0),
+            "StateTransition: chainId exists"
+        );
+        require(
+            IBridgehub(bridgehub).getStateTransition(_chainId) == address(this),
+            "StateTransition: not registered in Bridgehub"
+        );
 
         // check input
         bytes32 cutHash = keccak256(abi.encode(_diamondCut));
@@ -181,32 +187,14 @@ contract StateTransition is IStateTransition, StateTransitionBase {
         Diamond.DiamondCutData calldata _cutData
     ) external onlyChainGovernor(_chainId) {
         bytes32 cutHash = keccak256(abi.encode(_cutData));
-        require(cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion], "StateTransition: cutHash mismatch");
+        require(
+            cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion],
+            "StateTransition: cutHash mismatch"
+        );
 
         IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
             stateTransitionStorage.stateTransitionChainContract[_chainId]
         );
-        stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
-    }
-
-    function specialUpgradeChain(
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external onlyGovernor {
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
-            stateTransitionStorage.stateTransitionChainContract[_chainId]
-        );
-        stateTransitionChainContract.executeUpgrade(_cutData, _protocolVersion);
-    }
-
-    function freezeNotUpdated() external onlyGovernor {
-        uint256 protocolVersion = stateTransitionStorage.protocolVersion;
-        for (uint256 i = 0; i < stateTransitionStorage.totalChains; i = i.uncheckedInc()) {
-            IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
-                stateTransitionStorage.chainNumberToContract[i]
-            );
-            stateTransitionChainContract.freezeNotUpdated(protocolVersion);
-        }
+        stateTransitionChainContract.executeUpgrade(_cutData);
     }
 }
