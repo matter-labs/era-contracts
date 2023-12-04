@@ -31,7 +31,7 @@
     "eslint-plugin-import": "^2.29.0",
     "eslint-plugin-prettier": "^5.0.1",
     "ethers": "^5.7.0",
-    "hardhat": "=2.16.0",
+    "hardhat": "^2.18.3",
     "hardhat-typechain": "^0.3.3",
     "markdownlint-cli": "^0.33.0",
     "mocha": "^9.0.2",
@@ -46,6 +46,7 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
+    "test": "hardhat test",
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",
