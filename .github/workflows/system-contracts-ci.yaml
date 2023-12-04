@@ -36,12 +36,12 @@ jobs:
         with:
           key: artifacts-system-${{ github.sha }}
           path: |
-            artifacts-zk
-            cache-zk
-            typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
-            bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain-types
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
 
   lint:
     runs-on: ubuntu-latest
@@ -93,12 +93,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            artifacts-zk
-            cache-zk
-            typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
-            bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain-types
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
 
       - name: Check hashes
         run: yarn calculate-hashes:check
@@ -135,12 +135,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            artifacts-zk
-            cache-zk
-            typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
-            bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain-types
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
 
       - name: Run tests
         run: yarn test
@@ -172,12 +172,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-system-${{ github.sha }}
           path: |
-            artifacts-zk
-            cache-zk
-            typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
-            bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain-types
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
 
       - name: Run bootloader tests
         run: "cd bootloader/test_infra && cargo run"
