@@ -147,7 +147,7 @@ jobs:
 
       - name: Print output logs of era_test_node
         if: always()
-        run: cat system-contracts/era_test_node.log
+        run: cat era_test_node.log
 
   test_bootloader:
     needs: [build, lint]
