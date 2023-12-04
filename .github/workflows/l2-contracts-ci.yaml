@@ -107,4 +107,4 @@ jobs:
         uses: dutterbutter/era-test-node-action@latest
 
       - name: Run tests
-        run: yarn hardhat test
+        run: yarn test
