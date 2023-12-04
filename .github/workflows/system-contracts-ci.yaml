@@ -1,4 +1,4 @@
-name: "CI"
+name: System Contracts CI
 
 on:
   pull_request:
@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: system-contracts
 
     steps:
       - name: Checkout the repository

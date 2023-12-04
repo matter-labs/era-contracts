@@ -1,9 +1,9 @@
-name: CI
+name: L1 contracts CI
 
 on: pull_request
 
 jobs:
-  lint-l1:
+  lint:
     runs-on: ubuntu-latest
 
     defaults:
@@ -30,34 +30,7 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
-  lint-l2:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: l2-contracts
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-          cache-dependency-path: l2-contracts/yarn.lock
-
-      - name: Install yarn
-        run: npm install -g yarn
-
-      - name: Install dependencies
-        run: yarn install
-
-      - name: Lint
-        run: yarn lint:check
-
-  build-l1:
+  build:
     runs-on: ubuntu-latest
 
     defaults:
@@ -93,44 +66,8 @@ jobs:
             l1-contracts/cache
             l1-contracts/typechain
 
-  build-l2:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: l2-contracts
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-          cache-dependency-path: l2-contracts/yarn.lock
-
-      - name: Install yarn
-        run: npm install -g yarn
-
-      - name: Install dependencies
-        run: yarn install
-
-      - name: Build artifacts
-        run: yarn build
-
-      - name: Create cache
-        uses: actions/cache/save@v3
-        with:
-          key: artifacts-zk-${{ github.sha }}
-          path: |
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
-
-  test-hardhat-l1:
-    needs: [build-l1, lint-l1]
+  test-hardhat:
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     defaults:
@@ -167,8 +104,8 @@ jobs:
       - name: Run tests
         run: yarn test --no-compile
 
-  test-foundry-l1:
-    needs: [build-l1, lint-l1]
+  test-foundry:
+    needs: [build, lint]
     runs-on: ubuntu-latest
 
     defaults:
@@ -209,49 +146,6 @@ jobs:
 
       - name: Run tests
         run: forge test
-
-  test-hardhat-l2:
-    needs: [build-l2, lint-l2]
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: l2-contracts
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v3
-        with:
-          submodules: "recursive"
-
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
-          cache-dependency-path: l2-contracts/yarn.lock
-
-      - name: Install yarn
-        run: npm install -g yarn
-
-      - name: Install dependencies
-        run: yarn install
-
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-zk-${{ github.sha }}
-          path: |
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
-
-      - name: Run Era test node
-        uses: dutterbutter/era-test-node-action@latest
-
-      - name: Run tests
-        run: yarn hardhat test
 
   check-verifier-generator:
     runs-on: ubuntu-latest
