@@ -1,4 +1,4 @@
-name: System Contracts CI
+name: System contracts CI
 
 on:
   pull_request:
