@@ -34,7 +34,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-${{ github.sha }}
+          key: artifacts-system-${{ github.sha }}
           path: |
             artifacts-zk
             cache-zk
@@ -91,7 +91,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-${{ github.sha }}
+          key: artifacts-system-${{ github.sha }}
           path: |
             artifacts-zk
             cache-zk
@@ -133,7 +133,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-${{ github.sha }}
+          key: artifacts-system-${{ github.sha }}
           path: |
             artifacts-zk
             cache-zk
@@ -170,7 +170,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-${{ github.sha }}
+          key: artifacts-system-${{ github.sha }}
           path: |
             artifacts-zk
             cache-zk

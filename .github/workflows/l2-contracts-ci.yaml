@@ -60,7 +60,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-zk-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
@@ -97,7 +97,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-zk-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
