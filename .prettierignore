@@ -1,5 +1,6 @@
 # root
 node_modules
+tools/data
 
 # l1-contracts
 l1-contracts/artifacts
