@@ -2,3 +2,4 @@
 tools/target
 tools/data/Verifier.sol
 node_modules
+yarn-error.log
