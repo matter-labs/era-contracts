@@ -1,6 +1,7 @@
-import { BigNumber, BigNumberish, BytesLike, ethers, Wallet } from "ethers";
-import { Address } from "zksync-web3/build/src/types";
-import { FacetCut } from "../../src.ts/diamondCut";
+import type { BigNumberish, BytesLike, Wallet } from "ethers";
+import { BigNumber, ethers } from "ethers";
+import type { Address } from "zksync-web3/build/src/types";
+import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
 
@@ -15,14 +16,14 @@ export const CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
 
-export const EMPTY_STRING_KECCAK = `0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470`;
-export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = `0x0000000000000000000000000000000000000000000000000000000000000000`;
-export const L2_SYSTEM_CONTEXT_ADDRESS = `0x000000000000000000000000000000000000800b`;
-export const L2_BOOTLOADER_ADDRESS = `0x0000000000000000000000000000000000008001`;
-export const L2_KNOWN_CODE_STORAGE_ADDRESS = `0x0000000000000000000000000000000000008004`;
-export const L2_TO_L1_MESSENGER = `0x0000000000000000000000000000000000008008`;
+export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+export const DEFAULT_L2_LOGS_TREE_ROOT_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
+export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
+export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
+export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
 export const L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
-export const L2_BYTECODE_COMPRESSOR_ADDRESS = `0x000000000000000000000000000000000000800e`;
+export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -146,7 +147,7 @@ export async function requestExecuteDirect(
   factoryDeps: BytesLike[],
   refundRecipient: string
 ) {
-  let overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 28000000 as BigNumberish };
+  const overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 28000000 as BigNumberish };
   overrides.gasPrice = await mailbox.provider.getGasPrice();
 
   // we call bridgehubChain direcetly to avoid running out of gas.
@@ -190,7 +191,7 @@ export function createSystemLogs(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
+      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
     ),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
@@ -231,7 +232,7 @@ export function createSystemLogsWithUpgrade(
       true,
       L2_TO_L1_MESSENGER,
       SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      `0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563`
+      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
     ),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(

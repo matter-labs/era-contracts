@@ -2,24 +2,20 @@ import { expect } from "chai";
 import * as hardhat from "hardhat";
 import * as fs from "fs";
 import { diamondCut } from "../../src.ts/diamondCut";
+import type { ExecutorFacet, AdminFacet, GettersFacet, StateTransition } from "../../typechain";
 import {
-  ExecutorFacet,
   ExecutorFacetFactory,
   GettersFacetFactory,
-  AdminFacet,
   AdminFacetFactory,
-  GettersFacet,
   DefaultUpgradeFactory,
   CustomUpgradeTestFactory,
-  StateTransition,
   StateTransitionFactory,
 } from "../../typechain";
+import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
   getCallRevertReason,
   EMPTY_STRING_KECCAK,
   genesisStoredBatchInfo,
-  StoredBatchInfo,
-  CommitBatchInfo,
   L2_SYSTEM_CONTEXT_ADDRESS,
   L2_BOOTLOADER_ADDRESS,
   createSystemLogs,
@@ -31,7 +27,8 @@ import {
   createSystemLogsWithUpgrade,
 } from "./utils";
 import * as ethers from "ethers";
-import { BigNumberish, Wallet, BytesLike } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
+import { Wallet } from "ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
 
 import { keccak256 } from "ethers/lib/utils";
@@ -86,7 +83,7 @@ describe("L2 upgrade test", function () {
 
     await owner.sendTransaction(tx);
 
-    let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
     initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
 
     chainId = deployer.chainId;
@@ -724,7 +721,7 @@ async function buildCommitBatchInfo(
   info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  let systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs, prevInfo.batchHash);
+  const systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs, prevInfo.batchHash);
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -779,7 +776,7 @@ async function buildCommitBatchInfoWithUpgrade(
   upgradeTxHash: string
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  let systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
+  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,

@@ -2,20 +2,22 @@ import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut, getAllSelectors } from "../../src.ts/diamondCut";
-import {
+import type {
   DiamondProxy,
-  DiamondProxyFactory,
   DiamondProxyTest,
-  DiamondProxyTestFactory,
   AdminFacet,
-  AdminFacetFactory,
   GettersFacet,
-  GettersFacetFactory,
   MailboxFacet,
-  MailboxFacetFactory,
   ExecutorFacet,
-  ExecutorFacetFactory,
   DiamondInit,
+} from "../../typechain";
+import {
+  DiamondProxyFactory,
+  DiamondProxyTestFactory,
+  AdminFacetFactory,
+  GettersFacetFactory,
+  MailboxFacetFactory,
+  ExecutorFacetFactory,
   DiamondInitFactory,
   TestnetERC20TokenFactory,
 } from "../../typechain";
@@ -32,7 +34,7 @@ describe("Diamond proxy tests", function () {
   let governor: ethers.Signer;
   let owner: ethers.Signer;
   let governorAddress: string;
-  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  const chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
     [owner, governor] = await hardhat.ethers.getSigners();
@@ -54,7 +56,7 @@ describe("Diamond proxy tests", function () {
     const mailboxFacetContract = await mailboxFacetFactory.deploy();
     mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
 
-    const executorFactory = await hardhat.ethers.getContractFactory(`ExecutorFacet`);
+    const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
     const executorContract = await executorFactory.deploy();
     executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
 

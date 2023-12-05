@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
-import { BigNumberish, Wallet } from "ethers";
+import type { BigNumberish } from "ethers";
+import { Wallet } from "ethers";
 import { ethers } from "hardhat";
 import { Provider } from "zksync-web3";
 import "@nomiclabs/hardhat-ethers";

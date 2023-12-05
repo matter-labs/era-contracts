@@ -1,7 +1,8 @@
 import * as path from "path";
 import { ethers } from "ethers";
 import { readBytecode, readInterface, computeL2Create2Address, applyL1ToL2Alias, hashL2Bytecode } from "./utils";
-import { L1WethBridge, L1ERC20Bridge } from "../typechain";
+import type { L1ERC20Bridge } from "../typechain";
+import { L1WethBridge } from "../typechain";
 
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 

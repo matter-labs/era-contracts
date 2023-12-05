@@ -4,8 +4,9 @@ import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 
-import { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
-import { AllowList, L1WethBridge, L1WethBridgeFactory, WETH9, WETH9Factory } from "../../typechain";
+import type { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
+import type { AllowList, L1WethBridge, WETH9 } from "../../typechain";
+import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
 import { hashL2Bytecode } from "../../scripts/utils";
 import {
@@ -15,7 +16,7 @@ import {
 } from "../../scripts/utils-bytecode";
 
 import { Interface } from "ethers/lib/utils";
-import { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-web3/build/src/types";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -64,7 +65,7 @@ describe("WETH Bridge tests", () => {
   let allowList: AllowList;
   let bridgeProxy: L1WethBridge;
   let l1Weth: WETH9;
-  let functionSignature = "0x0fdef251";
+  const functionSignature = "0x0fdef251";
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
@@ -86,7 +87,7 @@ describe("WETH Bridge tests", () => {
 
     await owner.sendTransaction(tx);
 
-    let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
     allowList = deployer.l1AllowList(deployWallet);
@@ -164,7 +165,7 @@ describe("WETH Bridge tests", () => {
     expect(revertReason).equal("Amount cannot be zero");
   });
 
-  it(`Should deposit successfully`, async () => {
+  it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
     await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
     await bridgeProxy

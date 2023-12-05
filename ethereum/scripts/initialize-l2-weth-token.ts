@@ -91,7 +91,7 @@ async function main() {
     .action(async (cmd) => {
       const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       if (!l1WethTokenAddress) {
-        console.log(`Base Layer WETH address not provided. Skipping.`);
+        console.log("Base Layer WETH address not provided. Skipping.");
         return;
       }
 
@@ -133,7 +133,7 @@ async function main() {
     .action(async (cmd) => {
       const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       if (!l1WethTokenAddress) {
-        console.log(`Base Layer WETH address not provided. Skipping.`);
+        console.log("Base Layer WETH address not provided. Skipping.");
         return;
       }
 

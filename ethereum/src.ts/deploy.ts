@@ -1,20 +1,20 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 
-import { BigNumberish, ethers, providers, Signer, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
-import { diamondCut, FacetCut } from "./diamondCut";
+import type { BigNumberish, providers, Signer, Wallet } from "ethers";
+import { ethers } from "ethers";
+import { Interface, hexlify } from "ethers/lib/utils";
+import type { FacetCut } from "./diamondCut";
+import { diamondCut, getCurrentFacetCutsForAdd, getBridgehubCurrentFacetCutsForAdd } from "./diamondCut";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IStateTransitionFactory } from "../typechain/IStateTransitionFactory";
 import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
-import { getCurrentFacetCutsForAdd, getBridgehubCurrentFacetCutsForAdd } from "./diamondCut";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { AllowListFactory } from "../typechain";
 import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
-import { hexlify } from "ethers/lib/utils";
 import {
   hashL2Bytecode,
   getAddressFromEnv,

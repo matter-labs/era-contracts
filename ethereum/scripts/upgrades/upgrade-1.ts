@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { deployedAddressesFromEnv } from "../../src.ts/deploy";
 import { getNumberFromEnv } from "../utils";
 import { diamondCut } from "../../src.ts/diamondCut";
-import { BigNumberish, BytesLike } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 
 type DeploymentPram = {

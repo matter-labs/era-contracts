@@ -1,14 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import {
-  BridgehubFactory,
-  MailboxFacetFactory,
-  AllowList,
-  Forwarder,
-  ForwarderFactory,
-  MockExecutorFacet,
-  MockExecutorFacetFactory,
-} from "../../typechain";
+import type { AllowList, Forwarder, MockExecutorFacet } from "../../typechain";
+import { BridgehubFactory, MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
 
 import {
   DEFAULT_REVERT_REASON,
@@ -65,7 +58,7 @@ describe("Mailbox tests", function () {
     const mockExecutorContract = await mockExecutorFactory.deploy();
     const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
 
-    let deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
     allowList = deployer.l1AllowList(deployWallet);
@@ -172,7 +165,7 @@ describe("Mailbox tests", function () {
         )
       );
 
-      expect(revertReason).equal(`d2`);
+      expect(revertReason).equal("d2");
     });
 
     it("Should accept depositing less than or equal to the deposit limit", async () => {
@@ -216,11 +209,11 @@ describe("Mailbox tests", function () {
         )
       );
 
-      expect(revertReason).equal(`d2`);
+      expect(revertReason).equal("d2");
     });
   });
 
-  describe(`finalizeEthWithdrawal`, function () {
+  describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 0;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
@@ -257,17 +250,17 @@ describe("Mailbox tests", function () {
       await proxyAsMockExecutor.saveL2LogsRootHash(BLOCK_NUMBER, L2_LOGS_TREE_ROOT);
     });
 
-    it(`Reverts when proof is invalid`, async () => {
-      let invalidProof = [...MERKLE_PROOF];
+    it("Reverts when proof is invalid", async () => {
+      const invalidProof = [...MERKLE_PROOF];
       invalidProof[0] = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43bb";
 
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal(`pi`);
+      expect(revertReason).equal("pi");
     });
 
-    it(`Successful withdrawal`, async () => {
+    it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
 
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
@@ -275,21 +268,21 @@ describe("Mailbox tests", function () {
       expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
     });
 
-    it(`Reverts when withdrawal is already finalized`, async () => {
+    it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal(`jj`);
+      expect(revertReason).equal("jj");
     });
   });
 
-  describe(`Access mode functionality`, function () {
+  describe("Access mode functionality", function () {
     before(async () => {
       // We still need to set infinite amount of allowed deposit limit in order to ensure that every fee will be accepted
       await allowList.setDepositLimit(ethers.constants.AddressZero, true, ethers.utils.parseEther("2000"));
     });
 
-    it(`Should not allow an un-whitelisted address to call`, async () => {
+    it("Should not allow an un-whitelisted address to call", async () => {
       await allowList.setAccessMode(mailbox.address, AccessMode.Closed);
 
       const revertReason = await getCallRevertReason(
@@ -304,10 +297,10 @@ describe("Mailbox tests", function () {
           ethers.constants.AddressZero
         )
       );
-      expect(revertReason).equal(`nr2`);
+      expect(revertReason).equal("nr2");
     });
 
-    it(`Should allow the whitelisted address to call`, async () => {
+    it("Should allow the whitelisted address to call", async () => {
       await allowList.setAccessMode(mailbox.address, AccessMode.SpecialAccessOnly);
       await allowList.setPermissionToCall(await owner.getAddress(), mailbox.address, "0x291d331a", true);
 
@@ -360,7 +353,7 @@ describe("Mailbox tests", function () {
         refundRecipient,
       ]);
 
-    let overrides: ethers.PayableOverrides = {};
+    const overrides: ethers.PayableOverrides = {};
     overrides.gasPrice = await bridgehub.provider.getGasPrice();
     overrides.value = await bridgehub.l2TransactionBaseCost(
       chainId,
