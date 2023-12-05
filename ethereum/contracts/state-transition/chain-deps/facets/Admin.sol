@@ -46,7 +46,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
         address oldPendingAdmin = chainStorage.pendingAdmin;
         // Change pending admin
         chainStorage.pendingAdmin = _newPendingAdmin;
-        emit NewPendingGovernor(oldPendingAdmin, _newPendingAdmin);
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
@@ -95,9 +95,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
-    function executeUpgrade(
-        Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyStateTransition {
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransition {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
     }

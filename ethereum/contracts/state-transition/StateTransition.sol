@@ -117,7 +117,7 @@ contract StateTransition is IStateTransition, StateTransitionBase {
             )
         });
 
-        IAdmin(_chainContract).executeUpgrade(cutData, stateTransitionStorage.protocolVersion);
+        IAdmin(_chainContract).executeUpgrade(cutData);
     }
 
     /// @notice

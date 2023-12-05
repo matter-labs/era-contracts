@@ -70,7 +70,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev Governor's address
     address public governor;
 
-    // if EOA then L1toL2 alias is applied.
+    // if not EOA then L1toL2 alias is applied.
     address public l2Governor;
 
     bytes32 public factoryDepsHash;
@@ -135,13 +135,13 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
-    function l2Bridge() external view returns (address){
+    function l2Bridge() external view returns (address) {
         return l2BridgeAddress[eraChainId];
     }
 
     /// @notice Checks that the message sender is the governor
     modifier onlyGovernor() {
-        require(msg.sender == governor, "L1ERC20Bridge: not governor"); 
+        require(msg.sender == governor, "L1ERC20Bridge: not governor");
         _;
     }
 
@@ -153,7 +153,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
         l2TokenBeaconAddress[_chainId] = _l2TokenBeaconAddress;
     }
-
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it
@@ -379,7 +378,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             depositAmount[_chainId][msg.sender][_l1Token][l2TxHash] = amount;
         }
 
-        emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+        emit DepositInitiated(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+        if (_chainId = eraChainId) {
+            emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+        }
     }
 
     // to avoid stack too deep error
@@ -483,7 +485,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         // Withdraw funds
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
-        emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
+        emit ClaimedFailedDeposit(_chainId, _depositSender, _l1Token, amount);
+        if (_chainId = eraChainId) {
+            emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
+        }
     }
 
     /// @notice Finalize the withdrawal and release funds
@@ -539,7 +544,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
 
-            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+            emit WithdrawalFinalized(_chainId, l1Receiver, l1Token, amount);
+            if (_chainId = eraChainId) {
+                emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+            }
         }
     }
 
@@ -578,6 +586,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeaconStandardAddress), ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return L2ContractHelper.computeCreate2Address(l2BridgeStandardAddress, salt, l2TokenProxyBytecodeHash, constructorInputHash);
+        return
+            L2ContractHelper.computeCreate2Address(
+                l2BridgeStandardAddress,
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
     }
 }

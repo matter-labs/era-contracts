@@ -87,14 +87,14 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             }
         }
 
-        _propagateToZkSync();
+        _propagateToStateTransitionChain();
     }
 
     /// @dev Make a call to the zkSync contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator {
-        _propagateToZkSync();
+        _propagateToStateTransitionChain();
     }
 
     /// @dev Make a call to the zkSync contract with the same calldata.
@@ -105,7 +105,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator {
-        _propagateToZkSync();
+        _propagateToStateTransitionChain();
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -117,19 +117,19 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 uint256 commitBatchTimestamp = committedBatchTimestamp.get(_newBatchesData[i].batchNumber);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
-                // * The batch was committed, but not though this contract.
+                // * The batch was committed, but not through this contract.
                 // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
                 // We allow executing such batches.
 
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToZkSync();
+        _propagateToStateTransitionChain();
     }
 
     /// @dev Call the zkSync contract with the same calldata as this contract was called.
     /// Note: it is called the zkSync contract, not delegatecalled!
-    function _propagateToZkSync() internal {
+    function _propagateToStateTransitionChain() internal {
         address contractAddress = stateTransitionChain;
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position

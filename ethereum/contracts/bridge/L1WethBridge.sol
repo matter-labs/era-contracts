@@ -115,7 +115,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         bytes[] calldata _factoryDeps,
         address _l2WethStandardAddress,
         address _l2BridgeStandardAddress,
-        address _governor, 
+        address _governor,
         address _l2Governor
     ) external reinitializer(2) {
         require(_l2WethStandardAddress != address(0), "L2 WETH address cannot be zero");
@@ -130,13 +130,13 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
-    function l2Bridge() external view returns (address){
+    function l2Bridge() external view returns (address) {
         return l2BridgeAddress[eraChainId];
     }
 
     /// @notice Checks that the message sender is the governor
     modifier onlyGovernor() {
-        require(msg.sender == governor, "L1WETHBridge: not governor"); 
+        require(msg.sender == governor, "L1WETHBridge: not governor");
         _;
     }
 
@@ -165,10 +165,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
     ) external payable {
-        require(
-            l2BridgeAddress[_chainId] == address(0),
-            "L1WETHBridge: bridge already deployed"
-        );
+        require(l2BridgeAddress[_chainId] == address(0), "L1WETHBridge: bridge already deployed");
         require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
         require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WethBridge: Invalid factory deps");
         require(
@@ -180,14 +177,15 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         bytes32 l2WethBridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
 
         // Deploy L2 bridge implementation contract
-        (address wethBridgeImplementationAddr, bytes32 bridgeImplTxHash) = BridgeInitializationHelper.requestDeployTransaction(
-            _chainId,
-            bridgehub,
-            _deployBridgeImplementationFee,
-            l2WethBridgeImplementationBytecodeHash,
-            "", // Empty constructor data
-            _factoryDeps // All factory deps are needed for L2 bridge
-        );
+        (address wethBridgeImplementationAddr, bytes32 bridgeImplTxHash) = BridgeInitializationHelper
+            .requestDeployTransaction(
+                _chainId,
+                bridgehub,
+                _deployBridgeImplementationFee,
+                l2WethBridgeImplementationBytecodeHash,
+                "", // Empty constructor data
+                _factoryDeps // All factory deps are needed for L2 bridge
+            );
 
         // Prepare the proxy constructor data
         bytes memory l2WethBridgeProxyConstructorData;
@@ -205,15 +203,16 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         }
 
         // Deploy L2 bridge proxy contract
-        (address wethBridgeProxyAddress, bytes32 bridgeProxyTxHash) = BridgeInitializationHelper.requestDeployTransaction(
-            _chainId,
-            bridgehub,
-            _deployBridgeProxyFee,
-            l2WethBridgeProxyBytecodeHash,
-            l2WethBridgeProxyConstructorData,
-            // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
-            new bytes[](0)
-        );
+        (address wethBridgeProxyAddress, bytes32 bridgeProxyTxHash) = BridgeInitializationHelper
+            .requestDeployTransaction(
+                _chainId,
+                bridgehub,
+                _deployBridgeProxyFee,
+                l2WethBridgeProxyBytecodeHash,
+                l2WethBridgeProxyConstructorData,
+                // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
+                new bytes[](0)
+            );
         require(wethBridgeProxyAddress == l2BridgeStandardAddress, "L1WETHBridge: bridge address does not match");
 
         bridgeImplDeployOnL2TxHash[_chainId] = bridgeImplTxHash;
@@ -324,7 +323,10 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
             refundRecipient
         );
 
-        emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiated(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        if (_chainId = eraChainId) {
+            emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        }
     }
 
     function _depositSendTx(
@@ -446,7 +448,10 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
             isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
         }
 
-        emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
+        emit WithdrawalFinalized(_chainId, l1WethWithdrawReceiver, l1WethAddress, amount);
+        if (_chainId = eraChainId) {
+            emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
+        }
     }
 
     /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken

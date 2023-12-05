@@ -23,9 +23,7 @@ interface IAdmin is IStateTransitionChainBase {
 
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut, uint256 _latestProtocolVersion) external;
-
-    function freezeNotUpdated(uint256 _protocolVersion) external;
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
     function freezeDiamond() external;
 

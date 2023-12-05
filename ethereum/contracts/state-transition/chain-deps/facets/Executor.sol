@@ -11,6 +11,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {VerifierParams} from "../StateTransitionChainStorage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {IStateTransition} from "../../state-transition-interfaces/IStateTransition.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
@@ -182,7 +183,10 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         CommitBatchInfo[] calldata _newBatchesData
     ) external override nonReentrant onlyValidator {
         // check that we have the right protocol version
-        require(StataTransition(chainStorage.stateTransition).getProtocolVersion() == chainStorage.protocolVersion, "Executor facet: wrong protocol version");
+        require(
+            IStateTransition(chainStorage.stateTransition).getProtocolVersion() == chainStorage.protocolVersion,
+            "Executor facet: wrong protocol version"
+        );
         // Check that we commit batches after last committed batch
         require(
             chainStorage.storedBatchHashes[chainStorage.totalBatchesCommitted] ==
