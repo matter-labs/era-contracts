@@ -15,7 +15,7 @@ import {
   L2_WETH_BRIDGE_PROXY_BYTECODE,
 } from "../../scripts/utils-bytecode";
 
-import {EraLegacyChainId} from "../../src.ts/deploy"
+import { EraLegacyChainId } from "../../src.ts/deploy";
 
 import { Interface } from "ethers/lib/utils";
 import type { Address } from "zksync-web3/build/src/types";
@@ -99,7 +99,12 @@ describe("WETH Bridge tests", () => {
 
     const bridge = await (
       await hardhat.ethers.getContractFactory("L1WethBridge")
-    ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubProxy, deployer.addresses.AllowList, EraLegacyChainId);
+    ).deploy(
+      l1Weth.address,
+      deployer.addresses.Bridgehub.BridgehubProxy,
+      deployer.addresses.AllowList,
+      EraLegacyChainId
+    );
 
     const _bridgeProxy = await (await hardhat.ethers.getContractFactory("ERC1967Proxy")).deploy(bridge.address, "0x");
 
@@ -116,14 +121,10 @@ describe("WETH Bridge tests", () => {
       l2WethProxyAddress,
       l2WethBridgeProxyAddress,
       await owner.getAddress(),
-      await owner.getAddress(),
+      await owner.getAddress()
     );
 
-    await bridgeProxy.initializeChainGovernance(
-      chainId,
-      l2WethProxyAddress,
-      l2WethBridgeProxyAddress,
-    );
+    await bridgeProxy.initializeChainGovernance(chainId, l2WethProxyAddress, l2WethBridgeProxyAddress);
   });
 
   it("Should not allow an un-whitelisted address to deposit", async () => {

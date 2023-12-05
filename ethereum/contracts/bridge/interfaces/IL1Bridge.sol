@@ -22,11 +22,21 @@ interface IL1Bridge {
         uint256 amount
     );
 
-    event WithdrawalFinalizedChainId(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
+    event WithdrawalFinalizedChainId(
+        uint256 indexed chainId,
+        address indexed to,
+        address indexed l1Token,
+        uint256 amount
+    );
     // legacy before bridgehub, only used for Era
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
 
-    event ClaimedFailedDepositChainId(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
+    event ClaimedFailedDepositChainId(
+        uint256 indexed chainId,
+        address indexed to,
+        address indexed l1Token,
+        uint256 amount
+    );
     // legacy before bridgehub, only used for Era
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 

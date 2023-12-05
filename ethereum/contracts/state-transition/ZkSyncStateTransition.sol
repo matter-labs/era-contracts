@@ -21,7 +21,9 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
     string public constant override getName = "EraStateTransition";
 
     /// initialize
-    function initialize(ZkSyncStateTransitionInitializeData calldata _initializeData) external reentrancyGuardInitializer {
+    function initialize(
+        ZkSyncStateTransitionInitializeData calldata _initializeData
+    ) external reentrancyGuardInitializer {
         require(_initializeData.governor != address(0), "StateTransition: governor zero");
 
         stateTransitionStorage.bridgehub = _initializeData.bridgehub;

@@ -147,10 +147,7 @@ describe("Diamond proxy tests", function () {
     const diamondProxyTestCalldata = diamondProxyTest.interface.encodeFunctionData("setFreezability", [true]);
     const diamondCutInitData = diamondCut([], diamondProxyTest.address, diamondProxyTestCalldata);
 
-    const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [
-      diamondCutInitData,
-      
-    ]);
+    const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [diamondCutInitData]);
     await proxy.fallback({ data: adminFacetExecuteCalldata });
 
     expect(await proxyAsGettersFacet.isDiamondStorageFrozen()).equal(true);
