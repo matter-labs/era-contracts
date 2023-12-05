@@ -11,7 +11,7 @@ import {Diamond} from "../../common/libraries/Diamond.sol";
 /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
 /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
-struct StateTransitionInitializeData {
+struct ZkSyncStateTransitionInitializeData {
     address bridgehub;
     address governor;
     address diamondInit;
@@ -22,6 +22,6 @@ struct StateTransitionInitializeData {
     uint256 protocolVersion;
 }
 
-interface IStateTransitionInit {
-    function initialize(StateTransitionInitializeData calldata _initalizeData) external;
+interface IZkSyncStateTransitionInit {
+    function initialize(ZkSyncStateTransitionInitializeData calldata _initalizeData) external;
 }

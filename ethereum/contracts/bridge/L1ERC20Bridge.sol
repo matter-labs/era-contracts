@@ -379,7 +379,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         }
 
         emit DepositInitiated(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
-        if (_chainId = eraChainId) {
+        if (_chainId == eraChainId) {
             emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
         }
     }
@@ -486,7 +486,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
         emit ClaimedFailedDeposit(_chainId, _depositSender, _l1Token, amount);
-        if (_chainId = eraChainId) {
+        if (_chainId == eraChainId) {
             emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
         }
     }
@@ -545,7 +545,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
 
             emit WithdrawalFinalized(_chainId, l1Receiver, l1Token, amount);
-            if (_chainId = eraChainId) {
+            if (_chainId == eraChainId) {
                 emit WithdrawalFinalized(l1Receiver, l1Token, amount);
             }
         }

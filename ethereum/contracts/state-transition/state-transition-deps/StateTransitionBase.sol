@@ -9,7 +9,7 @@ import "../chain-interfaces/IStateTransitionChain.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
-contract StateTransitionBase is ReentrancyGuard, AllowListed {
+contract ZkSyncStateTransitionBase is ReentrancyGuard, AllowListed {
     StateTransitionStorage internal stateTransitionStorage;
 
     /// @notice Checks that the message sender is an active governor

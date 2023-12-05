@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-interface IStateTransitionGetters {
+interface IZkSyncStateTransitionGetters {
     function getGovernor() external view returns (address);
 
     function getBridgehub() external view returns (address);

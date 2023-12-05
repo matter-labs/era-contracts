@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.13;
 
-// import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
 import "./bridgehub-deps/BridgehubBase.sol";
 import "./bridgehub-interfaces/IBridgehub.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
@@ -32,7 +31,7 @@ contract Bridgehub is BridgehubBase, IBridgehub {
     }
 
     function getStateTransitionChain(uint256 _chainId) public view returns (address) {
-        return IStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId);
+        return IZkSyncStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId);
     }
 
     //// Registry
