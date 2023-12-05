@@ -22,7 +22,6 @@ async function main() {
     .option("--owner-address <owner-address>")
     .option("--create2-salt <create2-salt>")
     .option("--diamond-upgrade-init <version>")
-    .option("--only-verifier")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -51,33 +50,25 @@ async function main() {
 
       // Create2 factory already deployed on the public networks, only deploy it on local node
       if (process.env.CHAIN_ETH_NETWORK === "localhost") {
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
-
-        await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
-        nonce++;
+        await deployer.deployCreate2Factory({ gasPrice, nonce: nonce++ });
+        await deployer.deployMulticall3(create2Salt, { gasPrice, nonce: nonce++ });
       }
 
-      if (cmd.onlyVerifier) {
-        await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
-        return;
-      }
+      await deployer.deployVerifier(create2Salt, { gasPrice, nonce: nonce++ });
 
       // Deploy diamond upgrade init contract if needed
       const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
       if (diamondUpgradeContractVersion) {
         await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
           gasPrice,
-          nonce,
+          nonce: nonce++,
         });
-        nonce++;
       }
 
       await deployer.deployDefaultUpgrade(create2Salt, {
         gasPrice,
-        nonce,
+        nonce: nonce++,
       });
-      nonce++;
 
       await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
       await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);
