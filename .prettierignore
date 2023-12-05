@@ -1,20 +1,3 @@
-# root
-node_modules
 tools/data
-
-# l1-contracts
-l1-contracts/artifacts
-l1-contracts/artifacts-forge
-l1-contracts/cache
-l1-contracts/cache-forge
 l1-contracts/lib
-l1-contracts/node_modules
-
-# l2-contracts
-l2-contracts/artifacts-zk
-l2-contracts/cache-zk
-l2-contracts/node_modules
-
-# system-contracts
-system-contracts/cache-zk
 system-contracts/contracts/openzeppelin
