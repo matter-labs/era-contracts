@@ -323,7 +323,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
             refundRecipient
         );
 
-        emit DepositInitiated(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiatedChainId(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
         if (_chainId == eraChainId) {
             emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
         }
@@ -448,7 +448,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
             isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
         }
 
-        emit WithdrawalFinalized(_chainId, l1WethWithdrawReceiver, l1WethAddress, amount);
+        emit WithdrawalFinalizedChainId(_chainId, l1WethWithdrawReceiver, l1WethAddress, amount);
         if (_chainId == eraChainId) {
             emit WithdrawalFinalized(l1WethWithdrawReceiver, l1WethAddress, amount);
         }

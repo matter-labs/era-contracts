@@ -378,7 +378,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             depositAmount[_chainId][msg.sender][_l1Token][l2TxHash] = amount;
         }
 
-        emit DepositInitiated(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+        emit DepositInitiatedChainId(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
         if (_chainId == eraChainId) {
             emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
         }
@@ -485,7 +485,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         // Withdraw funds
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
-        emit ClaimedFailedDeposit(_chainId, _depositSender, _l1Token, amount);
+        emit ClaimedFailedDepositChainId(_chainId, _depositSender, _l1Token, amount);
         if (_chainId == eraChainId) {
             emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
         }
@@ -544,7 +544,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
 
-            emit WithdrawalFinalized(_chainId, l1Receiver, l1Token, amount);
+            emit WithdrawalFinalizedChainId(_chainId, l1Receiver, l1Token, amount);
             if (_chainId == eraChainId) {
                 emit WithdrawalFinalized(l1Receiver, l1Token, amount);
             }

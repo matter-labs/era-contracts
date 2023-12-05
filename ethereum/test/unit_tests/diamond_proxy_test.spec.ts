@@ -149,7 +149,7 @@ describe("Diamond proxy tests", function () {
 
     const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [
       diamondCutInitData,
-      0,
+      
     ]);
     await proxy.fallback({ data: adminFacetExecuteCalldata });
 
@@ -167,7 +167,7 @@ describe("Diamond proxy tests", function () {
     ];
     const diamondCutData = diamondCut(facetCuts, ethers.constants.AddressZero, "0x");
 
-    const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [diamondCutData, 0]);
+    const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [diamondCutData]);
     await proxy.fallback({ data: adminFacetExecuteCalldata });
   });
 

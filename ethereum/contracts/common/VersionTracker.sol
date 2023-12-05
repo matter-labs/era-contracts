@@ -82,7 +82,7 @@ abstract contract VersionTracker {
         return _initialized;
     }
 
-    function _setInitializedVersionVariable(uint8 _version) private {
+    function _setInitializedVersionInner(uint8 _version) private {
         assembly {
             sstore(INITIALIZED_ADDRESS, _version)
         }
@@ -174,7 +174,7 @@ abstract contract VersionTracker {
             revert();
         } else {
             require(_getInitializedVersion() < version, "Initializable: contract is already initialized");
-            _setInitializedVersion(version);
+            _setInitializedVersionInner(version);
             return true;
         }
     }

@@ -15,6 +15,8 @@ import {
   L2_WETH_BRIDGE_PROXY_BYTECODE,
 } from "../../scripts/utils-bytecode";
 
+import {EraLegacyChainId} from "../../src.ts/deploy"
+
 import { Interface } from "ethers/lib/utils";
 import type { Address } from "zksync-web3/build/src/types";
 
@@ -93,12 +95,11 @@ describe("WETH Bridge tests", () => {
     allowList = deployer.l1AllowList(deployWallet);
 
     l1Weth = WETH9Factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
-
     // prepare the bridge
 
     const bridge = await (
       await hardhat.ethers.getContractFactory("L1WethBridge")
-    ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubProxy, deployer.addresses.AllowList);
+    ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubProxy, deployer.addresses.AllowList, EraLegacyChainId);
 
     const _bridgeProxy = await (await hardhat.ethers.getContractFactory("ERC1967Proxy")).deploy(bridge.address, "0x");
 
@@ -110,19 +111,18 @@ describe("WETH Bridge tests", () => {
       l1Weth.address
     );
 
-    await bridgeProxy.initialize(
+    await bridgeProxy.initializeV2(
       [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
       l2WethProxyAddress,
       l2WethBridgeProxyAddress,
-      await owner.getAddress()
+      await owner.getAddress(),
+      await owner.getAddress(),
     );
 
-    await bridgeProxy.initializeChain(
+    await bridgeProxy.initializeChainGovernance(
       chainId,
-      [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-      ethers.constants.WeiPerEther,
-      ethers.constants.WeiPerEther,
-      { value: ethers.constants.WeiPerEther.mul(2) }
+      l2WethProxyAddress,
+      l2WethBridgeProxyAddress,
     );
   });
 

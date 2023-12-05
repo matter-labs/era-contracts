@@ -8,7 +8,7 @@ import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd, getBridgehubCurrentFacetCutsForAdd } from "./diamondCut";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
-import { IStateTransitionFactory } from "../typechain/IStateTransitionChainFactory";
+import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
@@ -30,6 +30,7 @@ import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
+export const EraLegacyChainId = 324;
 
 export interface DeployedAddresses {
   Bridgehub: {
@@ -477,7 +478,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList, EraLegacyChainId],
       create2Salt,
       ethTxOptions
     );
@@ -521,7 +522,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList, EraLegacyChainId],
       create2Salt,
       ethTxOptions
     );
@@ -736,7 +737,7 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IStateTransitionFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
+    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
   public stateTransitionChainContract(signerOrProvider: Signer | providers.Provider) {

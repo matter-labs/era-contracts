@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 /// @author Matter Labs
 interface IL1Bridge {
-    event DepositInitiated(
+    event DepositInitiatedChainId(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
         address indexed from,
@@ -22,11 +22,11 @@ interface IL1Bridge {
         uint256 amount
     );
 
-    event WithdrawalFinalized(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
+    event WithdrawalFinalizedChainId(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
     // legacy before bridgehub, only used for Era
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
 
-    event ClaimedFailedDeposit(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
+    event ClaimedFailedDepositChainId(uint256 indexed chainId, address indexed to, address indexed l1Token, uint256 amount);
     // legacy before bridgehub, only used for Era
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
