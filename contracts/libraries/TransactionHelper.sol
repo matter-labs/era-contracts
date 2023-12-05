@@ -231,7 +231,9 @@ library TransactionHelper {
             bytes memory encodedNonce = RLPEncoder.encodeUint256(_transaction.nonce);
             bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 0
+                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+                : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
@@ -302,7 +304,9 @@ library TransactionHelper {
             bytes memory encodedMaxPriorityFeePerGas = RLPEncoder.encodeUint256(_transaction.maxPriorityFeePerGas);
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 0
+                ? RLPEncoder.encodeAddress(address(uint160(_transaction.to)))
+                : bytes(hex"80");
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
