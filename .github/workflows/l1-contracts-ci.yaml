@@ -83,7 +83,7 @@ jobs:
             l1-contracts/typechain
 
       - name: Run tests
-        run: yarn l1 foundry:test
+        run: yarn l1 test:foundry
 
   test-hardhat:
     needs: [build, lint]
