@@ -1,6 +1,11 @@
 name: L2 contracts CI
 
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
 
 jobs:
   build:
@@ -58,7 +63,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v3
         with:
-          submodules: "recursive"
+          submodules: recursive
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -80,7 +85,7 @@ jobs:
             l2-contracts/typechain
 
       - name: Run Era test node
-        uses: dutterbutter/era-test-node-action@latest
+        uses: dutterbutter/era-test-node-action@v0.1.3
 
       - name: Run tests
         run: yarn l2 test
