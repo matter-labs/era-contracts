@@ -33,11 +33,11 @@ used on msg.sender, when it calls other contracts.
 
 This repository is used as a submodule of the [zksync-era](https://github.com/matter-labs/zksync-era).
 
-Compile the solidity and yul contracts: `yarn build`
+Compile the solidity and yul contracts: `yarn sc build`
 
-Check the system contracts hashes: `yarn calculate-hashes:check`
+Check the system contracts hashes: `yarn sc calculate-hashes:check`
 
-Update the system contracts hashes: `yarn calculate-hashes:fix`
+Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ## Update Process
 
