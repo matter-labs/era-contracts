@@ -86,7 +86,7 @@ jobs:
 
       - name: Run bootloader tests
         run: |
-          cd bootloader/test_infra
+          cd system-contracts/bootloader/test_infra
           cargo run
 
   test-contracts:
