@@ -3,6 +3,7 @@ import "@matterlabs/hardhat-zksync-solc";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-solpp";
 import "@typechain/hardhat";
+import "@matterlabs/hardhat-zksync-node";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const systemConfig = require("./SystemConfig.json");

@@ -76,13 +76,20 @@ changes.
 
 ## Testing
 
-The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following command in the root of the repository:
+The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following commands in the root of the repository:
 
 ```
-bash ./scripts/quick-setup.sh
+yarn test-node
 ```
 
-The `quick-setup.sh` script will proceeed to install all the necessary dependencies and will run the tests.
+It will run the test node, and you can see its logs in the output.
+Then run tests in the separate terminal:
+
+```
+yarn test
+```
+
+Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
 
 ## License
 
