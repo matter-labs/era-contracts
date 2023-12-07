@@ -127,6 +127,9 @@ jobs:
             contracts/precompiles/artifacts
             bootloader/build
 
+      - name: Build contracts
+        run: yarn build
+
       - name: Run tests
         run: yarn test
 
