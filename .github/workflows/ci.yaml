@@ -6,6 +6,7 @@ on:
     branches:
       - dev
       - main
+      - v1-4-1-integration
 
 jobs:
   build:
@@ -108,7 +109,7 @@ jobs:
       - name: Use era-test-node for testing
         uses: dutterbutter/era-test-node-action@v0.1.3
         with:
-          releaseTag: v0.0.1-alpha.boojum
+          releaseTag: v0.0.1-vm1.4.1
 
       - name: Install dependencies
         run: yarn
