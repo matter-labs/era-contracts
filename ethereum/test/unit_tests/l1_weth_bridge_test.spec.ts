@@ -115,9 +115,9 @@ describe("WETH Bridge tests", () => {
       bridgeProxy.address,
       l1Weth.address
     );
-    
+
     await bridgeProxy.initialize();
-    
+
     await bridgeProxy.initializeV2(
       [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
       l2WethProxyAddress,

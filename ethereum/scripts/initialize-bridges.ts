@@ -49,9 +49,7 @@ async function initializeBridges(
       l2ERC20BridgeProxyAddr,
       l1GovernorAddress,
       l2GovernorAddress,
-      { nonce : nonce+1,
-        gasPrice,
-      }
+      { nonce: nonce + 1, gasPrice }
     ),
   ];
 
@@ -81,7 +79,6 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
     l1WethBridge.address,
     l1WethAddress
   );
-  
 
   const independentInitialization = [
     l1WethBridge.initialize(),
@@ -91,11 +88,9 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
       l2WethBridgeProxyAddress,
       l1GovernorAddress,
       l2GovernorAddress,
-      { nonce : nonce+1,
-        gasPrice,
-      }
-    )
-  ]
+      { nonce: nonce + 1, gasPrice }
+    ),
+  ];
 
   const txs = await Promise.all(independentInitialization);
   for (const tx of txs) {

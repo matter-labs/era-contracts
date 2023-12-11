@@ -9,8 +9,8 @@ import {
   AdminFacetFactory,
   DefaultUpgradeFactory,
   CustomUpgradeTestFactory,
-ZkSyncStateTransition,
-ZkSyncStateTransitionFactory,
+  ZkSyncStateTransition,
+  ZkSyncStateTransitionFactory,
 } from "../../typechain";
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
@@ -466,7 +466,7 @@ describe("L2 upgrade test", function () {
       throw new Error("Can not perform this test without l2UpgradeTxHash");
     }
 
-    console.log("kl todo",await  proxyGetters.getProtocolVersion(), await stateTransition.getProtocolVersion());
+    console.log("kl todo", await proxyGetters.getProtocolVersion(), await stateTransition.getProtocolVersion());
 
     const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
       batchNumber: 3,

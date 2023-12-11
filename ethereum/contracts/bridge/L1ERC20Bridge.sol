@@ -104,8 +104,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     }
 
     // used for calling reentracyGuardInitializer in testing and independent deployments
-    function initialize() reentrancyGuardInitializer() external {
-    }
+    function initialize() external reentrancyGuardInitializer {}
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it
