@@ -4,8 +4,10 @@ import * as zksync from "zksync-web3";
 import type { Wallet } from "zksync-web3";
 import { serialize } from "zksync-web3/build/src/utils";
 import type { BootloaderUtilities } from "../typechain-types";
+import { BootloaderUtilities__factory } from "../typechain-types";
 import { signedTxToTransactionData } from "./shared/transactions";
-import { deployContract, getWallets } from "./shared/utils";
+import { getWallets, deployContractOnAddress } from "./shared/utils";
+import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
 
 describe("BootloaderUtilities tests", function () {
   let wallet: Wallet;
@@ -13,7 +15,8 @@ describe("BootloaderUtilities tests", function () {
 
   before(async () => {
     wallet = getWallets()[0];
-    bootloaderUtilities = (await deployContract("BootloaderUtilities")) as BootloaderUtilities;
+    await deployContractOnAddress(TEST_BOOTLOADER_UTILITIES_ADDRESS, "BootloaderUtilities");
+    bootloaderUtilities = BootloaderUtilities__factory.connect(TEST_BOOTLOADER_UTILITIES_ADDRESS, wallet);
   });
 
   describe("EIP-712 transaction", function () {

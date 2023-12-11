@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
+use multivm::interface::dyn_tracers::vm_1_4_0::DynTracer;
+use multivm::vm_latest::{HistoryMode, SimpleMemory, VmTracer};
+use multivm::zk_evm_1_4_0::tracing::{BeforeExecutionData, VmLocalStateData};
 use once_cell::sync::OnceCell;
-use vm::{
-    DynTracer, ExecutionEndTracer, ExecutionProcessing, HistoryMode, SimpleMemory,
-    VmExecutionResultAndLogs, VmTracer,
-};
 use zksync_state::{StoragePtr, WriteStorage};
-use zksync_types::zkevm_test_harness::zk_evm::tracing::{BeforeExecutionData, VmLocalStateData};
 
 use crate::hook::TestVmHook;
 
@@ -25,7 +23,7 @@ impl TestCountTracer {
     }
 }
 
-impl<S, H: HistoryMode> DynTracer<S, H> for TestCountTracer {
+impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for TestCountTracer {
     fn before_execution(
         &mut self,
         state: VmLocalStateData<'_>,
@@ -41,10 +39,4 @@ impl<S, H: HistoryMode> DynTracer<S, H> for TestCountTracer {
     }
 }
 
-impl<H: HistoryMode> ExecutionEndTracer<H> for TestCountTracer {}
-
-impl<S: WriteStorage, H: HistoryMode> ExecutionProcessing<S, H> for TestCountTracer {}
-
-impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for TestCountTracer {
-    fn save_results(&mut self, _result: &mut VmExecutionResultAndLogs) {}
-}
+impl<S: WriteStorage, H: HistoryMode> VmTracer<S, H> for TestCountTracer {}

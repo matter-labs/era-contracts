@@ -35,8 +35,7 @@ jobs:
             artifacts-zk
             cache-zk
             typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
+            contracts-preprocessed
             bootloader/build
 
   lint:
@@ -84,8 +83,7 @@ jobs:
             artifacts-zk
             cache-zk
             typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
+            contracts-preprocessed
             bootloader/build
 
       - name: Check hashes
@@ -122,8 +120,7 @@ jobs:
             artifacts-zk
             cache-zk
             typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
+            contracts-preprocessed
             bootloader/build
 
       - name: Run tests
@@ -155,8 +152,7 @@ jobs:
             artifacts-zk
             cache-zk
             typechain-types
-            contracts/artifacts
-            contracts/precompiles/artifacts
+            contracts-preprocessed
             bootloader/build
 
       - name: Run bootloader tests
