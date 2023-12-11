@@ -3,8 +3,6 @@
 
 pragma solidity ^0.8.13;
 
-// import "../../state-transition/state-transition-interfaces/IStateTransition.sol";
-
 import {IVerifier, VerifierParams} from "../../state-transition/chain-interfaces/IVerifier.sol";
 // import "../../state-transition/Verifier.sol";
 import {UpgradeStorage} from "../../state-transition/chain-deps/StateTransitionChainStorage.sol";

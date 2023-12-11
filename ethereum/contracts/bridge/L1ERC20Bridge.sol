@@ -78,7 +78,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2BridgeAddress;
 
-    /// @dev A mapping chainId => bridgeProxy. Used to store the token beacon proxy's address, and to see if it has been deployed yet.
+    /// @dev A mapping chainId => l2TokenBeacon. Used to store the token beacon proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2TokenBeaconAddress;
 
     /// @dev A mapping chainId => bridgeImplTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).

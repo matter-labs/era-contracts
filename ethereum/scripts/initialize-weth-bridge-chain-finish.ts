@@ -1,16 +1,9 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { Wallet } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
-import {
-  L2_ERC20_BRIDGE_PROXY_BYTECODE,
-  L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
-  L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
-  L2_STANDARD_ERC20_PROXY_BYTECODE,
-  L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-} from "./utils-bytecode";
+import { web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -18,8 +11,6 @@ import * as path from "path";
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
 async function main() {
   const program = new Command();
@@ -71,14 +62,13 @@ async function main() {
       });
 
       const bridgehub = deployer.bridgehubContract(deployWallet);
-      const erc20Bridge = cmd.erc20Bridge
-        ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
-        : deployer.defaultERC20Bridge(deployWallet);
+      const wethBridge = cmd.erc20Bridge
+        ? deployer.defaultWethBridge(deployWallet).attach(cmd.erc20Bridge)
+        : deployer.defaultWethBridge(deployWallet);
 
-      const implDeployTxHash = await erc20Bridge.bridgeImplDeployOnL2TxHash(chainId);
-      const proxyDeployTxHash = await erc20Bridge.bridgeProxyDeployOnL2TxHash(chainId);
+      const implDeployTxHash = await wethBridge.bridgeImplDeployOnL2TxHash(chainId);
+      const proxyDeployTxHash = await wethBridge.bridgeProxyDeployOnL2TxHash(chainId);
 
-      console.log();
       const {
         l1BatchNumber: implL1BatchNumber,
         l2MessageIndex: implL2MessageIndex,
@@ -92,9 +82,8 @@ async function main() {
         l2TxNumberInBlock: proxyL2TxNumberInBlock,
         proof: proxyProof,
       } = await syncWallet.getPriorityOpConfirmation(proxyDeployTxHash);
-      //   _getWithdrawalLog(withdrawalHash, index);
 
-      const tx = await erc20Bridge.finishInitializeChain(
+      const tx = await wethBridge.finishInitializeChain(
         chainId,
         implL1BatchNumber,
         implL2MessageIndex,
@@ -111,6 +100,7 @@ async function main() {
       const receipts = await tx.wait(2);
 
       console.log(`ERC20 bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
+      console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await wethBridge.l2Bridge()}`);
     });
 
   await program.parseAsync(process.argv);

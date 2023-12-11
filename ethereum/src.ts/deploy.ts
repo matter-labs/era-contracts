@@ -30,7 +30,7 @@ import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
-export let EraLegacyChainId = 324;
+export const EraLegacyChainId = 324;
 
 export interface DeployedAddresses {
   Bridgehub: {

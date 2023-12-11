@@ -3,9 +3,9 @@ import { Wallet, Provider } from "zksync-web3";
 import * as hre from "hardhat";
 import { ethers } from "ethers";
 import { L2WethFactory } from "../typechain/L2WethFactory";
-import { L2Weth } from "../typechain/L2Weth";
+import type { L2Weth } from "../typechain/L2Weth";
 import { L2WethBridgeFactory } from "../typechain/L2WethBridgeFactory";
-import { L2WethBridge } from "../typechain/L2WethBridge";
+import type { L2WethBridge } from "../typechain/L2WethBridge";
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 
 const richAccount = {
@@ -16,8 +16,8 @@ const richAccount = {
 const eth18 = ethers.utils.parseEther("18");
 
 describe("WETH token & WETH bridge", function () {
-  let provider = new Provider(hre.config.networks.localhost.url);
-  let wallet = new Wallet(richAccount.privateKey, provider);
+  const provider = new Provider(hre.config.networks.localhost.url);
+  const wallet = new Wallet(richAccount.privateKey, provider);
   let wethToken: L2Weth;
   let wethBridge: L2WethBridge;
 
