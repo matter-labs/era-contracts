@@ -1,5 +1,7 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
+import * as zksync from 'zksync-web3';
+import { RetryProvider } from '../src.ts/';
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
@@ -40,6 +42,23 @@ async function main() {
             "m/44'/60'/0'/0/0"
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
+    
+      const l2NodeUrl = process.env.
+      const l2Provider = new zksync.Provider(
+        {
+            url: l2NodeUrl,
+            timeout: 1200 * 1000
+        },
+        undefined,
+    );
+
+      const syncWallet = cmd.privateKey
+      ? new zksync.Wallet(cmd.privateKey, l2provider, provider)
+      : zksync.Wallet.fromMnemonic(
+          process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+          "m/44'/60'/0'/0/0"
+        ).connect(l2provider);
+      new zksync.Wallet(env.mainWalletPK, this.l2Provider, this.l1Provider);
 
       const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
@@ -58,47 +77,7 @@ async function main() {
         ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
         : deployer.defaultERC20Bridge(deployWallet);
 
-      const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-
-      // There will be two deployments done during the initial initialization
-      const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
-        chainId,
-        gasPrice,
-        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-      );
-
-      const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
-        chainId,
-        gasPrice,
-        priorityTxMaxGasLimit,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-      );
-
-      const independentInitialization = [
-        bridgehub.requestL2Transaction(
-          chainId,
-          ethers.constants.AddressZero,
-          0,
-          "0x",
-          priorityTxMaxGasLimit,
-          REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
-          deployWallet.address,
-          { gasPrice, nonce, value: requiredValueToPublishBytecodes }
-        ),
-        erc20Bridge.startInitializeChain(
-          chainId,
-          [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],
-          requiredValueToInitializeBridge,
-          requiredValueToInitializeBridge,
-          {
-            gasPrice,
-            nonce: nonce + 1,
-            value: requiredValueToInitializeBridge.mul(2),
-          }
-        ),
-      ];
+      const deployTxHash = await erc20Bridge.bridgeProxyDeployOnL2TxHash(chainId)
 
       const txs = await Promise.all(independentInitialization);
       for (const tx of txs) {

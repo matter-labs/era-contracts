@@ -103,6 +103,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         eraChainId = _eraChainId;
     }
 
+    // used for calling reentracyGuardInitializer in testing and independent deployments
+    function initialize() reentrancyGuardInitializer() external {
+    }
+
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 bridge

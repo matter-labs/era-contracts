@@ -63,7 +63,8 @@ describe("L1ERC20Bridge tests", function () {
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
     l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(
       deployer.addresses.Bridgehub.BridgehubProxy,
-      allowList.address
+      allowList.address,
+      0
     );
     l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
     l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);

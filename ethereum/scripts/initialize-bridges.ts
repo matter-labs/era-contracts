@@ -42,14 +42,15 @@ async function initializeBridges(
 
   const { l2TokenFactoryAddr, l2ERC20BridgeProxyAddr } = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
   const independentInitialization = [
-    erc20Bridge.initialize(
+    erc20Bridge.initialize(),
+    erc20Bridge.initializeV2(
       [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],
       l2TokenFactoryAddr,
       l2ERC20BridgeProxyAddr,
+      l1GovernorAddress,
       l2GovernorAddress,
-      {
+      { nonce : nonce+1,
         gasPrice,
-        nonce: nonce,
       }
     ),
   ];
@@ -62,10 +63,12 @@ async function initializeBridges(
 
   console.log(`ERC20 bridge initialized on L1, gasUsed: ${receipts[0].gasUsed.toString()}`);
 }
+
 async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumber) {
   const bridgehub = deployer.bridgehubContract(deployWallet);
   const l1WethBridge = deployer.defaultWethBridge(deployWallet);
   const chainId = deployer.chainId;
+  const nonce = await deployWallet.getTransactionCount();
 
   const l1GovernorAddress = await bridgehub.getGovernor();
   // Check whether governor is a smart contract on L1 to apply alias if needed.
@@ -78,22 +81,29 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
     l1WethBridge.address,
     l1WethAddress
   );
+  
 
-  const tx = await l1WethBridge.initialize(
-    [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-    l2WethProxyAddress,
-    l2WethBridgeProxyAddress,
-    l2GovernorAddress,
-    {
-      gasPrice,
-    }
-  );
+  const independentInitialization = [
+    l1WethBridge.initialize(),
+    await l1WethBridge.initializeV2(
+      [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
+      l2WethProxyAddress,
+      l2WethBridgeProxyAddress,
+      l1GovernorAddress,
+      l2GovernorAddress,
+      { nonce : nonce+1,
+        gasPrice,
+      }
+    )
+  ]
 
-  console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+  const txs = await Promise.all(independentInitialization);
+  for (const tx of txs) {
+    console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
+  }
+  const receipts = await Promise.all(txs.map((tx) => tx.wait(2)));
 
-  const receipt = await tx.wait();
-
-  console.log(`WETH bridge initialized, gasUsed: ${receipt.gasUsed.toString()}`);
+  console.log(`WETH bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);
   console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2Bridge()}`);
   console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddress}`);
   console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddress}`);

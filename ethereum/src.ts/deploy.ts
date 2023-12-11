@@ -30,7 +30,7 @@ import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
-export const EraLegacyChainId = 324;
+export let EraLegacyChainId = 324;
 
 export interface DeployedAddresses {
   Bridgehub: {
@@ -365,7 +365,7 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("StateTransition", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("ZkSyncStateTransition", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_STATE_TRANSITION_IMPL_ADDR=${contractAddress}`);
@@ -386,7 +386,7 @@ export class Deployer {
     const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
     const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
 
-    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("StateTransition").abi);
+    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("ZkSyncStateTransition").abi);
 
     const initCalldata = stateTransition.encodeFunctionData("initialize", [
       {

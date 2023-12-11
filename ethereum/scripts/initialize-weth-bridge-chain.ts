@@ -82,7 +82,7 @@ async function main() {
           deployWallet.address,
           { gasPrice, nonce, value: requiredValueToPublishBytecodes }
         ),
-        l1WethBridge.initializeChain(
+        l1WethBridge.startInitializeChain(
           chainId,
           [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
           requiredValueToInitializeBridge,
