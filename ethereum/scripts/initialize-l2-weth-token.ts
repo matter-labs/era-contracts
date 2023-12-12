@@ -115,7 +115,7 @@ async function main() {
         gasPrice
       );
       console.log(JSON.stringify(l1TxInfo, null, 4));
-      console.log("IMPORTANT: gasPrice that you provide in the transaction should <= to the one provided above.");
+      console.log("IMPORTANT: gasPrice that you provide in the transaction should be <= to the one provided above.");
     });
 
   program
