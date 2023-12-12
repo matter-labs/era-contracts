@@ -3331,19 +3331,12 @@ object "Bootloader" {
             /// Debug utilities
             ///
 
-            /// @notice A method used to prevent optimization of x by the compiler
-            /// @dev This method is only used for logging purposes 
-            function nonOptimized(x) -> ret {
-                // value() is always 0 in bootloader context.
-                ret := add(mul(callvalue(),x),x)
-            }
-
             /// @dev This method accepts the message and some 1-word data associated with it
             /// It triggers a VM hook that allows the server to observe the behavior of the system.
             function debugLog(msg, data) {
-                storeVmHookParam(0, nonOptimized(msg))
-                storeVmHookParam(1, nonOptimized(data))
-                setHook(nonOptimized(VM_HOOK_DEBUG_LOG()))
+                storeVmHookParam(0, msg)
+                storeVmHookParam(1, data)
+                setHook(VM_HOOK_DEBUG_LOG())
             }
 
             /// @dev Triggers a hook that displays the returndata on the server side.
@@ -3357,15 +3350,15 @@ object "Bootloader" {
             /// refunded to the user. This is to be used by the operator to derive the correct
             /// `gasUsed` in the API.
             function notifyAboutRefund(refund) {
-                storeVmHookParam(0, nonOptimized(refund)) 
+                storeVmHookParam(0, refund) 
                 setHook(VM_NOTIFY_OPERATOR_ABOUT_FINAL_REFUND())
                 debugLog("refund(gas)", refund)
             }
 
             function notifyExecutionResult(success) {
                 let ptr := returnDataPtr()
-                storeVmHookParam(0, nonOptimized(success))
-                storeVmHookParam(1, nonOptimized(ptr))
+                storeVmHookParam(0, success)
+                storeVmHookParam(1, ptr)
                 setHook(VM_HOOK_EXECUTION_RESULT())
 
                 debugLog("execution result: success", success)
@@ -3383,7 +3376,7 @@ object "Bootloader" {
             /// Since the slot after the transaction is not touched,
             /// this slot can be used in the in-circuit VM out of box.
             function askOperatorForRefund(gasLeft) {
-                storeVmHookParam(0, nonOptimized(gasLeft))
+                storeVmHookParam(0, gasLeft)
                 setHook(VM_HOOK_ASK_OPERATOR_FOR_REFUND())
             }
             
@@ -3651,14 +3644,14 @@ object "Bootloader" {
 
             // Need to prevent the compiler from optimizing out similar operations, 
             // which may have different meaning for the offline debugging 
-            function unoptimized(val) -> ret {
+            function $llvm_NoInline_llvm$_unoptimized(val) -> ret {
                 ret := add(val, callvalue())
             }
 
             /// @notice Triggers a VM hook. 
             /// The server will recognize it and output corresponding logs.
             function setHook(hook) {
-                mstore(VM_HOOK_PTR(), unoptimized(hook))
+                mstore(VM_HOOK_PTR(), $llvm_NoInline_llvm$_unoptimized(hook))
             }   
 
             /// @notice Sets a value to a param of the vm hook.
@@ -3669,7 +3662,7 @@ object "Bootloader" {
             /// paramId smaller than the VM_HOOK_PARAMS()
             function storeVmHookParam(paramId, value) {
                 let offset := add(VM_HOOK_PARAMS_OFFSET(), mul(32, paramId))
-                mstore(offset, unoptimized(value))
+                mstore(offset, $llvm_NoInline_llvm$_unoptimized(value))
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum

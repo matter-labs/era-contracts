@@ -2,16 +2,17 @@ import * as hre from "hardhat";
 
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { Command } from "commander";
-import type { BigNumber } from "ethers";
+import type { BigNumber, BytesLike } from "ethers";
 import { ethers } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
+import type { types } from "zksync-web3";
 import { Provider, Wallet } from "zksync-web3";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
-import { filterPublishedFactoryDeps, publishFactoryDeps, readYulBytecode } from "./utils";
+import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -22,6 +23,58 @@ const MAX_COMBINED_LENGTH = 90000;
 const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
 const BOOTLOADER_CONTRACT_NAME = "Bootloader";
 
+const CONSOLE_COLOR_RESET = "\x1b[0m";
+const CONSOLE_COLOR_RED = "\x1b[31m";
+const CONSOLE_COLOR_GREEN = "\x1b[32m";
+
+interface TransactionReport {
+  msg: string;
+  success: boolean;
+}
+
+class PublishReporter {
+  // Promises for pending L1->L2 transactions with submitted bytecode hashes.
+  // Each promise will return either string with error or null denoting success.
+  pendingPromises: Promise<TransactionReport>[] = [];
+
+  async appendPublish(bytecodes: BytesLike[], deployer: Deployer, transaction: types.PriorityOpResponse) {
+    const waitAndDoubleCheck = async () => {
+      // Waiting for the transaction to be processed by the server
+      await transaction.wait();
+
+      // Double checking that indeed the dependencies have been marked as known
+      await checkMarkers(bytecodes, deployer);
+    };
+
+    this.pendingPromises.push(
+      waitAndDoubleCheck()
+        .catch((err) => {
+          return Promise.resolve({
+            msg: `Transaction ${transaction.hash} failed with ${err.message || err}`,
+            success: false,
+          });
+        })
+        .then(() => {
+          return Promise.resolve({
+            msg: `Transaction ${transaction.hash} was successful`,
+            success: true,
+          });
+        })
+    );
+  }
+
+  async report() {
+    const results = await Promise.all(this.pendingPromises);
+    results.forEach((result) => {
+      if (result.success) {
+        console.log(CONSOLE_COLOR_GREEN + result.msg + CONSOLE_COLOR_RESET);
+      } else {
+        console.log(CONSOLE_COLOR_RED + result.msg + CONSOLE_COLOR_RESET);
+      }
+    });
+  }
+}
+
 class ZkSyncDeployer {
   deployer: Deployer;
   gasPrice: BigNumber;
@@ -29,15 +82,23 @@ class ZkSyncDeployer {
   dependenciesToUpgrade: DeployedDependency[];
   defaultAccountToUpgrade?: DeployedDependency;
   bootloaderToUpgrade?: DeployedDependency;
+  reporter: PublishReporter;
   constructor(deployer: Deployer, gasPrice: BigNumber, nonce: number) {
     this.deployer = deployer;
     this.gasPrice = gasPrice;
     this.nonce = nonce;
     this.dependenciesToUpgrade = [];
+    this.reporter = new PublishReporter();
   }
 
   async publishFactoryDeps(dependencies: Dependency[]) {
-    await publishFactoryDeps(dependencies, this.deployer, this.nonce, this.gasPrice);
+    if (dependencies.length === 0) {
+      return;
+    }
+
+    const priorityOpHandle = await publishFactoryDeps(dependencies, this.deployer, this.nonce, this.gasPrice);
+
+    await this.reporter.appendPublish(getBytecodes(dependencies), this.deployer, priorityOpHandle);
     this.nonce += 1;
   }
 
@@ -80,7 +141,6 @@ class ZkSyncDeployer {
         bytecodes: defaultAccountBytecodes,
       },
     ]);
-    this.nonce += 1;
   }
 
   // Publishes the bytecode of default AA and appends it to the deployed bytecodes if needed.
@@ -128,9 +188,7 @@ class ZkSyncDeployer {
   }
 
   async processBootloader() {
-    const bootloaderCode = ethers.utils.hexlify(
-      fs.readFileSync("./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin")
-    );
+    const bootloaderCode = ethers.utils.hexlify(fs.readFileSync("./bootloader/build/artifacts/proved_batch.yul.zbin"));
 
     await this.publishBootloader(bootloaderCode);
     await this.checkShouldUpgradeBootloader(bootloaderCode);
@@ -285,6 +343,9 @@ async function main() {
         const dependenciesToPublish = await zkSyncDeployer.prepareContractsForPublishing();
         await zkSyncDeployer.publishDependencies(dependenciesToPublish);
       }
+
+      console.log("\nSending all L1->L2 transactions done. Now waiting for the reports on those...\n");
+      await zkSyncDeployer.reporter.report();
 
       const result = zkSyncDeployer.returnResult();
       console.log(JSON.stringify(result, null, 2));
