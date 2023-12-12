@@ -1,8 +1,9 @@
+import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
-import { BigNumber, Wallet, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Wallet, ethers } from "ethers";
 import * as fs from "fs";
-import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
@@ -78,6 +79,25 @@ async function getBridgeUpgradeTxInfo(
     priorityTxMaxGasLimit,
     provider
   );
+
+
+  return {
+    to: zksync.address,
+    data: l1Calldata,
+    value: neededValue.toString(),
+    gasPrice: gasPrice.toString(),
+  };
+}
+
+async function getTransparentProxyUpgradeTxInfo(
+  deployer: Deployer,
+  target: string,
+  proxyAddress: string,
+  refundRecipient: string,
+  gasPrice: BigNumber
+) {
+  const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
+  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice);
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -101,7 +121,11 @@ async function getTxInfo(
   l2ProxyAddress?: string
 ) {
   if (contract === "L2ERC20Bridge") {
-    return getBridgeUpgradeTxInfo(deployer, target, refundRecipient, gasPrice);
+    return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
+  } else if (contract == "L2Weth") {
+    throw new Error(
+      "The latest L2Weth implementation requires L2WethBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed."
+    );
   } else if (contract == "L2StandardERC20") {
     if (!l2ProxyAddress) {
       console.log("Explicit beacon address is not supplied, requesting the one from L2 node");
@@ -136,7 +160,9 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
       const deployer = new Deployer({ deployWallet });
-      const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.constants.HashZero);
       checkSupportedContract(cmd.contract);
 
@@ -211,7 +237,9 @@ async function main() {
     .option("--deployer-private-key <deployer-private-key>")
     .option("--refund-recipient <refund-recipient>")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.deployerPrivateKey
         ? new Wallet(cmd.deployerPrivateKey, provider)
         : Wallet.fromMnemonic(
@@ -245,7 +273,9 @@ async function main() {
     .option("--refund-recipient <refund-recipient>")
     .option("--no-l2-double-check")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? BigNumber.from(cmd.gasPrice) : (await provider.getGasPrice()).mul(3).div(2);
+      const gasPrice = cmd.gasPrice
+        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.governorPrivateKey
         ? new Wallet(cmd.governorPrivateKey, provider)
         : Wallet.fromMnemonic(
@@ -301,7 +331,7 @@ async function main() {
         throw new Error("Gas price is not provided");
       }
 
-      const gasPrice = BigNumber.from(cmd.gasPrice);
+      const gasPrice = ethers.utils.parseUnits(cmd.gasPrice, "gwei");
 
       const deployer = new Deployer({ deployWallet: Wallet.createRandom().connect(provider) });
       const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
