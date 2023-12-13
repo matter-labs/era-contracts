@@ -1,15 +1,15 @@
-import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import type { BigNumber } from "ethers";
 import { Wallet, ethers } from "ethers";
 import * as fs from "fs";
+import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1 } from "./utils";
+import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
 
 export function getContractBytecode(contractName: string) {
   return hre.artifacts.readArtifactSync(contractName).bytecode;
@@ -25,7 +25,7 @@ function checkSupportedContract(contract: any): contract is SupportedContracts {
   return true;
 }
 
-const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
@@ -62,28 +62,22 @@ async function getBeaconProxyUpgradeCalldata(target: string) {
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
 }
 
-async function getL1TxInfo(
+async function getBridgeUpgradeTxInfo(
   deployer: Deployer,
-  to: string,
-  l2Calldata: string,
+  target: string,
   refundRecipient: string,
   gasPrice: BigNumber
 ) {
-  const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
-  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
-    to,
-    0,
-    l2Calldata,
-    priorityTxMaxGasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-    [], // It is assumed that the target has already been deployed
-    refundRecipient,
-  ]);
+  const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
 
-  const neededValue = await zksync.l2TransactionBaseCost(
+  return await getL1TxInfo(
+    deployer,
+    l2Erc20BridgeProxyAddress,
+    l2Calldata,
+    refundRecipient,
     gasPrice,
     priorityTxMaxGasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
+    provider
   );
 
   return {
@@ -114,7 +108,7 @@ async function getTokenBeaconUpgradeTxInfo(
 ) {
   const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice);
+  return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
 }
 
 async function getTxInfo(

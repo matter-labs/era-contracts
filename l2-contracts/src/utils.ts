@@ -1,13 +1,14 @@
 import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
+import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
 import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
 
-import type { BytesLike, Wallet } from "ethers";
+import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
 import type { Provider } from "zksync-web3";
-import { sleep } from "zksync-web3/build/src/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -128,4 +129,38 @@ export async function awaitPriorityOps(
       throw new Error("Failed to process L2 tx");
     }
   }
+}
+
+export async function getL1TxInfo(
+  deployer: Deployer,
+  to: string,
+  l2Calldata: string,
+  refundRecipient: string,
+  gasPrice: BigNumber,
+  priorityTxMaxGasLimit: BigNumber,
+  provider: ethers.providers.JsonRpcProvider
+) {
+  const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
+    to,
+    0,
+    l2Calldata,
+    priorityTxMaxGasLimit,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    [], // It is assumed that the target has already been deployed
+    refundRecipient,
+  ]);
+
+  const neededValue = await zksync.l2TransactionBaseCost(
+    gasPrice,
+    priorityTxMaxGasLimit,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
+  );
+
+  return {
+    to: zksync.address,
+    data: l1Calldata,
+    value: neededValue.toString(),
+    gasPrice: gasPrice.toString(),
+  };
 }
