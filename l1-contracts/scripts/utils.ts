@@ -77,12 +77,12 @@ export function applyL1ToL2Alias(address: string): string {
 }
 
 export function readBatchBootloaderBytecode() {
-  const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "etc/system-contracts/bootloader");
+  const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
   return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
-  const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "etc/system-contracts");
+  const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
   const artifact = fs.readFileSync(
     `${systemContractsPath}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
   );
