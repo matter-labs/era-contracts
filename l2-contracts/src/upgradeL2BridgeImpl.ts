@@ -1,7 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
-import type { BigNumber } from "ethers";
-import { Wallet, ethers } from "ethers";
+import { BigNumber, Wallet, ethers } from "ethers";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import * as path from "path";
@@ -60,32 +59,6 @@ async function getBeaconProxyUpgradeCalldata(target: string) {
   const proxyInterface = new ethers.utils.Interface(proxyArtifact.abi);
 
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
-}
-
-async function getBridgeUpgradeTxInfo(
-  deployer: Deployer,
-  target: string,
-  refundRecipient: string,
-  gasPrice: BigNumber
-) {
-  const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
-
-  return await getL1TxInfo(
-    deployer,
-    l2Erc20BridgeProxyAddress,
-    l2Calldata,
-    refundRecipient,
-    gasPrice,
-    priorityTxMaxGasLimit,
-    provider
-  );
-
-  return {
-    to: zksync.address,
-    data: l1Calldata,
-    value: neededValue.toString(),
-    gasPrice: gasPrice.toString(),
-  };
 }
 
 async function getTransparentProxyUpgradeTxInfo(
