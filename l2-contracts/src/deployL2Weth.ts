@@ -1,10 +1,10 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { getTokens, web3Provider } from "../../l1-contracts/scripts/utils";
+import { Deployer } from "../../l1-contracts/src.ts/deploy";
 
-import { getNumberFromEnv, applyL1ToL2Alias, create2DeployFromL1, computeL2Create2Address } from "./utils";
+import { applyL1ToL2Alias, computeL2Create2Address, create2DeployFromL1, getNumberFromEnv } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -13,7 +13,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/zksync/artifacts-zk/");
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
 
 const openzeppelinTransparentProxyArtifactsPath = path.join(

@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
+import { Deployer } from "../src.ts/deploy";
+import { getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -11,7 +11,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/zksync/artifacts-zk/");
+const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
   contractArtifactsPath,
