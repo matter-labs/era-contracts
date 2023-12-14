@@ -13,12 +13,12 @@ contract DepositTest is L1WethBridgeTest {
 
         vm.prank(randomSigner);
         vm.expectRevert(bytes.concat("nr"));
-        bridgeProxy.deposit(randomSigner, address(0), 0, 0, 0, address(0));
+        bridgeProxy.deposit(randomSigner, address(0), 0, 1, 0, address(0));
     }
 
     function test_RevertWhen_ReceivedL1TokenIsNotL1WethAddress() public {
         vm.expectRevert("Invalid L1 token address");
-        bridgeProxy.deposit(randomSigner, makeAddr("invalidL1TokenAddress"), 0, 0, 0, address(0));
+        bridgeProxy.deposit(randomSigner, makeAddr("invalidL1TokenAddress"), 0, 1, 0, address(0));
     }
 
     function test_RevertWhen_DepositingZeroWETH() public {
@@ -27,12 +27,46 @@ contract DepositTest is L1WethBridgeTest {
             randomSigner,
             bridgeProxy.l1WethAddress(),
             0,
-            0,
+            1,
             0,
             address(0)
         );
 
         vm.expectRevert("Amount cannot be zero");
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool revertAsExpected, ) = address(bridgeProxy).call(depositCallData);
+        assertTrue(revertAsExpected, "expectRevert: call did not revert");
+    }
+
+    function test_RevertWhen_L2ReceiverAddressIsZero() public {
+        bytes memory depositCallData = abi.encodeWithSelector(
+            bridgeProxy.deposit.selector,
+            address(0),
+            bridgeProxy.l1WethAddress(),
+            100,
+            1,
+            0,
+            address(0)
+        );
+
+        vm.expectRevert("L2 receiver address cannot be zero");
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool revertAsExpected, ) = address(bridgeProxy).call(depositCallData);
+        assertTrue(revertAsExpected, "expectRevert: call did not revert");
+    }
+
+    function test_RevertWhen_L2GasLimitIsZero() public {
+        bytes memory depositCallData = abi.encodeWithSelector(
+            bridgeProxy.deposit.selector,
+            randomSigner,
+            bridgeProxy.l1WethAddress(),
+            100,
+            0,
+            0,
+            address(0)
+        );
+
+        vm.expectRevert("L2 gas limit cannot be zero");
         // solhint-disable-next-line avoid-low-level-calls
         (bool revertAsExpected, ) = address(bridgeProxy).call(depositCallData);
         assertTrue(revertAsExpected, "expectRevert: call did not revert");

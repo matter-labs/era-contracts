@@ -164,6 +164,8 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
+        require(_l2Receiver != address(0), "L2 receiver address cannot be zero");
+        require(_l2TxGasLimit != 0, "L2 gas limit cannot be zero");
         require(_l1Token == l1WethAddress, "Invalid L1 token address");
         require(_amount != 0, "Amount cannot be zero");
 

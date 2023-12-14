@@ -162,13 +162,47 @@ describe("WETH Bridge tests", () => {
           await randomSigner.getAddress(),
           await bridgeProxy.l1WethAddress(),
           0,
-          0,
+          1,
           0,
           ethers.constants.AddressZero
         )
     );
 
     expect(revertReason).equal("Amount cannot be zero");
+  });
+
+  it("Should not allow address(0) receiver", async () => {
+    const revertReason = await getCallRevertReason(
+      bridgeProxy
+        .connect(randomSigner)
+        .deposit(
+          ethers.constants.AddressZero,
+          await bridgeProxy.l1WethAddress(),
+          100,
+          1,
+          0,
+          ethers.constants.AddressZero
+        )
+    );
+
+    expect(revertReason).equal("L2 receiver address cannot be zero");
+  });
+
+  it("Should not allow zero gasLimit", async () => {
+    const revertReason = await getCallRevertReason(
+      bridgeProxy
+        .connect(randomSigner)
+        .deposit(
+          await randomSigner.getAddress(),
+          await bridgeProxy.l1WethAddress(),
+          100,
+          0,
+          0,
+          ethers.constants.AddressZero
+        )
+    );
+
+    expect(revertReason).equal("L2 gas limit cannot be zero");
   });
 
   it("Should deposit successfully", async () => {
