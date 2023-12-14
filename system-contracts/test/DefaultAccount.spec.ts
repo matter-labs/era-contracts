@@ -1,22 +1,10 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import * as zksync from "zksync-web3";
 import type { Wallet } from "zksync-web3";
+import * as zksync from "zksync-web3";
 import { serialize } from "zksync-web3/build/src/utils";
-import type {
-  Callable,
-  DefaultAccount,
-  L2EthToken,
-  MockERC20Approve,
-  NonceHolder,
-  Callable,
-  DefaultAccount,
-  DelegateCaller,
-  L2EthToken,
-  MockERC20Approve,
-  NonceHolder,
-} from "../typechain-types";
-import { DefaultAccount__factory, L2EthToken__factory, NonceHolder__factory } from "../typechain-types";
+import type { Callable, DefaultAccount, DelegateCaller, L2EthToken, MockERC20Approve, NonceHolder } from "../typechain";
+import { DefaultAccountFactory, L2EthTokenFactory, NonceHolderFactory } from "../typechain";
 import {
   BOOTLOADER_FORMAL_ADDRESS,
   ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS,
@@ -44,9 +32,9 @@ describe("DefaultAccount tests", function () {
     account = getWallets()[2];
     const defaultAccountArtifact = await loadArtifact("DefaultAccount");
     await setCode(account.address, defaultAccountArtifact.bytecode);
-    defaultAccount = DefaultAccount__factory.connect(account.address, wallet);
-    nonceHolder = NonceHolder__factory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
-    l2EthToken = L2EthToken__factory.connect(ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, wallet);
+    defaultAccount = DefaultAccountFactory.connect(account.address, wallet);
+    nonceHolder = NonceHolderFactory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
+    l2EthToken = L2EthTokenFactory.connect(ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, wallet);
     callable = (await deployContract("Callable")) as Callable;
     delegateCaller = (await deployContract("DelegateCaller")) as DelegateCaller;
     mockERC20Approve = (await deployContract("MockERC20Approve")) as MockERC20Approve;

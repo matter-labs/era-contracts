@@ -3,12 +3,12 @@ import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/type
 import type { BytesLike } from "ethers";
 import * as hre from "hardhat";
 import { ethers, network } from "hardhat";
-import * as zksync from "zksync-web3";
 import type { Contract } from "zksync-web3";
+import * as zksync from "zksync-web3";
 import { Provider, Wallet } from "zksync-web3";
 import { Language } from "../../scripts/constants";
 import { readYulBytecode } from "../../scripts/utils";
-import { ContractDeployer__factory } from "../../typechain-types";
+import { ContractDeployerFactory } from "../../typechain";
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./constants";
 
 const RICH_WALLETS = [
@@ -122,7 +122,7 @@ export async function setCode(address: string, bytecode: BytesLike) {
   });
 
   const deployerAccount = await ethers.getSigner(DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
-  const deployerContract = ContractDeployer__factory.connect(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, deployerAccount);
+  const deployerContract = ContractDeployerFactory.connect(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, deployerAccount);
 
   const deployment = {
     bytecodeHash: zksync.utils.hashBytecode(bytecode),

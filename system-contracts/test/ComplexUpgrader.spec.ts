@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { ComplexUpgrader, DummyUpgrade } from "../typechain-types";
+import type { ComplexUpgrader, DummyUpgrade } from "../typechain";
 import { FORCE_DEPLOYER_ADDRESS } from "./shared/constants";
 import { deployContract } from "./shared/utils";
 

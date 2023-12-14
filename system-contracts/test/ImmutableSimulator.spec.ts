@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { ImmutableSimulator } from "../typechain-types";
+import type { ImmutableSimulator } from "../typechain";
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
 import { deployContract } from "./shared/utils";
 

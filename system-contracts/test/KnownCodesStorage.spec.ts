@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-web3";
-import type { KnownCodesStorage, MockL1Messenger } from "../typechain-types";
-import { MockL1Messenger__factory } from "../typechain-types";
+import type { KnownCodesStorage, MockL1Messenger } from "../typechain";
+import { MockL1MessengerFactory } from "../typechain";
 import {
   BOOTLOADER_FORMAL_ADDRESS,
   COMPRESSOR_CONTRACT_ADDRESS,
@@ -33,7 +33,7 @@ describe("KnownCodesStorage tests", function () {
     _l1MessengerCode = await getCode(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
     const l1MessengerArtifact = await loadArtifact("MockL1Messenger");
     await setCode(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, l1MessengerArtifact.bytecode);
-    mockL1Messenger = MockL1Messenger__factory.connect(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, wallet);
+    mockL1Messenger = MockL1MessengerFactory.connect(L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
     await network.provider.request({
       method: "hardhat_impersonateAccount",
