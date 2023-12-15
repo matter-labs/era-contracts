@@ -15,7 +15,6 @@ import "../upgrades/IDefaultUpgrade.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import "./l2-deps/ISystemContext.sol";
 
-
 /// @title StateTransition conract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -143,8 +142,8 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             verifier: address(0),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash:  bytes32(0),
-                recursionCircuitsSetVksHash:  bytes32(0)
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
             }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
@@ -157,25 +156,22 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: stateTransitionStorage.genesisUpgrade,
-            initCalldata: abi.encodeWithSelector(
-                IDefaultUpgrade.upgrade.selector,
-                proposedUpgrade
-            )
+            initCalldata: abi.encodeWithSelector(IDefaultUpgrade.upgrade.selector, proposedUpgrade)
         });
 
-        IAdmin(_chainContract).executeChainIdUpgrade(cutData, l2ProtocolUpgradeTx, stateTransitionStorage.protocolVersion);
+        IAdmin(_chainContract).executeChainIdUpgrade(
+            cutData,
+            l2ProtocolUpgradeTx,
+            stateTransitionStorage.protocolVersion
+        );
     }
 
     /// @notice
-    function newChain(
-        uint256 _chainId,
-        address _governor,
-        bytes calldata _diamondCut
-    ) external onlyBridgehub {
+    function newChain(uint256 _chainId, address _governor, bytes calldata _diamondCut) external onlyBridgehub {
         // check not registered
         address bridgehub = stateTransitionStorage.bridgehub;
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
-        
+
         // check input
         bytes32 cutHash = keccak256(_diamondCut);
         require(cutHash == stateTransitionStorage.cutHash, "StateTransition: initial cutHash mismatch");

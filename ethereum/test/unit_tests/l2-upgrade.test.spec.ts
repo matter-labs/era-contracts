@@ -2,16 +2,13 @@ import { expect } from "chai";
 import * as hardhat from "hardhat";
 import * as fs from "fs";
 import { diamondCut } from "../../src.ts/diamondCut";
+import type { ExecutorFacet, GettersFacet, AdminFacet, ZkSyncStateTransition } from "../../typechain";
 import {
-  ExecutorFacet,
   ExecutorFacetFactory,
-  GettersFacet,
   GettersFacetFactory,
-  AdminFacet,
   AdminFacetFactory,
   DefaultUpgradeFactory,
   CustomUpgradeTestFactory,
-  ZkSyncStateTransition,
   ZkSyncStateTransitionFactory,
 } from "../../typechain";
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
@@ -459,7 +456,7 @@ describe("L2 upgrade test", function () {
       newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
     const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
-    await rollBackProtocolVersion((4+1+initialProtocolVersion).toString(), stateTransition, upgrade)
+    await rollBackProtocolVersion((4 + 1 + initialProtocolVersion).toString(), stateTransition, upgrade);
     expect(revertReason).to.equal("Previous upgrade has not been finalized");
   });
 
@@ -467,7 +464,6 @@ describe("L2 upgrade test", function () {
     if (!l2UpgradeTxHash) {
       throw new Error("Can not perform this test without l2UpgradeTxHash");
     }
-
 
     const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
       batchNumber: 3,
@@ -953,9 +949,8 @@ async function rollBackProtocolVersion(
   stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>
 ) {
-  
   partialUpgrade.newProtocolVersion = protocolVersion;
-  
+
   const upgrade = buildProposeUpgrade(partialUpgrade);
 
   const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");

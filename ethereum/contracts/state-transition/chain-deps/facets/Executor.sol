@@ -176,7 +176,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         }
 
         // if (_outdatedProtocolVersion) {
-            // check we did not execute more than the upgrade tx
+        // check we did not execute more than the upgrade tx
         // }
     }
 
@@ -217,13 +217,13 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         chainStorage.totalBatchesCommitted = chainStorage.totalBatchesCommitted + _newBatchesData.length;
     }
 
-    // until we can confirm that no L2 txs were processed we cannot have this 
+    // until we can confirm that no L2 txs were processed we cannot have this
     // /// @notice Commit batch
     // /// @notice 1. Checks timestamp.
     // /// @notice 2. Process L2 logs.
     // /// @notice 3. Store batch commitments.
     // /// @notice here we should only commit a single batch, it should only contain a single tx,
-    // /// @notice and this tx should be the upgrade tx  
+    // /// @notice and this tx should be the upgrade tx
     // function commitBatchesOutdatedProtocolVersion(
     //     StoredBatchInfo memory _lastCommittedBatchData,
     //     CommitBatchInfo[] calldata _newBatchesData
@@ -298,7 +298,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
             // If we are committing batches with an outdated protocol version, we need to check that the upgrade transaction
             // is the only transaction in the batch.
             require(_newBatchesData.length == 1, "ik");
-        } 
+        }
 
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.

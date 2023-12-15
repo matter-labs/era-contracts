@@ -43,7 +43,6 @@ struct ProposedUpgrade {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
-
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -215,7 +214,7 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) virtual internal {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
         uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,

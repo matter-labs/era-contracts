@@ -92,39 +92,39 @@ describe("Mailbox tests", function () {
     expect(revertReason).equal(DEFAULT_REVERT_REASON);
   });
 
-    it("Should not accept bytecode is not chunkable", async () => {
-      const revertReason = await getCallRevertReason(
-        requestExecute(
-          chainId,
-          bridgehub,
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(0),
-          "0x",
-          ethers.BigNumber.from(100000),
-          [new Uint8Array(63)],
-          ethers.constants.AddressZero
-        )
-      );
+  it("Should not accept bytecode is not chunkable", async () => {
+    const revertReason = await getCallRevertReason(
+      requestExecute(
+        chainId,
+        bridgehub,
+        ethers.constants.AddressZero,
+        ethers.BigNumber.from(0),
+        "0x",
+        ethers.BigNumber.from(100000),
+        [new Uint8Array(63)],
+        ethers.constants.AddressZero
+      )
+    );
 
-      expect(revertReason).equal("pq");
-    });
+    expect(revertReason).equal("pq");
+  });
 
-    it("Should not accept bytecode of even length in words", async () => {
-      const revertReason = await getCallRevertReason(
-        requestExecute(
-          chainId,
-          bridgehub,
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(0),
-          "0x",
-          ethers.BigNumber.from(100000),
-          [new Uint8Array(64)],
-          ethers.constants.AddressZero
-        )
-      );
+  it("Should not accept bytecode of even length in words", async () => {
+    const revertReason = await getCallRevertReason(
+      requestExecute(
+        chainId,
+        bridgehub,
+        ethers.constants.AddressZero,
+        ethers.BigNumber.from(0),
+        "0x",
+        ethers.BigNumber.from(100000),
+        [new Uint8Array(64)],
+        ethers.constants.AddressZero
+      )
+    );
 
-      expect(revertReason).equal("ps");
-    });
+    expect(revertReason).equal("ps");
+  });
 
   it("Should not accept bytecode that is too long", async () => {
     const revertReason = await getCallRevertReason(

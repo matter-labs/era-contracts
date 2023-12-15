@@ -172,9 +172,12 @@ export class Deployer {
       },
     ]);
 
-    return diamondCut(facetCuts, this.addresses.StateTransition.DiamondInit, "0x"+diamondInitCalldata.slice(2+228*2));
+    return diamondCut(
+      facetCuts,
+      this.addresses.StateTransition.DiamondInit,
+      "0x" + diamondInitCalldata.slice(2 + 228 * 2)
+    );
   }
-
 
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
     if (this.verbose) {
@@ -245,7 +248,6 @@ export class Deployer {
 
     this.addresses.AllowList = contractAddress;
   }
-
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
@@ -593,16 +595,25 @@ export class Deployer {
     const inputChainId = 0;
     const governor = this.ownerAddress;
     const diamondCutData = await this.initialStateTransitionChainDiamondCut(extraFacets);
-    const initialDiamondCut = (new ethers.utils.AbiCoder()).encode([
-      "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)"
-    ],
-    [diamondCutData]);
+    const initialDiamondCut = new ethers.utils.AbiCoder().encode(
+      [
+        "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)",
+      ],
+      [diamondCutData]
+    );
 
-    const tx = await bridgehub.newChain(inputChainId, this.addresses.StateTransition.StateTransitionProxy, Date.now(), governor, initialDiamondCut, {
-      gasPrice,
-      nonce,
-      gasLimit,
-    });
+    const tx = await bridgehub.newChain(
+      inputChainId,
+      this.addresses.StateTransition.StateTransitionProxy,
+      Date.now(),
+      governor,
+      initialDiamondCut,
+      {
+        gasPrice,
+        nonce,
+        gasLimit,
+      }
+    );
     const receipt = await tx.wait();
     const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
       .topics[1];

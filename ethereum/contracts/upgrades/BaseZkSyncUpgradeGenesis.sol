@@ -15,13 +15,12 @@ import {ProposedUpgrade, BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
-
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) override internal {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override {
         uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
-            // Note this is the only thing change > to >= 
+            // Note this is the only thing change > to >=
             _newProtocolVersion >= previousProtocolVersion,
             "New protocol version is not greater than the current one"
         );

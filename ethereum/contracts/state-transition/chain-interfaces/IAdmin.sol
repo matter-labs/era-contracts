@@ -26,7 +26,11 @@ interface IAdmin is IStateTransitionChainBase {
 
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
-    function executeChainIdUpgrade(Diamond.DiamondCutData calldata _diamondCut, L2CanonicalTransaction memory _l2ProtocolUpgradeTx, uint256 _protocolVersion ) external;
+    function executeChainIdUpgrade(
+        Diamond.DiamondCutData calldata _diamondCut,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
+        uint256 _protocolVersion
+    ) external;
 
     function freezeDiamond() external;
 

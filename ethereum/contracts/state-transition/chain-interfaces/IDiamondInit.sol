@@ -35,5 +35,4 @@ struct InitializeData {
 
 interface IDiamondInit {
     function initialize(InitializeData calldata _initData) external returns (bytes32);
-
 }
