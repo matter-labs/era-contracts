@@ -81,6 +81,11 @@ interface IExecutor is IStateTransitionChainBase {
         CommitBatchInfo[] calldata _newBatchesData
     ) external;
 
+    // function commitBatchesOutDatedProtocolVersion(
+    //     StoredBatchInfo calldata _lastCommittedBatchData,
+    //     CommitBatchInfo[] calldata _newBatchesData
+    // ) external;
+
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,

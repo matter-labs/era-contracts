@@ -50,41 +50,4 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
-
-    function setChainIdUpgrade(uint256 _chainId, uint256 _protocolVersion) external returns (bytes32) {
-        WritePriorityOpParams memory params;
-
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
-        uint256[] memory uintEmptyArray;
-
-        L2CanonicalTransaction memory l2Transaction = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_BOOTLOADER_ADDRESS)),
-            to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
-            gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            maxFeePerGas: uint256(0),
-            maxPriorityFeePerGas: uint256(0),
-            paymaster: uint256(0),
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: _protocolVersion,
-            value: 0,
-            reserved: [uint256(0), 0, 0, 0],
-            data: systemContextCalldata,
-            signature: new bytes(0),
-            factoryDeps: uintEmptyArray,
-            paymasterInput: new bytes(0),
-            reservedDynamic: new bytes(0)
-        });
-
-        bytes memory encodedTransaction = abi.encode(l2Transaction);
-
-        bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
-
-        emit SetChainIdUpgrade(l2Transaction, block.timestamp, _protocolVersion);
-
-        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
-
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
 }

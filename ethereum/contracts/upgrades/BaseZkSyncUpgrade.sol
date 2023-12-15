@@ -10,38 +10,39 @@ import "../common/Messaging.sol";
 import "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 
+/// @notice The struct that represents the upgrade proposal.
+/// @param l2ProtocolUpgradeTx The system upgrade transaction.
+/// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
+/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
+/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
+/// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
+/// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
+/// in each upgrade. Usually empty.
+/// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
+/// upgrade. Usually empty.
+/// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
+/// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
+/// the previous protocol version.
+/// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
+struct ProposedUpgrade {
+    L2CanonicalTransaction l2ProtocolUpgradeTx;
+    bytes[] factoryDeps;
+    bytes32 bootloaderHash;
+    bytes32 defaultAccountHash;
+    address verifier;
+    VerifierParams verifierParams;
+    bytes l1ContractsUpgradeCalldata;
+    bytes postUpgradeCalldata;
+    uint256 upgradeTimestamp;
+    uint256 newProtocolVersion;
+    address newAllowList;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
-    /// @notice The struct that represents the upgrade proposal.
-    /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-    /// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
-    /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-    /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-    /// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
-    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
-    /// in each upgrade. Usually empty.
-    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
-    /// upgrade. Usually empty.
-    /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
-    /// the previous protocol version.
-    /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
-    struct ProposedUpgrade {
-        L2CanonicalTransaction l2ProtocolUpgradeTx;
-        bytes[] factoryDeps;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        address verifier;
-        VerifierParams verifierParams;
-        bytes l1ContractsUpgradeCalldata;
-        bytes postUpgradeCalldata;
-        uint256 upgradeTimestamp;
-        uint256 newProtocolVersion;
-        address newAllowList;
-    }
 
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
@@ -214,7 +215,7 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) virtual internal {
         uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,

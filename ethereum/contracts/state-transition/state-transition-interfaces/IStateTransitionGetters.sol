@@ -17,7 +17,7 @@ interface IZkSyncStateTransitionGetters {
 
     function getCutHash() external view returns (bytes32);
 
-    function getDiamondInit() external view returns (address);
+    function getGenesisUpgradeAddress() external view returns (address);
 
     function getUpgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 

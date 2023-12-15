@@ -80,6 +80,12 @@ async function main() {
       });
       nonce++;
 
+      await deployer.deployGenesisUpgrade(create2Salt, {
+        gasPrice,
+        nonce,
+      });
+      nonce++;
+
       await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
       await deployer.deployAllowList(create2Salt, { gasPrice });
       await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });

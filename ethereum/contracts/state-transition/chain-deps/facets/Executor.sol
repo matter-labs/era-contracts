@@ -28,7 +28,8 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
     function _commitOneBatch(
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        bool _outdatedProtocolVersion
     ) internal view returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
@@ -41,7 +42,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp
-        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, _outdatedProtocolVersion);
 
         require(_previousBatch.batchHash == previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -101,7 +102,8 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        bool _outdatedProtocolVersion
     )
         internal
         pure
@@ -172,6 +174,10 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         } else {
             require(processedLogs == 255, "b8");
         }
+
+        // if (_outdatedProtocolVersion) {
+            // check we did not execute more than the upgrade tx
+        // }
     }
 
     /// @notice Commit batch
@@ -203,12 +209,48 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
             _commitBatchesWithSystemContractsUpgrade(
                 _lastCommittedBatchData,
                 _newBatchesData,
-                systemContractsUpgradeTxHash
+                systemContractsUpgradeTxHash,
+                false
             );
         }
 
         chainStorage.totalBatchesCommitted = chainStorage.totalBatchesCommitted + _newBatchesData.length;
     }
+
+    // until we can confirm that no L2 txs were processed we cannot have this 
+    // /// @notice Commit batch
+    // /// @notice 1. Checks timestamp.
+    // /// @notice 2. Process L2 logs.
+    // /// @notice 3. Store batch commitments.
+    // /// @notice here we should only commit a single batch, it should only contain a single tx,
+    // /// @notice and this tx should be the upgrade tx  
+    // function commitBatchesOutdatedProtocolVersion(
+    //     StoredBatchInfo memory _lastCommittedBatchData,
+    //     CommitBatchInfo[] calldata _newBatchesData
+    // ) external override nonReentrant onlyValidator {
+    //     // Check that we commit batches after last committed batch
+    //     require(
+    //         chainStorage.storedBatchHashes[chainStorage.totalBatchesCommitted] ==
+    //             _hashStoredBatchInfo(_lastCommittedBatchData),
+    //         "i"
+    //     ); // incorrect previous batch data
+    //     require(_newBatchesData.length > 0, "No batches to commit");
+
+    //     bytes32 systemContractsUpgradeTxHash = chainStorage.l2SystemContractsUpgradeTxHash;
+    //     // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
+    //     if (systemContractsUpgradeTxHash == bytes32(0) || chainStorage.l2SystemContractsUpgradeBatchNumber != 0) {
+    //         revert();
+    //     } else {
+    //         _commitBatchesWithSystemContractsUpgrade(
+    //             _lastCommittedBatchData,
+    //             _newBatchesData,
+    //             systemContractsUpgradeTxHash,
+    //             true
+    //         );
+    //     }
+
+    //     chainStorage.totalBatchesCommitted = chainStorage.totalBatchesCommitted + _newBatchesData.length;
+    // }
 
     /// @dev Commits new batches without any system contracts upgrade.
     /// @param _lastCommittedBatchData The data of the last committed batch.
@@ -218,7 +260,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
+            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0), false);
 
             chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(
                 _lastCommittedBatchData
@@ -238,7 +280,8 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
     function _commitBatchesWithSystemContractsUpgrade(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData,
-        bytes32 _systemContractUpgradeTxHash
+        bytes32 _systemContractUpgradeTxHash,
+        bool _outdatedProtocolVersion
     ) internal {
         // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
         // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
@@ -251,13 +294,20 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
         // Save the batch number where the upgrade transaction was executed.
         chainStorage.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
 
+        if (_outdatedProtocolVersion) {
+            // If we are committing batches with an outdated protocol version, we need to check that the upgrade transaction
+            // is the only transaction in the batch.
+            require(_newBatchesData.length == 1, "ik");
+        } 
+
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.
             bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
-                expectedUpgradeTxHash
+                expectedUpgradeTxHash,
+                _outdatedProtocolVersion
             );
 
             chainStorage.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(

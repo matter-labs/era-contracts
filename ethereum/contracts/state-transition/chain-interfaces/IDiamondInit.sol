@@ -36,7 +36,4 @@ struct InitializeData {
 interface IDiamondInit {
     function initialize(InitializeData calldata _initData) external returns (bytes32);
 
-    function setChainIdUpgrade(uint256 _chainId, uint256 _protocolVersion) external returns (bytes32);
-
-    event SetChainIdUpgrade(L2CanonicalTransaction l2Transaction, uint256 timestamp, uint256 protocolVersion);
 }

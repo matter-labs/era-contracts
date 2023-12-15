@@ -7,6 +7,7 @@ import "../Verifier.sol";
 import "../chain-deps/StateTransitionChainStorage.sol";
 import "./IBase.sol";
 import {Diamond} from "../../common/libraries/Diamond.sol";
+import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 interface IAdmin is IStateTransitionChainBase {
     function setPendingGovernor(address _newPendingGovernor) external;
@@ -24,6 +25,8 @@ interface IAdmin is IStateTransitionChainBase {
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
+
+    function executeChainIdUpgrade(Diamond.DiamondCutData calldata _diamondCut, L2CanonicalTransaction memory _l2ProtocolUpgradeTx, uint256 _protocolVersion ) external;
 
     function freezeDiamond() external;
 
@@ -54,6 +57,8 @@ interface IAdmin is IStateTransitionChainBase {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
+
+    event SetChainIdUpgrade(L2CanonicalTransaction l2Transaction, uint256 timestamp, uint256 protocolVersion);
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();

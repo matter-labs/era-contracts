@@ -27,8 +27,8 @@ struct StateTransitionStorage {
     bytes32 storedBatchZero;
     /// @dev Stored cutData for diamond cut
     bytes32 cutHash;
-    /// @dev Diamond Init address for setChainId
-    address diamondInit;
+    /// @dev genesisUpgrade address for setChainId
+    address genesisUpgrade;
     /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 => bytes32) upgradeCutHash;
     /// @dev protocolVersion

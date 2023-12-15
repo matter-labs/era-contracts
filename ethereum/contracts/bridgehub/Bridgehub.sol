@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 
 import "./bridgehub-deps/BridgehubBase.sol";
 import "./bridgehub-interfaces/IBridgehub.sol";
+import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
 contract Bridgehub is BridgehubBase, IBridgehub {
@@ -50,12 +51,13 @@ contract Bridgehub is BridgehubBase, IBridgehub {
     function newChain(
         uint256 _chainId,
         address _stateTransition,
-        uint256 _salt
+        uint256 _salt,
+        address _l2Governor,
+        bytes calldata _initData
     ) external onlyGovernor returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
-        // KL Todo: uint16 until the server can take bigger numbers.
         if (_chainId == 0) {
-            chainId = uint16(
+            chainId = uint48(
                 uint256(
                     keccak256(
                         abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
@@ -73,7 +75,9 @@ contract Bridgehub is BridgehubBase, IBridgehub {
 
         bridgehubStorage.stateTransition[chainId] = _stateTransition;
 
-        emit NewChain(uint16(chainId), _stateTransition, msg.sender);
+        IZkSyncStateTransition(_stateTransition).newChain(chainId, _l2Governor, _initData);
+
+        emit NewChain(uint48(chainId), _stateTransition, msg.sender);
     }
 
     //// Mailbox forwarder

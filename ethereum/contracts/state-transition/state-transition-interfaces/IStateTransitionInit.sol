@@ -14,7 +14,7 @@ import {Diamond} from "../../common/libraries/Diamond.sol";
 struct ZkSyncStateTransitionInitializeData {
     address bridgehub;
     address governor;
-    address diamondInit;
+    address genesisUpgrade;
     bytes32 genesisBatchHash;
     uint64 genesisIndexRepeatedStorageChanges;
     bytes32 genesisBatchCommitment;
