@@ -4,12 +4,11 @@ pragma solidity ^0.8.13;
 
 import "./StateTransitionStorage.sol";
 import "../../common/ReentrancyGuard.sol";
-import "../../common/AllowListed.sol";
 import "../chain-interfaces/IStateTransitionChain.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
-contract ZkSyncStateTransitionBase is ReentrancyGuard, AllowListed {
+contract ZkSyncStateTransitionBase is ReentrancyGuard {
     StateTransitionStorage internal stateTransitionStorage;
 
     /// @notice Checks that the message sender is an active governor

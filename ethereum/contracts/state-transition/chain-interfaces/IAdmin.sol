@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import "../../common/interfaces/IAllowList.sol";
 import "../Verifier.sol";
 import "../chain-deps/StateTransitionChainStorage.sol";
 import "./IBase.sol";

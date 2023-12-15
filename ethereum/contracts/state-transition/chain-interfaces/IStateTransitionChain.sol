@@ -16,7 +16,6 @@ interface IStateTransitionChain is IAdmin, IExecutor, IGetters, IMailbox {
         uint256 _chainId,
         address _bridgehubChainContract,
         address _governor,
-        IAllowList _allowList,
         Verifier _verifier,
         VerifierParams calldata _verifierParams,
         bytes32 _l2BootloaderBytecodeHash,

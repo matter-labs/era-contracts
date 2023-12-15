@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 
 import "./IBridgehubBase.sol";
 import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
-import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 
 interface IBridgehubRegistry {

@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 
 import "../chain-interfaces/IVerifier.sol";
 import "../Verifier.sol";
-import "../../common/interfaces/IAllowList.sol";
 import "../../common/Messaging.sol";
 
 /// @dev storing all storage variables for zkSync facets

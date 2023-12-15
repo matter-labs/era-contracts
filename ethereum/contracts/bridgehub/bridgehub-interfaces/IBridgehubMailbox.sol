@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.13;
 
-// import {L2Log, L2Message} from "../chain-deps/ChainStorage.sol";
 import "../../common/Messaging.sol";
 
 interface IBridgehubMailbox {

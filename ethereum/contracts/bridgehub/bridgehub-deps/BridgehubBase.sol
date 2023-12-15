@@ -4,12 +4,11 @@ pragma solidity ^0.8.13;
 
 import "./BridgehubStorage.sol";
 import "../../common/ReentrancyGuard.sol";
-import "../../common/AllowListed.sol";
 import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
-contract BridgehubBase is ReentrancyGuard, AllowListed {
+contract BridgehubBase is ReentrancyGuard {
     BridgehubStorage internal bridgehubStorage;
 
     /// @notice Checks that the message sender is an active governor
