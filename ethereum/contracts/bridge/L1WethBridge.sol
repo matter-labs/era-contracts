@@ -87,11 +87,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address payable _l1WethAddress,
-        IBridgehub _bridgehub,
-        uint256 _eraChainId
-    ) reentrancyGuardInitializer {
+    constructor(address payable _l1WethAddress, IBridgehub _bridgehub, uint256 _eraChainId) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
         eraChainId = _eraChainId;

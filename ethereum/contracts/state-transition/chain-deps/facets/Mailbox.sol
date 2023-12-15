@@ -35,13 +35,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external onlyBridgehub {
-        _finalizeEthWithdrawal(
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        _finalizeEthWithdrawal(_l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
     }
 
     // this is implemented in the bridghead, does not go through the router.
@@ -55,12 +49,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    )
-        external
-        payable
-        onlyBridgehub
-        returns (bytes32 canonicalTxHash)
-    {
+    ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(
             _msgValue,
             _sender,
@@ -221,13 +210,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        _finalizeEthWithdrawal(
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        _finalizeEthWithdrawal(_l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
     }
 
     /// @notice Finalize the withdrawal and release funds
@@ -274,11 +257,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    )
-        external
-        payable
-        returns (bytes32 canonicalTxHash)
-    {
+    ) external payable returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(
             msg.value,
             msg.sender,

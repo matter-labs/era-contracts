@@ -134,7 +134,14 @@ async function getTxInfo(
   l2ProxyAddress?: string
 ) {
   if (contract === "L2ERC20Bridge") {
-    return getTransparentProxyUpgradeTxInfo(deployer,chainId, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
+    return getTransparentProxyUpgradeTxInfo(
+      deployer,
+      chainId,
+      target,
+      l2Erc20BridgeProxyAddress,
+      refundRecipient,
+      gasPrice
+    );
   } else if (contract == "L2Weth") {
     return getTransparentProxyUpgradeTxInfo(deployer, chainId, target, l2WethProxyAddress, refundRecipient, gasPrice);
   } else if (contract == "L2StandardERC20") {
