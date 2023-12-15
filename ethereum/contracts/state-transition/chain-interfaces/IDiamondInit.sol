@@ -2,11 +2,9 @@
 
 pragma solidity ^0.8.13;
 
-import "../../common/interfaces/IAllowList.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import "../chain-interfaces/IExecutor.sol";
 import "./IVerifier.sol";
-import "../../common/interfaces/IAllowList.sol";
 
 /// @param chainId
 /// @param stateTransition contract's address
@@ -25,7 +23,6 @@ struct InitializeData {
     address governor;
     address admin;
     bytes32 storedBatchZero;
-    IAllowList allowList;
     IVerifier verifier;
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;

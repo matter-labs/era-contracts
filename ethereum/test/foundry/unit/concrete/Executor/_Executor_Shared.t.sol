@@ -4,8 +4,6 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
-import {AllowList} from "../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
@@ -21,7 +19,6 @@ contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
-    AllowList internal allowList;
     AdminFacet internal admin;
     ExecutorFacet internal executor;
     GettersFacet internal getters;
@@ -60,7 +57,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](29);
+        bytes4[] memory selectors = new bytes4[](28);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getGovernor.selector;
         selectors[2] = getters.getPendingGovernor.selector;
@@ -79,17 +76,16 @@ contract ExecutorTest is Test {
         selectors[15] = getters.getVerifierParams.selector;
         selectors[16] = getters.isDiamondStorageFrozen.selector;
         selectors[17] = getters.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = getters.getAllowList.selector;
-        selectors[19] = getters.isEthWithdrawalFinalized.selector;
-        selectors[20] = getters.facets.selector;
-        selectors[21] = getters.facetFunctionSelectors.selector;
-        selectors[22] = getters.facetAddresses.selector;
-        selectors[23] = getters.facetAddress.selector;
-        selectors[24] = getters.isFunctionFreezable.selector;
-        selectors[25] = getters.isFacetFreezable.selector;
-        selectors[26] = getters.getTotalBatchesCommitted.selector;
-        selectors[27] = getters.getTotalBatchesVerified.selector;
-        selectors[28] = getters.getTotalBatchesExecuted.selector;
+        selectors[18] = getters.isEthWithdrawalFinalized.selector;
+        selectors[19] = getters.facets.selector;
+        selectors[20] = getters.facetFunctionSelectors.selector;
+        selectors[21] = getters.facetAddresses.selector;
+        selectors[22] = getters.facetAddress.selector;
+        selectors[23] = getters.isFunctionFreezable.selector;
+        selectors[24] = getters.isFacetFreezable.selector;
+        selectors[25] = getters.getTotalBatchesCommitted.selector;
+        selectors[26] = getters.getTotalBatchesVerified.selector;
+        selectors[27] = getters.getTotalBatchesExecuted.selector;
         return selectors;
     }
 
@@ -114,7 +110,6 @@ contract ExecutorTest is Test {
         getters = new GettersFacet();
         mailbox = new MailboxFacet();
 
-        allowList = new AllowList(owner);
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -127,7 +122,6 @@ contract ExecutorTest is Test {
             0,
             0,
             0,
-            allowList,
             VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
             false,
             dummyHash,
@@ -170,9 +164,6 @@ contract ExecutorTest is Test {
 
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
-
-        vm.prank(owner);
-        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
 
         executor = ExecutorFacet(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));

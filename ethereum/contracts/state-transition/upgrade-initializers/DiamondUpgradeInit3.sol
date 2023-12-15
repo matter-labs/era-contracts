@@ -44,14 +44,14 @@ interface IOldDiamondCut {
 contract DiamondUpgradeInit3 is StateTransitionChainBase {
     function upgrade(
         uint256 _priorityTxMaxGasLimit,
-        IAllowList _allowList,
+        address _allowList,
         IVerifier _verifier
     ) external payable returns (bytes32) {
         // Zero out the deprecated storage slots
         delete chainStorage.__DEPRECATED_diamondCutStorage;
 
         chainStorage.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
-        chainStorage.allowList = _allowList;
+        chainStorage.__DEPRECATED_allowList = _allowList;
         chainStorage.verifier = _verifier;
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

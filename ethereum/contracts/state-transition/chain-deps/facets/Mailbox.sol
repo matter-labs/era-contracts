@@ -4,21 +4,19 @@ pragma solidity 0.8.20;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import {StateTransitionChainBase} from "./Base.sol";
+import {IMailbox, TxStatus} from "../../chain-interfaces/IMailbox.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {L2Message, L2Log, WritePriorityOpParams, L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
-import {L2Message, L2Log, WritePriorityOpParams, L2CanonicalTransaction} from "../../../common/Messaging.sol";
+import {StateTransitionChainBase} from "./Base.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
-import {IAllowList} from "../../../common/interfaces/IAllowList.sol";
-
-import {IMailbox, TxStatus} from "../../chain-interfaces/IMailbox.sol";
 import {IBridgehub} from "../../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -31,15 +29,13 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     string public constant override getName = "MailboxFacet";
 
     function finalizeEthWithdrawalBridgehub(
-        address _sender,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external onlyBridgehub knownSenderCanCallFunction(_sender, chainStorage.allowList) {
-        _finalizeEthWithdrawalSender(
-            _sender,
+    ) external onlyBridgehub {
+        _finalizeEthWithdrawal(
             _l2BatchNumber,
             _l2MessageIndex,
             _l2TxNumberInBatch,
@@ -63,7 +59,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         external
         payable
         onlyBridgehub
-        knownSenderCanCallFunction(_sender, chainStorage.allowList)
         returns (bytes32 canonicalTxHash)
     {
         canonicalTxHash = _requestL2TransactionSender(
@@ -232,9 +227,8 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override knownSenderCanCallFunction(msg.sender, chainStorage.allowList) {
-        _finalizeEthWithdrawalSender(
-            msg.sender,
+    ) external override {
+        _finalizeEthWithdrawal(
             _l2BatchNumber,
             _l2MessageIndex,
             _l2TxNumberInBatch,
@@ -249,8 +243,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
     /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
     /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function _finalizeEthWithdrawalSender(
-        address _sender,
+    function _finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
@@ -291,7 +284,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     )
         external
         payable
-        knownSenderCanCallFunction(msg.sender, chainStorage.allowList)
         returns (bytes32 canonicalTxHash)
     {
         canonicalTxHash = _requestL2TransactionSender(
@@ -351,10 +343,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
-        // The L1 -> L2 transaction may be failed and funds will be sent to the `_refundRecipient`,
-        // so we use `msg.value` instead of `_l2Value` as the bridged amount.
-        _verifyDepositLimit(_sender, _msgValue);
-
         // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
 
@@ -366,24 +354,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         params.refundRecipient = _refundRecipient;
 
         canonicalTxHash = _requestL2Transaction(_msgValue, params, _calldata, _factoryDeps, false);
-    }
-
-    function _verifyDepositLimit(address _depositor, uint256 _amount) internal {
-        IAllowList.Deposit memory limitData = IAllowList(chainStorage.allowList).getTokenDepositLimitData(address(0)); // address(0) denotes the ETH
-        if (!limitData.depositLimitation) return; // no deposit limitation is placed for ETH
-
-        require(chainStorage.totalDepositedAmountPerUser[_depositor] + _amount <= limitData.depositCap, "d2");
-        chainStorage.totalDepositedAmountPerUser[_depositor] += _amount;
-    }
-
-    // for setting chainID in VM
-    function requestL2TransactionProof(
-        WritePriorityOpParams memory _params,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps,
-        bool _isFree
-    ) external onlyStateTransition returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = _requestL2Transaction(0, _params, _calldata, _factoryDeps, _isFree);
     }
 
     function _requestL2Transaction(

@@ -1,20 +1,19 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-
-import * as fs from "fs";
+import { hashL2Bytecode } from "../../scripts/utils";
+import type { L1WethBridge, WETH9 } from "../../typechain";
+import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
-import type { AllowList, L1WethBridge, WETH9 } from "../../typechain";
-import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
-import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
-import { hashL2Bytecode } from "../../scripts/utils";
+import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
 import {
   calculateWethAddresses,
   L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
   L2_WETH_BRIDGE_PROXY_BYTECODE,
 } from "../../scripts/utils-bytecode";
 
+import * as fs from "fs";
 import { EraLegacyChainId } from "../../src.ts/deploy";
 
 import { Interface } from "ethers/lib/utils";
@@ -64,7 +63,6 @@ export async function create2DeployFromL1(
 describe("WETH Bridge tests", () => {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
-  let allowList: AllowList;
   let bridgeProxy: L1WethBridge;
   let l1Weth: WETH9;
   const functionSignature = "0x0fdef251";
@@ -89,10 +87,10 @@ describe("WETH Bridge tests", () => {
 
     await owner.sendTransaction(tx);
 
+    // note we can use initialDeployment so we don't go into deployment details here
     const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
-    allowList = deployer.l1AllowList(deployWallet);
 
     l1Weth = WETH9Factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
     // prepare the bridge
@@ -102,7 +100,6 @@ describe("WETH Bridge tests", () => {
     ).deploy(
       l1Weth.address,
       deployer.addresses.Bridgehub.BridgehubProxy,
-      deployer.addresses.AllowList,
       EraLegacyChainId
     );
 

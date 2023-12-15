@@ -118,7 +118,7 @@ library Utils {
         selectors[15] = GettersFacet.getVerifierParams.selector;
         selectors[16] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[17] = GettersFacet.getPriorityTxMaxGasLimit.selector;
-        selectors[18] = GettersFacet.getAllowList.selector;
+        selectors[18] = GettersFacet.isEthWithdrawalFinalized.selector;
         selectors[19] = GettersFacet.facets.selector;
         selectors[20] = GettersFacet.facetFunctionSelectors.selector;
         selectors[21] = GettersFacet.facetAddresses.selector;

@@ -1,12 +1,11 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { AllowList, Forwarder, MockExecutorFacet } from "../../typechain";
+import type { Forwarder, MockExecutorFacet } from "../../typechain";
 import { BridgehubFactory, MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
 
 import {
   DEFAULT_REVERT_REASON,
   getCallRevertReason,
-  AccessMode,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   requestExecute,
   requestExecuteDirect,
@@ -24,19 +23,17 @@ import { Action, facetCut } from "../../src.ts/diamondCut";
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Mailbox tests", function () {
-  let allowList: AllowList;
-  let bridgehub: ethers.Contract;
   let mailbox: ethers.Contract;
   let proxyAsMockExecutor: MockExecutorFacet;
+  let bridgehub: ethers.Contract;
   let owner: ethers.Signer;
-  let randomSigner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
-    [owner, randomSigner] = await hardhat.ethers.getSigners();
+    [owner] = await hardhat.ethers.getSigners();
 
     const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
@@ -61,7 +58,6 @@ describe("Mailbox tests", function () {
     const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
-    allowList = deployer.l1AllowList(deployWallet);
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);

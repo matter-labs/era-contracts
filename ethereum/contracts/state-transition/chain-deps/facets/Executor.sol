@@ -430,7 +430,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
 
     function _verifyProof(uint256[] memory proofPublicInput, ProofInput calldata _proof) internal view {
         // We can only process 1 batch proof at a time.
-        require(_proof.serializedProof.length == 1, "t4");
+        require(proofPublicInput.length == 1, "t4");
 
         bool successVerifyProof = chainStorage.verifier.verify(
             proofPublicInput,

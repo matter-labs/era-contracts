@@ -3,14 +3,13 @@ import { BigNumberish, ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import * as fs from "fs";
-
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
-import type { AllowList, TestnetERC20Token, Bridgehub } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory, MailboxFacet, MailboxFacetFactory } from "../../typechain";
+import { IBridgehub} from "../../typechain/IBridgehub";
+import type { TestnetERC20Token, Bridgehub } from "../../typechain";
+import { TestnetERC20TokenFactory, BridgehubFactory, MailboxFacetFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { AccessMode, getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
-import type { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
+import {  getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -20,7 +19,6 @@ process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSIO
 describe("L1ERC20Bridge tests", function () {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
-  let allowList: AllowList;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1Bridge;
   let erc20TestToken: TestnetERC20Token;
@@ -56,14 +54,12 @@ describe("L1ERC20Bridge tests", function () {
     const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId.toString();
-    allowList = deployer.l1AllowList(deployWallet);
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
     l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(
       deployer.addresses.Bridgehub.BridgehubProxy,
-      allowList.address,
       0
     );
     l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
@@ -78,9 +74,6 @@ describe("L1ERC20Bridge tests", function () {
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
-
-    // // Exposing the methods of IZkSync to the diamond proxy
-    // bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
   });
 
   it("Should not allow depositing zero amount", async () => {
@@ -179,7 +172,7 @@ describe("L1ERC20Bridge tests", function () {
 
 async function depositERC20(
   bridge: IL1Bridge,
-  zksyncContract: IBridgehubMailbox,
+  zksyncContract: IBridgehub,
   chainId: string,
   l2Receiver: string,
   l1Token: string,

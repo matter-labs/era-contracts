@@ -164,11 +164,6 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
         return chainStorage.priorityTxMaxGasLimit;
     }
 
-    /// @return The allow list smart contract
-    function getAllowList() external view returns (address) {
-        return address(chainStorage.allowList);
-    }
-
     /// @return Whether the selector can be frozen by the governor or always accessible
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();

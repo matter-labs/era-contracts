@@ -4,14 +4,13 @@ pragma solidity ^0.8.13;
 
 import "../StateTransitionChainStorage.sol";
 import "../../../common/ReentrancyGuard.sol";
-import "../../../common/AllowListed.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract StateTransitionChainBase is ReentrancyGuard, AllowListed {
+contract StateTransitionChainBase is ReentrancyGuard {
     StateTransitionChainStorage internal chainStorage;
 
     /// @notice Checks that the message sender is an active governor

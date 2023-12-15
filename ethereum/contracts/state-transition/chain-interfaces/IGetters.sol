@@ -63,10 +63,9 @@ interface IGetters is IStateTransitionChainBase {
 
     function isDiamondStorageFrozen() external view returns (bool);
 
-    // KL todo: remove this?
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
-    function getAllowList() external view returns (address);
+    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE

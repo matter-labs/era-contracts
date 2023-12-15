@@ -9,12 +9,10 @@ import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
-import "../common/interfaces/IAllowList.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
 import "../common/Messaging.sol";
-import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
 import "../common/VersionTracker.sol";
@@ -37,7 +35,7 @@ import "../vendor/AddressAliasHelper.sol";
 /// WETH, and sends the WETH to the L1 recipient.
 /// @dev The `L1WethBridge` contract works in conjunction with its L2 counterpart, `L2WethBridge`.
 /// @dev Note VersionTracker stores at random addresses, so we can add it to the inheritance tree.
-contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker {
+contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     using SafeERC20 for IERC20;
 
     /// @dev Event emitted when ETH is received by the contract.
@@ -45,9 +43,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
 
     /// @dev The address of the WETH token on L1
     address payable public immutable l1WethAddress;
-
-    /// @dev The smart contract that manages the list with permission to call contract functions
-    IAllowList public immutable allowList;
 
     /// @dev bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub public immutable bridgehub;
@@ -95,12 +90,10 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
     constructor(
         address payable _l1WethAddress,
         IBridgehub _bridgehub,
-        IAllowList _allowList,
         uint256 _eraChainId
     ) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
-        allowList = _allowList;
         eraChainId = _eraChainId;
     }
 
@@ -298,7 +291,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
+    ) external payable nonReentrant returns (bytes32 txHash) {
         require(_l1Token == l1WethAddress, "Invalid L1 token address");
         require(_amount != 0, "Amount cannot be zero");
 
@@ -395,7 +388,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard, VersionTracker
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant senderCanCallFunction(allowList) {
+    ) external nonReentrant {
         {
             if (_chainId == eraChainId) {
                 require(!isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");

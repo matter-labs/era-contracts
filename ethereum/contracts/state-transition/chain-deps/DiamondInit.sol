@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.13;
 
-import "../../common/interfaces/IAllowList.sol";
 import "../../common/libraries/Diamond.sol";
 import "./facets/Base.sol";
 
@@ -38,7 +37,6 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
         chainStorage.admin = _initializeData.admin;
 
         chainStorage.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        chainStorage.allowList = _initializeData.allowList;
         chainStorage.verifierParams = _initializeData.verifierParams;
         chainStorage.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         chainStorage.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;

@@ -13,7 +13,6 @@ import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { AllowListFactory } from "../typechain";
 import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
 import {
   hashL2Bytecode,
@@ -59,7 +58,6 @@ export interface DeployedAddresses {
   };
   TransparentProxyAdmin: string;
   Governance: string;
-  AllowList: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
 }
@@ -100,7 +98,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
     },
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
-    AllowList: getAddressFromEnv("CONTRACTS_L1_ALLOW_LIST_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
@@ -163,7 +160,6 @@ export class Deployer {
         governor: "0x0000000000000000000000000000000000003234",
         admin: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
-        allowList: this.addresses.AllowList,
         verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
@@ -236,17 +232,6 @@ export class Deployer {
     }
 
     this.addresses.Governance = contractAddress;
-  }
-
-  public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("AllowList", [this.ownerAddress], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_L1_ALLOW_LIST_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.AllowList = contractAddress;
   }
 
   public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -411,7 +396,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList, EraLegacyChainId],
+      [this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId],
       create2Salt,
       ethTxOptions
     );
@@ -455,7 +440,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, this.addresses.AllowList, EraLegacyChainId],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId],
       create2Salt,
       ethTxOptions
     );
@@ -705,10 +690,6 @@ export class Deployer {
 
   public validatorTimelock(signerOrProvider: Signer | providers.Provider) {
     return ValidatorTimelockFactory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
-  }
-
-  public l1AllowList(signerOrProvider: Signer | providers.Provider) {
-    return AllowListFactory.connect(this.addresses.AllowList, signerOrProvider);
   }
 
   public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {

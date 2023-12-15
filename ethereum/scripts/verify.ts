@@ -55,8 +55,7 @@ async function main() {
 
   // Bridges
   const promise = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [
-    addresses.StateTransition.DiamondProxy,
-    addresses.AllowList,
+    addresses.StateTransition.DiamondProxy
   ]);
   promises.push(promise);
 

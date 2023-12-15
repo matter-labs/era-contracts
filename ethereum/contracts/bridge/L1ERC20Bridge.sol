@@ -14,8 +14,6 @@ import "./libraries/BridgeInitializationHelper.sol";
 
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../common/Messaging.sol";
-import "../common/interfaces/IAllowList.sol";
-import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/ReentrancyGuard.sol";
@@ -27,11 +25,8 @@ import "../vendor/AddressAliasHelper.sol";
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
-contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGuard, VersionTracker {
+contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTracker {
     using SafeERC20 for IERC20;
-
-    /// @dev The smart contract that manages the list with permission to call contract functions
-    IAllowList internal immutable allowList;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub internal immutable bridgehub;
@@ -97,9 +92,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAllowList _allowList, uint256 _eraChainId) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub, uint256 _eraChainId) reentrancyGuardInitializer {
         bridgehub = _bridgehub;
-        allowList = _allowList;
         eraChainId = _eraChainId;
     }
 
@@ -275,8 +269,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return l2TxHash The L2 transaction hash of deposit finalization
-    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers, because the inner
-    /// method does.
     function deposit(
         address _l2Receiver,
         address _l1Token,
@@ -356,12 +348,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) public payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 l2TxHash) {
+    ) public payable nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
         uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "1T"); // The token has non-standard transfer logic
-        // verify the deposit amount is allowed
-        _verifyDepositLimit(_l1Token, msg.sender, _amount, false);
 
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -457,7 +447,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant senderCanCallFunction(allowList) {
+    ) external nonReentrant {
         bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
             _chainId,
             _l2TxHash,
@@ -476,9 +466,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
             amount = depositAmount[_chainId][_depositSender][_l1Token][_l2TxHash];
         }
         require(amount > 0, "y1");
-
-        // Change the total deposited amount by the user
-        _verifyDepositLimit(_l1Token, _depositSender, amount, true);
 
         if (_chainId == eraChainId) {
             delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
@@ -507,11 +494,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant senderCanCallFunction(allowList) {
+    ) external nonReentrant {
         if (_chainId == eraChainId) {
             require(!isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex], "pw");
         } else {
-            require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "pw");
+            require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         }
 
         L2Message memory l2ToL1Message = L2Message({
@@ -569,19 +556,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, AllowListed, ReentrancyGua
         (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
         (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-    }
-
-    /// @dev Verify the deposit limit is reached to its cap or not
-    function _verifyDepositLimit(address _l1Token, address _depositor, uint256 _amount, bool _claiming) internal {
-        IAllowList.Deposit memory limitData = IAllowList(allowList).getTokenDepositLimitData(_l1Token);
-        if (!limitData.depositLimitation) return; // no deposit limitation is placed for this token
-
-        if (_claiming) {
-            totalDepositedAmountPerUser[_l1Token][_depositor] -= _amount;
-        } else {
-            require(totalDepositedAmountPerUser[_l1Token][_depositor] + _amount <= limitData.depositCap, "d1");
-            totalDepositedAmountPerUser[_l1Token][_depositor] += _amount;
-        }
     }
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token

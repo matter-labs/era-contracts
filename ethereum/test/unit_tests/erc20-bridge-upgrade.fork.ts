@@ -24,7 +24,6 @@ async function isPromiseFailed(promise: Promise<any>): Promise<boolean> {
 }
 
 describe("L1 ERC20 proxy upgrade fork test", function () {
-  const allowListOnNewImplementation = "0xdeadbeafdeadbeafdeadbeafdeadbeafdeadbeaf";
   const mailboxOnNewImplementation = "0x1234567890123456789012345678901234567890";
 
   let governor: ethers.Signer;
@@ -44,15 +43,12 @@ describe("L1 ERC20 proxy upgrade fork test", function () {
     oldBridgeImplementationAddress = await bridgeProxy.connect(governor).callStatic.implementation();
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20BridgeTest");
-    const l1Erc20Bridge = await l1Erc20BridgeFactory.deploy(mailboxOnNewImplementation, allowListOnNewImplementation);
+    const l1Erc20Bridge = await l1Erc20BridgeFactory.deploy(mailboxOnNewImplementation);
     newBridgeImplementation = L1ERC20BridgeTestFactory.connect(l1Erc20Bridge.address, l1Erc20Bridge.signer);
   });
 
   it("should revert on non-existed methods", async () => {
     const bridgeProxyAsNewImplementation = L1ERC20BridgeTestFactory.connect(bridgeProxy.address, randomSigner);
-
-    const failedGetAllowList = await isPromiseFailed(bridgeProxyAsNewImplementation.getAllowList());
-    expect(failedGetAllowList).to.be.true;
 
     const failedGetMailbox = await isPromiseFailed(bridgeProxyAsNewImplementation.getZkSyncMailbox());
     expect(failedGetMailbox).to.be.true;
@@ -64,9 +60,6 @@ describe("L1 ERC20 proxy upgrade fork test", function () {
 
   it("check new functions", async () => {
     const bridgeProxyAsNewImplementation = L1ERC20BridgeTestFactory.connect(bridgeProxy.address, randomSigner);
-
-    const allowlist = await bridgeProxyAsNewImplementation.getAllowList();
-    expect(allowlist.toLocaleLowerCase()).to.be.eq(allowListOnNewImplementation.toLocaleLowerCase());
 
     const mailbox = await bridgeProxyAsNewImplementation.getZkSyncMailbox();
     expect(mailbox.toLocaleLowerCase()).to.be.eq(mailboxOnNewImplementation.toLocaleLowerCase());
