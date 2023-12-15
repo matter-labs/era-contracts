@@ -2,10 +2,12 @@ import { expect } from "chai";
 import * as hardhat from "hardhat";
 import * as fs from "fs";
 import { diamondCut } from "../../src.ts/diamondCut";
-import type { ExecutorFacet, AdminFacet, GettersFacet, StateTransition } from "../../typechain";
 import {
+  ExecutorFacet,
   ExecutorFacetFactory,
+  GettersFacet,
   GettersFacetFactory,
+  AdminFacet,
   AdminFacetFactory,
   DefaultUpgradeFactory,
   CustomUpgradeTestFactory,
@@ -49,7 +51,7 @@ describe("L2 upgrade test", function () {
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
 
-  let stateTransition: StateTransition;
+  let stateTransition: ZkSyncStateTransition;
 
   let owner: ethers.Signer;
 
@@ -443,7 +445,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
-      nonce: 4 + 1 + initialProtocolVersion,
+      nonce: 5 + 1 + initialProtocolVersion,
     });
 
     const upgrade = {
@@ -457,7 +459,7 @@ describe("L2 upgrade test", function () {
       newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
     const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
-
+    await rollBackProtocolVersion((4+1+initialProtocolVersion).toString(), stateTransition, upgrade)
     expect(revertReason).to.equal("Previous upgrade has not been finalized");
   });
 
@@ -466,7 +468,6 @@ describe("L2 upgrade test", function () {
       throw new Error("Can not perform this test without l2UpgradeTxHash");
     }
 
-    console.log("kl todo", await proxyGetters.getProtocolVersion(), await stateTransition.getProtocolVersion());
 
     const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
       batchNumber: 3,
@@ -920,7 +921,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 async function executeUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  stateTransition: StateTransition,
+  stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -946,10 +947,34 @@ async function executeUpgrade(
   return stateTransition.upgradeChain(chainId, partialUpgrade.newProtocolVersion, diamondCutData);
 }
 
+// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
+async function rollBackProtocolVersion(
+  protocolVersion: string,
+  stateTransition: ZkSyncStateTransition,
+  partialUpgrade: Partial<ProposedUpgrade>
+) {
+  
+  partialUpgrade.newProtocolVersion = protocolVersion;
+  
+  const upgrade = buildProposeUpgrade(partialUpgrade);
+
+  const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");
+
+  const defaultUpgrade = await defaultUpgradeFactory.deploy();
+  const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
+
+  const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
+
+  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+
+  // This promise will be handled in the tests
+  (await stateTransition.setUpgradeDiamondCut(diamondCutData, protocolVersion)).wait();
+}
+
 async function executeCustomUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  stateTransition: StateTransition,
+  stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {

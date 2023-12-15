@@ -322,7 +322,9 @@ export async function initialDeployment(
   process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
-  await deployer.deployAllowList(create2Salt, { gasPrice, nonce });
+  await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
+
+  await deployer.deployAllowList(create2Salt, { gasPrice });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);

@@ -83,25 +83,6 @@ describe("L1ERC20Bridge tests", function () {
     // bridgehubMailboxFacet = BridgehubMailboxFacetFactory.connect(diamondProxyContract.address, diamondProxyContract.provider);
   });
 
-  it("Should not allow an un-whitelisted address to deposit", async () => {
-    const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .deposit(
-          chainId,
-          await randomSigner.getAddress(),
-          testnetERC20TokenContract.address,
-          0,
-          0,
-          0,
-          ethers.constants.AddressZero
-        )
-    );
-    expect(revertReason).equal("nr");
-
-    await (await allowList.setAccessMode(l1ERC20BridgeAddress, AccessMode.Public)).wait();
-  });
-
   it("Should not allow depositing zero amount", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge

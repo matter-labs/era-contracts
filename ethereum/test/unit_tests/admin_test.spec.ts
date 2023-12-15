@@ -41,6 +41,7 @@ describe("Admin facet tests", function () {
     expect(revertReason).equal("StateTransition chain: Only by governor or admin");
   });
 
+  // kl todo
   // disabled as state transition has to set porter availability
   // it("governor successfully set porter availability", async () => {
   //   await adminFacetTest.setPorterAvailability(true);

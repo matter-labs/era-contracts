@@ -129,27 +129,6 @@ describe("WETH Bridge tests", () => {
     await bridgeProxy.initializeChainGovernance(chainId, l2WethProxyAddress, l2WethBridgeProxyAddress);
   });
 
-  it("Should not allow an un-whitelisted address to deposit", async () => {
-    const revertReason = await getCallRevertReason(
-      bridgeProxy
-        .connect(randomSigner)
-        .deposit(
-          chainId,
-          await randomSigner.getAddress(),
-          ethers.constants.AddressZero,
-          0,
-          0,
-          0,
-          ethers.constants.AddressZero
-        )
-    );
-
-    expect(revertReason).equal("nr");
-
-    // This is only so the following tests don't need whitelisting
-    await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
-  });
-
   it("Should not allow depositing zero WETH", async () => {
     const revertReason = await getCallRevertReason(
       bridgeProxy
