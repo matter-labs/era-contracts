@@ -76,13 +76,6 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
 
     //////////////////
 
-    /// @return Whether a withdrawal has been finalized.
-    /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
-    /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
-    function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
-        return chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
-    }
-
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message

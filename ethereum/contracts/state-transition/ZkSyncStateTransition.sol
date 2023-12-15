@@ -148,8 +148,7 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: stateTransitionStorage.protocolVersion,
-            newAllowList: address(0)
+            newProtocolVersion: stateTransitionStorage.protocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;

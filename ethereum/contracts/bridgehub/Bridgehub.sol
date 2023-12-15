@@ -185,7 +185,6 @@ contract Bridgehub is BridgehubBase, IBridgehub {
         address stateTransitionChain = getStateTransitionChain(_chainId);
         return
             IStateTransitionChain(stateTransitionChain).finalizeEthWithdrawalBridgehub(
-                msg.sender,
                 _l2BatchNumber,
                 _l2MessageIndex,
                 _l2TxNumberInBatch,

@@ -7,8 +7,6 @@ import "../../common/Messaging.sol";
 import "./IMailboxEvents.sol";
 
 interface IMailbox is IMailboxEvents, IStateTransitionChainBase {
-    function isEthWithdrawalFinalized(uint256 _batchNumber, uint256 _index) external view returns (bool);
-
     function proveL2MessageInclusion(
         uint256 _batchNumber,
         uint256 _index,
@@ -41,7 +39,6 @@ interface IMailbox is IMailboxEvents, IStateTransitionChainBase {
     ) external;
 
     function finalizeEthWithdrawalBridgehub(
-        address _sender,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
@@ -70,13 +67,6 @@ interface IMailbox is IMailboxEvents, IStateTransitionChainBase {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash);
-
-    function requestL2TransactionProof(
-        WritePriorityOpParams memory _params,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps,
-        bool _isFree
-    ) external returns (bytes32 canonicalTxHash);
 
     function l2TransactionBaseCost(
         uint256 _gasPrice,

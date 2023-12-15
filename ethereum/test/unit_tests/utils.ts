@@ -318,7 +318,6 @@ export async function initialDeployment(
 
   await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
 
-  await deployer.deployAllowList(create2Salt, { gasPrice });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
@@ -327,19 +326,6 @@ export async function initialDeployment(
 
   await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
 
-  const allowList = deployer.l1AllowList(deployWallet);
-
-  const allowTx = await allowList.setBatchAccessMode(
-    [
-      deployer.addresses.Bridgehub.BridgehubProxy,
-      deployer.addresses.StateTransition.StateTransitionProxy,
-      deployer.addresses.StateTransition.DiamondProxy,
-      deployer.addresses.Bridges.ERC20BridgeProxy,
-      deployer.addresses.Bridges.WethBridgeProxy,
-    ],
-    [AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public, AccessMode.Public]
-  );
-  await allowTx.wait();
   return deployer;
 }
 
