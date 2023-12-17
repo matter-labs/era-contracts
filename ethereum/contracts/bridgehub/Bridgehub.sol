@@ -2,49 +2,58 @@
 
 pragma solidity ^0.8.13;
 
-import "./bridgehub-deps/BridgehubBase.sol";
 import "./bridgehub-interfaces/IBridgehub.sol";
 import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
+import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
-contract Bridgehub is BridgehubBase, IBridgehub {
+contract Bridgehub is IBridgehub, ReentrancyGuard {
     string public constant override getName = "Bridgehub";
 
+    /// @notice Address which will exercise critical changes
+    address public governor;
+    /// new fields
+    /// @notice we store registered stateTransitions
+    mapping(address => bool) public stateTransitionIsRegistered;
+    /// @notice chainID => stateTransition contract address
+    mapping(uint256 => address) public stateTransition;
+
+    /// @notice Checks that the message sender is an active governor
+    modifier onlyGovernor() {
+        require(msg.sender == governor, "Bridgehub: not governor");
+        _;
+    }
+
+    modifier onlyStateTransition(uint256 _chainId) {
+        require(msg.sender == stateTransition[_chainId], "Bridgehub: not state transition");
+        _;
+    }
+
+    modifier onlyStateTransitionChain(uint256 _chainId) {
+        require(
+            msg.sender == IZkSyncStateTransition(stateTransition[_chainId]).stateTransitionChain(_chainId),
+            "Bridgehub: not state transition chain"
+        );
+        _;
+    }
+
     function initialize(address _governor) external reentrancyGuardInitializer returns (bytes32) {
-        require(bridgehubStorage.governor == address(0), "Bridgehub: governor zero");
-        bridgehubStorage.governor = _governor;
+        require(governor == address(0), "Bridgehub: governor zero");
+        governor = _governor;
     }
 
     ///// Getters
 
-    /// @return The address of the current governor
-    function getGovernor() external view returns (address) {
-        return bridgehubStorage.governor;
-    }
-
-    /// @return The total number of batches that were committed & verified & executed
-    function getIsStateTransition(address _stateTransition) external view returns (bool) {
-        return bridgehubStorage.stateTransitionIsRegistered[_stateTransition];
-    }
-
-    function getStateTransition(uint256 _chainId) external view returns (address) {
-        return bridgehubStorage.stateTransition[_chainId];
-    }
-
     function getStateTransitionChain(uint256 _chainId) public view returns (address) {
-        return IZkSyncStateTransition(bridgehubStorage.stateTransition[_chainId]).getStateTransitionChain(_chainId);
+        return IZkSyncStateTransition(stateTransition[_chainId]).stateTransitionChain(_chainId);
     }
 
     //// Registry
 
     /// @notice Proof system can be any contract with the appropriate interface, functionality
     function newStateTransition(address _stateTransition) external onlyGovernor {
-        // KL todo add checks here
-        require(
-            !bridgehubStorage.stateTransitionIsRegistered[_stateTransition],
-            "Bridgehub: state transition already registered"
-        );
-        bridgehubStorage.stateTransitionIsRegistered[_stateTransition] = true;
+        require(!stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
+        stateTransitionIsRegistered[_stateTransition] = true;
     }
 
     /// @notice
@@ -68,12 +77,11 @@ contract Bridgehub is BridgehubBase, IBridgehub {
             chainId = _chainId;
         }
 
-        require(
-            bridgehubStorage.stateTransitionIsRegistered[_stateTransition],
-            "Bridgehub: state transition not registered"
-        );
+        require(stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition not registered");
 
-        bridgehubStorage.stateTransition[chainId] = _stateTransition;
+        require(stateTransition[_chainId] == address(0), "Bridgehub: chainId already not registered");
+
+        stateTransition[chainId] = _stateTransition;
 
         IZkSyncStateTransition(_stateTransition).newChain(chainId, _l2Governor, _initData);
 

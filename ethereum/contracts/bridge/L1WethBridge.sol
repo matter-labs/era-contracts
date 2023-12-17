@@ -9,6 +9,7 @@ import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import "../state-transition/chain-interfaces/IMailbox.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
@@ -47,6 +48,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub public immutable bridgehub;
 
+    /// @dev Era's chainID
+    uint256 public immutable eraChainId;
+
     /// @dev The address of deployed L2 WETH bridge counterpart
     address public l2BridgeStandardAddress;
 
@@ -57,14 +61,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalizedEra;
 
-    /// @dev Era's chainID
-    uint256 public immutable eraChainId;
-
     /// @dev Governor's address
     address public governor;
-
-    /// @dev L1 address that governs the L2 bridges. (if not EOA then L1toL2 alias is applied)
-    address public l2Governor;
 
     /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge
     bytes32 public factoryDepsHash;
@@ -99,7 +97,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
-    /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation
+    /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
+    /// implementation and proxy upon initialization
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethStandardAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
@@ -107,8 +106,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         bytes[] calldata _factoryDeps,
         address _l2WethStandardAddress,
         address _l2BridgeStandardAddress,
-        address _governor,
-        address _l2Governor
+        address _governor
     ) external reinitializer(2) {
         require(_l2WethStandardAddress != address(0), "L2 WETH address cannot be zero");
         require(_governor != address(0), "Governor address cannot be zero");
@@ -117,7 +115,14 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         l2WethStandardAddress = _l2WethStandardAddress;
         l2BridgeStandardAddress = _l2BridgeStandardAddress;
         governor = _governor;
-        l2Governor = _l2Governor;
+
+        // #if !EOA_GOVERNOR
+        uint32 size;
+        assembly {
+            size := extcodesize(_governor)
+        }
+        require(size > 0, "L1WETHBridge, governor cannot be EOA");
+        // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
@@ -182,6 +187,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         // Prepare the proxy constructor data
         bytes memory l2WethBridgeProxyConstructorData;
         {
+            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
@@ -250,8 +256,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             ),
             "L1ERC20Bridge: bridge proxy tx not confirmed"
         );
-        bridgeImplDeployOnL2TxHash[_chainId] = 0x00;
-        bridgeProxyDeployOnL2TxHash[_chainId] = 0x00;
+        delete bridgeImplDeployOnL2TxHash[_chainId];
+        delete bridgeProxyDeployOnL2TxHash[_chainId];
         l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
         l2WethAddress[_chainId] = l2WethStandardAddress;
     }
@@ -460,7 +466,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
         require(
-            bytes4(functionSignature) == IBridgehubMailbox.finalizeEthWithdrawal.selector,
+            bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector,
             "Incorrect ETH message function selector"
         );
 

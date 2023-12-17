@@ -303,9 +303,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        address sender = _sender;
-        if (sender != tx.origin) {
-            sender = AddressAliasHelper.applyL1ToL2Alias(_sender);
+        address l2Sender = _sender;
+        if (l2Sender != tx.origin) {
+            l2Sender = AddressAliasHelper.applyL1ToL2Alias(_sender);
         }
 
         // Enforcing that `_l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
@@ -318,7 +318,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
 
-        params.sender = sender;
+        params.sender = l2Sender;
         params.l2Value = _l2Value;
         params.contractAddressL2 = _contractL2;
         params.l2GasLimit = _l2GasLimit;
@@ -455,14 +455,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         require(_message.length >= 56, "pm");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(
-            bytes4(functionSignature) ==
-                bytes4(
-                    // Note this is the selector with the chainId, as that is called from bridgehub
-                    abi.encodeWithSignature("finalizeEthWithdrawal(uint256,uint256,uint256,uint16,bytes,bytes32[])")
-                ),
-            "is"
-        );
+        require(bytes4(functionSignature) == this.finalizeEthWithdrawal.selector, "is");
 
         (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
         (amount, offset) = UnsafeBytes.readUint256(_message, offset);

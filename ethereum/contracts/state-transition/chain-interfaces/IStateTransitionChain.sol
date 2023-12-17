@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.13;
 
-// import "./IBridgehubMailbox.sol";
 import "./IAdmin.sol";
 import "./IExecutor.sol";
 import "./IGetters.sol";

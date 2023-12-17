@@ -22,14 +22,14 @@ library BridgeInitializationHelper {
 
     /// @notice Requests L2 transaction that will deploy a contract with a given bytecode hash and constructor data.
     /// NOTE: it is always used to deploy via create2 with ZERO salt
-    /// @param _zkSync The address of the zkSync contract
+    /// @param _bridgehub The address of the zkSync contract
     /// @param _deployTransactionFee The fee that will be paid for the L1 -> L2 transaction
     /// @param _bytecodeHash The hash of the bytecode of the contract to be deployed
     /// @param _constructorData The data to be passed to the contract constructor
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment
     function requestDeployTransaction(
         uint256 _chainId,
-        IBridgehub _zkSync,
+        IBridgehub _bridgehub,
         uint256 _deployTransactionFee,
         bytes32 _bytecodeHash,
         bytes memory _constructorData,
@@ -39,7 +39,7 @@ library BridgeInitializationHelper {
             IL2ContractDeployer.create2,
             (bytes32(0), _bytecodeHash, _constructorData)
         );
-        txHash = _zkSync.requestL2Transaction{value: _deployTransactionFee}(
+        txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
             _chainId,
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,

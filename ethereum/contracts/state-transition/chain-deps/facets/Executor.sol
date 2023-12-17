@@ -190,7 +190,7 @@ contract ExecutorFacet is StateTransitionChainBase, IExecutor {
     ) external override nonReentrant onlyValidator {
         // check that we have the right protocol version
         require(
-            IZkSyncStateTransition(chainStorage.stateTransition).getProtocolVersion() == chainStorage.protocolVersion,
+            IZkSyncStateTransition(chainStorage.stateTransition).protocolVersion() == chainStorage.protocolVersion,
             "Executor facet: wrong protocol version"
         );
         // Check that we commit batches after last committed batch

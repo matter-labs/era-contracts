@@ -30,6 +30,7 @@ const prodConfig = {
   PRIORITY_TX_MAX_GAS_LIMIT,
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: false,
+  EOA_GOVERNOR: false,
 };
 const testnetConfig = {
   UPGRADE_NOTICE_PERIOD: 0,
@@ -39,6 +40,7 @@ const testnetConfig = {
   PRIORITY_TX_MAX_GAS_LIMIT,
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: true,
+  EOA_GOVERNOR: true,
 };
 const testConfig = {
   UPGRADE_NOTICE_PERIOD: 0,
@@ -47,10 +49,12 @@ const testConfig = {
   PRIORITY_TX_MAX_GAS_LIMIT,
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: true,
+  EOA_GOVERNOR: true,
 };
 const localConfig = {
   ...prodConfig,
   DUMMY_VERIFIER: true,
+  EOA_GOVERNOR: true,
 };
 
 const contractDefs = {

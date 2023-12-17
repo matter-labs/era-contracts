@@ -29,7 +29,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehub internal immutable bridgehub;
+    IBridgehub public immutable bridgehub;
+
+    /// @dev Era's chainID
+    uint256 public immutable eraChainId;
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -59,14 +62,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
     mapping(address => mapping(address => uint256)) public totalDepositedAmountPerUser;
 
-    /// @dev Era's chainID
-    uint256 public immutable eraChainId;
-
     /// @dev Governor's address
     address public governor;
-
-    // if not EOA then L1toL2 alias is applied.
-    address public l2Governor;
 
     bytes32 public factoryDepsHash;
 
@@ -115,8 +112,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         bytes[] calldata _factoryDeps,
         address _l2TokenBeacon,
         address _l2Bridge,
-        address _governor,
-        address _l2Governor
+        address _governor
     ) external payable reinitializer(2) {
         require(_l2TokenBeacon != address(0), "nf");
         require(_governor != address(0), "nh");
@@ -127,7 +123,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         l2TokenBeaconStandardAddress = _l2TokenBeacon;
         l2BridgeStandardAddress = _l2Bridge;
         governor = _governor;
-        l2Governor = _l2Governor;
+
+        // #if !EOA_GOVERNOR
+        uint32 size;
+        assembly {
+            size := extcodesize(_governor)
+        }
+        require(size > 0, "L1ERC20Bridge, governor cannot be EOA");
+        // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
@@ -172,7 +175,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1ERC20Bridge: invalid factory deps");
         // The caller miscalculated deploy transactions fees
         require(msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1ERC20Bridge: invalid fee");
-        l2TokenProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[2]);
 
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
@@ -191,6 +193,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         // Prepare the proxy constructor data
         bytes memory l2BridgeProxyConstructorData;
         {
+            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2ERC20Bridge.initialize,
@@ -254,8 +257,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             ),
             "L1ERC20Bridge: bridge proxy tx not confirmed"
         );
-        bridgeImplDeployOnL2TxHash[_chainId] = 0x00;
-        bridgeProxyDeployOnL2TxHash[_chainId] = 0x00;
+        delete bridgeImplDeployOnL2TxHash[_chainId];
+        delete bridgeProxyDeployOnL2TxHash[_chainId];
         l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
         l2TokenBeaconAddress[_chainId] = l2TokenBeaconStandardAddress;
     }
@@ -475,7 +478,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         // Withdraw funds
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
-        emit ClaimedFailedDepositChainId(_chainId, _depositSender, _l1Token, amount);
+        emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, amount);
         if (_chainId == eraChainId) {
             emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
         }

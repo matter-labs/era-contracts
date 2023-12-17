@@ -12,7 +12,6 @@ import {Diamond} from "../../common/libraries/Diamond.sol";
 /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
 /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
 struct ZkSyncStateTransitionInitializeData {
-    address bridgehub;
     address governor;
     address genesisUpgrade;
     bytes32 genesisBatchHash;
@@ -23,5 +22,7 @@ struct ZkSyncStateTransitionInitializeData {
 }
 
 interface IZkSyncStateTransitionInit {
+    function getName() external view returns (string memory);
+
     function initialize(ZkSyncStateTransitionInitializeData calldata _initalizeData) external;
 }

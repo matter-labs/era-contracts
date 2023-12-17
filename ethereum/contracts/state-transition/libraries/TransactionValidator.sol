@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-// import "../state-transition-interfaces/IProofMailbox.sol";
 import "../../common/Config.sol";
 import "../../common/Messaging.sol";
 

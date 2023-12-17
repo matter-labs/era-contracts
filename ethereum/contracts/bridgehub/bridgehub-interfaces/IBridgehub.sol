@@ -7,6 +7,7 @@ import "../../common/Messaging.sol";
 import "./IBridgehubMailbox.sol";
 import "./IBridgehubRegistry.sol";
 import "./IBridgehubGetters.sol";
-import "./IBridgehubBase.sol";
 
-interface IBridgehub is IBridgehubBase, IBridgehubMailbox, IBridgehubGetters, IBridgehubRegistry {}
+interface IBridgehub is IBridgehubMailbox, IBridgehubGetters, IBridgehubRegistry {
+    function getName() external view returns (string memory);
+}

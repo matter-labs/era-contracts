@@ -3,23 +3,21 @@
 pragma solidity ^0.8.13;
 
 interface IZkSyncStateTransitionGetters {
-    function getGovernor() external view returns (address);
+    function governor() external view returns (address);
 
-    function getBridgehub() external view returns (address);
+    function bridgehub() external view returns (address);
 
-    function getTotalChains() external view returns (uint256);
+    function totalChains() external view returns (uint256);
 
-    function getChainNumberToContract(uint256 _chainNumber) external view returns (address);
+    function stateTransitionChain(uint256 _chainId) external view returns (address);
 
-    function getStateTransitionChain(uint256 _chainId) external view returns (address);
+    function storedBatchZero() external view returns (bytes32);
 
-    function getStoredBatchZero() external view returns (bytes32);
+    function initialCutHash() external view returns (bytes32);
 
-    function getCutHash() external view returns (bytes32);
+    function genesisUpgrade() external view returns (address);
 
-    function getGenesisUpgradeAddress() external view returns (address);
+    function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
-    function getUpgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
-
-    function getProtocolVersion() external view returns (uint256);
+    function protocolVersion() external view returns (uint256);
 }

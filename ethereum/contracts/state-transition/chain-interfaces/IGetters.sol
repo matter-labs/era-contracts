@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-// import "../libraries/PriorityQueue.sol";
+import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams, UpgradeState} from "../chain-deps/StateTransitionChainStorage.sol";
 import "./IBase.sol";
 
@@ -11,13 +11,15 @@ interface IGetters is IStateTransitionChainBase {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function getBridgehub() external view returns (address);
-
-    function getVerifier() external view returns (address);
-
     function getGovernor() external view returns (address);
 
     function getPendingGovernor() external view returns (address);
+
+    function getBridgehub() external view returns (address);
+
+    function getStateTransition() external view returns (address);
+
+    function getVerifier() external view returns (address);
 
     function getTotalBatchesCommitted() external view returns (uint256);
 
@@ -25,17 +27,17 @@ interface IGetters is IStateTransitionChainBase {
 
     function getTotalBatchesExecuted() external view returns (uint256);
 
-    // function getTotalPriorityTxs() external view returns (uint256);
+    function getTotalPriorityTxs() external view returns (uint256);
 
-    // function getFirstUnprocessedPriorityTx() external view returns (uint256);
+    function getFirstUnprocessedPriorityTx() external view returns (uint256);
 
-    // function getPriorityQueueSize() external view returns (uint256);
+    function getPriorityQueueSize() external view returns (uint256);
 
-    // function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
+    function priorityQueueFrontOperation() external view returns (PriorityOperation memory);
 
     function isValidator(address _address) external view returns (bool);
 
-    // function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32 hash);
+    function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32 hash);
 
     function storedBatchHash(uint256 _batchNumber) external view returns (bytes32);
 
@@ -45,23 +47,13 @@ interface IGetters is IStateTransitionChainBase {
 
     function getVerifierParams() external view returns (VerifierParams memory);
 
-    // function getSecurityCouncil() external view returns (address);
-
-    // function getUpgradeProposalState() external view returns (ProofUpgradeState);
-
-    // function getProposedUpgradeHash() external view returns (bytes32);
-
-    // function getProposedUpgradeTimestamp() external view returns (uint256);
-
-    // function getCurrentProposalId() external view returns (uint256);
+    function isDiamondStorageFrozen() external view returns (bool);
 
     function getProtocolVersion() external view returns (uint256);
 
     function getL2SystemContractsUpgradeTxHash() external view returns (bytes32);
 
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
-
-    function isDiamondStorageFrozen() external view returns (bool);
 
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 

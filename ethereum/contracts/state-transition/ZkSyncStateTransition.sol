@@ -5,10 +5,11 @@ pragma solidity ^0.8.13;
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
 
+import "../common/ReentrancyGuard.sol";
+import "./chain-interfaces/IStateTransitionChain.sol";
 import "../common/DiamondProxy.sol";
 import {ZkSyncStateTransitionInitializeData} from "./state-transition-interfaces/IStateTransitionInit.sol";
 import {IZkSyncStateTransition} from "./state-transition-interfaces/IZkSyncStateTransition.sol";
-import "./state-transition-deps/StateTransitionBase.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "./chain-interfaces/IDiamondInit.sol";
 import "../upgrades/IDefaultUpgrade.sol";
@@ -18,24 +19,83 @@ import "./l2-deps/ISystemContext.sol";
 /// @title StateTransition conract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionBase {
+contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
     using UncheckedMath for uint256;
 
     string public constant override getName = "ZkSyncStateTransition";
 
-    /// initialize
+    /// @notice Address of the bridgehub
+    address public immutable bridgehub;
+
+    /// @notice Address which will exercise governance over the network i.e. change validator set, conduct upgrades
+    address public governor;
+
+    /// @notice Address that the governor proposed as one that will replace it
+    address public pendingGovernor;
+
+    /// total number of chains registered in the contract
+    uint256 public totalChains;
+
+    /// @notice chainId => chainContract
+    mapping(uint256 => address) public stateTransitionChain;
+
+    /// @dev Batch hash zero, calculated at initialization
+    bytes32 public storedBatchZero;
+
+    /// @dev Stored cutData for diamond cut
+    bytes32 public initialCutHash;
+
+    /// @dev genesisUpgrade contract address, used to setChainId
+    address public genesisUpgrade;
+
+    /// @dev current protocolVersion
+    uint256 public protocolVersion;
+
+    /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    mapping(uint256 => bytes32) public upgradeCutHash;
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    constructor(address _bridgehub) reentrancyGuardInitializer {
+        bridgehub = _bridgehub;
+    }
+
+    /// @notice Checks that the message sender is an active governor
+    modifier onlyGovernor() {
+        require(msg.sender == governor, "StateTransition: only governor");
+        _;
+    }
+
+    modifier onlyBridgehub() {
+        require(msg.sender == bridgehub, "StateTransition: only bridgehub");
+        _;
+    }
+
+    modifier onlyChain(uint256 _chainId) {
+        require(stateTransitionChain[_chainId] == msg.sender, "StateTransition: only chain");
+        _;
+    }
+
+    modifier onlyChainGovernor(uint256 _chainId) {
+        require(
+            IStateTransitionChain(stateTransitionChain[_chainId]).getGovernor() == msg.sender,
+            "StateTransition: only chain governor"
+        );
+        _;
+    }
+
+    /// @dev initialize
     function initialize(
         ZkSyncStateTransitionInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
         require(_initializeData.governor != address(0), "StateTransition: governor zero");
 
-        stateTransitionStorage.bridgehub = _initializeData.bridgehub;
-        stateTransitionStorage.governor = _initializeData.governor;
-        stateTransitionStorage.genesisUpgrade = _initializeData.genesisUpgrade;
-        stateTransitionStorage.protocolVersion = _initializeData.protocolVersion;
+        governor = _initializeData.governor;
+        genesisUpgrade = _initializeData.genesisUpgrade;
+        protocolVersion = _initializeData.protocolVersion;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory storedBatchZero = IExecutor.StoredBatchInfo(
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
             0,
             _initializeData.genesisBatchHash,
             _initializeData.genesisIndexRepeatedStorageChanges,
@@ -45,70 +105,58 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             0,
             _initializeData.genesisBatchCommitment
         );
-        stateTransitionStorage.storedBatchZero = keccak256(abi.encode(storedBatchZero));
+        storedBatchZero = keccak256(abi.encode(batchZero));
 
-        stateTransitionStorage.cutHash = keccak256(abi.encode(_initializeData.diamondCut));
+        initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
-    /// getters
-    /// @return The address of the current governor
-    function getGovernor() external view returns (address) {
-        return stateTransitionStorage.governor;
+    /// @dev set initial cutHash
+    function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyGovernor {
+        initialCutHash = keccak256(abi.encode(_diamondCut));
     }
 
-    /// @return The address of the current governor
-    function getPendingGovernor() external view returns (address) {
-        return stateTransitionStorage.pendingGovernor;
+    /// @dev set New Version with upgrade from old version
+    function setNewVersionUpgrade(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion,
+        uint256 _newProtocolVersion
+    ) external onlyGovernor {
+        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        protocolVersion = _newProtocolVersion;
     }
 
-    function getBridgehub() external view returns (address) {
-        return stateTransitionStorage.bridgehub;
+    /// @dev set upgrade for some protocolVersion
+    function setUpgradeDiamondCut(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion
+    ) external onlyGovernor {
+        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
     }
 
-    /// @return The address of the current governor
-    function getTotalChains() external view returns (uint256) {
-        return stateTransitionStorage.totalChains;
+    /// upgrade a specific chain
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _cutData
+    ) external onlyChainGovernor(_chainId) {
+        bytes32 cutHashInput = keccak256(abi.encode(_cutData));
+        require(cutHashInput == upgradeCutHash[_oldProtocolVersion], "StateTransition: cutHash mismatch");
+
+        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(stateTransitionChain[_chainId]);
+        require(
+            stateTransitionChainContract.getProtocolVersion() == _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC when upgrading"
+        );
+        stateTransitionChainContract.executeUpgrade(_cutData);
     }
 
-    function getChainNumberToContract(uint256 _chainNumber) external view returns (address) {
-        return stateTransitionStorage.stateTransitionChainContract[_chainNumber];
-    }
+    /// registration
 
-    function getStateTransitionChain(uint256 _chainId) external view returns (address) {
-        return stateTransitionStorage.stateTransitionChainContract[_chainId];
-    }
-
-    /// @return The address of the current governor
-    function getStoredBatchZero() external view returns (bytes32) {
-        return stateTransitionStorage.storedBatchZero;
-    }
-
-    /// @return The address of the current governor
-    function getCutHash() external view returns (bytes32) {
-        return stateTransitionStorage.cutHash;
-    }
-
-    /// @return The address of the current governor
-    function getGenesisUpgradeAddress() external view returns (address) {
-        return stateTransitionStorage.genesisUpgrade;
-    }
-
-    /// @return The address of the current governor
-    function getUpgradeCutHash(uint256 _protocolVersion) external view returns (bytes32) {
-        return stateTransitionStorage.upgradeCutHash[_protocolVersion];
-    }
-
-    /// @return The address of the current governor
-    function getProtocolVersion() external view returns (uint256) {
-        return stateTransitionStorage.protocolVersion;
-    }
-
-    /// registry
-    // we have to set the chainId, as blockhashzero is the same for all chains, and specifies the genesis chainId
+    /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
     function _setChainIdUpgrade(uint256 _chainId, address _chainContract) internal {
         bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (_chainId));
         uint256[] memory uintEmptyArray;
@@ -124,7 +172,7 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-            nonce: stateTransitionStorage.protocolVersion,
+            nonce: protocolVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
             data: systemContextCalldata,
@@ -148,32 +196,27 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
-            newProtocolVersion: stateTransitionStorage.protocolVersion
+            newProtocolVersion: protocolVersion
         });
 
         Diamond.FacetCut[] memory emptyArray;
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
-            initAddress: stateTransitionStorage.genesisUpgrade,
+            initAddress: genesisUpgrade,
             initCalldata: abi.encodeWithSelector(IDefaultUpgrade.upgrade.selector, proposedUpgrade)
         });
 
-        IAdmin(_chainContract).executeChainIdUpgrade(
-            cutData,
-            l2ProtocolUpgradeTx,
-            stateTransitionStorage.protocolVersion
-        );
+        IAdmin(_chainContract).executeChainIdUpgrade(cutData, l2ProtocolUpgradeTx, protocolVersion);
     }
 
-    /// @notice
+    /// @notice called by Bridgehub when a chain registers
     function newChain(uint256 _chainId, address _governor, bytes calldata _diamondCut) external onlyBridgehub {
         // check not registered
-        address bridgehub = stateTransitionStorage.bridgehub;
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         // check input
-        bytes32 cutHash = keccak256(_diamondCut);
-        require(cutHash == stateTransitionStorage.cutHash, "StateTransition: initial cutHash mismatch");
+        bytes32 cutHashInput = keccak256(_diamondCut);
+        require(cutHashInput == initialCutHash, "StateTransition: initial cutHash mismatch");
 
         // construct init data
         bytes memory initData;
@@ -182,10 +225,10 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
             bytes32(_chainId),
             bytes32(uint256(uint160(address(bridgehub)))),
             bytes32(uint256(uint160(address(this)))),
-            bytes32(uint256(stateTransitionStorage.protocolVersion)),
+            bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_governor))),
             bytes32(uint256(uint160(_governor))),
-            bytes32(stateTransitionStorage.storedBatchZero),
+            bytes32(storedBatchZero),
             diamondCut.initCalldata
         );
 
@@ -196,38 +239,12 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ZkSyncStateTransitionB
         // save data
         address stateTransitionChainAddress = address(stateTransitionChainContract);
 
-        stateTransitionStorage.stateTransitionChainContract[_chainId] = stateTransitionChainAddress;
-        stateTransitionStorage.chainNumberToContract[stateTransitionStorage.totalChains] = stateTransitionChainAddress;
-        ++stateTransitionStorage.totalChains;
+        stateTransitionChain[_chainId] = stateTransitionChainAddress;
+        ++totalChains;
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionChainAddress);
 
         emit StateTransitionNewChain(_chainId, stateTransitionChainAddress);
-    }
-
-    function setUpgradeDiamondCut(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _protocolVersion
-    ) external onlyGovernor {
-        stateTransitionStorage.upgradeCutHash[_protocolVersion] = keccak256(abi.encode(_cutData));
-        stateTransitionStorage.protocolVersion = _protocolVersion;
-    }
-
-    function upgradeChain(
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external onlyChainGovernor(_chainId) {
-        bytes32 cutHash = keccak256(abi.encode(_cutData));
-        require(
-            cutHash == stateTransitionStorage.upgradeCutHash[_protocolVersion],
-            "StateTransition: cutHash mismatch"
-        );
-
-        IStateTransitionChain stateTransitionChainContract = IStateTransitionChain(
-            stateTransitionStorage.stateTransitionChainContract[_chainId]
-        );
-        stateTransitionChainContract.executeUpgrade(_cutData);
     }
 }

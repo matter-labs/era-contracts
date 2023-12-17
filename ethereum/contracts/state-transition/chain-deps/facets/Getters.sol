@@ -23,21 +23,6 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     //////////////////////////////////////////////////////////////*/
 
     /// @return The address of the current governor
-    function getStateTransition() external view returns (address) {
-        return address(chainStorage.stateTransition);
-    }
-
-    /// @return The address of the current governor
-    function getBridgehub() external view returns (address) {
-        return address(chainStorage.bridgehub);
-    }
-
-    /// @return The address of the verifier smart contract
-    function getVerifier() external view returns (address) {
-        return address(chainStorage.verifier);
-    }
-
-    /// @return The address of the current governor
     function getGovernor() external view returns (address) {
         return chainStorage.governor;
     }
@@ -45,6 +30,21 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// @return The address of the pending governor
     function getPendingGovernor() external view returns (address) {
         return chainStorage.pendingGovernor;
+    }
+
+    /// @return The address of the bridgehub
+    function getBridgehub() external view returns (address) {
+        return address(chainStorage.bridgehub);
+    }
+
+    /// @return The address of the state transition
+    function getStateTransition() external view returns (address) {
+        return address(chainStorage.stateTransition);
+    }
+
+    /// @return The address of the verifier smart contract
+    function getVerifier() external view returns (address) {
+        return address(chainStorage.verifier);
     }
 
     /// @return The total number of batches that were committed
@@ -116,6 +116,12 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
         return chainStorage.verifierParams;
     }
 
+    /// @return Whether the diamond is frozen or not
+    function isDiamondStorageFrozen() external view returns (bool) {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        return ds.isFrozen;
+    }
+
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256) {
         return chainStorage.protocolVersion;
@@ -133,17 +139,6 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
         return chainStorage.l2SystemContractsUpgradeBatchNumber;
-    }
-
-    // /// @return The number of received upgrade approvals from the security council
-    // function isApprovedBySecurityCouncil() external view returns (bool) {
-    //     return chainStorage.upgrades.approvedBySecurityCouncil;
-    // }
-
-    /// @return Whether the diamond is frozen or not
-    function isDiamondStorageFrozen() external view returns (bool) {
-        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
-        return ds.isFrozen;
     }
 
     /// @return isFreezable Whether the facet can be frozen by the governor or always accessible
