@@ -1,12 +1,12 @@
 import { expect } from "chai";
-import { BigNumberish, ethers, Wallet } from "ethers";
+import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { TestnetERC20Token, Bridgehub } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory, MailboxFacetFactory } from "../../typechain";
+import { TestnetERC20TokenFactory, BridgehubFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
@@ -35,10 +35,6 @@ describe("L1ERC20Bridge tests", function () {
     const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
     process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
-
-    const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
-    const mailboxContract = await mailboxFactory.deploy();
-    const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
     const tx = {
       from: owner.getAddress(),

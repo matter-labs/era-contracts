@@ -23,6 +23,7 @@ const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
@@ -65,7 +66,7 @@ describe("WETH Bridge tests", () => {
   let randomSigner: ethers.Signer;
   let bridgeProxy: L1WethBridge;
   let l1Weth: WETH9;
-  const functionSignature = "0x0fdef251";
+  const functionSignature = "0x6c0960f9";
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
@@ -115,7 +116,6 @@ describe("WETH Bridge tests", () => {
       [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
       l2WethProxyAddress,
       l2WethBridgeProxyAddress,
-      await owner.getAddress(),
       await owner.getAddress()
     );
 

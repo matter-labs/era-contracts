@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider } from "./utils";

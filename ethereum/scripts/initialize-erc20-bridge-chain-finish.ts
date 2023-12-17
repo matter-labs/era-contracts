@@ -1,16 +1,9 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { Wallet } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
-import {
-  L2_ERC20_BRIDGE_PROXY_BYTECODE,
-  L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
-  L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
-  L2_STANDARD_ERC20_PROXY_BYTECODE,
-  L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-} from "./utils-bytecode";
+import { web3Provider, getNumberFromEnv } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -18,8 +11,6 @@ import * as path from "path";
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
 async function main() {
   const program = new Command();
@@ -38,7 +29,7 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
+            "m/44'/60'/0'/0/1"
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
@@ -70,7 +61,6 @@ async function main() {
         verbose: true,
       });
 
-      const bridgehub = deployer.bridgehubContract(deployWallet);
       const erc20Bridge = cmd.erc20Bridge
         ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
         : deployer.defaultERC20Bridge(deployWallet);

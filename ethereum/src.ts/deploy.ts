@@ -5,7 +5,7 @@ import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { Interface, hexlify } from "ethers/lib/utils";
 import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd, getBridgehubCurrentFacetCutsForAdd } from "./diamondCut";
+import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
@@ -282,7 +282,12 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ZkSyncStateTransition", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2(
+      "ZkSyncStateTransition",
+      [this.addresses.Bridgehub.BridgehubProxy],
+      create2Salt,
+      ethTxOptions
+    );
 
     if (this.verbose) {
       console.log(`CONTRACTS_STATE_TRANSITION_IMPL_ADDR=${contractAddress}`);
@@ -307,7 +312,6 @@ export class Deployer {
 
     const initCalldata = stateTransition.encodeFunctionData("initialize", [
       {
-        bridgehub: this.addresses.Bridgehub.BridgehubProxy,
         governor: this.ownerAddress,
         genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
         genesisBatchHash,
@@ -527,7 +531,7 @@ export class Deployer {
   public async deployBridgehubContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployBridgehubImplementation(create2Salt, { gasPrice });
+    await this.deployBridgehubImplementation(create2Salt, { gasPrice, nonce });
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
   }
 

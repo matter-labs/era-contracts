@@ -23,15 +23,12 @@ import {
   constructL2Log,
   packBatchTimestampAndBatchTimestamp,
   initialDeployment,
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
   createSystemLogsWithUpgrade,
 } from "./utils";
 import * as ethers from "ethers";
 import type { BigNumberish, BytesLike } from "ethers";
 import { Wallet } from "ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
-
-import { keccak256 } from "ethers/lib/utils";
 
 // process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
@@ -456,7 +453,7 @@ describe("L2 upgrade test", function () {
       newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
     const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
-    await rollBackProtocolVersion((4 + 1 + initialProtocolVersion).toString(), stateTransition, upgrade);
+    await rollBackToVersion((4 + 1 + initialProtocolVersion).toString(), stateTransition, upgrade);
     expect(revertReason).to.equal("Previous upgrade has not been finalized");
   });
 
@@ -936,13 +933,16 @@ async function executeUpgrade(
 
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
+  const oldProtocolVersion = await proxyGetters.getProtocolVersion();
   // This promise will be handled in the tests
-  (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
-  return stateTransition.upgradeChain(chainId, partialUpgrade.newProtocolVersion, diamondCutData);
+  (
+    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+  ).wait();
+  return stateTransition.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
 }
 
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
-async function rollBackProtocolVersion(
+async function rollBackToVersion(
   protocolVersion: string,
   stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>
@@ -961,7 +961,13 @@ async function rollBackProtocolVersion(
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
   // This promise will be handled in the tests
-  (await stateTransition.setUpgradeDiamondCut(diamondCutData, protocolVersion)).wait();
+  (
+    await stateTransition.setNewVersionUpgrade(
+      diamondCutData,
+      (parseInt(protocolVersion) - 1).toString(),
+      protocolVersion
+    )
+  ).wait();
 }
 
 async function executeCustomUpgrade(
@@ -987,10 +993,13 @@ async function executeCustomUpgrade(
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const oldProtocolVersion = await proxyGetters.getProtocolVersion();
 
   // This promise will be handled in the tests
-  (await stateTransition.setUpgradeDiamondCut(diamondCutData, partialUpgrade.newProtocolVersion)).wait();
-  return stateTransition.upgradeChain(chainId, partialUpgrade.newProtocolVersion, diamondCutData);
+  (
+    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+  ).wait();
+  return stateTransition.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
 }
 
 async function makeExecutedEqualCommitted(

@@ -29,7 +29,7 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
+            "m/44'/60'/0'/0/1"
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
@@ -61,7 +61,6 @@ async function main() {
         verbose: true,
       });
 
-      const bridgehub = deployer.bridgehubContract(deployWallet);
       const wethBridge = cmd.erc20Bridge
         ? deployer.defaultWethBridge(deployWallet).attach(cmd.erc20Bridge)
         : deployer.defaultWethBridge(deployWallet);

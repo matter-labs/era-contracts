@@ -16,7 +16,6 @@ import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 
 import * as fs from "fs";
 import * as path from "path";
-import { L1ERC20Bridge } from "../typechain";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -48,7 +47,6 @@ async function initializeBridges(
       l2TokenFactoryAddr,
       l2ERC20BridgeProxyAddr,
       l1GovernorAddress,
-      l2GovernorAddress,
       { nonce: nonce + 1, gasPrice }
     ),
   ];
@@ -65,7 +63,6 @@ async function initializeBridges(
 async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumber) {
   const bridgehub = deployer.bridgehubContract(deployWallet);
   const l1WethBridge = deployer.defaultWethBridge(deployWallet);
-  const chainId = deployer.chainId;
   const nonce = await deployWallet.getTransactionCount();
 
   const l1GovernorAddress = await bridgehub.getGovernor();
@@ -87,7 +84,6 @@ async function initializeWethBridges(deployer: Deployer, deployWallet: Wallet, g
       l2WethProxyAddress,
       l2WethBridgeProxyAddress,
       l1GovernorAddress,
-      l2GovernorAddress,
       { nonce: nonce + 1, gasPrice }
     ),
   ];

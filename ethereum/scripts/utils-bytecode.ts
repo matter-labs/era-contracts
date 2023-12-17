@@ -2,10 +2,10 @@ import * as path from "path";
 import { ethers } from "ethers";
 import { readBytecode, readInterface, computeL2Create2Address, applyL1ToL2Alias, hashL2Bytecode } from "./utils";
 import type { L1ERC20Bridge } from "../typechain";
-import { L1WethBridge } from "../typechain";
 
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
 const contractArtifactsPath = path.join((process.env.ZKSYNC_HOME as string) || "./", "contracts/zksync/artifacts-zk/");
