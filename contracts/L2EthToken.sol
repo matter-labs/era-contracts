@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {IEthToken} from "./interfaces/IEthToken.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {MSG_VALUE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS, L1_MESSENGER_CONTRACT} from "./Constants.sol";
-import {IBridgehubMailbox} from "./interfaces/IBridgehubMailbox.sol";
+import {IMailbox} from "./interfaces/IMailbox.sol";
 
 /**
  * @author Matter Labs
@@ -110,7 +110,7 @@ contract L2EthToken is IEthToken, ISystemContract {
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
-        return abi.encodePacked(IBridgehubMailbox.finalizeEthWithdrawal.selector, _to, _amount);
+        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount);
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
@@ -120,8 +120,7 @@ contract L2EthToken is IEthToken, ISystemContract {
         address _sender,
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
-        return
-            abi.encodePacked(IBridgehubMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 
     /// @dev This method has not been stabilized and might be
