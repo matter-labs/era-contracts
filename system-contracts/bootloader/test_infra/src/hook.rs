@@ -1,16 +1,15 @@
-use vm::{
+use multivm::vm_latest::{
     constants::{BOOTLOADER_HEAP_PAGE, VM_HOOK_PARAMS_START_POSITION},
     HistoryMode, SimpleMemory,
 };
 
-use zksync_types::{
-    zkevm_test_harness::zk_evm::{
-        aux_structures::MemoryPage,
-        tracing::{BeforeExecutionData, VmLocalStateData},
-        zkevm_opcode_defs::{FatPointer, Opcode, UMAOpcode},
-    },
-    U256,
+use multivm::zk_evm_1_4_0::{
+    aux_structures::MemoryPage,
+    tracing::{BeforeExecutionData, VmLocalStateData},
+    zkevm_opcode_defs::{FatPointer, Opcode, UMAOpcode},
 };
+
+use zksync_types::U256;
 use zksync_utils::u256_to_h256;
 
 #[derive(Clone, Debug)]

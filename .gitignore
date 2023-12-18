@@ -7,6 +7,7 @@ build/
 cache-forge/
 cache-zk/
 cache/
+contracts-preprocessed/
 .DS_Store
 node_modules/
 target/

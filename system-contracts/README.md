@@ -39,6 +39,80 @@ Check the system contracts hashes: `yarn sc calculate-hashes:check`
 
 Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
+## Testing
+
+### Run tests
+
+The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following commands in the root of the repository:
+
+```
+yarn test-node
+```
+
+It will run the test node, and you can see its logs in the output.
+Then run tests in the separate terminal:
+
+```
+yarn test
+```
+
+Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
+
+### Testing infrastructure overview
+
+#### Address space
+
+During the tests, we deploy most of the system contracts on special "testing" addresses, which are equal to production addresses + `0x1000`.
+
+This approach enhances test flexibility since we can manipulate contract states without impacting the system's functionality.
+We can freely modify contract states, mock them, etc., without being constrained by the contracts used by the test node.
+Additionally, these addresses are located in the kernel space, as required by the system contracts.
+
+For this purpose special testing preprocessing mode exists, it's needed to change the address constants.
+When some system contracts call others using these constants, they will actually get to testing addresses.
+
+The exceptions are:
+
+- [EventWriter.yul](contracts%2FEventWriter.yul)
+- [precompiles](contracts%2Fprecompiles)
+
+During preprocessing, we keep production addresses for them because we want other contracts to call them in tests rather than mock them. This simplifies the testing process.
+Also, when testing these contracts, some of them should also be deployed on the original addresses:
+
+- [EventWriter.yul](contracts%2FEventWriter.yul): should be on the original address because event logs are filtered by address
+- [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
+- [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
+- [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
+
+However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
+
+#### Test contracts/features
+
+The behavior of the contracts can depend on various factors: system call flag, extra ABI registers, `msg.sender`, `msg.value`(`context_u128` value), context, etc.
+It is crucial to control these values during testing.
+
+They are often interconnected, requiring the need to mock some of them.
+
+To achieve this, the following contracts and features were used/implemented:
+
+- [MockContract.sol](contracts%2Ftest-contracts%2FMockContract.sol) - a contract used for mocking.
+- [ExtraAbiCaller.zasm](contracts%2Ftest-contracts%2FExtraAbiCaller.zasm) - a contract that allows to set the extra abi registers, `context_u128` value with the system flag for the call.
+- [SystemCaller.sol](contracts%2Ftest-contracts%2FSystemCaller.sol) - a "proxy" that sets the system call flag.
+  In theory `ExtraAbiCaller` can be used instead, but this one is sometimes more convenient because it can be called with the destination contract ABI.
+- `hardhat_stopImpersonatingAccount` - this API method is useful during the tests themselves.
+  Apart from that, it's used to force deploy the contracts on the specific addresses during the tests. See [ContractDeployer.sol](contracts%2FContractDeployer.sol):`forceDeployOnAddress`.
+
+Only the main and most generic aspects are mentioned above, however, there are more features that can be found in the tests.
+There are wrappers/helpers for these contracts and features, along with additional functionality in [shared](test%2Fshared), and [test-contracts](contracts%2Ftest-contracts).
+
+#### Test cases
+
+Currently, during specific contract testing, we aim to cover all external functions.
+Typically, one test case corresponds to one main function call, possibly with additional calls to prepare the state.
+
+Therefore, considering all the information above, we can say that it's almost unit tests over external functions.
+Many examples can be found in [test](test).
+
 ## Update Process
 
 System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To
