@@ -1,3 +1,16 @@
 .idea
-tools/target
+.vscode
+artifacts-forge/
+artifacts-zk/
+artifacts/
+build/
+cache-forge/
+cache-zk/
+cache/
+.DS_Store
+node_modules/
+target/
 tools/data/Verifier.sol
+typechain/
+yarn-debug.log*
+yarn-error.log*
