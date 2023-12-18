@@ -19,7 +19,7 @@ const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORIT
 const L2ERC20BridgeABI = JSON.parse(
   fs
     .readFileSync(
-      "../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json"
+      "../l2-contracts/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json"
     )
     .toString()
 ).abi;
