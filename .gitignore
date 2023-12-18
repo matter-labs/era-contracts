@@ -1,3 +1,4 @@
+.DS_Store
 .idea
 .vscode
 artifacts-forge/
@@ -8,7 +9,7 @@ cache-forge/
 cache-zk/
 cache/
 contracts-preprocessed/
-.DS_Store
+era_test_node.log*
 node_modules/
 target/
 tools/data/Verifier.sol
