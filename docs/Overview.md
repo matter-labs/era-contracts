@@ -78,10 +78,11 @@ Each upgrade consists of two steps:
 
 - Upgrade Proposal - The governor can schedule upgrades in two different manners:
   - Fully transparent data. All implementation contracts and migration contracts are known to the community. The governor must wait
-    for the timelock to execute the upgrade.
+for the timelock to execute the upgrade.
   - Shadow upgrade. The governor only shows the commitment for the upgrade. The upgrade can be executed only with security council
-    approval without timelock.
+approval without timelock.
 - Upgrade execution - perform the upgrade that was proposed.
+
 
 #### MailboxFacet
 
@@ -118,6 +119,7 @@ function applyL1ToL2Alias(address l1Address) internal pure returns (address l2Ad
     l2Address = address(uint160(l1Address) + offset);
   }
 }
+
 ```
 
 For most of the rollups the address aliasing needs to prevent cross-chain exploits that would otherwise be possible if
@@ -167,14 +169,14 @@ Each L2 -> L1 system log will have a key that is part of the following:
 
 ```solidity
 enum SystemLogKey {
-  L2_TO_L1_LOGS_TREE_ROOT_KEY,
-  TOTAL_L2_TO_L1_PUBDATA_KEY,
-  STATE_DIFF_HASH_KEY,
-  PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-  PREV_BATCH_HASH_KEY,
-  CHAINED_PRIORITY_TXN_HASH_KEY,
-  NUMBER_OF_LAYER_1_TXS_KEY,
-  EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+    L2_TO_L1_LOGS_TREE_ROOT_KEY,
+    TOTAL_L2_TO_L1_PUBDATA_KEY,
+    STATE_DIFF_HASH_KEY,
+    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    PREV_BATCH_HASH_KEY,
+    CHAINED_PRIORITY_TXN_HASH_KEY,
+    NUMBER_OF_LAYER_1_TXS_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```
 
