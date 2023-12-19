@@ -1,0 +1,142 @@
+name: L1 contracts CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build artifacts
+        run: yarn l1 build
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Lint
+        run: yarn lint:check
+
+  test-foundry:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+      - name: Run tests
+        run: yarn l1 test:foundry
+
+  test-hardhat:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
+
+      - name: Run tests
+        run: yarn l1 test --no-compile
+
+  check-verifier-generator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.72.0
+
+      - name: Generate Verifier.sol
+        working-directory: tools
+        run: cargo run
+
+      - name: Compare
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/zksync/Verifier.sol
