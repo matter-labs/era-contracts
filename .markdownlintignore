@@ -1,0 +1,12 @@
+# root
+node_modules
+
+# l1-contracts
+l1-contracts/lib
+l1-contracts/node_modules
+
+# l2-contracts
+l2-contracts/node_modules
+
+# system-contracts
+system-contracts/node_modules
