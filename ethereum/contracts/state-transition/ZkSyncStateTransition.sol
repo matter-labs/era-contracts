@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
@@ -210,7 +210,7 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
     }
 
     /// @notice called by Bridgehub when a chain registers
-    function newChain(uint256 _chainId, address _governor, bytes calldata _diamondCut) external onlyBridgehub {
+    function newChain(uint256 _chainId, address _baseToken, address _baseTokenBridge, address _governor, bytes calldata _diamondCut) external onlyBridgehub {
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 

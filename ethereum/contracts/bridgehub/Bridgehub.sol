@@ -1,22 +1,36 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.13;
+pragma solidity 0.8.20;
 
 import "./bridgehub-interfaces/IBridgehub.sol";
+import "../bridge/interfaces/IL1Bridge.sol";
 import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard {
     string public constant override getName = "Bridgehub";
+    address public constant ethTokenAddress = address(0);
 
     /// @notice Address which will exercise critical changes
     address public governor;
     /// new fields
     /// @notice we store registered stateTransitions
     mapping(address => bool) public stateTransitionIsRegistered;
+    /// @notice we store registered tokens (for arbitrary base token)
+    mapping(address => bool) public tokenIsRegistered;
+    /// @notice we store registered bridges
+    mapping(address => bool) public tokenBridgeIsRegistered;
+
     /// @notice chainID => stateTransition contract address
     mapping(uint256 => address) public stateTransition;
+    /// @notice chainID => base token address
+    mapping(uint256 => address) public baseToken;
+    /// @notice chainID => bridge holding the base token
+    /// @notice a bridge can have multiple tokens
+    mapping(uint256 => address) public baseTokenBridge;
+
+    IL1Bridge public wethBridge;
 
     /// @notice Checks that the message sender is an active governor
     modifier onlyGovernor() {
@@ -37,6 +51,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
         _;
     }
 
+    modifier onlyBaseTokenBridge(uint256 _chainId) {
+        require(msg.sender == baseTokenBridge[_chainId], "Bridgehub: not base token bridge");
+        _;
+    }
+
     function initialize(address _governor) external reentrancyGuardInitializer returns (bytes32) {
         require(governor == address(0), "Bridgehub: governor zero");
         governor = _governor;
@@ -50,16 +69,34 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
 
     //// Registry
 
-    /// @notice Proof system can be any contract with the appropriate interface, functionality
+    /// @notice State Transition can be any contract with the appropriate interface/functionality
     function newStateTransition(address _stateTransition) external onlyGovernor {
         require(!stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
         stateTransitionIsRegistered[_stateTransition] = true;
     }
 
-    /// @notice
+    /// @notice token can be any contract with the appropriate interface/functionality
+    function newToken(address _token) external onlyGovernor {
+        require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
+        tokenIsRegistered[_token] = true;
+    }
+
+    /// @notice Bridge can be any contract with the appropriate interface/functionality
+    function newTokenBridge(address _tokenBridge) external onlyGovernor {
+        require(!tokenBridgeIsRegistered[_tokenBridge], "Bridgehub: token bridge already registered");
+        tokenBridgeIsRegistered[_tokenBridge] = true;
+    }
+
+    function setWethBridge(address _wethBridge) external onlyGovernor {
+        wethBridge = IL1Bridge(_wethBridge);
+    }
+
+    /// @notice for Eth the baseToken address is 0.
     function newChain(
         uint256 _chainId,
         address _stateTransition,
+        address _baseToken,
+        address _baseTokenBridge,
         uint256 _salt,
         address _l2Governor,
         bytes calldata _initData
@@ -78,26 +115,27 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
         }
 
         require(stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition not registered");
+        require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
+        require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
         require(stateTransition[_chainId] == address(0), "Bridgehub: chainId already not registered");
 
         stateTransition[chainId] = _stateTransition;
+        baseToken[chainId] = _baseToken;
+        baseTokenBridge[chainId] = _baseTokenBridge;
 
-        IZkSyncStateTransition(_stateTransition).newChain(chainId, _l2Governor, _initData);
+        IZkSyncStateTransition(_stateTransition).newChain(
+            chainId,
+            _baseToken,
+            _baseTokenBridge,
+            _l2Governor,
+            _initData
+        );
 
         emit NewChain(uint48(chainId), _stateTransition, msg.sender);
     }
 
     //// Mailbox forwarder
-    function isEthWithdrawalFinalized(
-        uint256 _chainId,
-        uint256 _l2MessageIndex,
-        uint256 _l2TxNumberInBatch
-    ) external view override returns (bool) {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
-        return
-            IStateTransitionChain(stateTransitionChain).isEthWithdrawalFinalized(_l2MessageIndex, _l2TxNumberInBatch);
-    }
 
     function proveL2MessageInclusion(
         uint256 _chainId,
@@ -161,6 +199,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
     function requestL2Transaction(
         uint256 _chainId,
         address _contractL2,
+        uint256 _mintValue,
         uint256 _l2Value,
         bytes calldata _calldata,
         uint256 _l2GasLimit,
@@ -168,11 +207,37 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) public payable override returns (bytes32 canonicalTxHash) {
+        {
+            address token = baseToken[_chainId];
+            // address tokenBridge = baseTokenBridge[_chainId];
+
+            if (token == ethTokenAddress) {
+                // kl todo it would be nice here to be able to deposit weth instead of eth
+                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit{value:msg.value}(_chainId, token, msg.value);
+            } else {
+                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+                // note we have to pass token, as a bridge might have multiple tokens.
+                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit(_chainId, token, _mintValue);
+            }
+        }
+
+        // to avoid stack too deep error we check the same condition twice for different varialbes
+        uint256 mintValue = _mintValue;
+        {
+            address token = baseToken[_chainId];
+            // address tokenBridge = baseTokenBridge[_chainId];
+
+            if (token == ethTokenAddress) {
+                // kl todo it would be nice here to be able to deposit weth instead of eth
+                mintValue = msg.value;
+            }
+        }
+
         address stateTransitionChain = getStateTransitionChain(_chainId);
-        canonicalTxHash = IStateTransitionChain(stateTransitionChain).requestL2TransactionBridgehub(
-            msg.value,
+        canonicalTxHash = IStateTransitionChain(stateTransitionChain).bridgehubRequestL2Transaction(
             msg.sender,
             _contractL2,
+            mintValue,
             _l2Value,
             _calldata,
             _l2GasLimit,
@@ -180,40 +245,5 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
             _factoryDeps,
             _refundRecipient
         );
-    }
-
-    function finalizeEthWithdrawal(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external override {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
-        return
-            IStateTransitionChain(stateTransitionChain).finalizeEthWithdrawalBridgehub(
-                _l2BatchNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBatch,
-                _message,
-                _merkleProof
-            );
-    }
-
-    function deposit(uint256 _chainId) external payable onlyStateTransitionChain(_chainId) {
-        // just accept eth
-        return;
-    }
-
-    /// @notice Transfer ether from the contract to the receiver
-    /// @dev Reverts only if the transfer call failed
-    function withdrawFunds(uint256 _chainId, address _to, uint256 _amount) external onlyStateTransitionChain(_chainId) {
-        bool callSuccess;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
-        }
-        require(callSuccess, "Bridgehub: withdraw failed");
     }
 }

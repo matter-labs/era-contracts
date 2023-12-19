@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 /// @author Matter Labs
 interface IL1Bridge {
-    event DepositInitiatedChainId(
+    event DepositInitiatedSharedBridge(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
         address indexed from,
@@ -22,7 +22,7 @@ interface IL1Bridge {
         uint256 amount
     );
 
-    event WithdrawalFinalizedChainId(
+    event WithdrawalFinalizedSharedBridge(
         uint256 indexed chainId,
         address indexed to,
         address indexed l1Token,
@@ -50,6 +50,7 @@ interface IL1Bridge {
         uint256 _chainId,
         address _l2Receiver,
         address _l1Token,
+        uint256 _mintValue, 
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
@@ -75,6 +76,12 @@ interface IL1Bridge {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
+
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _l1Token,
+        uint256 _amount
+    ) external payable;
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

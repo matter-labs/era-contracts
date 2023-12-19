@@ -12,6 +12,8 @@ import "./interfaces/IL2ERC20Bridge.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
+import "../state-transition/chain-interfaces/IMailbox.sol";
+
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../common/Messaging.sol";
 import "../common/libraries/UnsafeBytes.sol";
@@ -19,6 +21,8 @@ import "../common/libraries/L2ContractHelper.sol";
 import "../common/ReentrancyGuard.sol";
 import "../common/VersionTracker.sol";
 import "../vendor/AddressAliasHelper.sol";
+
+import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -87,6 +91,22 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256)))) internal depositAmount;
 
+    function l2Bridge() external view returns (address) {
+        return l2BridgeAddress[eraChainId];
+    }
+
+    /// @notice Checks that the message sender is the governor
+    modifier onlyGovernor() {
+        require(msg.sender == governor, "L1ERC20Bridge: not governor");
+        _;
+    }
+
+    /// @notice Checks that the message sender is the governor
+    modifier onlyBridgehub() {
+        require(msg.sender == address(bridgehub), "L1ERC20Bridge: not bridgehub");
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub, uint256 _eraChainId) reentrancyGuardInitializer {
@@ -135,16 +155,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
-    function l2Bridge() external view returns (address) {
-        return l2BridgeAddress[eraChainId];
-    }
-
-    /// @notice Checks that the message sender is the governor
-    modifier onlyGovernor() {
-        require(msg.sender == governor, "L1ERC20Bridge: not governor");
-        _;
-    }
-
     function initializeChainGovernance(
         uint256 _chainId,
         address _l2BridgeAddress,
@@ -165,57 +175,77 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function startInitializeChain(
         uint256 _chainId,
+        uint256 _mintValue,
         bytes[] calldata _factoryDeps,
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
     ) external payable {
-        require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
-        // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-        require(_factoryDeps.length == 3, "L1ERC20Bridge: invalid number of factory deps");
-        require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1ERC20Bridge: invalid factory deps");
+        {
+            require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
+            // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
+            require(_factoryDeps.length == 3, "L1ERC20Bridge: invalid number of factory deps");
+            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1ERC20Bridge: invalid factory deps");
+        }
         // The caller miscalculated deploy transactions fees
-        require(msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1ERC20Bridge: invalid fee");
-
+        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == address(0);
+        {
+            uint256 mintValue = _mintValue;
+            if (ethIsBaseToken) {
+                mintValue = msg.value;
+            } else {
+                require(msg.value == 0, "L1WethBridge: msg.value not 0 for non eth base token");
+            }
+            
+            require(mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1ERC20Bridge: invalid fee");
+        }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
+        {
+            // Deploy L2 bridge implementation contract
+            (address bridgeImplementationAddr, bytes32 bridgeImplTxHash) = BridgeInitializationHelper
+                .requestDeployTransaction(
+                    ethIsBaseToken,
+                    _chainId,
+                    bridgehub,
+                    _deployBridgeImplementationFee,
+                    l2BridgeImplementationBytecodeHash,
+                    "", // Empty constructor data
+                    _factoryDeps // All factory deps are needed for L2 bridge
+                );
 
-        // Deploy L2 bridge implementation contract
-        (address bridgeImplementationAddr, bytes32 bridgeImplTxHash) = BridgeInitializationHelper
-            .requestDeployTransaction(
+            // Prepare the proxy constructor data
+            bytes memory l2BridgeProxyConstructorData;
+            {
+                address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
+                // Data to be used in delegate call to initialize the proxy
+                bytes memory proxyInitializationParams = abi.encodeCall(
+                    IL2ERC20Bridge.initialize,
+                    (address(this), l2TokenProxyBytecodeHash, l2Governor)
+                );
+                l2BridgeProxyConstructorData = abi.encode(bridgeImplementationAddr, l2Governor, proxyInitializationParams);
+            }
+
+            // Deploy L2 bridge proxy contract
+            (address bridgeProxyAddr, bytes32 bridgeProxyTxHash) = BridgeInitializationHelper.requestDeployTransaction(
+                ethIsBaseToken,
                 _chainId,
                 bridgehub,
-                _deployBridgeImplementationFee,
-                l2BridgeImplementationBytecodeHash,
-                "", // Empty constructor data
-                _factoryDeps // All factory deps are needed for L2 bridge
+                _deployBridgeProxyFee,
+                l2BridgeProxyBytecodeHash,
+                l2BridgeProxyConstructorData,
+                // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+                new bytes[](0)
             );
-
-        // Prepare the proxy constructor data
-        bytes memory l2BridgeProxyConstructorData;
-        {
-            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
-            // Data to be used in delegate call to initialize the proxy
-            bytes memory proxyInitializationParams = abi.encodeCall(
-                IL2ERC20Bridge.initialize,
-                (address(this), l2TokenProxyBytecodeHash, l2Governor)
-            );
-            l2BridgeProxyConstructorData = abi.encode(bridgeImplementationAddr, l2Governor, proxyInitializationParams);
+            require(bridgeProxyAddr == l2BridgeStandardAddress, "L1ERC20Bridge: bridge address does not match");
+            _setTxHashes(_chainId, bridgeImplTxHash, bridgeProxyTxHash);
+            
         }
+    }
 
-        // Deploy L2 bridge proxy contract
-        (address bridgeProxyAddr, bytes32 bridgeProxyTxHash) = BridgeInitializationHelper.requestDeployTransaction(
-            _chainId,
-            bridgehub,
-            _deployBridgeProxyFee,
-            l2BridgeProxyBytecodeHash,
-            l2BridgeProxyConstructorData,
-            // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
-            new bytes[](0)
-        );
-        require(bridgeProxyAddr == l2BridgeStandardAddress, "L1ERC20Bridge: bridge address does not match");
-
-        bridgeImplDeployOnL2TxHash[_chainId] = bridgeImplTxHash;
-        bridgeProxyDeployOnL2TxHash[_chainId] = bridgeProxyTxHash;
+    // to avoid stack too deep error
+    function _setTxHashes(uint256 _chainId, bytes32 _bridgeImplTxHash, bytes32 _bridgeProxyTxHash) internal {
+        bridgeImplDeployOnL2TxHash[_chainId] = _bridgeImplTxHash;
+        bridgeProxyDeployOnL2TxHash[_chainId] = _bridgeProxyTxHash;
     }
 
     /// @dev We have to confirm that the deploy transactions succeeded.
@@ -283,6 +313,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             eraChainId,
             _l2Receiver,
             _l1Token,
+            0, // this is overriden by msg.value for era
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
@@ -314,6 +345,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             eraChainId,
             _l2Receiver,
             _l1Token,
+            0, // this is overriden by msg.value for era
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
@@ -347,16 +379,33 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         uint256 _chainId,
         address _l2Receiver,
         address _l1Token,
+        uint256 _mintValue,
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        require(_amount != 0, "2T"); // empty deposit amount
-        uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "1T"); // The token has non-standard transfer logic
+        require(l2BridgeAddress[_chainId] != address(0), "L1ERC20Bridge: bridge not deployed");
+        uint256 mintValue = _mintValue;
 
-        bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, amount);
+        {
+            address baseToken = bridgehub.baseToken(_chainId);
+            require(baseToken != _l1Token, "L1ERC20Bridge: base token transfer not supported");
+
+            
+            require(_amount != 0, "2T"); // empty deposit amount
+            uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
+            require(amount == _amount, "1T"); // The token has non-standard transfer logic
+        
+            bool ethIsBaseToken = (baseToken == address(0));
+            if (ethIsBaseToken){
+                mintValue = msg.value;
+            } else {
+                require(msg.value == 0 , "L1ERC20 deposit: msg.value with not Eth base token");
+            }
+            
+        }
+        bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
         // Otherwise, the refund will be sent to the specified address.
         // If the recipient is a contract on L1, the address alias will be applied.
@@ -365,24 +414,38 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
 
-        l2TxHash = _depositSendTx(_chainId, l2TxCalldata, _l2TxGasLimit, _l2TxGasPerPubdataByte, refundRecipient);
+        l2TxHash = _depositSendTx(_chainId, mintValue, l2TxCalldata, _l2TxGasLimit, _l2TxGasPerPubdataByte, refundRecipient);
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         if (_chainId == eraChainId) {
-            depositAmountEra[msg.sender][_l1Token][l2TxHash] = amount;
+            depositAmountEra[msg.sender][_l1Token][l2TxHash] = _amount;
         } else {
-            depositAmount[_chainId][msg.sender][_l1Token][l2TxHash] = amount;
+            depositAmount[_chainId][msg.sender][_l1Token][l2TxHash] = _amount;
         }
 
-        emit DepositInitiatedChainId(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+        emit DepositInitiatedSharedBridge(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
         if (_chainId == eraChainId) {
-            emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, amount);
+            emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
         }
+    }
+
+    /// used by bridgehub to aquire mintValue. If tx fails refunds are sent to 
+    function bridgehubDeposit(
+        uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging 
+        address _l1Token,
+        uint256 _amount
+    ) public payable nonReentrant onlyBridgehub() {
+        require(_amount != 0, "2T"); // empty deposit amount
+        uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
+        require(amount == _amount, "1T"); // The token has non-standard transfer logic
+
+        // Note we don't save the depistedAmounts, as this is for the base token, which gets sent to the refundRecipient if the txfails
     }
 
     // to avoid stack too deep error
     function _depositSendTx(
         uint256 _chainId,
+        uint256 _mintValue,
         bytes memory _l2TxCalldata,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
@@ -391,7 +454,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
             _chainId,
             l2BridgeAddress[_chainId],
-            0, // L2 msg.value
+            _mintValue, // l2 gas + l2 msg.Value
+            0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
             _l2TxCalldata,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
@@ -504,22 +568,15 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         }
 
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: _l2TxNumberInBatch,
-            sender: l2BridgeAddress[_chainId],
-            data: _message
-        });
+        (address l1Receiver, address l1Token, uint256 amount) = _checkWithdrawal(_chainId, _l2BatchNumber, _l2MessageIndex,
+            _l2TxNumberInBatch, _message, _merkleProof);
 
-        // Preventing the stack too deep error
-        {
-            bool success = bridgehub.proveL2MessageInclusion(
-                _chainId,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                l2ToL1Message,
-                _merkleProof
-            );
-            require(success, "nq");
+        // Withdraw funds
+        IERC20(l1Token).safeTransfer(l1Receiver, amount);
+
+        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
+        if (_chainId == eraChainId) {
+            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
         }
 
         {
@@ -530,35 +587,79 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
                 isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
             }
         }
-
-        {
-            (address l1Receiver, address l1Token, uint256 amount) = _parseL2WithdrawalMessage(l2ToL1Message.data);
-
-            // Withdraw funds
-            IERC20(l1Token).safeTransfer(l1Receiver, amount);
-
-            emit WithdrawalFinalizedChainId(_chainId, l1Receiver, l1Token, amount);
-            if (_chainId == eraChainId) {
-                emit WithdrawalFinalized(l1Receiver, l1Token, amount);
-            }
-        }
     }
+
+        /// @dev check that the withdrawal is valid
+        function _checkWithdrawal(
+            uint256 _chainId,
+            uint256 _l2BatchNumber,
+            uint256 _l2MessageIndex,
+            uint16 _l2TxNumberInBatch,
+            bytes calldata _message,
+            bytes32[] calldata _merkleProof
+        ) internal view returns (address l1Receiver, address l1Token, uint256 amount){
+            (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
+            address l2Sender;
+            {
+                bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) && (l1Token == bridgehub.baseToken(_chainId));
+                l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
+            }
+            L2Message memory l2ToL1Message = L2Message({
+                txNumberInBatch: _l2TxNumberInBatch,
+                sender: l2Sender,
+                data: _message
+            });
+    
+            // Preventing the stack too deep error
+            {
+                bool success = bridgehub.proveL2MessageInclusion(
+                    _chainId,
+                    _l2BatchNumber,
+                    _l2MessageIndex,
+                    l2ToL1Message,
+                    _merkleProof
+                );
+                require(success, "nq");
+            }    
+        }
 
     /// @dev Decode the withdraw message that came from L2
     function _parseL2WithdrawalMessage(
+        uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal pure returns (address l1Receiver, address l1Token, uint256 amount) {
-        // Check that the message length is correct.
-        // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-        // 76 (bytes).
-        require(_l2ToL1message.length == 76, "kk");
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
+        // We check that the message is long enough to read the data.
+        // Please note that there are two versions of the message:
+        // 1. The message that is sent by `withdraw(address _l1Receiver)`
+        // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
+        // 2. The message that is sent by `withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData)`
+        // It should be equal to the length of the following:
+        // bytes4 function signature + address l1Receiver + uint256 amount + address l2Sender + bytes _additionalData =
+        // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
+
+        // So the data is expected to be at least 56 bytes long.
+        require(_l2ToL1message.length >= 56, "pm");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        require(bytes4(functionSignature) == this.finalizeWithdrawal.selector, "nt");
+        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector){
+            // this message is a base token withdrawal
+            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            l1Token = bridgehub.baseToken(_chainId);
 
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-        (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+        } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
+            // this message is a token withdrawal
+
+            // Check that the message length is correct.
+            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+            // 76 (bytes).
+            require(_l2ToL1message.length == 76, "kk");
+            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+        } else {
+            revert("pk");
+        }
     }
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token

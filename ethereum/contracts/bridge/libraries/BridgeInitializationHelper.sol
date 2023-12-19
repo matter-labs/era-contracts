@@ -28,6 +28,7 @@ library BridgeInitializationHelper {
     /// @param _constructorData The data to be passed to the contract constructor
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment
     function requestDeployTransaction(
+        bool ethIsBaseToken,
         uint256 _chainId,
         IBridgehub _bridgehub,
         uint256 _deployTransactionFee,
@@ -39,16 +40,32 @@ library BridgeInitializationHelper {
             IL2ContractDeployer.create2,
             (bytes32(0), _bytecodeHash, _constructorData)
         );
-        txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
-            _chainId,
-            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            0,
-            deployCalldata,
-            DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps,
-            msg.sender
-        );
+
+        if (ethIsBaseToken) {
+            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee }(
+                _chainId,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+                _deployTransactionFee,
+                0,
+                deployCalldata,
+                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                _factoryDeps,
+                msg.sender
+            );
+        } else {
+            txHash = _bridgehub.requestL2Transaction(
+                _chainId,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+                _deployTransactionFee,
+                0,
+                deployCalldata,
+                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                _factoryDeps,
+                msg.sender
+            );
+        }
 
         deployedAddress = L2ContractHelper.computeCreate2Address(
             // Apply the alias to the address of the bridge contract, to get the `msg.sender` in L2.

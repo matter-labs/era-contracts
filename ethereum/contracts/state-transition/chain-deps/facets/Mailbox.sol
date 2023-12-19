@@ -18,6 +18,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import {IL1Bridge} from "../../../bridge/interfaces/IL1Bridge.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -28,21 +29,20 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
 
     string public constant override getName = "MailboxFacet";
 
-    function finalizeEthWithdrawalBridgehub(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external onlyBridgehub {
-        _finalizeEthWithdrawal(_l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
+    /// @dev Era's chainID
+    uint256 public immutable eraChainId;
+
+    /// @dev Contract is expected to be used as proxy implementation.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    constructor(uint256 _eraChainId) reentrancyGuardInitializer {
+        eraChainId = _eraChainId;
     }
 
     // this is implemented in the bridghead, does not go through the router.
-    function requestL2TransactionBridgehub(
-        uint256 _msgValue,
+    function bridgehubRequestL2Transaction(
         address _sender,
         address _contractL2,
+        uint256 _mintValue,
         uint256 _l2Value,
         bytes calldata _calldata,
         uint256 _l2GasLimit,
@@ -51,9 +51,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         address _refundRecipient
     ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(
-            _msgValue,
             _sender,
             _contractL2,
+            _mintValue,
             _l2Value,
             _calldata,
             _l2GasLimit,
@@ -198,6 +198,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     }
 
     /// @notice Finalize the withdrawal and release funds
+    /// here for legacy reasons
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
@@ -210,45 +211,11 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        _finalizeEthWithdrawal(_l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
+        require(chainStorage.chainId != eraChainId, " finalizeEthWithdrawal only available for Era on mailbox");
+        IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(eraChainId, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
     }
 
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
-    function _finalizeEthWithdrawal(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) internal nonReentrant {
-        require(!chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "jj");
-
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: _l2TxNumberInBatch,
-            sender: L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
-            data: _message
-        });
-
-        (address _l1WithdrawReceiver, uint256 _amount) = _parseL2WithdrawalMessage(_message);
-
-        {
-            bool proofValid = proveL2MessageInclusion(_l2BatchNumber, _l2MessageIndex, l2ToL1Message, _merkleProof);
-            require(proofValid, "pi"); // Failed to verify that withdrawal was actually initialized on L2
-        }
-
-        {
-            chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
-        }
-        IBridgehub(chainStorage.bridgehub).withdrawFunds(chainStorage.chainId, _l1WithdrawReceiver, _amount);
-
-        emit EthWithdrawalFinalized(_l1WithdrawReceiver, _amount);
-    }
-
+    // legacy for era
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,
@@ -258,10 +225,11 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
+        require(chainStorage.chainId == eraChainId, " requestL2Transaction only available for Era on mailbox");
         canonicalTxHash = _requestL2TransactionSender(
-            msg.value,
             msg.sender,
             _contractL2,
+            msg.value,
             _l2Value,
             _calldata,
             _l2GasLimit,
@@ -269,7 +237,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
             _factoryDeps,
             _refundRecipient
         );
-        IBridgehub(chainStorage.bridgehub).deposit{value: msg.value}(chainStorage.chainId);
+        IL1Bridge(chainStorage.baseTokenBridge).bridgehubDeposit{value: msg.value}(chainStorage.chainId, address(0), msg.value);
     }
 
     /// @notice Request execution of L2 transaction from L1.
@@ -291,9 +259,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
     /// @return canonicalTxHash The hash of the requested L2 transaction. This hash can be used to follow the transaction status
     function _requestL2TransactionSender(
-        uint256 _msgValue,
         address _sender,
         address _contractL2,
+        uint256 _mintValue,
         uint256 _l2Value,
         bytes calldata _calldata,
         uint256 _l2GasLimit,
@@ -325,11 +293,11 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         params.l2GasPricePerPubdata = _l2GasPerPubdataByteLimit;
         params.refundRecipient = _refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(_msgValue, params, _calldata, _factoryDeps, false);
+        canonicalTxHash = _requestL2Transaction(_mintValue, params, _calldata, _factoryDeps, false);
     }
 
     function _requestL2Transaction(
-        uint256 msgValue,
+        uint256 _mintValue,
         WritePriorityOpParams memory _params,
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps,
@@ -343,7 +311,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
 
         _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
-        require(msgValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+        require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 
         // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
         address refundRecipient = _params.refundRecipient == address(0) ? _params.sender : _params.refundRecipient;
@@ -355,7 +323,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-        _params.valueToMint = msgValue;
+        _params.valueToMint = _mintValue;
 
         canonicalTxHash = _writePriorityOp(_params, _calldata, _factoryDeps);
     }
@@ -436,28 +404,5 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
                 mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
             }
         }
-    }
-
-    /// @dev Decode the withdraw message that came from L2
-    function _parseL2WithdrawalMessage(
-        bytes memory _message
-    ) internal pure returns (address l1Receiver, uint256 amount) {
-        // We check that the message is long enough to read the data.
-        // Please note that there are two versions of the message:
-        // 1. The message that is sent by `withdraw(address _l1Receiver)`
-        // It should be equal to the length of the bytes4 function signature + address l1Receiver + uint256 amount = 4 + 20 + 32 = 56 (bytes).
-        // 2. The message that is sent by `withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData)`
-        // It should be equal to the length of the following:
-        // bytes4 function signature + address l1Receiver + uint256 amount + address l2Sender + bytes _additionalData =
-        // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
-
-        // So the data is expected to be at least 56 bytes long.
-        require(_message.length >= 56, "pm");
-
-        (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(bytes4(functionSignature) == this.finalizeEthWithdrawal.selector, "is");
-
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
-        (amount, offset) = UnsafeBytes.readUint256(_message, offset);
     }
 }

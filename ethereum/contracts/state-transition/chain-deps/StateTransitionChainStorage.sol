@@ -93,7 +93,7 @@ struct StateTransitionChainStorage {
     /// @dev The accumulated withdrawn amount during the withdrawal limit window
     uint256 __DEPRECATED_withdrawnAmountInWindow;
     /// @dev A mapping user address => the total deposited amount by the user
-    mapping(address => uint256) totalDepositedAmountPerUser;
+    mapping(address => uint256) __DEPRACATED_totalDepositedAmountPerUser;
     /// @dev Stores the protocol version. Note, that the protocol version may not only encompass changes to the
     /// smart contracts, but also to the node behavior.
     uint256 protocolVersion;
@@ -110,4 +110,5 @@ struct StateTransitionChainStorage {
     uint256 chainId;
     address bridgehub;
     address stateTransition;
+    address baseTokenBridge;
 }
