@@ -212,7 +212,14 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external override {
         require(chainStorage.chainId != eraChainId, " finalizeEthWithdrawal only available for Era on mailbox");
-        IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(eraChainId, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
+        IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(
+            eraChainId,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
+        );
     }
 
     // legacy for era
@@ -237,7 +244,11 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
             _factoryDeps,
             _refundRecipient
         );
-        IL1Bridge(chainStorage.baseTokenBridge).bridgehubDeposit{value: msg.value}(chainStorage.chainId, address(0), msg.value);
+        IL1Bridge(chainStorage.baseTokenBridge).bridgehubDeposit{value: msg.value}(
+            chainStorage.chainId,
+            address(0),
+            msg.value
+        );
     }
 
     /// @notice Request execution of L2 transaction from L1.

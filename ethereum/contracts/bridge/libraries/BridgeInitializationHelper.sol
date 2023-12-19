@@ -42,7 +42,7 @@ library BridgeInitializationHelper {
         );
 
         if (ethIsBaseToken) {
-            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee }(
+            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
                 _chainId,
                 L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
                 _deployTransactionFee,

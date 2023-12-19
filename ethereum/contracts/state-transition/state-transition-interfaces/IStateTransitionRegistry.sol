@@ -6,7 +6,13 @@ import "../../common/libraries/Diamond.sol";
 
 interface IZkSyncStateTransitionRegistry {
     /// @notice
-    function newChain(uint256 _chainId, address _baseToken, address _baseTokenBridge, address _governor, bytes calldata _diamondCut) external;
+    function newChain(
+        uint256 _chainId,
+        address _baseToken,
+        address _baseTokenBridge,
+        address _governor,
+        bytes calldata _diamondCut
+    ) external;
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

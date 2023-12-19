@@ -195,7 +195,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             } else {
                 require(msg.value == 0, "L1WethBridge: msg.value not 0 for non eth base token");
             }
-            
+
             require(mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1ERC20Bridge: invalid fee");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -222,7 +222,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
                     IL2ERC20Bridge.initialize,
                     (address(this), l2TokenProxyBytecodeHash, l2Governor)
                 );
-                l2BridgeProxyConstructorData = abi.encode(bridgeImplementationAddr, l2Governor, proxyInitializationParams);
+                l2BridgeProxyConstructorData = abi.encode(
+                    bridgeImplementationAddr,
+                    l2Governor,
+                    proxyInitializationParams
+                );
             }
 
             // Deploy L2 bridge proxy contract
@@ -238,7 +242,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             );
             require(bridgeProxyAddr == l2BridgeStandardAddress, "L1ERC20Bridge: bridge address does not match");
             _setTxHashes(_chainId, bridgeImplTxHash, bridgeProxyTxHash);
-            
         }
     }
 
@@ -392,18 +395,16 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             address baseToken = bridgehub.baseToken(_chainId);
             require(baseToken != _l1Token, "L1ERC20Bridge: base token transfer not supported");
 
-            
             require(_amount != 0, "2T"); // empty deposit amount
             uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
             require(amount == _amount, "1T"); // The token has non-standard transfer logic
-        
+
             bool ethIsBaseToken = (baseToken == address(0));
-            if (ethIsBaseToken){
+            if (ethIsBaseToken) {
                 mintValue = msg.value;
             } else {
-                require(msg.value == 0 , "L1ERC20 deposit: msg.value with not Eth base token");
+                require(msg.value == 0, "L1ERC20 deposit: msg.value with not Eth base token");
             }
-            
         }
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -414,7 +415,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             refundRecipient = msg.sender != tx.origin ? AddressAliasHelper.applyL1ToL2Alias(msg.sender) : msg.sender;
         }
 
-        l2TxHash = _depositSendTx(_chainId, mintValue, l2TxCalldata, _l2TxGasLimit, _l2TxGasPerPubdataByte, refundRecipient);
+        l2TxHash = _depositSendTx(
+            _chainId,
+            mintValue,
+            l2TxCalldata,
+            _l2TxGasLimit,
+            _l2TxGasPerPubdataByte,
+            refundRecipient
+        );
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         if (_chainId == eraChainId) {
@@ -429,12 +437,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         }
     }
 
-    /// used by bridgehub to aquire mintValue. If tx fails refunds are sent to 
+    /// used by bridgehub to aquire mintValue. If tx fails refunds are sent to
     function bridgehubDeposit(
-        uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging 
+        uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging
         address _l1Token,
         uint256 _amount
-    ) public payable nonReentrant onlyBridgehub() {
+    ) public payable nonReentrant onlyBridgehub {
         require(_amount != 0, "2T"); // empty deposit amount
         uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "1T"); // The token has non-standard transfer logic
@@ -568,8 +576,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         }
 
-        (address l1Receiver, address l1Token, uint256 amount) = _checkWithdrawal(_chainId, _l2BatchNumber, _l2MessageIndex,
-            _l2TxNumberInBatch, _message, _merkleProof);
+        (address l1Receiver, address l1Token, uint256 amount) = _checkWithdrawal(
+            _chainId,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
+        );
 
         // Withdraw funds
         IERC20(l1Token).safeTransfer(l1Receiver, amount);
@@ -589,39 +603,40 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         }
     }
 
-        /// @dev check that the withdrawal is valid
-        function _checkWithdrawal(
-            uint256 _chainId,
-            uint256 _l2BatchNumber,
-            uint256 _l2MessageIndex,
-            uint16 _l2TxNumberInBatch,
-            bytes calldata _message,
-            bytes32[] calldata _merkleProof
-        ) internal view returns (address l1Receiver, address l1Token, uint256 amount){
-            (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
-            address l2Sender;
-            {
-                bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) && (l1Token == bridgehub.baseToken(_chainId));
-                l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
-            }
-            L2Message memory l2ToL1Message = L2Message({
-                txNumberInBatch: _l2TxNumberInBatch,
-                sender: l2Sender,
-                data: _message
-            });
-    
-            // Preventing the stack too deep error
-            {
-                bool success = bridgehub.proveL2MessageInclusion(
-                    _chainId,
-                    _l2BatchNumber,
-                    _l2MessageIndex,
-                    l2ToL1Message,
-                    _merkleProof
-                );
-                require(success, "nq");
-            }    
+    /// @dev check that the withdrawal is valid
+    function _checkWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
+        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
+        address l2Sender;
+        {
+            bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) &&
+                (l1Token == bridgehub.baseToken(_chainId));
+            l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
         }
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: _l2TxNumberInBatch,
+            sender: l2Sender,
+            data: _message
+        });
+
+        // Preventing the stack too deep error
+        {
+            bool success = bridgehub.proveL2MessageInclusion(
+                _chainId,
+                _l2BatchNumber,
+                _l2MessageIndex,
+                l2ToL1Message,
+                _merkleProof
+            );
+            require(success, "nq");
+        }
+    }
 
     /// @dev Decode the withdraw message that came from L2
     function _parseL2WithdrawalMessage(
@@ -641,12 +656,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(_l2ToL1message.length >= 56, "pm");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector){
+        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
             // this message is a base token withdrawal
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
-
         } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
 

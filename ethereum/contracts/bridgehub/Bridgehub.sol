@@ -213,7 +213,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
 
             if (token == ethTokenAddress) {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit{value:msg.value}(_chainId, token, msg.value);
+                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit{value: msg.value}(_chainId, token, msg.value);
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.

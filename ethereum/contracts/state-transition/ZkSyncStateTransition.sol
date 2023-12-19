@@ -210,7 +210,13 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
     }
 
     /// @notice called by Bridgehub when a chain registers
-    function newChain(uint256 _chainId, address _baseToken, address _baseTokenBridge, address _governor, bytes calldata _diamondCut) external onlyBridgehub {
+    function newChain(
+        uint256 _chainId,
+        address _baseToken,
+        address _baseTokenBridge,
+        address _governor,
+        bytes calldata _diamondCut
+    ) external onlyBridgehub {
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 

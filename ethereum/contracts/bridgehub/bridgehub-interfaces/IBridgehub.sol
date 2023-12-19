@@ -6,9 +6,7 @@ import "../../common/Messaging.sol";
 import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../../common/libraries/Diamond.sol";
 
-
 interface IBridgehub {
-
     /// Getters
     function getName() external view returns (string memory);
 

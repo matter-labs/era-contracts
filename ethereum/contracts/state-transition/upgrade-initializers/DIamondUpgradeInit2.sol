@@ -18,11 +18,8 @@ interface IOldContractDeployer {
 
 /// @author Matter Labs
 contract DiamondUpgradeInit2 is MailboxFacet {
-        
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
-    }
-    
+    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {}
 
     function forceDeploy2(
         bytes calldata _upgradeDeployerCalldata,
