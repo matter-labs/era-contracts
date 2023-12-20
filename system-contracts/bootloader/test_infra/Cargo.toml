@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 
-vm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
 
 colored = "2.0"
 hex = "0.4"

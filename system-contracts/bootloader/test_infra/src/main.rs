@@ -1,15 +1,17 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
+use multivm::interface::{
+    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmExecutionMode, VmInterface,
+};
+use multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
 use once_cell::sync::OnceCell;
 use std::process;
+
+use multivm::interface::{ExecutionResult, Halt};
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use vm::{
-    HistoryDisabled, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, Vm, VmExecutionMode,
-    VmTracer,
-};
 use zksync_contracts::{
     read_zbin_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
     SystemContractsRepo,
@@ -31,7 +33,7 @@ mod tracer;
 fn execute_internal_bootloader_test() {
     let test_location = env::current_dir()
         .unwrap()
-        .join("../build/artifacts/bootloader_test.yul/bootloader_test.yul.zbin");
+        .join("../build/artifacts/bootloader_test.yul.zbin");
     println!("Current dir is {:?}", test_location);
     let bytecode = read_zbin_bytecode(test_location.as_path());
     let hash = hash_bytecode(&bytecode);
@@ -93,20 +95,15 @@ fn execute_internal_bootloader_test() {
             ))
             .to_rc_ptr();
 
-        let mut vm = Vm::new(
-            l1_batch_env.clone(),
-            system_env.clone(),
-            storage.clone(),
-            HistoryDisabled,
-        );
+        let mut vm: Vm<_, HistoryDisabled> =
+            Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
 
         let test_count = Arc::new(OnceCell::default());
-        let custom_tracers = vec![Box::new(TestCountTracer::new(test_count.clone()))
-            as Box<dyn VmTracer<StorageView<InMemoryStorage>, HistoryDisabled>>];
+        let custom_tracers = TestCountTracer::new(test_count.clone()).into_tracer_pointer();
 
         // We're using a TestCountTracer (and passing 0 as fee account) - this should cause the bootloader
         // test framework to report number of tests via VM hook.
-        vm.inspect(custom_tracers, VmExecutionMode::Bootloader);
+        vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
 
         test_count.get().unwrap().clone()
     };
@@ -129,35 +126,77 @@ fn execute_internal_bootloader_test() {
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
         l1_batch_env.fee_account = zksync_types::H160::from(u256_to_h256(U256::from(test_id)));
-        let mut vm = Vm::new(
-            l1_batch_env.clone(),
-            system_env.clone(),
-            storage.clone(),
-            HistoryDisabled,
-        );
+        let mut vm: Vm<_, HistoryDisabled> =
+            Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
         let test_result = Arc::new(OnceCell::default());
+        let requested_assert = Arc::new(OnceCell::default());
+        let test_name = Arc::new(OnceCell::default());
 
-        let custom_tracers = vec![Box::new(BootloaderTestTracer::new(test_result.clone()))
-            as Box<dyn VmTracer<StorageView<InMemoryStorage>, HistoryDisabled>>];
+        let custom_tracers = BootloaderTestTracer::new(
+            test_result.clone(),
+            requested_assert.clone(),
+            test_name.clone(),
+        )
+        .into_tracer_pointer();
 
         // Let's insert transactions into slots. They are not executed, but the tests can run functions against them.
         let json_str = include_str!("test_transactions/0.json");
         let tx: Transaction = serde_json::from_str(json_str).unwrap();
         vm.push_transaction(tx);
 
-        vm.inspect(custom_tracers, VmExecutionMode::Bootloader);
+        let result = vm.inspect(custom_tracers.into(), VmExecutionMode::Bootloader);
+        let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();
+        let requested_assert = Arc::into_inner(requested_assert).unwrap().into_inner();
+        let test_name = Arc::into_inner(test_name)
+            .unwrap()
+            .into_inner()
+            .unwrap_or_default();
 
-        let test_result = test_result.get().unwrap();
-        match &test_result.result {
-            Ok(_) => println!("{} {}", "[PASS]".green(), test_result.test_name),
+        if test_result.is_none() {
+            test_result = Some(if let Some(requested_assert) = requested_assert {
+                match &result.result {
+                    ExecutionResult::Success { .. } => Err(format!(
+                        "Should have failed with {}, but run succesfully.",
+                        requested_assert
+                    )),
+                    ExecutionResult::Revert { output } => Err(format!(
+                        "Should have failed with {}, but run reverted with {}.",
+                        requested_assert,
+                        output.to_user_friendly_string()
+                    )),
+                    ExecutionResult::Halt { reason } => {
+                        if let Halt::UnexpectedVMBehavior(reason) = reason {
+                            let reason = reason.strip_prefix("Assertion error: ").unwrap();
+                            if reason == requested_assert {
+                                Ok(())
+                            } else {
+                                Err(format!(
+                                        "Should have failed with `{}`, but failed with different assert `{}`",
+                                        requested_assert, reason
+                                    ))
+                            }
+                        } else {
+                            Err(format!(
+                                "Should have failed with `{}`, but halted with`{}`",
+                                requested_assert, reason
+                            ))
+                        }
+                    }
+                }
+            } else {
+                match &result.result {
+                    ExecutionResult::Success { .. } => Ok(()),
+                    ExecutionResult::Revert { output } => Err(output.to_user_friendly_string()),
+                    ExecutionResult::Halt { reason } => Err(reason.to_string()),
+                }
+            });
+        }
+
+        match &test_result.unwrap() {
+            Ok(_) => println!("{} {}", "[PASS]".green(), test_name),
             Err(error_info) => {
                 tests_failed += 1;
-                println!(
-                    "{} {} {}",
-                    "[FAIL]".red(),
-                    test_result.test_name,
-                    error_info
-                )
+                println!("{} {} {}", "[FAIL]".red(), test_name, error_info)
             }
         }
     }

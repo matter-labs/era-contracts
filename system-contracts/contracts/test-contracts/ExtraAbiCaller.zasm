@@ -1,0 +1,60 @@
+.text
+        .file   "main"
+        .globl  __entry
+__entry:
+.func_begin0:
+        sub.s!  0, r2, r0
+        jump.eq @.RUNTIME_CODE
+        ; deployment code
+        add     32, r0, r1
+        st.1    r0, r1
+        st.1    r1, r0
+        add     @CPI0_1[0], r0, r1
+        ret.ok.to_label r1, @DEFAULT_FAR_RETURN
+.RUNTIME_CODE:
+        ; ABI:
+        ; 0-32 address(in the lowest 20 bytes)
+        ; 32-64 msg.value
+        ; 64-384 extra data
+        ; 384+ calldata
+        ;
+        ; load address into r2
+        ld.inc  r1, r2, r1
+        ; set msg.value
+        ld.inc  r1, r3, r1
+        context.set_context_u128 r3
+        ; load extra abi data into r3-r12
+        ld.inc  r1, r3, r1
+        ld.inc  r1, r4, r1
+        ld.inc  r1, r5, r1
+        ld.inc  r1, r6, r1
+        ld.inc  r1, r7, r1
+        ld.inc  r1, r8, r1
+        ld.inc  r1, r9, r1
+        ld.inc  r1, r10, r1
+        ld.inc  r1, r11, r1
+        ld.inc  r1, r12, r1
+        ptr.pack.s     @CPI0_0[0], r1, r1
+        far_call r1, r2, @.CALL_REVERT
+        ptr.pack.s     @CPI0_2[0], r1, r1
+        ret.ok r1
+.CALL_REVERT:
+        ptr.pack.s     @CPI0_2[0], r1, r1
+        ret.revert r1
+.func_end0:
+        .note.GNU-stack
+        .rodata
+; far call abi:
+; gas amount = 0xFFFFFFFF(max)
+; forwarding mode = fat ptr
+; shard id = 0
+; constructor flag = false
+; system call flag = true
+; 01 00 00 01 FFFFFFFF 0000000000000000 00000000000000000000000000000000
+CPI0_0:
+        .cell 452312902503159716397502014137536550255307801666780882257920705274096648192
+CPI0_1:
+        .cell 5070602400912917605986812821504
+; 01 0000000000000000 00000000000000000000000000000000
+CPI0_2:
+        .cell 6277101735386680763835789423207666416102355444464034512896
