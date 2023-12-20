@@ -38,9 +38,9 @@ object "Bootloader" {
             /// It is roughly equal to 80kk/MAX_TRANSACTIONS_PER_BATCH, i.e. how many gas would an L1->L2 transaction
             /// need to pay to compensate for the batch being closed.
             /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is 
-            /// compensated enough in case the batch might be prematurely sealed because of the memory being filled up.
+            /// compensated enough in case the batch might be prematurely sealed because of the transaction slots being filled up.
             function TX_SLOT_OVERHEAD_GAS() -> ret {
-                ret := 80000
+                ret := 10000
             }
 
             /// @dev The overhead for each byte of the bootloader memory that the encoding of the transaction.
@@ -104,12 +104,6 @@ object "Bootloader" {
             /// hashing of it, etc.
             function L1_GAS_PER_PUBDATA_BYTE() -> ret {
                 ret := 17
-            }
-
-            /// @dev The size of the bootloader memory that is to spent by the transaction's
-            /// encodings.
-            function BOOTLOADER_MEMORY_FOR_TXS() -> ret {
-                ret := {{BOOTLOADER_MEMORY_FOR_TXS}}
             }
 
             /// @dev Whether the batch is allowed to accept transactions with
@@ -410,7 +404,7 @@ object "Bootloader" {
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 
             function MAX_MEM_SIZE() -> ret {
-                ret := 0x1000000 // 2^24 bytes
+                ret := 24000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
