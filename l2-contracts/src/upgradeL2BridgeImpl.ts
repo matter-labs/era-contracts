@@ -4,7 +4,7 @@ import { BigNumber, Wallet, ethers } from "ethers";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import * as path from "path";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";

@@ -4,7 +4,7 @@ import "@nomiclabs/hardhat-solpp";
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
-import "hardhat-typechain";
+import "@typechain/hardhat";
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 import { task } from "hardhat/config";
 import "solidity-coverage";

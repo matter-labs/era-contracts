@@ -3,7 +3,7 @@ import "@matterlabs/hardhat-zksync-verify";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-solpp";
-import "hardhat-typechain";
+import "@typechain/hardhat";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {

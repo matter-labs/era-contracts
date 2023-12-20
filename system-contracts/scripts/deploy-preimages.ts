@@ -2,13 +2,11 @@ import * as hre from "hardhat";
 
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { Command } from "commander";
-import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { Provider, Wallet } from "zksync-web3";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { Provider, Wallet } from "zksync-ethers";
+import { hashBytecode } from "zksync-ethers/build/src/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
 import { filterPublishedFactoryDeps, publishFactoryDeps, readYulBytecode } from "./utils";
@@ -24,12 +22,12 @@ const BOOTLOADER_CONTRACT_NAME = "Bootloader";
 
 class ZkSyncDeployer {
   deployer: Deployer;
-  gasPrice: BigNumber;
+  gasPrice: bigint;
   nonce: number;
   dependenciesToUpgrade: DeployedDependency[];
   defaultAccountToUpgrade?: DeployedDependency;
   bootloaderToUpgrade?: DeployedDependency;
-  constructor(deployer: Deployer, gasPrice: BigNumber, nonce: number) {
+  constructor(deployer: Deployer, gasPrice: bigint, nonce: number) {
     this.deployer = deployer;
     this.gasPrice = gasPrice;
     this.nonce = nonce;
@@ -49,8 +47,8 @@ class ZkSyncDeployer {
 
   // If needed, appends the default account bytecode to the upgrade
   async checkShouldUpgradeDefaultAA(defaultAccountBytecode: string) {
-    const bytecodeHash = ethers.utils.hexlify(hashBytecode(defaultAccountBytecode));
-    const currentDefaultAccountBytecode = ethers.utils.hexlify(await this.currentDefaultAccountBytecode());
+    const bytecodeHash = ethers.hexlify(hashBytecode(defaultAccountBytecode));
+    const currentDefaultAccountBytecode = ethers.hexlify(await this.currentDefaultAccountBytecode());
 
     // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentDefaultAccountBytecode) {
@@ -97,8 +95,8 @@ class ZkSyncDeployer {
   }
 
   async checkShouldUpgradeBootloader(bootloaderCode: string) {
-    const bytecodeHash = ethers.utils.hexlify(hashBytecode(bootloaderCode));
-    const currentBootloaderBytecode = ethers.utils.hexlify(await this.currentBootloaderBytecode());
+    const bytecodeHash = ethers.hexlify(hashBytecode(bootloaderCode));
+    const currentBootloaderBytecode = ethers.hexlify(await this.currentBootloaderBytecode());
 
     // If the bytecode is not the same as the one deployed on zkSync, we need to add it to the deployment
     if (bytecodeHash.toLowerCase() !== currentBootloaderBytecode) {
@@ -128,7 +126,7 @@ class ZkSyncDeployer {
   }
 
   async processBootloader() {
-    const bootloaderCode = ethers.utils.hexlify(
+    const bootloaderCode = ethers.hexlify(
       fs.readFileSync("./bootloader/build/artifacts/proved_batch.yul/proved_batch.yul.zbin")
     );
 
@@ -161,7 +159,7 @@ class ZkSyncDeployer {
         factoryDeps = [readYulBytecode(contract)];
       }
 
-      const contractBytecodeHash = ethers.utils.hexlify(hashBytecode(factoryDeps[factoryDeps.length - 1]));
+      const contractBytecodeHash = ethers.hexlify(hashBytecode(factoryDeps[factoryDeps.length - 1]));
       if (await this.shouldUpgradeSystemContract(contract.address, contractBytecodeHash)) {
         this.dependenciesToUpgrade.push({
           name: contractName,
@@ -198,7 +196,7 @@ class ZkSyncDeployer {
     let currentDependencies: Dependency[] = [];
     // We iterate over dependencies and try to batch the publishing of those in order to save up on gas as well as time.
     for (const dependency of dependenciesToPublish) {
-      const dependencyLength = dependency.bytecodes.reduce((prev, dep) => prev + ethers.utils.arrayify(dep).length, 0);
+      const dependencyLength = dependency.bytecodes.reduce((prev, dep) => prev + ethers.toBeArray(ethers.hexlify(dep)).length, 0);
       if (currentLength + dependencyLength > MAX_COMBINED_LENGTH) {
         await this.publishFactoryDeps(currentDependencies);
         currentLength = dependencyLength;
@@ -248,7 +246,7 @@ async function main() {
     .action(async (cmd) => {
       const l1Rpc = cmd.l1Rpc ? cmd.l1Rpc : l1RpcUrl();
       const l2Rpc = cmd.l2Rpc ? cmd.l2Rpc : l2RpcUrl();
-      const providerL1 = new ethers.providers.JsonRpcProvider(l1Rpc);
+      const providerL1 = new ethers.JsonRpcProvider(l1Rpc);
       const providerL2 = new Provider(l2Rpc);
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey)
@@ -266,10 +264,10 @@ async function main() {
 
       console.log(`Using deployer wallet: ${ethWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await providerL1.getGasPrice();
-      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
+      const gasPrice = cmd.gasPrice ? ethers.parseUnits(cmd.gasPrice, "gwei") : (await providerL1.getFeeData()).gasPrice!;
+      console.log(`Using gas price: ${ethers.formatUnits(Number(gasPrice), "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await ethWallet.getNonce();
       console.log(`Using nonce: ${nonce}`);
 
       const zkSyncDeployer = new ZkSyncDeployer(deployer, gasPrice, nonce);
