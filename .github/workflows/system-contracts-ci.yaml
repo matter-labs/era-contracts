@@ -35,8 +35,6 @@ jobs:
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
-            system-contracts/contracts/artifacts
-            system-contracts/contracts/precompiles/artifacts
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
 
@@ -81,8 +79,6 @@ jobs:
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
-            system-contracts/contracts/artifacts
-            system-contracts/contracts/precompiles/artifacts
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
 
@@ -122,8 +118,6 @@ jobs:
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
-            system-contracts/contracts/artifacts
-            system-contracts/contracts/precompiles/artifacts
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
 
@@ -160,8 +154,6 @@ jobs:
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
-            system-contracts/contracts/artifacts
-            system-contracts/contracts/precompiles/artifacts
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
 
