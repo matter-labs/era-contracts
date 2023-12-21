@@ -106,7 +106,7 @@ contract MerkleTestTest is Test {
         bytes32[] memory proof = merkleTree.getProof(elements, 0);
 
         vm.expectRevert(bytes("px"));
-        merkleTest.calculateRoot(proof, 2**255, leaf);
+        merkleTest.calculateRoot(proof, 2 ** 255, leaf);
     }
 
     function testProofLengthTooLarge_shouldRevert() public {
