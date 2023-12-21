@@ -13,6 +13,9 @@ enum TxStatus {
     Success
 }
 
+/// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IMailbox is IBase {
     /// @dev Structure that includes all fields of the L2 transaction
     /// @dev The hash of this structure is the "canonical L2 transaction hash" and can be used as a unique identifier of a tx

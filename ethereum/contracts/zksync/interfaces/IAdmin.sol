@@ -6,6 +6,9 @@ import "./IBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 
+/// @title The interface of the Admin Contract that controls access rights for contract management.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IAdmin is IBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 

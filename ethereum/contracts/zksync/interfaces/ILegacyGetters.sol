@@ -7,6 +7,7 @@ import "./IBase.sol";
 /// @author Matter Labs
 /// @dev This interface contains getters for the zkSync contract that should not be used,
 /// but still are keot for backward compatibility.
+/// @custom:security-contact security@matterlabs.dev
 interface ILegacyGetters is IBase {
     function getTotalBlocksCommitted() external view returns (uint256);
 

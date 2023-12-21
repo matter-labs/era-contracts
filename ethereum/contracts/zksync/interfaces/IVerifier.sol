@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.20;
 
+/// @title The interface of the Verifier contract, responsible for the zero knowledge proof verification.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IVerifier {
     function verify(
         uint256[] calldata _publicInputs,

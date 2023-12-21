@@ -25,6 +25,9 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
+/// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IExecutor is IBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
