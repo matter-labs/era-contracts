@@ -11,4 +11,6 @@ import "./IGetters.sol";
 /// @author Matter Labs
 /// @dev This interface combines the interfaces of all the facets of the zkSync contract.
 /// @custom:security-contact security@matterlabs
-interface IZkSync is IMailbox, IAdmin, IExecutor, IGetters {}
+interface IZkSync is IMailbox, IAdmin, IExecutor, IGetters {
+
+}
