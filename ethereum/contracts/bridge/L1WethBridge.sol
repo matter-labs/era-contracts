@@ -15,6 +15,8 @@ import "./libraries/BridgeInitializationHelper.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
 import "../common/libraries/L2ContractHelper.sol";
+import {TxStatus} from "../zksync/interfaces/IMailbox.sol";
+import "../zksync/Storage.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 import "../vendor/AddressAliasHelper.sol";
 

@@ -13,6 +13,8 @@ import "./interfaces/IL2ERC20Bridge.sol";
 import "./libraries/BridgeInitializationHelper.sol";
 
 import "../zksync/interfaces/IZkSync.sol";
+import {TxStatus} from "../zksync/interfaces/IMailbox.sol";
+import "../zksync/Storage.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/ReentrancyGuard.sol";

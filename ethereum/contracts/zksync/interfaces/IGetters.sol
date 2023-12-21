@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../libraries/PriorityQueue.sol";
+import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams, UpgradeState} from "../Storage.sol";
 import "./IBase.sol";
 

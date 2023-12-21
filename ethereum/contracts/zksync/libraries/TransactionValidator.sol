@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "../interfaces/IMailbox.sol";
-import "../Config.sol";
+import {IMailbox} from "../interfaces/IMailbox.sol";
+import {PRIORITY_TX_MAX_PUBDATA, L1_TX_INTRINSIC_L2_GAS, L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_MIN_L2_GAS_BASE, L1_TX_INTRINSIC_PUBDATA, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, BATCH_OVERHEAD_L2_GAS, BATCH_OVERHEAD_PUBDATA, MAX_TRANSACTIONS_IN_BATCH, BOOTLOADER_TX_ENCODING_SPACE, L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
 
 /// @title zkSync Library for validating L1 -> L2 transactions
 /// @author Matter Labs

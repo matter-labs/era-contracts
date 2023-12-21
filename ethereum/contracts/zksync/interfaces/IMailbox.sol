@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {L2Log, L2Message} from "../Storage.sol";
-import "./IBase.sol";
+import {IBase} from "./IBase.sol";
 
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed

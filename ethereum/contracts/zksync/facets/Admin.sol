@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.20;
 
-import "../interfaces/IAdmin.sol";
-import "../libraries/Diamond.sol";
+import {IAdmin} from "../interfaces/IAdmin.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
-import "./Base.sol";
+import {Base} from "./Base.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
