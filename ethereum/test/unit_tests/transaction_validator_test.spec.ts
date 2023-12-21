@@ -243,7 +243,7 @@ function createTestTransaction(overrides) {
 
 function getCorrectOverheadForTransaction(len: number) {
   const MEMORY_BYTE_OVERHEAD = 10;
-  const TX_SLOT_OVERHEAD = 80000;
+  const TX_SLOT_OVERHEAD = 10000;
 
   return Math.max(len * MEMORY_BYTE_OVERHEAD, TX_SLOT_OVERHEAD);
 }
