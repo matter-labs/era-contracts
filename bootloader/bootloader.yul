@@ -3715,14 +3715,16 @@ object "Bootloader" {
 
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
+
+
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                 let baseFee := 0
 
                 baseFee, GAS_PRICE_PER_PUBDATA := getFeeParams(
                     FAIR_PUBDATA_PRICE,
                     FAIR_L2_GAS_PRICE
                 )
-
-                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
 
                 // Only for the proved batch we enforce that the baseFee proposed 
                 // by the operator is equal to the expected one. For the playground batch, we allow
