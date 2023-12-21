@@ -125,3 +125,6 @@ uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev Address of the point evaluation precompile used for 4844 blob verification.
+address constant POINT_EVALUATION_PRECOMPILE_ADDR = address(0x0A);

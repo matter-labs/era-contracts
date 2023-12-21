@@ -3,8 +3,8 @@
 pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey} from "../interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -476,5 +476,30 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Sets the given bit in {_num} at index {_index} to 1.
     function _setBit(uint256 _bitMap, uint8 _index) internal pure returns (uint256) {
         return _bitMap | (1 << _index);
+    }
+
+    /// @notice Calls the point evaluation precompile and verifies the output
+    // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
+    // Also verify that the provided commitment matches the provided versioned_hash.
+    function _pointEvaluationPrecompile(
+        bytes32 _versionedHash, 
+        uint256 _inputPoint, 
+        uint256 _claimedValue, 
+        bytes memory _commitment, 
+        bytes memory _proof
+    ) internal returns (bytes32) {
+        bytes memory precompileInput = abi.encodePacked(
+            _versionedHash,
+            _inputPoint,
+            _claimedValue,
+            _commitment,
+            _proof
+        );
+
+        (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.call(precompileInput);
+
+        require(success, "failed to call point evaluation precompile");
+        uint256 result = abi.decode(data, (uint256));
+        require(result == BLS_MODULUS, "precompile unexpected output");
     }
 }

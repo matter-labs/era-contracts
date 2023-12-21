@@ -46,6 +46,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// The number of bytes processed in one keccak256 round.
     uint256 internal constant KECCAK_ROUND_NUMBER_OF_BYTES = 136;
 
+    /// Total number of bytes in a blob. Blob = 4096 field elements * 32 bytes per field element/
+    uint256 internal constant BLOB_SIZE_BYTES = 131_072;
+
     /// The gas cost of calculation of keccak256 of bytes array of such length.
     function keccakGasCost(uint256 _length) internal pure returns (uint256) {
         return KECCAK_ROUND_GAS_COST * (_length / KECCAK_ROUND_NUMBER_OF_BYTES + 1);

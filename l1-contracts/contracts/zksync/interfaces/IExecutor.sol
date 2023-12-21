@@ -25,6 +25,10 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
+/// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the 
+/// point evaluation precompile
+uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
+
 interface IExecutor is IBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
@@ -56,7 +60,7 @@ interface IExecutor is IBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param totalL2ToL1Pubdata Total pubdata committed to as part of bootloader run. Contents are: l2Tol1Logs <> l2Tol1Messages <> publishedBytecodes <> stateDiffs
+    /// @param pubdataCommitments Packed pubdata commitments. # commitments || ∑ (versioned hash || input point || claimed value || commitment || proof)
     struct CommitBatchInfo {
         uint64 batchNumber;
         uint64 timestamp;
@@ -67,7 +71,7 @@ interface IExecutor is IBase {
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
-        bytes totalL2ToL1Pubdata;
+        bytes pubdataCommitments;
     }
 
     /// @notice Recursive proof input data (individual commitments are constructed onchain)
