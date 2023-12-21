@@ -415,11 +415,6 @@ contract ExecutorFacet is Base, IExecutor {
         emit BlocksRevert(s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
     }
 
-    /// @notice Returns larger of two values
-    function _maxU256(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? b : a;
-    }
-
     /// @dev Creates batch commitment from its data
     function _createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
