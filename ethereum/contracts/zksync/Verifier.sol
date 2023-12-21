@@ -255,8 +255,7 @@ contract Verifier is IVerifier {
     uint256 internal constant G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
     uint256 internal constant G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
 
-    /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
-    /// @return vkHash The keccak256 hash of the loaded verification keys.
+    /// @inheritdoc IVerifier
     function verificationKeyHash() external pure returns (bytes32 vkHash) {
         _loadVerificationKey();
 
@@ -340,9 +339,7 @@ contract Verifier is IVerifier {
         }
     }
 
-    /// @dev Verifies a zk-SNARK proof.
-    /// @return A boolean value indicating whether the zk-SNARK proof is valid.
-    /// Note: The function may revert execution instead of returning false in some cases.
+    /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata, // _publicInputs
         uint256[] calldata, // _proof

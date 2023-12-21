@@ -17,6 +17,9 @@ import {Base} from "./Base.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
+// While formally the following import is not used, it is needed to inherit documentation from it
+import {IBase} from "../interfaces/IBase.sol";
+
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -24,14 +27,10 @@ contract MailboxFacet is Base, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
+    /// @inheritdoc IBase
     string public constant override getName = "MailboxFacet";
 
-    /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
-    /// @param _batchNumber The executed L2 batch number in which the message appeared
-    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
-    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
-    /// @return Whether the proof is valid
+    /// @inheritdoc IMailbox
     function proveL2MessageInclusion(
         uint256 _batchNumber,
         uint256 _index,
@@ -41,12 +40,7 @@ contract MailboxFacet is Base, IMailbox {
         return _proveL2LogInclusion(_batchNumber, _index, _L2MessageToLog(_message), _proof);
     }
 
-    /// @notice Prove that a specific L2 log was sent in a specific L2 batch
-    /// @param _batchNumber The executed L2 batch number in which the log appeared
-    /// @param _index The position of the l2log in the L2 logs Merkle tree
-    /// @param _log Information about the sent log
-    /// @param _proof Merkle proof for inclusion of the L2 log
-    /// @return Whether the proof is correct and L2 log is included in batch
+    /// @inheritdoc IMailbox
     function proveL2LogInclusion(
         uint256 _batchNumber,
         uint256 _index,
@@ -56,15 +50,7 @@ contract MailboxFacet is Base, IMailbox {
         return _proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
-    /// @notice Prove that the L1 -> L2 transaction was processed with the specified status.
-    /// @param _l2TxHash The L2 canonical transaction hash
-    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
-    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
-    /// @return Whether the proof is correct and the transaction was actually executed with provided status
-    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
+    /// @inheritdoc IMailbox
     function proveL1ToL2TransactionStatus(
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
@@ -144,11 +130,7 @@ contract MailboxFacet is Base, IMailbox {
             });
     }
 
-    /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
-    /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution
-    /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
-    /// @param _l2GasPerPubdataByteLimit The maximum amount of L2 gas that the operator may charge the user for a single byte of pubdata.
-    /// @return The estimated ETH spent on L2 gas for the transaction
+    /// @inheritdoc IMailbox
     function l2TransactionBaseCost(
         uint256 _gasPrice,
         uint256 _l2GasLimit,
@@ -169,12 +151,7 @@ contract MailboxFacet is Base, IMailbox {
         return Math.max(FAIR_L2_GAS_PRICE, minL2GasPriceETH);
     }
 
-    /// @notice Finalize the withdrawal and release funds
-    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
-    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
-    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    /// @inheritdoc IMailbox
     function finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -199,26 +176,9 @@ contract MailboxFacet is Base, IMailbox {
         _withdrawFunds(_l1WithdrawReceiver, _amount);
 
         emit EthWithdrawalFinalized(_l1WithdrawReceiver, _amount);
-    }
+    }   
 
-    /// @notice Request execution of L2 transaction from L1.
-    /// @param _contractL2 The L2 receiver address
-    /// @param _l2Value `msg.value` of L2 transaction
-    /// @param _calldata The input of the L2 transaction
-    /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2
-    /// @param _l2GasPerPubdataByteLimit The maximum amount L2 gas that the operator may charge the user for single byte of pubdata.
-    /// @param _factoryDeps An array of L2 bytecodes that will be marked as known on L2
-    /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// @dev If the L2 deposit finalization transaction fails, the `_refundRecipient` will receive the `_l2Value`.
-    /// Please note, the contract may change the refund recipient's address to eliminate sending funds to addresses out of control.
-    /// - If `_refundRecipient` is a contract on L1, the refund will be sent to the aliased `_refundRecipient`.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has NO deployed bytecode on L1, the refund will be sent to the `msg.sender` address.
-    /// - If `_refundRecipient` is set to `address(0)` and the sender has deployed bytecode on L1, the refund will be sent to the aliased `msg.sender` address.
-    /// @dev The address aliasing of L1 contracts as refund recipient on L2 is necessary to guarantee that the funds are controllable,
-    /// since address aliasing to the from address for the L2 tx will be applied if the L1 `msg.sender` is a contract.
-    /// Without address aliasing for L1 contracts as refund recipients they would not be able to make proper L2 tx requests
-    /// through the Mailbox to use or withdraw the funds from L2, and the funds would be lost.
-    /// @return canonicalTxHash The hash of the requested L2 transaction. This hash can be used to follow the transaction status
+    /// @inheritdoc IMailbox
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,
