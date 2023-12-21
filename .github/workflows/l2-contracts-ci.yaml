@@ -1,0 +1,91 @@
+name: L2 contracts CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build artifacts
+        run: yarn l2 build
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-l2-${{ github.sha }}
+          path: |
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Lint
+        run: yarn lint:check
+
+  test:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l2-${{ github.sha }}
+          path: |
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
+
+      - name: Run Era test node
+        uses: dutterbutter/era-test-node-action@v0.1.3
+
+      - name: Run tests
+        run: yarn l2 test

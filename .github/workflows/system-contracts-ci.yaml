@@ -1,0 +1,165 @@
+name: System contracts CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build artifacts
+        run: yarn sc build
+
+      - name: Create cache
+        uses: actions/cache/save@v3
+        with:
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run lint
+        run: yarn lint:check
+
+  test-bootloader:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2023-04-17
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
+
+      - name: Run bootloader tests
+        run: |
+          cd system-contracts/bootloader/test_infra
+          cargo run
+
+  test-contracts:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Use era-test-node for testing
+        uses: dutterbutter/era-test-node-action@v0.1.3
+        with:
+          releaseTag: v0.0.1-alpha.boojum
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
+
+      - name: Run tests
+        run: yarn sc test
+
+      - name: Print output logs of era_test_node
+        if: always()
+        run: cat era_test_node.log
+
+  check-hashes:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts/artifacts
+            system-contracts/contracts/precompiles/artifacts
+            system-contracts/bootloader/build
+
+      - name: Check hashes
+        run: yarn sc calculate-hashes:check
