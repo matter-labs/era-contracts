@@ -4815,7 +4815,7 @@ dependencies = [
 [[package]]
 name = "vlog"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "chrono",
  "sentry",
@@ -4827,7 +4827,7 @@ dependencies = [
 [[package]]
 name = "vm"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "anyhow",
  "hex",
@@ -5233,7 +5233,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "serde",
  "serde_json",
@@ -5243,7 +5243,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -5262,7 +5262,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "envy",
  "ethabi",
@@ -5276,7 +5276,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "base64 0.13.1",
  "blake2 0.10.6",
@@ -5291,7 +5291,7 @@ dependencies = [
 [[package]]
 name = "zksync_dal"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -5318,7 +5318,7 @@ dependencies = [
 [[package]]
 name = "zksync_health_check"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "async-trait",
  "futures",
@@ -5331,7 +5331,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -5341,7 +5341,7 @@ dependencies = [
 [[package]]
 name = "zksync_state"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "anyhow",
  "metrics",
@@ -5358,7 +5358,7 @@ dependencies = [
 [[package]]
 name = "zksync_storage"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "num_cpus",
  "once_cell",
@@ -5370,7 +5370,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "blake2 0.10.6",
  "chrono",
@@ -5398,7 +5398,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-integration#d2ca29bf20b4ec2d9ec9e327b4ba6b281d9793de"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
 dependencies = [
  "anyhow",
  "bigdecimal",

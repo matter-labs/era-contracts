@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 
-vm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
-vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-integration" }
+vm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
+vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "boojum-with-big-batch" }
 
 colored = "2.0"
 hex = "0.4"
