@@ -23,9 +23,7 @@ contract TransactionValidatorTest {
         TransactionValidator.validateUpgradeTransaction(_transaction);
     }
 
-    function getOverheadForTransaction(
-        uint256 _encodingLength
-    ) external pure returns (uint256) {
+    function getOverheadForTransaction(uint256 _encodingLength) external pure returns (uint256) {
         return TransactionValidator.getOverheadForTransaction(_encodingLength);
     }
 }
