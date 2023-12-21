@@ -84,7 +84,7 @@ library TransactionValidator {
             // and the size of each new encoding word).
             costForComputation += Math.ceilDiv(_encodingLength * L1_TX_DELTA_544_ENCODING_BYTES, 544);
 
-            // Taking into the account the additional costs of providing new factory dependenies
+            // Taking into the account the additional costs of providing new factory dependencies
             costForComputation += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_L2_GAS;
 
             // There is a minimal amount of computational L2 gas that the transaction should cover
@@ -93,10 +93,10 @@ library TransactionValidator {
 
         uint256 costForPubdata = 0;
         {
-            // Adding the intrinsic cost for the transaction, i.e. auxilary prices which cannot be easily accounted for
+            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
             costForPubdata = L1_TX_INTRINSIC_PUBDATA * _l2GasPricePerPubdata;
 
-            // Taking into the account the additional costs of providing new factory dependenies
+            // Taking into the account the additional costs of providing new factory dependencies
             costForPubdata += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_PUBDATA * _l2GasPricePerPubdata;
         }
 

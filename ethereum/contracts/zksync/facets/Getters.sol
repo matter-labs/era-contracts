@@ -9,7 +9,7 @@ import "../../common/libraries/UncheckedMath.sol";
 import "../interfaces/IGetters.sol";
 import "../interfaces/ILegacyGetters.sol";
 
-/// @title Getters Contract implements functions for getting contract state from outside the batchchain.
+/// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is Base, IGetters, ILegacyGetters {
