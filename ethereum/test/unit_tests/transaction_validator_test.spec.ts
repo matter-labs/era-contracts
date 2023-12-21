@@ -48,13 +48,7 @@ describe("TransactionValidator tests", function () {
       );
       expect(result).equal("uk");
 
-      const result = await getCallRevertReason(
-        tester.validateL1ToL2Transaction(
-          createTestTransaction({}),
-          500000,
-          1
-        )
-      );
+      const result = await getCallRevertReason(tester.validateL1ToL2Transaction(createTestTransaction({}), 500000, 1));
       expect(result).equal("uk");
     });
 
@@ -72,12 +66,16 @@ describe("TransactionValidator tests", function () {
     });
 
     it("Should allow large transactions if the caller is fine with it", async () => {
-      // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically 
+      // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically
       // allowed in the production system
-      await tester.validateL1ToL2Transaction(createTestTransaction({
-        gasPergasPerPubdataByteLimit: 1,
-        gasLimit: 2_000_000_000,
-      }), 2_000_000_000, 2_000_000_000);
+      await tester.validateL1ToL2Transaction(
+        createTestTransaction({
+          gasPergasPerPubdataByteLimit: 1,
+          gasLimit: 2_000_000_000,
+        }),
+        2_000_000_000,
+        2_000_000_000
+      );
     });
   });
 
