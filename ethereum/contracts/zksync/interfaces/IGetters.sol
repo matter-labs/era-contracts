@@ -62,10 +62,10 @@ interface IGetters is IBase {
 
     /// @return Verifier parameters.
     function getVerifierParams() external view returns (VerifierParams memory);
-    
+
     /// @return Whether the diamond is frozen or not
     function isDiamondStorageFrozen() external view returns (bool);
-    
+
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256);
 

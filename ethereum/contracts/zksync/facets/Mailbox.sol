@@ -176,7 +176,7 @@ contract MailboxFacet is Base, IMailbox {
         _withdrawFunds(_l1WithdrawReceiver, _amount);
 
         emit EthWithdrawalFinalized(_l1WithdrawReceiver, _amount);
-    }   
+    }
 
     /// @inheritdoc IMailbox
     function requestL2Transaction(
