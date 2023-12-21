@@ -1695,7 +1695,6 @@ object "Bootloader" {
                 if gt(operatorOverheadForTransaction, txTotalGasLimit) {
                     assertionError("Overhead higher than gasLimit")
                 }
-                let txGasLimit := min(safeSub(txTotalGasLimit, operatorOverheadForTransaction, "www"), MAX_GAS_PER_TRANSACTION())
 
                 let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
 
@@ -1904,12 +1903,6 @@ object "Bootloader" {
                 if lt(gas(), safeAdd(gasToProvide, CHECK_ENOUGH_GAS_OVERHEAD(), "cjq")) {
                     revertWithReason(NOT_ENOUGH_GAS_PROVIDED_ERR_CODE(), 0)
                 }
-            }
-
-            /// Returns the batch overhead to be paid, assuming a certain value of gasPerPubdata
-            function getBatchOverheadEth(l1GasPrice) -> ret {
-                let l1GasOverhead := BATCH_OVERHEAD_L1_GAS()
-                ret := safeMul(l1GasOverhead, l1GasPrice, "aa")
             }
 
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
