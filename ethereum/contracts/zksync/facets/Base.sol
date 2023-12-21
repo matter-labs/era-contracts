@@ -19,7 +19,7 @@ contract Base is ReentrancyGuard {
 
     /// @notice Checks that the message sender is an active governor or admin
     modifier onlyGovernorOrAdmin() {
-        require(msg.sender == s.governor || msg.sender == s.admin, "Only by governor or admin");
+        require(msg.sender == s.governor || msg.sender == s.admin, "1k");
         _;
     }
 
