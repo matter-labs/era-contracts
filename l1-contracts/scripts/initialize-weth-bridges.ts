@@ -1,6 +1,5 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { ethers, formatUnits, parseUnits, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, web3Provider } from "./utils";
 
@@ -42,16 +41,15 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/0").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getNonce();
       console.log(`Using deployer nonce: ${nonce}`);
 
       const l2WethAddress = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
@@ -66,7 +64,7 @@ async function main() {
 
       const l1GovernorAddress = await zkSync.getGovernor();
       // Check whether governor is a smart contract on L1 to apply alias if needed.
-      const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
+      const l1GovernorCodeSize = ethers.dataLength(await deployWallet.provider.getCode(l1GovernorAddress));
       const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
 
       // There will be two deployments done during the initial initialization

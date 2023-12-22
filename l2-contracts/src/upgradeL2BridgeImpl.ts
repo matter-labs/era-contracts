@@ -1,11 +1,11 @@
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { Command } from "commander";
-import { BigNumber, Wallet, ethers } from "ethers";
+import { Wallet, ethers } from "ethers";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-ethers";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
@@ -24,7 +24,7 @@ function checkSupportedContract(contract: any): contract is SupportedContracts {
   return true;
 }
 
-const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
+const priorityTxMaxGasLimit = BigInt(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
@@ -44,12 +44,12 @@ async function getERC20BeaconAddress() {
 async function getWETHAddress() {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
   const wethToken = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
-  return ethers.utils.hexStripZeros(await provider.getStorageAt(wethToken, EIP1967_IMPLEMENTATION_SLOT));
+  return ethers.hexStripZeros(await provider.getStorage(wethToken, EIP1967_IMPLEMENTATION_SLOT));
 }
 
 async function getTransparentProxyUpgradeCalldata(target: string) {
   const proxyArtifact = await hre.artifacts.readArtifact("TransparentUpgradeableProxy");
-  const proxyInterface = new ethers.utils.Interface(proxyArtifact.abi);
+  const proxyInterface = new ethers.Interface(proxyArtifact.abi);
 
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
 }
@@ -66,7 +66,7 @@ async function getTransparentProxyUpgradeTxInfo(
   target: string,
   proxyAddress: string,
   refundRecipient: string,
-  gasPrice: BigNumber
+  gasPrice: bigint
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
   return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice);
@@ -76,7 +76,7 @@ async function getTokenBeaconUpgradeTxInfo(
   deployer: Deployer,
   target: string,
   refundRecipient: string,
-  gasPrice: BigNumber,
+  gasPrice: bigint,
   proxy: string
 ) {
   const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
@@ -88,7 +88,7 @@ async function getTxInfo(
   deployer: Deployer,
   target: string,
   refundRecipient: string,
-  gasPrice: BigNumber,
+  gasPrice: bigint,
   contract: SupportedContracts,
   l2ProxyAddress?: string
 ) {
@@ -127,19 +127,19 @@ async function main() {
       // We deploy the target contract through L1 to ensure security
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);
       const deployer = new Deployer({ deployWallet });
       const gasPrice = cmd.gasPrice
-        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
+        ? ethers.parseUnits(cmd.gasPrice, "gwei")
         : (await provider.getGasPrice()).mul(3).div(2);
-      const salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.constants.HashZero);
+      const salt = cmd.create2Salt ? cmd.create2Salt : ethers.hexlify(ethers.constants.HashZero);
       checkSupportedContract(cmd.contract);
 
       console.log(`Using deployer wallet: ${deployWallet.address}`);
-      console.log("Gas price: ", ethers.utils.formatUnits(gasPrice, "gwei"));
+      console.log("Gas price: ", ethers.formatUnits(gasPrice, "gwei"));
       console.log("Salt: ", salt);
 
       const bridgeImplBytecode = getContractBytecode(cmd.contract);
@@ -214,7 +214,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.deployerPrivateKey
         ? new Wallet(cmd.deployerPrivateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);
@@ -224,7 +224,6 @@ async function main() {
         throw new Error("L2 target address is not provided");
       }
       checkSupportedContract(cmd.contract);
-
       const refundRecipient = cmd.refundRecipient ? cmd.refundRecipient : deployWallet.address;
       console.log("Gas price: ", ethers.utils.formatUnits(gasPrice, "gwei"));
       console.log("Target address: ", target);
@@ -250,7 +249,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(3).div(2);
       const deployWallet = cmd.governorPrivateKey
         ? new Wallet(cmd.governorPrivateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);

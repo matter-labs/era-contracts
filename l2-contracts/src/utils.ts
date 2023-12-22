@@ -1,6 +1,5 @@
 import { artifacts } from "hardhat";
 
-import { Interface } from "ethers/lib/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
 import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
@@ -8,7 +7,7 @@ import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
 import type { Provider } from "zksync-ethers";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-ethers/build/src/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;

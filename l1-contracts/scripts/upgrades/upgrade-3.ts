@@ -2,13 +2,13 @@ import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import { Wallet } from "ethers";
 import { ethers } from "hardhat";
-import { Provider } from "zksync-web3";
-import "@nomiclabs/hardhat-ethers";
+import { Provider } from "zksync-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
 import * as fs from "fs";
 import * as path from "path";
-import { IOldDiamondCutFactory } from "../../typechain/IOldDiamondCutFactory";
+import { IOldDiamondCut__factory } from "../../typechain-types";
 
 function sleep(millis: number) {
   return new Promise((resolve) => setTimeout(resolve, millis));
@@ -36,7 +36,7 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
-const ZERO_ADDRESS = ethers.constants.AddressZero;
+const ZERO_ADDRESS = ethers.ZeroAddress;
 
 async function main() {
   const program = new Command();
@@ -75,18 +75,17 @@ async function main() {
       const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
 
-      const zkSyncContract = IOldDiamondCutFactory.connect(deployer.addresses.ZkSync.DiamondProxy, deployWallet);
+      const zkSyncContract = IOldDiamondCut__factory.connect(deployer.addresses.ZkSync.DiamondProxy, deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

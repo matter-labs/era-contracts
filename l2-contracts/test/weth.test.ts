@@ -3,10 +3,10 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-ethers";
-import type { L2Weth } from "../typechain/L2Weth";
-import type { L2WethBridge } from "../typechain/L2WethBridge";
-import { L2WethBridgeFactory } from "../typechain/L2WethBridgeFactory";
-import { L2WethFactory } from "../typechain/L2WethFactory";
+import type { L2Weth } from "../typechain-types/L2Weth";
+import type { L2WethBridge } from "../typechain-types/L2WethBridge";
+import { L2WethBridgeFactory } from "../typechain-types/L2WethBridgeFactory";
+import { L2WethFactory } from "../typechain-types/L2WethFactory";
 
 const richAccount = {
   address: "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",

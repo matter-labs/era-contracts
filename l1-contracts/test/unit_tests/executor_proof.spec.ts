@@ -1,7 +1,7 @@
 import * as hardhat from "hardhat";
 import { expect } from "chai";
-import type { ExecutorProvingTest } from "../../typechain";
-import { ExecutorProvingTestFactory } from "../../typechain";
+import type { ExecutorProvingTest } from "../../typechain-types";
+import { ExecutorProvingTest__factory } from "../../typechain-types";
 
 describe("Executor test", function () {
   let executor: ExecutorProvingTest;
@@ -9,7 +9,7 @@ describe("Executor test", function () {
   before(async function () {
     const factory = await hardhat.ethers.getContractFactory("ExecutorProvingTest");
     const executorContract = await factory.deploy();
-    executor = ExecutorProvingTestFactory.connect(executorContract.address, executorContract.signer);
+    executor = ExecutorProvingTest__factory.connect(executorContract.address, executorContract.signer);
   });
 
   /// This test is based on a block generated in a local system.

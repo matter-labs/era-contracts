@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const warning = chalk.bold.yellow;
-const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
+const CREATE2_PREFIX = ethers.solidityPackedKeccak256(["string"], ["zksyncCreate2"]);
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -28,7 +28,7 @@ export function web3Url() {
 }
 
 export function web3Provider() {
-  const provider = new ethers.providers.JsonRpcProvider(web3Url());
+  const provider = new ethers.JsonRpcProvider(web3Url());
 
   // Check that `CHAIN_ETH_NETWORK` variable is set. If not, it's most likely because
   // the variable was renamed. As this affects the time to deploy contracts in localhost
@@ -70,10 +70,10 @@ export function getNumberFromEnv(envName: string): string {
   return number;
 }
 
-const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+const ADDRESS_MODULO = 2n^160n;
 
 export function applyL1ToL2Alias(address: string): string {
-  return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+  return ethers.hexlify(ethers.toBeArray(((BigInt(address) + BigInt(L1_TO_L2_ALIAS_OFFSET)) % ADDRESS_MODULO)));
 }
 
 export function readBatchBootloaderBytecode() {
@@ -91,14 +91,14 @@ export function readSystemContractsBytecode(fileName: string) {
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
   // For getting the consistent length we first convert the bytecode to UInt8Array
-  const bytecodeAsArray = ethers.utils.arrayify(bytecode);
+  const bytecodeAsArray = ethers.toBeArray(ethers.hexlify(bytecode));
 
   if (bytecodeAsArray.length % 32 != 0) {
     throw new Error("The bytecode length in bytes must be divisible by 32");
   }
 
-  const hashStr = ethers.utils.sha256(bytecodeAsArray);
-  const hash = ethers.utils.arrayify(hashStr);
+  const hashStr = ethers.sha256(bytecodeAsArray);
+  const hash = ethers.toBeArray(hashStr);
 
   // Note that the length of the bytecode
   // should be provided in 32-byte words.
@@ -106,17 +106,17 @@ export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
   if (bytecodeLengthInWords % 2 == 0) {
     throw new Error("Bytecode length in 32-byte words must be odd");
   }
-  const bytecodeLength = ethers.utils.arrayify(bytecodeAsArray.length / 32);
+  const bytecodeLength = ethers.toBeArray(bytecodeAsArray.length / 32);
   if (bytecodeLength.length > 2) {
     throw new Error("Bytecode length must be less than 2^16 bytes");
   }
   // The bytecode should always take the first 2 bytes of the bytecode hash,
   // so we pad it from the left in case the length is smaller than 2 bytes.
-  const bytecodeLengthPadded = ethers.utils.zeroPad(bytecodeLength, 2);
+  const bytecodeLengthPadded = ethers.zeroPadValue(bytecodeLength, 2);
 
   const codeHashVersion = new Uint8Array([1, 0]);
   hash.set(codeHashVersion, 0);
-  hash.set(bytecodeLengthPadded, 2);
+  hash.set(ethers.toBeArray(bytecodeLengthPadded), 2);
 
   return hash;
 }
@@ -127,16 +127,16 @@ export function computeL2Create2Address(
   constructorInput: BytesLike,
   create2Salt: BytesLike
 ) {
-  const senderBytes = ethers.utils.hexZeroPad(deployWallet, 32);
+  const senderBytes = ethers.zeroPadValue(deployWallet, 32);
   const bytecodeHash = hashL2Bytecode(bytecode);
 
-  const constructorInputHash = ethers.utils.keccak256(constructorInput);
+  const constructorInputHash = ethers.keccak256(constructorInput);
 
-  const data = ethers.utils.keccak256(
-    ethers.utils.concat([CREATE2_PREFIX, senderBytes, create2Salt, bytecodeHash, constructorInputHash])
+  const data = ethers.keccak256(
+    ethers.concat([CREATE2_PREFIX, senderBytes, create2Salt, bytecodeHash, constructorInputHash])
   );
 
-  return ethers.utils.hexDataSlice(data, 12);
+  return ethers.dataSlice(data, 12);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -145,7 +145,7 @@ export function print(name: string, data: any) {
 }
 
 export function getLowerCaseAddress(address: string) {
-  return ethers.utils.getAddress(address).toLowerCase();
+  return ethers.getAddress(address).toLowerCase();
 }
 
 export function permissionToCallComparator(first: PermissionToCall, second: PermissionToCall) {

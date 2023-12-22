@@ -1,7 +1,6 @@
 import * as hardhat from "hardhat";
 import { expect } from "chai";
-import type { VerifierTest, VerifierRecursiveTest } from "../../typechain";
-import { VerifierTestFactory } from "../../typechain";
+import { VerifierTest, VerifierRecursiveTest, VerifierTest__factory} from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
 import { ethers } from "hardhat";
 
@@ -64,7 +63,7 @@ describe("Verifier test", function () {
   before(async function () {
     const verifierFactory = await hardhat.ethers.getContractFactory("VerifierTest");
     const verifierContract = await verifierFactory.deploy();
-    verifier = VerifierTestFactory.connect(verifierContract.address, verifierContract.signer);
+    verifier = VerifierTest__factory.connect(verifierContract.address, verifierContract.runner);
   });
 
   it("Should verify proof", async () => {
@@ -85,9 +84,7 @@ describe("Verifier test", function () {
     it("Public input with dirty bits over Fr mask", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Fill dirty bits
-      validProof.publicInputs[0] = ethers.BigNumber.from(validProof.publicInputs[0])
-        .add("0xe000000000000000000000000000000000000000000000000000000000000000")
-        .toHexString();
+      validProof.publicInputs[0] = ethers.toBeHex(BigInt(validProof.publicInputs[0])+ BigInt("0xe000000000000000000000000000000000000000000000000000000000000000"))
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -99,8 +96,8 @@ describe("Verifier test", function () {
     it("Elliptic curve points over modulo", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Add modulo to points
-      validProof.serializedProof[0] = ethers.BigNumber.from(validProof.serializedProof[0]).add(Q_MOD);
-      validProof.serializedProof[1] = ethers.BigNumber.from(validProof.serializedProof[1]).add(Q_MOD).add(Q_MOD);
+      validProof.serializedProof[0] = BigInt(validProof.serializedProof[0])+Q_MOD;
+      validProof.serializedProof[1] = BigInt(validProof.serializedProof[1])+Q_MOD +Q_MOD;
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -112,7 +109,7 @@ describe("Verifier test", function () {
     it("Fr over modulo", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Add modulo to number
-      validProof.serializedProof[22] = ethers.BigNumber.from(validProof.serializedProof[22]).add(R_MOD);
+      validProof.serializedProof[22] = BigInt(validProof.serializedProof[22])+ R_MOD;
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -170,8 +167,8 @@ describe("Verifier test", function () {
     it("Elliptic curve point at infinity", async () => {
       const invalidProof = JSON.parse(JSON.stringify(PROOF));
       // Change first point to point at infinity (encode as (0, 0) on EVM)
-      invalidProof.serializedProof[0] = ethers.constants.HashZero;
-      invalidProof.serializedProof[1] = ethers.constants.HashZero;
+      invalidProof.serializedProof[0] = ethers.ZeroHash;
+      invalidProof.serializedProof[1] = ethers.ZeroHash;
       const revertReason = await getCallRevertReason(
         verifier.verify(invalidProof.publicInputs, invalidProof.serializedProof, invalidProof.recursiveAggregationInput)
       );
@@ -181,7 +178,7 @@ describe("Verifier test", function () {
 
   it("Should failed with invalid public input", async () => {
     const revertReason = await getCallRevertReason(
-      verifier.verify([ethers.constants.HashZero], PROOF.serializedProof, PROOF.recursiveAggregationInput)
+      verifier.verify([ethers.ZeroHash], PROOF.serializedProof, PROOF.recursiveAggregationInput)
     );
     expect(revertReason).equal("invalid quotient evaluation");
   });
@@ -256,7 +253,7 @@ describe("Verifier with recursive part test", function () {
   before(async function () {
     const verifierFactory = await hardhat.ethers.getContractFactory("VerifierRecursiveTest");
     const verifierContract = await verifierFactory.deploy();
-    verifier = VerifierTestFactory.connect(verifierContract.address, verifierContract.signer);
+    verifier = VerifierTest__factory.connect(verifierContract.address, verifierContract.signer);
   });
 
   it("Should verify proof", async () => {
@@ -277,9 +274,8 @@ describe("Verifier with recursive part test", function () {
     it("Public input with dirty bits over Fr mask", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Fill dirty bits
-      validProof.publicInputs[0] = ethers.BigNumber.from(validProof.publicInputs[0])
-        .add("0xe000000000000000000000000000000000000000000000000000000000000000")
-        .toHexString();
+      validProof.publicInputs[0] = ethers.toBeHex(BigInt(validProof.publicInputs[0])
+        + BigInt("0xe000000000000000000000000000000000000000000000000000000000000000"))
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -291,8 +287,8 @@ describe("Verifier with recursive part test", function () {
     it("Elliptic curve points over modulo", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Add modulo to points
-      validProof.serializedProof[0] = ethers.BigNumber.from(validProof.serializedProof[0]).add(Q_MOD);
-      validProof.serializedProof[1] = ethers.BigNumber.from(validProof.serializedProof[1]).add(Q_MOD).add(Q_MOD);
+      validProof.serializedProof[0] = BigInt(validProof.serializedProof[0])+Q_MOD;
+      validProof.serializedProof[1] = BigInt(validProof.serializedProof[1])+Q_MOD+Q_MOD;
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -304,7 +300,7 @@ describe("Verifier with recursive part test", function () {
     it("Fr over modulo", async () => {
       const validProof = JSON.parse(JSON.stringify(PROOF));
       // Add modulo to number
-      validProof.serializedProof[22] = ethers.BigNumber.from(validProof.serializedProof[22]).add(R_MOD);
+      validProof.serializedProof[22] = BigInt(validProof.serializedProof[22])+R_MOD;
       const result = await verifier.verify(
         validProof.publicInputs,
         validProof.serializedProof,
@@ -367,8 +363,8 @@ describe("Verifier with recursive part test", function () {
     it("Elliptic curve point at infinity", async () => {
       const invalidProof = JSON.parse(JSON.stringify(PROOF));
       // Change first point to point at infinity (encode as (0, 0) on EVM)
-      invalidProof.serializedProof[0] = ethers.constants.HashZero;
-      invalidProof.serializedProof[1] = ethers.constants.HashZero;
+      invalidProof.serializedProof[0] = ethers.ZeroHash;
+      invalidProof.serializedProof[1] = ethers.ZeroHash;
       const revertReason = await getCallRevertReason(
         verifier.verify(invalidProof.publicInputs, invalidProof.serializedProof, invalidProof.recursiveAggregationInput)
       );
@@ -378,7 +374,7 @@ describe("Verifier with recursive part test", function () {
 
   it("Should failed with invalid public input", async () => {
     const revertReason = await getCallRevertReason(
-      verifier.verify([ethers.constants.HashZero], PROOF.serializedProof, PROOF.recursiveAggregationInput)
+      verifier.verify([ethers.ZeroHash], PROOF.serializedProof, PROOF.recursiveAggregationInput)
     );
     expect(revertReason).equal("invalid quotient evaluation");
   });

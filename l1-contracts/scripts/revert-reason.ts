@@ -1,6 +1,5 @@
 import * as chalk from "chalk";
-import { ethers } from "ethers";
-import { Interface } from "ethers/lib/utils";
+import { ethers, Interface } from "ethers";
 import * as hardhat from "hardhat";
 import { web3Url } from "./utils";
 
@@ -34,7 +33,7 @@ async function reason() {
   console.log("tx hash:", hash);
   console.log("provider:", web3);
 
-  const provider = new ethers.providers.JsonRpcProvider(web3);
+  const provider = new ethers.JsonRpcProvider(web3);
 
   const tx = await provider.getTransaction(hash);
   tx.gasPrice = null;
@@ -68,8 +67,8 @@ async function reason() {
       console.log("Gas used: ", receipt.gasUsed.toString());
 
       // If more than 90% of gas was used, report it as an error.
-      const threshold = gasLimit.mul(90).div(100);
-      if (gasUsed.gte(threshold)) {
+      const threshold = (gasLimit * 90n) / 100n;
+      if (gasUsed < threshold) {
         const error = chalk.bold.red;
         console.log(error("More than 90% of gas limit was used!"));
         console.log(error("It may be the reason of the transaction failure"));
@@ -79,7 +78,7 @@ async function reason() {
     if (receipt.status) {
       console.log("tx success");
     } else {
-      const code = await provider.call(tx, tx.blockNumber);
+      const code = await provider.call(tx);
       const reason = hex_to_ascii(code.substr(138));
       console.log("revert reason:", reason);
       console.log("revert code", code);

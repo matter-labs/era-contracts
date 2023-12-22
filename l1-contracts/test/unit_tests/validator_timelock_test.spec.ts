@@ -1,8 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
-import type { DummyExecutor, ValidatorTimelock } from "../../typechain";
-import { DummyExecutorFactory, ValidatorTimelockFactory } from "../../typechain";
+import { DummyExecutor, ValidatorTimelock, ValidatorTimelock__factory, DummyExecutor__factory } from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
 
 describe("ValidatorTimelock tests", function () {
@@ -22,11 +21,11 @@ describe("ValidatorTimelock tests", function () {
       batchNumber,
       timestamp,
       indexRepeatedStorageChanges: 0,
-      newStateRoot: ethers.constants.HashZero,
+      newStateRoot: ethers.ZeroHash,
       numberOfLayer1Txs: 0,
-      priorityOperationsHash: ethers.constants.HashZero,
-      bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-      eventsQueueStateHash: ethers.utils.randomBytes(32),
+      priorityOperationsHash: ethers.ZeroHash,
+      bootloaderHeapInitialContentsHash: ethers.randomBytes(32),
+      eventsQueueStateHash: ethers.randomBytes(32),
       systemLogs: [],
       totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
@@ -35,13 +34,13 @@ describe("ValidatorTimelock tests", function () {
   function getMockStoredBatchInfo(batchNumber: number, timestamp: number = 0) {
     return {
       batchNumber,
-      batchHash: ethers.constants.HashZero,
+      batchHash: ethers.ZeroHash,
       indexRepeatedStorageChanges: 0,
       numberOfLayer1Txs: 0,
-      priorityOperationsHash: ethers.constants.HashZero,
-      l2LogsTreeRoot: ethers.constants.HashZero,
+      priorityOperationsHash: ethers.ZeroHash,
+      l2LogsTreeRoot: ethers.ZeroHash,
       timestamp,
-      commitment: ethers.constants.HashZero,
+      commitment: ethers.ZeroHash,
     };
   }
 
@@ -50,16 +49,16 @@ describe("ValidatorTimelock tests", function () {
 
     const dummyExecutorFactory = await hardhat.ethers.getContractFactory("DummyExecutor");
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
-    dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
+    dummyExecutor = DummyExecutor__factory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
     const validatorTimelockContract = await validatorTimelockFactory.deploy(
       await owner.getAddress(),
       dummyExecutor.address,
       0,
-      ethers.constants.AddressZero
+      ethers.ZeroAddress
     );
-    validatorTimelock = ValidatorTimelockFactory.connect(
+    validatorTimelock = ValidatorTimelock__factory.connect(
       validatorTimelockContract.address,
       validatorTimelockContract.signer
     );

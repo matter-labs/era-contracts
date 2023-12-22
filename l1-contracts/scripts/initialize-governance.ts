@@ -1,7 +1,6 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { ethers, formatUnits, parseUnits, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider } from "./utils";
 
 import * as fs from "fs";
@@ -23,13 +22,12 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
@@ -65,8 +63,8 @@ async function main() {
 
       const operation = {
         calls: [call],
-        predecessor: ethers.constants.HashZero,
-        salt: ethers.constants.HashZero,
+        predecessor: ethers.ZeroHash,
+        salt: ethers.ZeroHash,
       };
 
       await (await governance.scheduleTransparent(operation, 0)).wait();

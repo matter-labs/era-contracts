@@ -1,6 +1,5 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { ethers, formatUnits, parseUnits, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import {
   applyL1ToL2Alias,
@@ -34,7 +33,7 @@ function readBytecode(path: string, fileName: string) {
 
 function readInterface(path: string, fileName: string) {
   const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
-  return new ethers.utils.Interface(abi);
+  return new ethers.Interface(abi);
 }
 
 const L2_ERC20_BRIDGE_PROXY_BYTECODE = readBytecode(
@@ -64,16 +63,15 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/0").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getNonce();
       console.log(`Using nonce: ${nonce}`);
 
       const deployer = new Deployer({
@@ -89,15 +87,15 @@ async function main() {
       const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
       const l1GovernorAddress = await zkSync.getGovernor();
       // Check whether governor is a smart contract on L1 to apply alias if needed.
-      const l1GovernorCodeSize = ethers.utils.hexDataLength(await deployWallet.provider.getCode(l1GovernorAddress));
+      const l1GovernorCodeSize = ethers.dataLength(await deployWallet.provider.getCode(l1GovernorAddress));
       const l2GovernorAddress = l1GovernorCodeSize == 0 ? l1GovernorAddress : applyL1ToL2Alias(l1GovernorAddress);
-      const abiCoder = new ethers.utils.AbiCoder();
+      const abiCoder = new ethers.AbiCoder();
 
       const l2ERC20BridgeImplAddr = computeL2Create2Address(
         applyL1ToL2Alias(erc20Bridge.address),
         L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
         "0x",
-        ethers.constants.HashZero
+        ethers.ZeroHash
       );
 
       const proxyInitializationParams = L2_ERC20_BRIDGE_INTERFACE.encodeFunctionData("initialize", [
@@ -108,26 +106,26 @@ async function main() {
       const l2ERC20BridgeProxyAddr = computeL2Create2Address(
         applyL1ToL2Alias(erc20Bridge.address),
         L2_ERC20_BRIDGE_PROXY_BYTECODE,
-        ethers.utils.arrayify(
+        ethers.toBeArray(
           abiCoder.encode(
             ["address", "address", "bytes"],
             [l2ERC20BridgeImplAddr, l2GovernorAddress, proxyInitializationParams]
           )
         ),
-        ethers.constants.HashZero
+        ethers.ZeroHash
       );
 
       const l2StandardToken = computeL2Create2Address(
         l2ERC20BridgeProxyAddr,
         L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
         "0x",
-        ethers.constants.HashZero
+        ethers.ZeroHash
       );
       const l2TokenFactoryAddr = computeL2Create2Address(
         l2ERC20BridgeProxyAddr,
         L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
-        ethers.utils.arrayify(abiCoder.encode(["address"], [l2StandardToken])),
-        ethers.constants.HashZero
+        ethers.toBeArray(abiCoder.encode(["address"], [l2StandardToken])),
+        ethers.ZeroHash
       );
 
       // There will be two deployments done during the initial initialization
@@ -145,7 +143,7 @@ async function main() {
 
       const independentInitialization = [
         zkSync.requestL2Transaction(
-          ethers.constants.AddressZero,
+          ethers.ZeroAddress,
           0,
           "0x",
           priorityTxMaxGasLimit,

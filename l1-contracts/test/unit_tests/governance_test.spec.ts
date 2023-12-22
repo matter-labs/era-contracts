@@ -1,12 +1,12 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import type { AdminFacetTest } from "../../typechain";
-import { AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
+import type { AdminFacetTest } from "../../typechain-types";
+import { AdminFacetTest__factory, Governance__factory } from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
 
 function randomAddress() {
-  return ethers.utils.hexlify(ethers.utils.randomBytes(20));
+  return ethers.hexlify(ethers.randomBytes(20));
 }
 
 describe("Admin facet tests", function () {
@@ -16,10 +16,10 @@ describe("Admin facet tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("AdminFacetTest");
     const contract = await contractFactory.deploy();
-    adminFacetTest = AdminFacetTestFactory.connect(contract.address, contract.signer);
+    adminFacetTest = AdminFacetTest__factory.connect(contract.address, contract.signer);
 
     const governanceContract = await contractFactory.deploy();
-    const governance = GovernanceFactory.connect(governanceContract.address, governanceContract.signer);
+    const governance = Governance__factory.connect(governanceContract.address, governanceContract.signer);
     await adminFacetTest.setPendingGovernor(governance.address);
 
     randomSigner = (await hardhat.ethers.getSigners())[1];

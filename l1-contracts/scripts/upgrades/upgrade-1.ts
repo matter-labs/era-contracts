@@ -1,8 +1,8 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { deployedAddressesFromEnv } from "../src.ts/deploy";
-import { getNumberFromEnv } from "./utils";
-import { diamondCut } from "../src.ts/diamondCut";
+import { deployedAddressesFromEnv } from "../../src.ts/deploy";
+import { getNumberFromEnv } from "../utils";
+import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 
@@ -14,7 +14,7 @@ type DeploymentPram = {
 };
 
 const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-const ZERO_ADDRESS = ethers.constants.AddressZero;
+const ZERO_ADDRESS = ethers.ZeroAddress;
 
 async function main() {
   const program = new Command();

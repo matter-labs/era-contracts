@@ -250,7 +250,7 @@ async function main() {
       const providerL2 = new Provider(l2Rpc);
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey)
-        : Wallet.fromMnemonic(process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic, "m/44'/60'/0'/0/1");
+        : Wallet.fromPhrase(process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic, "m/44'/60'/0'/0/1");
       wallet.connect(providerL2);
       wallet.connectToL1(providerL1);
 

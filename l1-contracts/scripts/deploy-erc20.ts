@@ -1,8 +1,7 @@
 import * as hardhat from "hardhat";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { Command } from "commander";
-import { Wallet } from "ethers";
-import { parseEther } from "ethers/lib/utils";
+import { Contract, HDNodeWallet, parseEther, Wallet } from "ethers";
 import { web3Provider } from "./utils";
 import * as fs from "fs";
 import * as path from "path";
@@ -25,18 +24,18 @@ type TokenDescription = Token & {
   implementation?: string;
 };
 
-async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Token> {
+async function deployToken(token: TokenDescription, wallet: Wallet | HDNodeWallet): Promise<Token> {
   token.implementation = token.implementation || DEFAULT_ERC20;
   const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
   const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
-  const erc20 = await tokenFactory.deploy(...args, { gasLimit: 5000000 });
-  await erc20.deployTransaction.wait();
+  const erc20 = await tokenFactory.deploy(...args, { gasLimit: 5000000 }) as Contract;
+  await erc20.waitForDeployment();
 
   if (token.implementation !== "WETH9") {
     await erc20.mint(wallet.address, parseEther("3000000000"));
   }
   for (let i = 0; i < 10; ++i) {
-    const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
+    const testWallet = Wallet.fromPhrase(ethTestConfig.test_mnemonic as string).derivePath("m/44'/60'/0'/0/" + i).connect(
       provider
     );
     if (token.implementation !== "WETH9") {
@@ -44,7 +43,7 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
     }
   }
 
-  token.address = erc20.address;
+  token.address = await erc20.getAddress();
 
   // Remove the unneeded field
   if (token.implementation) {
@@ -77,7 +76,7 @@ async function main() {
 
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+        : Wallet.fromPhrase(ethTestConfig.mnemonic).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
       console.log(JSON.stringify(await deployToken(token, wallet), null, 2));
     });
@@ -92,7 +91,7 @@ async function main() {
 
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+        : Wallet.fromPhrase(ethTestConfig.mnemonic).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
       for (const token of tokens) {
         result.push(await deployToken(token, wallet));

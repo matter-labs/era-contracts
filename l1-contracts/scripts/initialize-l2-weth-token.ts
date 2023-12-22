@@ -1,6 +1,5 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { ethers, formatUnits, parseUnits, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, web3Provider } from "./utils";
 
@@ -21,7 +20,7 @@ const openzeppelinTransparentProxyArtifactsPath = path.join(
 function readInterface(path: string, fileName: string, solFileName?: string) {
   solFileName ??= fileName;
   const abi = JSON.parse(fs.readFileSync(`${path}/${solFileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
-  return new ethers.utils.Interface(abi);
+  return new ethers.Interface(abi);
 }
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
@@ -42,7 +41,7 @@ async function getL1TxInfo(
   to: string,
   l2Calldata: string,
   refundRecipient: string,
-  gasPrice: ethers.BigNumber
+  gasPrice: bigint
 ) {
   const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
@@ -92,13 +91,12 @@ async function main() {
 
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const deployer = new Deployer({
@@ -111,7 +109,7 @@ async function main() {
         deployer,
         l2WethTokenProxyAddress,
         l2Calldata,
-        ethers.constants.AddressZero,
+        ethers.ZeroAddress,
         gasPrice
       );
       console.log(JSON.stringify(l1TxInfo, null, 4));
@@ -131,16 +129,15 @@ async function main() {
 
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getNonce();
       console.log(`Using deployer nonce: ${nonce}`);
 
       const deployer = new Deployer({

@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { ethers } from "hardhat";
-import type { PriorityQueueTest } from "../../typechain";
-import { PriorityQueueTestFactory } from "../../typechain";
+import type { PriorityQueueTest } from "../../typechain-types";
+import { PriorityQueueTest__factory } from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
 
 describe("Priority queue tests", function () {
@@ -12,7 +12,7 @@ describe("Priority queue tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("PriorityQueueTest");
     const contract = await contractFactory.deploy();
-    priorityQueueTest = PriorityQueueTestFactory.connect(contract.address, contract.signer);
+    priorityQueueTest = PriorityQueueTest__factory.connect(contract.address, contract.signer);
   });
 
   describe("on empty queue", function () {
@@ -52,7 +52,7 @@ describe("Priority queue tests", function () {
 
     before(async () => {
       for (let i = 0; i < NUMBER_OPERATIONS; ++i) {
-        const dummyOp = { canonicalTxHash: ethers.constants.HashZero, expirationTimestamp: i, layer2Tip: i };
+        const dummyOp = { canonicalTxHash: ethers.ZeroHash, expirationTimestamp: i, layer2Tip: i };
         queue.push(dummyOp);
         await priorityQueueTest.pushBack(dummyOp);
       }

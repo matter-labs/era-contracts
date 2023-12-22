@@ -1,16 +1,16 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain";
+import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain-types";
 import {
-  DiamondInitFactory,
-  AllowListFactory,
-  ExecutorFacetFactory,
-  GettersFacetFactory,
-  AdminFacetFactory,
-  DefaultUpgradeFactory,
-  CustomUpgradeTestFactory,
-} from "../../typechain";
+  DiamondInit__factory,
+  AllowList__factory,
+  ExecutorFacet__factory,
+  GettersFacet__factory,
+  AdminFacet__factory,
+  DefaultUpgrade__factory,
+  CustomUpgradeTest__factory,
+} from "../../typechain-types";
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
   getCallRevertReason,
@@ -26,7 +26,7 @@ import {
 } from "./utils";
 import * as ethers from "ethers";
 import type { BigNumberish, BytesLike } from "ethers";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -51,42 +51,42 @@ describe("L2 upgrade test", function () {
 
     const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
     const executorContract = await executorFactory.deploy();
-    const executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
+    const executorFacet = ExecutorFacet__factory.connect(executorContract.address, executorContract.signer);
 
     const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+    const gettersFacet = GettersFacet__factory.connect(gettersContract.address, gettersContract.signer);
 
     const adminFacetFactory = await hardhat.ethers.getContractFactory("AdminFacet");
     const adminFacetContract = await adminFacetFactory.deploy();
-    const adminFacet = AdminFacetFactory.connect(adminFacetContract.address, adminFacetContract.signer);
+    const adminFacet = AdminFacet__factory.connect(adminFacetContract.address, adminFacetContract.signer);
 
     const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
     const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
+    allowList = AllowList__factory.connect(allowListContract.address, allowListContract.signer);
 
     // Note, that while this testsuit is focused on testing MailboxFaucet only,
     // we still need to initialize its storage via DiamondProxy
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
-    verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    verifier = ethers.hexlify(ethers.randomBytes(20));
     verifierParams = {
-      recursionCircuitsSetVksHash: ethers.constants.HashZero,
-      recursionLeafLevelVkHash: ethers.constants.HashZero,
-      recursionNodeLevelVkHash: ethers.constants.HashZero,
+      recursionCircuitsSetVksHash: ethers.ZeroHash,
+      recursionLeafLevelVkHash: ethers.ZeroHash,
+      recursionNodeLevelVkHash: ethers.ZeroHash,
     };
     const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
       {
         verifier,
         governor: await owner.getAddress(),
         admin: await owner.getAddress(),
-        genesisBatchHash: ethers.constants.HashZero,
+        genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
+        genesisBatchCommitment: ethers.ZeroHash,
         allowList: allowList.address,
         verifierParams,
         zkPorterIsAvailable: false,
@@ -114,9 +114,9 @@ describe("L2 upgrade test", function () {
 
     await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
 
-    proxyExecutor = ExecutorFacetFactory.connect(diamondProxyContract.address, owner);
-    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, owner);
-    proxyAdmin = AdminFacetFactory.connect(diamondProxyContract.address, owner);
+    proxyExecutor = ExecutorFacet__factory.connect(diamondProxyContract.address, owner);
+    proxyGetters = GettersFacet__factory.connect(diamondProxyContract.address, owner);
+    proxyAdmin = AdminFacet__factory.connect(diamondProxyContract.address, owner);
 
     await (await proxyAdmin.setValidator(await owner.getAddress(), true)).wait();
   });
@@ -130,7 +130,7 @@ describe("L2 upgrade test", function () {
     const commitment = commitReceipt.events[0].args.commitment;
 
     expect(await proxyGetters.getProtocolVersion()).to.equal(0);
-    expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.constants.HashZero);
+    expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.ZeroHash);
 
     await (
       await executeUpgrade(proxyGetters, proxyAdmin, {
@@ -150,14 +150,14 @@ describe("L2 upgrade test", function () {
     // Upgrade was scheduled for now should work fine
     const timeNow = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
     await executeUpgrade(proxyGetters, proxyAdmin, {
-      upgradeTimestamp: ethers.BigNumber.from(timeNow),
+      upgradeTimestamp: BigInt(timeNow),
       l2ProtocolUpgradeTx: noopUpgradeTransaction,
     });
 
     // Upgrade that was scheduled for the future should not work now
     const revertReason = await getCallRevertReason(
       executeUpgrade(proxyGetters, proxyAdmin, {
-        upgradeTimestamp: ethers.BigNumber.from(timeNow).mul(2),
+        upgradeTimestamp: BigInt(timeNow) * 2n,
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     );
@@ -275,8 +275,8 @@ describe("L2 upgrade test", function () {
   });
 
   it("Should validate factory deps", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-    const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+    const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
+    const wrongFactoryDepHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [wrongFactoryDepHash],
       nonce: 3,
@@ -294,7 +294,7 @@ describe("L2 upgrade test", function () {
   });
 
   it("Should validate factory deps length match", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+    const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [],
       nonce: 3,
@@ -312,8 +312,8 @@ describe("L2 upgrade test", function () {
   });
 
   it("Should validate factory deps length isnt too large", async () => {
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-    const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
+    const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
+    const randomDepHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
 
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: Array(33).fill(randomDepHash),
@@ -333,16 +333,16 @@ describe("L2 upgrade test", function () {
 
   let l2UpgradeTxHash: string;
   it("Should successfully perform an upgrade", async () => {
-    const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const newVerifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const bootloaderHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
+    const defaultAccountHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
+    const newVerifier = ethers.hexlify(ethers.randomBytes(20));
     const newerVerifierParams = buildVerifierParams({
-      recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+      recursionNodeLevelVkHash: ethers.hexlify(ethers.randomBytes(32)),
+      recursionLeafLevelVkHash: ethers.hexlify(ethers.randomBytes(32)),
+      recursionCircuitsSetVksHash: ethers.hexlify(ethers.randomBytes(32)),
     });
 
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+    const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
@@ -398,9 +398,9 @@ describe("L2 upgrade test", function () {
     expect(upgradeEvents[1].args.newVerifier.toLowerCase()).to.eq(newVerifier.toLowerCase());
 
     expect(upgradeEvents[2].name).to.eq("NewVerifierParams");
-    expect(upgradeEvents[2].args.oldVerifierParams[0]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[1]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[2]).to.eq(ethers.constants.HashZero);
+    expect(upgradeEvents[2].args.oldVerifierParams[0]).to.eq(ethers.ZeroHash);
+    expect(upgradeEvents[2].args.oldVerifierParams[1]).to.eq(ethers.ZeroHash);
+    expect(upgradeEvents[2].args.oldVerifierParams[2]).to.eq(ethers.ZeroHash);
     expect(upgradeEvents[2].args.newVerifierParams[0]).to.eq(newerVerifierParams.recursionNodeLevelVkHash);
     expect(upgradeEvents[2].args.newVerifierParams[1]).to.eq(newerVerifierParams.recursionLeafLevelVkHash);
     expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
@@ -419,16 +419,16 @@ describe("L2 upgrade test", function () {
   });
 
   it("Should fail to upgrade when there is already a pending upgrade", async () => {
-    const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const bootloaderHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
+    const defaultAccountHash = ethers.hexlify(hashBytecode(ethers.randomBytes(32)));
+    const verifier = ethers.hexlify(ethers.randomBytes(20));
     const verifierParams = buildVerifierParams({
-      recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-      recursionCircuitsSetVksHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
+      recursionNodeLevelVkHash: ethers.hexlify(ethers.randomBytes(32)),
+      recursionLeafLevelVkHash: ethers.hexlify(ethers.randomBytes(32)),
+      recursionCircuitsSetVksHash: ethers.hexlify(ethers.randomBytes(32)),
     });
 
-    const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+    const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
@@ -490,7 +490,7 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch2InfoNoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -514,14 +514,14 @@ describe("L2 upgrade test", function () {
         true,
         L2_BOOTLOADER_ADDRESS,
         SYSTEM_LOG_KEYS.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
-        ethers.constants.HashZero
+        ethers.ZeroHash
       )
     );
     systemLogs[SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY] = constructL2Log(
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -554,7 +554,7 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -587,7 +587,7 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -624,7 +624,7 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -678,7 +678,7 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.hexlify(storedBatch1Info.batchHash)
     );
 
     const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
@@ -722,13 +722,13 @@ async function buildCommitBatchInfo(
   return {
     timestamp,
     indexRepeatedStorageChanges: 0,
-    newStateRoot: ethers.utils.randomBytes(32),
+    newStateRoot: ethers.randomBytes(32),
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
-    systemLogs: ethers.utils.hexConcat(systemLogs),
-    totalL2ToL1Pubdata: ethers.constants.HashZero,
-    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    systemLogs: ethers.concat(systemLogs),
+    totalL2ToL1Pubdata: ethers.ZeroHash,
+    bootloaderHeapInitialContentsHash: ethers.randomBytes(32),
+    eventsQueueStateHash: ethers.randomBytes(32),
     ...info,
   };
 }
@@ -749,13 +749,13 @@ async function buildCommitBatchInfoWithCustomLogs(
   return {
     timestamp,
     indexRepeatedStorageChanges: 0,
-    newStateRoot: ethers.utils.randomBytes(32),
+    newStateRoot: ethers.randomBytes(32),
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
-    systemLogs: ethers.utils.hexConcat(systemLogs),
-    totalL2ToL1Pubdata: ethers.constants.HashZero,
-    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    systemLogs: ethers.concat(systemLogs),
+    totalL2ToL1Pubdata: ethers.ZeroHash,
+    bootloaderHeapInitialContentsHash: ethers.randomBytes(32),
+    eventsQueueStateHash: ethers.randomBytes(32),
     ...info,
   };
 }
@@ -767,7 +767,7 @@ function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): St
     indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
     numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
     priorityOperationsHash: commitInfo.priorityOperationsHash,
-    l2LogsTreeRoot: ethers.constants.HashZero,
+    l2LogsTreeRoot: ethers.ZeroHash,
     timestamp: commitInfo.timestamp,
     commitment: commitment,
   };
@@ -795,7 +795,7 @@ interface L2CanonicalTransaction {
   reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
   data: BytesLike;
   signature: BytesLike;
-  factoryDeps: BigNumberish[];
+  factoryDeps: Uint8Array;
   paymasterInput: BytesLike;
   // Reserved dynamic type for the future use-case. Using it should be avoided,
   // But it is still here, just in case we want to enable some additional functionality.
@@ -805,8 +805,8 @@ interface L2CanonicalTransaction {
 function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
   return {
     txType: SYSTEM_UPGRADE_TX_TYPE,
-    from: ethers.constants.AddressZero,
-    to: ethers.constants.AddressZero,
+    from: ethers.ZeroAddress,
+    to: ethers.ZeroAddress,
     gasLimit: 5000000,
     gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
     maxFeePerGas: 0,
@@ -817,7 +817,7 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
     reserved: [0, 0, 0, 0],
     data: "0x",
     signature: "0x",
-    factoryDeps: [],
+    factoryDeps: new Uint8Array(),
     paymasterInput: "0x",
     reservedDynamic: "0x",
     ...tx,
@@ -832,9 +832,9 @@ interface VerifierParams {
 
 function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
   return {
-    recursionNodeLevelVkHash: ethers.constants.HashZero,
-    recursionLeafLevelVkHash: ethers.constants.HashZero,
-    recursionCircuitsSetVksHash: ethers.constants.HashZero,
+    recursionNodeLevelVkHash: ethers.ZeroHash,
+    recursionLeafLevelVkHash: ethers.ZeroHash,
+    recursionCircuitsSetVksHash: ethers.ZeroHash,
     ...params,
   };
 }
@@ -850,7 +850,7 @@ interface ProposedUpgrade {
   verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;
   postUpgradeCalldata: BytesLike;
-  upgradeTimestamp: ethers.BigNumber;
+  upgradeTimestamp: bigint;
   newProtocolVersion: BigNumberish;
   newAllowList: string;
 }
@@ -862,16 +862,16 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
   return {
     l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
     executeUpgradeTx: false,
-    bootloaderHash: ethers.constants.HashZero,
-    defaultAccountHash: ethers.constants.HashZero,
-    verifier: ethers.constants.AddressZero,
+    bootloaderHash: ethers.ZeroHash,
+    defaultAccountHash: ethers.ZeroHash,
+    verifier: ethers.ZeroAddress,
     verifierParams: buildVerifierParams({}),
     l1ContractsUpgradeCalldata: "0x",
     postUpgradeCalldata: "0x",
-    upgradeTimestamp: ethers.constants.Zero,
+    upgradeTimestamp: 0n,
     factoryDeps: [],
     newProtocolVersion,
-    newAllowList: ethers.constants.AddressZero,
+    newAllowList: ethers.ZeroAddress,
     ...proposedUpgrade,
   };
 }
@@ -893,7 +893,7 @@ async function executeUpgrade(
     : await hardhat.ethers.getContractFactory("DefaultUpgrade");
 
   const defaultUpgrade = await defaultUpgradeFactory.deploy();
-  const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
+  const diamondUpgradeInit = DefaultUpgrade__factory.connect(defaultUpgrade.address, defaultUpgrade.signer);
 
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
@@ -920,7 +920,7 @@ async function executeCustomUpgrade(
     : await hardhat.ethers.getContractFactory("CustomUpgradeTest");
 
   const customUpgrade = await upgradeFactory.deploy();
-  const diamondUpgradeInit = CustomUpgradeTestFactory.connect(customUpgrade.address, customUpgrade.signer);
+  const diamondUpgradeInit = CustomUpgradeTest__factory.connect(customUpgrade.address, customUpgrade.signer);
 
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 

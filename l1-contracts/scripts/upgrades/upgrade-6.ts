@@ -1,14 +1,14 @@
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
-import type { BigNumberish } from "ethers";
+import { BigNumberish, EventLog } from "ethers";
 import { ethers } from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
-import "@nomiclabs/hardhat-ethers";
+import { Provider, Wallet } from "zksync-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
 import * as fs from "fs";
 import * as path from "path";
-import { applyL1ToL2Alias, hashBytecode } from "zksync-web3/build/src/utils";
+import { applyL1ToL2Alias, hashBytecode } from "zksync-ethers/build/src/utils";
 
 type ForceDeployment = {
   bytecodeHash: string;
@@ -55,7 +55,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
-const ZERO_ADDRESS = ethers.constants.AddressZero;
+const ZERO_ADDRESS = ethers.ZeroAddress;
 
 async function getCalldata(
   diamondUpgradeAddress: string,
@@ -64,19 +64,19 @@ async function getCalldata(
   l2WethTokenImplAddress: string
 ) {
   // Generate wallet with random private key to load main contract governor.
-  const randomWallet = new Wallet(ethers.utils.randomBytes(32), zksProvider, provider);
+  const randomWallet = new Wallet(ethers.randomBytes(32).toString(), zksProvider, provider);
   let governor = await (await randomWallet.getMainContract()).getGovernor();
   // Apply L1 to L2 mask if needed.
-  if (ethers.utils.hexDataLength(await provider.getCode(governor)) != 0) {
+  if (ethers.dataLength(await provider.getCode(governor)) != 0) {
     governor = applyL1ToL2Alias(governor);
   }
 
   // This is TransparentUpgradeable proxy
-  const constructorInput = ethers.utils.defaultAbiCoder.encode(
+  const constructorInput = ethers.AbiCoder.defaultAbiCoder().encode(
     ["address", "address", "bytes"],
     [l2WethTokenImplAddress, governor, "0x"]
   );
-  const bytecodeHash = ethers.utils.hexlify(hashBytecode(await zksProvider.getCode(l2WethTokenProxyAddress)));
+  const bytecodeHash = ethers.hexlify(hashBytecode(await zksProvider.getCode(l2WethTokenProxyAddress)));
 
   const l2WethUpgrade: ForceDeployment = {
     newAddress: l2WethTokenProxyAddress,
@@ -131,14 +131,13 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new ethers.Wallet(cmd.privateKey, provider)
-        : ethers.Wallet.fromMnemonic(
+        : ethers.Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
       const zkSyncContract = deployer.zkSyncContract(deployWallet);
@@ -164,11 +163,11 @@ async function main() {
       const proposeUpgradeTx = await zkSyncContract.proposeTransparentUpgrade(upgradeParam, proposalId);
       await proposeUpgradeTx.wait();
 
-      const executeUpgradeTx = await zkSyncContract.executeUpgrade(upgradeParam, ethers.constants.HashZero);
+      const executeUpgradeTx = await zkSyncContract.executeUpgrade(upgradeParam, ethers.ZeroHash);
       const executeUpgradeRec = await executeUpgradeTx.wait();
-      const deployL2TxHashes = executeUpgradeRec.events
-        .filter((event) => event.event === "NewPriorityRequest")
-        .map((event) => event.args[1]);
+      const deployL2TxHashes = executeUpgradeRec.logs
+        .filter((event) => event instanceof EventLog ?  event.eventName === "NewPriorityRequest" : false)
+        .map((event) => event instanceof EventLog ? event.args[1] : null);
       for (const txHash of deployL2TxHashes) {
         console.log(txHash);
         let receipt = null;

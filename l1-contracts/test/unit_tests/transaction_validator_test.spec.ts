@@ -1,16 +1,15 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { TransactionValidatorTest } from "../../typechain";
-import { TransactionValidatorTestFactory } from "../../typechain";
+import type { TransactionValidatorTest } from "../../typechain-types";
+import { TransactionValidatorTest__factory } from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
-import * as ethers from "ethers";
 
 describe("TransactionValidator tests", function () {
   let tester: TransactionValidatorTest;
   before(async () => {
     const testerFactory = await hardhat.ethers.getContractFactory("TransactionValidatorTest");
     const testerContract = await testerFactory.deploy();
-    tester = TransactionValidatorTestFactory.connect(testerContract.address, testerContract.signer);
+    tester = TransactionValidatorTest__factory.connect(testerContract.address, testerContract.signer);
   });
 
   describe("validateL1ToL2Transaction", function () {
@@ -69,7 +68,7 @@ describe("TransactionValidator tests", function () {
       const result = await getCallRevertReason(
         tester.validateUpgradeTransaction(
           createTestTransaction({
-            from: ethers.BigNumber.from(2).pow(16),
+            from: 2n^16n,
           })
         )
       );
@@ -80,7 +79,7 @@ describe("TransactionValidator tests", function () {
       const result = await getCallRevertReason(
         tester.validateUpgradeTransaction(
           createTestTransaction({
-            to: ethers.BigNumber.from(2).pow(161),
+            to: 2n^161n,
           })
         )
       );
@@ -124,7 +123,7 @@ describe("TransactionValidator tests", function () {
       const result = await getCallRevertReason(
         tester.validateUpgradeTransaction(
           createTestTransaction({
-            reserved: [0, ethers.BigNumber.from(2).pow(161), 0, 0],
+            reserved: [0, 2n^161n, 0, 0],
           })
         )
       );
@@ -192,7 +191,7 @@ function createTestTransaction(overrides) {
   return Object.assign(
     {
       txType: 0,
-      from: ethers.BigNumber.from(2).pow(16).sub(1),
+      from: 2n^16n -1n,
       to: 0,
       gasLimit: 500000,
       gasPerPubdataByteLimit: 800,
