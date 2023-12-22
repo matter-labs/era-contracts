@@ -2,6 +2,7 @@ import * as hardhat from "hardhat";
 import { expect } from "chai";
 import type { ExecutorProvingTest } from "../../typechain-types";
 import { ExecutorProvingTest__factory } from "../../typechain-types";
+import { ethers } from "hardhat";
 
 describe("Executor test", function () {
   let executor: ExecutorProvingTest;
@@ -9,7 +10,7 @@ describe("Executor test", function () {
   before(async function () {
     const factory = await hardhat.ethers.getContractFactory("ExecutorProvingTest");
     const executorContract = await factory.deploy();
-    executor = ExecutorProvingTest__factory.connect(executorContract.address, executorContract.signer);
+    executor = ExecutorProvingTest__factory.connect(await executorContract.getAddress(), executorContract.runner);
   });
 
   /// This test is based on a block generated in a local system.
@@ -60,6 +61,6 @@ describe("Executor test", function () {
       // ignored.
       recursionCircuitsSetVksHash: "0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac",
     });
-    expect(result.toHexString(), "").to.be.equal("0xa37cc4d4684f5f0ddafc193a2ab9e364c1a8ebb2b30594c1f1e7dc08");
+    expect(ethers.toBeHex(result), "").to.be.equal("0xa37cc4d4684f5f0ddafc193a2ab9e364c1a8ebb2b30594c1f1e7dc08");
   });
 });

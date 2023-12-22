@@ -73,10 +73,10 @@ async function main() {
 
     console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
     const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", wallet);
-    const erc20 = await tokenFactory.deploy(...constructorArgs);
+    const erc20 = await tokenFactory.deploy(constructorArgs[0], constructorArgs[1], constructorArgs[2], constructorArgs[3]);
 
     const testnetToken = token;
-    testnetToken.address = erc20.address;
+    testnetToken.address = await erc20.getAddress();
     result.push(testnetToken);
   }
 

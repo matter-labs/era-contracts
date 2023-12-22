@@ -2,7 +2,10 @@
   "compilerOptions": {
     "types": ["node", "mocha"],
     "downlevelIteration": true,
-    "target": "ES2021",
-    "module": "commonjs"
+    "lib": [
+      "es2020", "esnext"
+    ],
+    "module": "commonjs",
+    "target": "es2020",
   }
 }

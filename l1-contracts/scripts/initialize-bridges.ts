@@ -12,6 +12,7 @@ import {
 
 import * as fs from "fs";
 import * as path from "path";
+import { L1ERC20Bridge } from "../typechain-types";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -81,7 +82,7 @@ async function main() {
 
       const zkSync = deployer.zkSyncContract(deployWallet);
       const erc20Bridge = cmd.erc20Bridge
-        ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge)
+        ? deployer.defaultERC20Bridge(deployWallet).attach(cmd.erc20Bridge) as L1ERC20Bridge
         : deployer.defaultERC20Bridge(deployWallet);
 
       const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
@@ -92,19 +93,19 @@ async function main() {
       const abiCoder = new ethers.AbiCoder();
 
       const l2ERC20BridgeImplAddr = computeL2Create2Address(
-        applyL1ToL2Alias(erc20Bridge.address),
+        applyL1ToL2Alias(await erc20Bridge.getAddress()),
         L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
         "0x",
         ethers.ZeroHash
       );
 
       const proxyInitializationParams = L2_ERC20_BRIDGE_INTERFACE.encodeFunctionData("initialize", [
-        erc20Bridge.address,
+        await erc20Bridge.getAddress(),
         hashL2Bytecode(L2_STANDARD_ERC20_PROXY_BYTECODE),
         l2GovernorAddress,
       ]);
       const l2ERC20BridgeProxyAddr = computeL2Create2Address(
-        applyL1ToL2Alias(erc20Bridge.address),
+        applyL1ToL2Alias(await erc20Bridge.getAddress()),
         L2_ERC20_BRIDGE_PROXY_BYTECODE,
         ethers.toBeArray(
           abiCoder.encode(
@@ -161,7 +162,7 @@ async function main() {
           {
             gasPrice,
             nonce: nonce + 1,
-            value: requiredValueToInitializeBridge.mul(2),
+            value: requiredValueToInitializeBridge * 2n,
           }
         ),
       ];

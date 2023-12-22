@@ -32,7 +32,7 @@ export async function create2DeployFromL1(
   const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  const gasPrice = await zkSync.provider.getGasPrice();
+  const gasPrice = (await zkSync.runner.provider.getFeeData()).gasPrice;
   const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
   await zkSync.requestL2Transaction(
@@ -62,19 +62,19 @@ describe("WETH Bridge tests", () => {
 
     const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacet__factory.connect(gettersContract.address, gettersContract.signer);
+    const gettersFacet = GettersFacet__factory.connect(await gettersContract.getAddress(), gettersContract.runner);
 
     const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailboxFactory.deploy();
-    const mailboxFacet = MailboxFacet__factory.connect(mailboxContract.address, mailboxContract.signer);
+    const mailboxFacet = MailboxFacet__factory.connect(await mailboxContract.getAddress(), mailboxContract.runner);
 
     const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowList__factory.connect(allowListContract.address, allowListContract.signer);
+    const allowListContract = await allowListFactory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
@@ -87,7 +87,7 @@ describe("WETH Bridge tests", () => {
         genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.ZeroHash,
-        allowList: allowList.address,
+        allowList: await allowList.getAddress(),
         verifierParams: {
           recursionCircuitsSetVksHash: ethers.ZeroHash,
           recursionLeafLevelVkHash: ethers.ZeroHash,
@@ -102,25 +102,25 @@ describe("WETH Bridge tests", () => {
     ]);
 
     const facetCuts = [
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true),
+      facetCut(await gettersFacet.getAddress(), gettersFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, true),
     ];
 
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
     const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
-    l1Weth = WETH9__factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
+    l1Weth = WETH9__factory.connect(await (await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).getAddress(), owner);
 
     // prepare the bridge
 
     const bridge = await (
       await hardhat.ethers.getContractFactory("L1WethBridge")
-    ).deploy(l1Weth.address, diamondProxyContract.address, allowListContract.address);
+    ).deploy(l1Weth.getAddress(), await  diamondProxyContract.getAddress(), await allowListContract.getAddress());
 
     // we don't test L2, so it is ok to give garbage factory deps and L2 address
     const garbageBytecode = "0x1111111111111111111111111111111111111111111111111111111111111111";
@@ -135,7 +135,7 @@ describe("WETH Bridge tests", () => {
     ]);
     const _bridgeProxy = await (
       await hardhat.ethers.getContractFactory("ERC1967Proxy")
-    ).deploy(bridge.address, bridgeInitData, { value: ethers.WeiPerEther*2n });
+    ).deploy(bridge.getAddress(), bridgeInitData, { value: ethers.WeiPerEther*2n });
 
     bridgeProxy = L1WethBridge__factory.connect(await _bridgeProxy.getAddress(), _bridgeProxy.runner);
   });
@@ -150,7 +150,7 @@ describe("WETH Bridge tests", () => {
     expect(revertReason).equal("nr");
 
     // This is only so the following tests don't need whitelisting
-    await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(bridgeProxy.getAddress(), AccessMode.Public)).wait();
   });
 
   it("Should not allow depositing zero WETH", async () => {
@@ -172,12 +172,12 @@ describe("WETH Bridge tests", () => {
 
   it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
-    await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
+    await (await l1Weth.connect(randomSigner).approve(bridgeProxy.getAddress(), 100)).wait();
     await bridgeProxy
       .connect(randomSigner)
       .deposit(
         await randomSigner.getAddress(),
-        l1Weth.address,
+        l1Weth.getAddress(),
         100,
         1000000,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -219,7 +219,7 @@ describe("WETH Bridge tests", () => {
           0,
           ethers.concat([
             functionSignature,
-            bridgeProxy.address,
+            await bridgeProxy.getAddress(),
             ethers.randomBytes(32),
             ethers.randomBytes(40),
           ]),

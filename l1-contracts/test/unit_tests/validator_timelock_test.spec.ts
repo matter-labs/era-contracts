@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
 import { DummyExecutor, ValidatorTimelock, ValidatorTimelock__factory, DummyExecutor__factory } from "../../typechain-types";
-import { getCallRevertReason } from "./utils";
+import { CommitBatchInfo, getCallRevertReason, StoredBatchInfo } from "./utils";
 
 describe("ValidatorTimelock tests", function () {
   let owner: ethers.Signer;
@@ -16,7 +16,7 @@ describe("ValidatorTimelock tests", function () {
     serializedProof: [],
   };
 
-  function getMockCommitBatchInfo(batchNumber: number, timestamp: number = 0) {
+  function getMockCommitBatchInfo(batchNumber: number, timestamp: number = 0): CommitBatchInfo {
     return {
       batchNumber,
       timestamp,
@@ -26,12 +26,12 @@ describe("ValidatorTimelock tests", function () {
       priorityOperationsHash: ethers.ZeroHash,
       bootloaderHeapInitialContentsHash: ethers.randomBytes(32),
       eventsQueueStateHash: ethers.randomBytes(32),
-      systemLogs: [],
+      systemLogs: new Uint8Array(0),
       totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
   }
 
-  function getMockStoredBatchInfo(batchNumber: number, timestamp: number = 0) {
+  function getMockStoredBatchInfo(batchNumber: number, timestamp: number = 0): StoredBatchInfo {
     return {
       batchNumber,
       batchHash: ethers.ZeroHash,
@@ -49,18 +49,18 @@ describe("ValidatorTimelock tests", function () {
 
     const dummyExecutorFactory = await hardhat.ethers.getContractFactory("DummyExecutor");
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
-    dummyExecutor = DummyExecutor__factory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
+    dummyExecutor = DummyExecutor__factory.connect(await dummyExecutorContract.getAddress(), dummyExecutorContract.runner);
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
     const validatorTimelockContract = await validatorTimelockFactory.deploy(
       await owner.getAddress(),
-      dummyExecutor.address,
+      await dummyExecutor.getAddress(),
       0,
       ethers.ZeroAddress
     );
     validatorTimelock = ValidatorTimelock__factory.connect(
-      validatorTimelockContract.address,
-      validatorTimelockContract.signer
+      await validatorTimelockContract.getAddress(),
+      validatorTimelockContract.runner
     );
   });
 

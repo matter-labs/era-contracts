@@ -44,7 +44,7 @@ async function main() {
       const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", deployWallet);
       const erc20 = await tokenFactory.deploy("Matter Labs Trial Token", "MLTT", 18, { gasLimit: 5000000 });
 
-      console.log(`CONTRACTS_TEST_ERC20=${erc20.address}`);
+      console.log(`CONTRACTS_TEST_ERC20=${await erc20.getAddress()}`);
 
       const failOnReceiveFactory = await hardhat.ethers.getContractFactory("FailOnReceive", deployWallet);
       const failOnReceive = await failOnReceiveFactory.deploy({

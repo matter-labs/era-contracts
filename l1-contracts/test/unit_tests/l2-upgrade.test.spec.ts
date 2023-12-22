@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain-types";
+import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet, DiamondProxy } from "../../typechain-types";
 import {
   DiamondInit__factory,
   AllowList__factory,
@@ -25,7 +25,7 @@ import {
   packBatchTimestampAndBatchTimestamp,
 } from "./utils";
 import * as ethers from "ethers";
-import type { BigNumberish, BytesLike } from "ethers";
+import type { BigNumberish, BytesLike, EventLog } from "ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
@@ -36,7 +36,7 @@ describe("L2 upgrade test", function () {
   let proxyGetters: GettersFacet;
 
   let allowList: AllowList;
-  let diamondProxyContract: ethers.Contract;
+  let diamondProxyContract: DiamondProxy;
   let owner: ethers.Signer;
 
   let batch1Info: CommitBatchInfo;
@@ -51,25 +51,25 @@ describe("L2 upgrade test", function () {
 
     const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
     const executorContract = await executorFactory.deploy();
-    const executorFacet = ExecutorFacet__factory.connect(executorContract.address, executorContract.signer);
+    const executorFacet = ExecutorFacet__factory.connect(await executorContract.getAddress(), executorContract.runner);
 
     const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacet__factory.connect(gettersContract.address, gettersContract.signer);
+    const gettersFacet = GettersFacet__factory.connect(await gettersContract.getAddress(), gettersContract.runner);
 
     const adminFacetFactory = await hardhat.ethers.getContractFactory("AdminFacet");
     const adminFacetContract = await adminFacetFactory.deploy();
-    const adminFacet = AdminFacet__factory.connect(adminFacetContract.address, adminFacetContract.signer);
+    const adminFacet = AdminFacet__factory.connect(await adminFacetContract.getAddress(), adminFacetContract.runner);
 
     const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowList__factory.connect(allowListContract.address, allowListContract.signer);
+    const allowListContract = await allowListFactory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     // Note, that while this testsuit is focused on testing MailboxFaucet only,
     // we still need to initialize its storage via DiamondProxy
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
@@ -87,7 +87,7 @@ describe("L2 upgrade test", function () {
         genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.ZeroHash,
-        allowList: allowList.address,
+        allowList: allowList.getAddress(),
         verifierParams,
         zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: dummyHash,
@@ -100,23 +100,23 @@ describe("L2 upgrade test", function () {
     const facetCuts = [
       // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
       // That means if the admin will be freezable, the proxy can NEVER be unfrozen.
-      facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
+      facetCut(await adminFacet.getAddress(), adminFacet.interface, Action.Add, false),
       // Should be unfreezable. There are getters, that users can expect to be available.
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
+      facetCut(await gettersFacet.getAddress(), gettersFacet.interface, Action.Add, false),
+      facetCut(await executorFacet.getAddress(), executorFacet.interface, Action.Add, true),
     ];
 
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
     const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
-    proxyExecutor = ExecutorFacet__factory.connect(diamondProxyContract.address, owner);
-    proxyGetters = GettersFacet__factory.connect(diamondProxyContract.address, owner);
-    proxyAdmin = AdminFacet__factory.connect(diamondProxyContract.address, owner);
+    proxyExecutor = ExecutorFacet__factory.connect(await diamondProxyContract.getAddress(), owner);
+    proxyGetters = GettersFacet__factory.connect(await diamondProxyContract.getAddress(), owner);
+    proxyAdmin = AdminFacet__factory.connect(await diamondProxyContract.getAddress(), owner);
 
     await (await proxyAdmin.setValidator(await owner.getAddress(), true)).wait();
   });
@@ -127,7 +127,7 @@ describe("L2 upgrade test", function () {
     });
 
     const commitReceipt = await (await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1Info])).wait();
-    const commitment = commitReceipt.events[0].args.commitment;
+    const commitment = (commitReceipt.logs[0] as EventLog).args.commitment;
 
     expect(await proxyGetters.getProtocolVersion()).to.equal(0);
     expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.ZeroHash);
@@ -345,7 +345,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
-      factoryDeps: [myFactoryDepHash],
+      factoryDeps: [ethers.toNumber(myFactoryDepHash)],
       nonce: 4,
     });
 
@@ -366,7 +366,7 @@ describe("L2 upgrade test", function () {
     const upgradeEvents = upgradeReceipt.logs.map((log) => {
       // Not all events can be parsed there, but we don't care about them
       try {
-        const event = defaultUpgradeFactory.interface.parseLog(log);
+        const event = defaultUpgradeFactory.interface.parseLog(log.toJSON());
         const parsedArgs = event.args;
         return {
           name: event.name,
@@ -431,7 +431,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDep = ethers.hexlify(ethers.randomBytes(32));
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
-      factoryDeps: [myFactoryDepHash],
+      factoryDeps: [ethers.toNumber(myFactoryDepHash)],
       nonce: 4,
     });
 
@@ -602,7 +602,7 @@ describe("L2 upgrade test", function () {
     const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])).wait();
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(2);
-    const commitment = commitReceipt.events[0].args.commitment;
+    const commitment = (commitReceipt.logs[0] as EventLog).args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch2InfoTwoUpgradeTx, commitment);
     await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
 
@@ -637,7 +637,7 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])).wait();
-    const commitment = commitReceipt.events[0].args.commitment;
+    const commitment = (commitReceipt.logs[0] as EventLog).args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
@@ -691,7 +691,7 @@ describe("L2 upgrade test", function () {
     );
 
     const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])).wait();
-    const commitment = commitReceipt.events[0].args.commitment;
+    const commitment = (commitReceipt.logs[0] as EventLog).args.commitment;
     const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
 
     await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
@@ -795,7 +795,7 @@ interface L2CanonicalTransaction {
   reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
   data: BytesLike;
   signature: BytesLike;
-  factoryDeps: Uint8Array;
+  factoryDeps: BigNumberish[];
   paymasterInput: BytesLike;
   // Reserved dynamic type for the future use-case. Using it should be avoided,
   // But it is still here, just in case we want to enable some additional functionality.
@@ -817,7 +817,7 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
     reserved: [0, 0, 0, 0],
     data: "0x",
     signature: "0x",
-    factoryDeps: new Uint8Array(),
+    factoryDeps: [],
     paymasterInput: "0x",
     reservedDynamic: "0x",
     ...tx,
@@ -839,7 +839,7 @@ function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
   };
 }
 
-interface ProposedUpgrade {
+interface ProposedUpgradeStruct {
   // The tx for the upgrade call to the l2 system upgrade contract
   l2ProtocolUpgradeTx: L2CanonicalTransaction;
   factoryDeps: BytesLike[];
@@ -855,9 +855,9 @@ interface ProposedUpgrade {
   newAllowList: string;
 }
 
-type PartialProposedUpgrade = Partial<ProposedUpgrade>;
+type PartialProposedUpgrade = Partial<ProposedUpgradeStruct>;
 
-function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedUpgrade {
+function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedUpgradeStruct {
   const newProtocolVersion = proposedUpgrade.newProtocolVersion || 0;
   return {
     l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
@@ -879,11 +879,11 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 async function executeUpgrade(
   proxyGetters: GettersFacet,
   proxyAdmin: AdminFacet,
-  partialUpgrade: Partial<ProposedUpgrade>,
+  partialUpgrade: Partial<ProposedUpgradeStruct>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
   if (partialUpgrade.newProtocolVersion == null) {
-    const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
+    const newVersion = (await proxyGetters.getProtocolVersion()) + 1n;
     partialUpgrade.newProtocolVersion = newVersion;
   }
   const upgrade = buildProposeUpgrade(partialUpgrade);
@@ -893,11 +893,11 @@ async function executeUpgrade(
     : await hardhat.ethers.getContractFactory("DefaultUpgrade");
 
   const defaultUpgrade = await defaultUpgradeFactory.deploy();
-  const diamondUpgradeInit = DefaultUpgrade__factory.connect(defaultUpgrade.address, defaultUpgrade.signer);
+  const diamondUpgradeInit = DefaultUpgrade__factory.connect(await defaultUpgrade.getAddress(), defaultUpgrade.runner);
 
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
-  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const diamondCutData = diamondCut([], await diamondUpgradeInit.getAddress(), upgradeCalldata);
 
   // This promise will be handled in the tests
   return proxyAdmin.executeUpgrade(diamondCutData);
@@ -906,11 +906,11 @@ async function executeUpgrade(
 async function executeCustomUpgrade(
   proxyGetters: GettersFacet,
   proxyAdmin: AdminFacet,
-  partialUpgrade: Partial<ProposedUpgrade>,
+  partialUpgrade: Partial<ProposedUpgradeStruct>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
   if (partialUpgrade.newProtocolVersion == null) {
-    const newVersion = (await proxyGetters.getProtocolVersion()).add(1);
+    const newVersion = (await proxyGetters.getProtocolVersion()) + 1n;
     partialUpgrade.newProtocolVersion = newVersion;
   }
   const upgrade = buildProposeUpgrade(partialUpgrade);
@@ -920,11 +920,11 @@ async function executeCustomUpgrade(
     : await hardhat.ethers.getContractFactory("CustomUpgradeTest");
 
   const customUpgrade = await upgradeFactory.deploy();
-  const diamondUpgradeInit = CustomUpgradeTest__factory.connect(customUpgrade.address, customUpgrade.signer);
+  const diamondUpgradeInit = CustomUpgradeTest__factory.connect(await customUpgrade.getAddress(), customUpgrade.runner);
 
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
-  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const diamondCutData = diamondCut([], await diamondUpgradeInit.getAddress(), upgradeCalldata);
 
   // This promise will be handled in the tests
   return proxyAdmin.executeUpgrade(diamondCutData);

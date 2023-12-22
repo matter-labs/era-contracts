@@ -35,7 +35,10 @@ async function reason() {
 
   const provider = new ethers.JsonRpcProvider(web3);
 
-  const tx = await provider.getTransaction(hash);
+  const tx_const = await provider.getTransaction(hash);
+  let tx = {
+    ...tx_const
+  };
   tx.gasPrice = null;
   if (!tx) {
     console.log("tx not found");
@@ -88,7 +91,7 @@ async function reason() {
       console.log(log);
       try {
         const parsedLog = interfaces
-          .map((contractInterface) => contractInterface.parseLog(log))
+          .map((contractInterface) => contractInterface.parseLog(log.toJSON()))
           .find((log) => log != null);
 
         if (parsedLog) {

@@ -50,11 +50,11 @@ describe("Diamond proxy upgrade fork test", function () {
 
     const executorFacetFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
     const executorFacet = await executorFacetFactory.deploy();
-    newExecutorFacet = IExecutor__factory.connect(executorFacet.address, executorFacet.signer);
+    newExecutorFacet = IExecutor__factory.connect(await executorFacet.getAddress(), executorFacet.runner);
 
     const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersFacet = await gettersFacetFactory.deploy();
-    newGettersFacet = IGetters__factory.connect(gettersFacet.address, gettersFacet.signer);
+    newGettersFacet = IGetters__factory.connect(await gettersFacet.getAddress(), gettersFacet.runner);
 
     const governanceFacetFactory = await hardhat.ethers.getContractFactory("GovernanceFacet");
     const governanceFacet = await governanceFacetFactory.deploy();
@@ -62,7 +62,7 @@ describe("Diamond proxy upgrade fork test", function () {
 
     const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxFacet = await mailboxFacetFactory.deploy();
-    newMailboxFacet = IMailbox__factory.connect(mailboxFacet.address, mailboxFacet.signer);
+    newMailboxFacet = IMailbox__factory.connect(await mailboxFacet.getAddress(), mailboxFacet.runner);
 
     // If the upgrade is already running, then cancel it to start upgrading over.
     const currentUpgradeStatus = await diamondProxy.getUpgradeProposalState();
@@ -74,11 +74,11 @@ describe("Diamond proxy upgrade fork test", function () {
     // Prepare diamond cut for upgrade
     let facetCuts;
     {
-      const getters = await hardhat.ethers.getContractAt("GettersFacet", newGettersFacet.address);
-      const diamondCutFacet = await hardhat.ethers.getContractAt("DiamondCutFacet", newDiamondCutFacet.address);
-      const executor = await hardhat.ethers.getContractAt("ExecutorFacet", newExecutorFacet.address);
-      const governance = await hardhat.ethers.getContractAt("GovernanceFacet", newGovernanceFacet.address);
-      const mailbox = await hardhat.ethers.getContractAt("MailboxFacet", newMailboxFacet.address);
+      const getters = await hardhat.ethers.getContractAt("GettersFacet",await newGettersFacet.getAddress());
+      const diamondCutFacet = await hardhat.ethers.getContractAt("DiamondCutFacet",await  newDiamondCutFacet.getAddress());
+      const executor = await hardhat.ethers.getContractAt("ExecutorFacet",await  newExecutorFacet.getAddress());
+      const governance = await hardhat.ethers.getContractAt("GovernanceFacet", await newGovernanceFacet.getAddress());
+      const mailbox = await hardhat.ethers.getContractAt("MailboxFacet", await newMailboxFacet.getAddress());
 
       const oldFacets = await diamondProxy.facets();
       const selectorsToRemove = [];
@@ -96,9 +96,9 @@ describe("Diamond proxy upgrade fork test", function () {
         },
         // Add new facets
         facetCut(await diamondCutFacet.getAddress(), diamondCutFacet.interface, Action.Add, false),
-        facetCut(getters.address, getters.interface, Action.Add, false),
-        facetCut(mailbox.address, mailbox.interface, Action.Add, true),
-        facetCut(executor.address, executor.interface, Action.Add, true),
+        facetCut(await getters.getAddress(), getters.interface, Action.Add, false),
+        facetCut(await mailbox.getAddress(), mailbox.interface, Action.Add, true),
+        facetCut(await executor.getAddress(), executor.interface, Action.Add, true),
         facetCut(await governance.getAddress(), governance.interface, Action.Add, true),
       ];
     }
@@ -158,19 +158,19 @@ describe("Diamond proxy upgrade fork test", function () {
     const isFrozen = await diamondProxy.isDiamondStorageFrozen();
     expect(isFrozen).to.be.eq(false);
 
-    const getters = await hardhat.ethers.getContractAt("GettersFacet", newGettersFacet.address);
-    const diamondCutFacet = await hardhat.ethers.getContractAt("DiamondCutFacet", newDiamondCutFacet.address);
-    const executor = await hardhat.ethers.getContractAt("ExecutorFacet", newExecutorFacet.address);
-    const governance = await hardhat.ethers.getContractAt("GovernanceFacet", newGovernanceFacet.address);
-    const mailbox = await hardhat.ethers.getContractAt("MailboxFacet", newMailboxFacet.address);
+    const getters = await hardhat.ethers.getContractAt("GettersFacet",await newGettersFacet.getAddress());
+    const diamondCutFacet = await hardhat.ethers.getContractAt("DiamondCutFacet",await newDiamondCutFacet.getAddress());
+    const executor = await hardhat.ethers.getContractAt("ExecutorFacet",await newExecutorFacet.getAddress());
+    const governance = await hardhat.ethers.getContractAt("GovernanceFacet",await newGovernanceFacet.getAddress());
+    const mailbox = await hardhat.ethers.getContractAt("MailboxFacet",await newMailboxFacet.getAddress());
 
     const facets = [...(await await diamondProxy.facets())].sort();
     const expectedFacets = [
-      [newDiamondCutFacet.address, getAllSelectors(diamondCutFacet.interface)],
-      [newExecutorFacet.address, getAllSelectors(executor.interface)],
-      [newGettersFacet.address, getAllSelectors(getters.interface)],
-      [newGovernanceFacet.address, getAllSelectors(governance.interface)],
-      [newMailboxFacet.address, getAllSelectors(mailbox.interface)],
+      [await newDiamondCutFacet.getAddress(), getAllSelectors(diamondCutFacet.interface)],
+      [await newExecutorFacet.getAddress(), getAllSelectors(executor.interface)],
+      [await newGettersFacet.getAddress(), getAllSelectors(getters.interface)],
+      [await newGovernanceFacet.getAddress(), getAllSelectors(governance.interface)],
+      [await newMailboxFacet.getAddress(), getAllSelectors(mailbox.interface)],
     ].sort();
     expect(expectedFacets).to.be.eql(facets);
   });

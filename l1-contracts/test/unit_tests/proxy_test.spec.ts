@@ -37,31 +37,31 @@ describe("Diamond proxy tests", function () {
 
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
+    diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const adminFactory = await hardhat.ethers.getContractFactory("AdminFacet");
     const adminContract = await adminFactory.deploy();
-    adminFacet = AdminFacet__factory.connect(adminContract.address, adminContract.signer);
+    adminFacet = AdminFacet__factory.connect(await adminContract.getAddress(), adminContract.runner);
 
     const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersFacetContract = await gettersFacetFactory.deploy();
-    gettersFacet = GettersFacet__factory.connect(gettersFacetContract.address, gettersFacetContract.signer);
+    gettersFacet = GettersFacet__factory.connect(await gettersFacetContract.getAddress(), gettersFacetContract.runner);
 
     const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxFacetContract = await mailboxFacetFactory.deploy();
-    mailboxFacet = MailboxFacet__factory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
+    mailboxFacet = MailboxFacet__factory.connect(await mailboxFacetContract.getAddress(), mailboxFacetContract.runner);
 
     const diamondProxyTestFactory = await hardhat.ethers.getContractFactory("DiamondProxyTest");
     const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
     diamondProxyTest = DiamondProxyTest__factory.connect(
-      diamondProxyTestContract.address,
-      diamondProxyTestContract.signer
+      await diamondProxyTestContract.getAddress(),
+      diamondProxyTestContract.runner
     );
 
     const facetCuts = [
-      facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true),
+      facetCut(await adminFacet.getAddress(), adminFacet.interface, Action.Add, false),
+      facetCut(await gettersFacet.getAddress(), gettersFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, true),
     ];
 
     const dummyVerifierParams = {
@@ -87,22 +87,22 @@ describe("Diamond proxy tests", function () {
       },
     ]);
 
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitCalldata);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitCalldata);
 
     const proxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     const proxyContract = await proxyFactory.deploy(chainId, diamondCutData);
-    proxy = DiamondProxy__factory.connect(proxyContract.address, proxyContract.signer);
+    proxy = DiamondProxy__factory.connect(await proxyContract.getAddress(), proxyContract.runner);
   });
 
   it("check added selectors", async () => {
-    const proxyAsGettersFacet = GettersFacet__factory.connect(proxy.address, proxy.signer);
+    const proxyAsGettersFacet = GettersFacet__factory.connect(await proxy.getAddress(), proxy.runner);
 
     const dummyFacetSelectors = getAllSelectors(gettersFacet.interface);
     for (const selector of dummyFacetSelectors) {
       const addr = await proxyAsGettersFacet.facetAddress(selector);
       const isFreezable = await proxyAsGettersFacet.isFunctionFreezable(selector);
-      expect(addr).equal(gettersFacet.address);
+      expect(addr).equal(gettersFacet.getAddress());
       expect(isFreezable).equal(false);
     }
 
@@ -110,15 +110,15 @@ describe("Diamond proxy tests", function () {
     for (const selector of diamondCutSelectors) {
       const addr = await proxyAsGettersFacet.facetAddress(selector);
       const isFreezable = await proxyAsGettersFacet.isFunctionFreezable(selector);
-      expect(addr).equal(adminFacet.address);
+      expect(addr).equal(adminFacet.getAddress());
       expect(isFreezable).equal(false);
     }
   });
 
   it("check that proxy reject non-added selector", async () => {
-    const proxyAsERC20 = TestnetERC20Token__factory.connect(proxy.address, proxy.signer);
+    const proxyAsERC20 = TestnetERC20Token__factory.connect(await proxy.getAddress(), proxy.runner);
 
-    const revertReason = await getCallRevertReason(proxyAsERC20.transfer(proxyAsERC20.address, 0));
+    const revertReason = await getCallRevertReason(proxyAsERC20.transfer(proxyAsERC20.getAddress(), 0));
     expect(revertReason).equal("F");
   });
 
@@ -130,10 +130,10 @@ describe("Diamond proxy tests", function () {
   });
 
   it("should freeze the diamond storage", async () => {
-    const proxyAsGettersFacet = GettersFacet__factory.connect(proxy.address, proxy.signer);
+    const proxyAsGettersFacet = GettersFacet__factory.connect(await proxy.getAddress(), proxy.runner);
 
     const diamondProxyTestCalldata = diamondProxyTest.interface.encodeFunctionData("setFreezability", [true]);
-    const diamondCutInitData = diamondCut([], diamondProxyTest.address, diamondProxyTestCalldata);
+    const diamondCutInitData = diamondCut([], await diamondProxyTest.getAddress(), diamondProxyTestCalldata);
 
     const adminFacetExecuteCalldata = adminFacet.interface.encodeFunctionData("executeUpgrade", [diamondCutInitData]);
     await proxy.fallback({ data: adminFacetExecuteCalldata });
@@ -144,7 +144,7 @@ describe("Diamond proxy tests", function () {
   it("should not revert on executing a proposal when diamondStorage is frozen", async () => {
     const facetCuts = [
       {
-        facet: adminFacet.address,
+        facet: await adminFacet.getAddress(),
         selectors: ["0x000000aa"],
         action: Action.Add,
         isFreezable: false,

@@ -5,7 +5,7 @@ import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src
 import type { IZkSync } from "zksync-ethers/build/typechain";
 import { IZkSync__factory } from "zksync-ethers/build/typechain";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
-import type { AllowList, TestnetERC20Token } from "../../typechain-types";
+import type { AllowList, L1ERC20Bridge, TestnetERC20Token } from "../../typechain-types";
 import {
   AllowList__factory,
   DiamondInit__factory,
@@ -23,8 +23,8 @@ describe("L1ERC20Bridge tests", function () {
   let allowList: AllowList;
   let l1ERC20Bridge: IL1Bridge;
   let erc20TestToken: TestnetERC20Token;
-  let testnetERC20TokenContract: ethers.Contract;
-  let l1Erc20BridgeContract: ethers.Contract;
+  let testnetERC20TokenContract: TestnetERC20Token;
+  let l1Erc20BridgeContract: L1ERC20Bridge;
   let zksyncContract: IZkSync;
 
   before(async () => {
@@ -32,19 +32,19 @@ describe("L1ERC20Bridge tests", function () {
 
     const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacet__factory.connect(gettersContract.address, gettersContract.signer);
+    const gettersFacet = GettersFacet__factory.connect(await gettersContract.getAddress(), gettersContract.runner);
 
     const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailboxFactory.deploy();
-    const mailboxFacet = MailboxFacet__factory.connect(mailboxContract.address, mailboxContract.signer);
+    const mailboxFacet = MailboxFacet__factory.connect(await mailboxContract.getAddress(), mailboxContract.runner);
 
     const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowList__factory.connect(allowListContract.address, allowListContract.signer);
+    const allowListContract = await allowListFactory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
@@ -57,7 +57,7 @@ describe("L1ERC20Bridge tests", function () {
         genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.ZeroHash,
-        allowList: allowList.address,
+        allowList: allowList.getAddress(),
         verifierParams: {
           recursionCircuitsSetVksHash: ethers.ZeroHash,
           recursionLeafLevelVkHash: ethers.ZeroHash,
@@ -72,36 +72,36 @@ describe("L1ERC20Bridge tests", function () {
     ]);
 
     const facetCuts = [
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true),
+      facetCut(await gettersFacet.getAddress(), gettersFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, true),
     ];
 
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
     const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
     const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
-    l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(diamondProxyContract.address, allowListContract.address);
-    l1ERC20Bridge = IL1Bridge__factory.connect(l1Erc20BridgeContract.address, l1Erc20BridgeContract.signer);
+    l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(diamondProxyContract.getAddress(),await allowListContract.getAddress());
+    l1ERC20Bridge = IL1Bridge__factory.connect(await l1Erc20BridgeContract.getAddress(), l1Erc20BridgeContract.runner);
 
     const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
     testnetERC20TokenContract = await testnetERC20TokenFactory.deploy("TestToken", "TT", 18);
     erc20TestToken = TestnetERC20Token__factory.connect(
-      testnetERC20TokenContract.address,
-      testnetERC20TokenContract.signer
+      await testnetERC20TokenContract.getAddress(),
+      testnetERC20TokenContract.runner
     );
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.parseUnits("10000", 18));
     await erc20TestToken
       .connect(randomSigner)
-      .approve(l1Erc20BridgeContract.address, ethers.parseUnits("10000", 18));
+      .approve(l1Erc20BridgeContract.getAddress(), ethers.parseUnits("10000", 18));
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
     // Exposing the methods of IZkSync to the diamond proxy
-    zksyncContract = IZkSync__factory.connect(diamondProxyContract.address, diamondProxyContract.provider);
+    zksyncContract = IZkSync__factory.connect(await diamondProxyContract.getAddress(), diamondProxyContract.runner);
   });
 
   it("Should not allow an un-whitelisted address to deposit", async () => {
@@ -110,7 +110,7 @@ describe("L1ERC20Bridge tests", function () {
         .connect(randomSigner)
         .deposit(
           await randomSigner.getAddress(),
-          testnetERC20TokenContract.address,
+          testnetERC20TokenContract.getAddress(),
           0,
           0,
           0,
@@ -119,7 +119,7 @@ describe("L1ERC20Bridge tests", function () {
     );
     expect(revertReason).equal("nr");
 
-    await (await allowList.setAccessMode(l1Erc20BridgeContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await l1Erc20BridgeContract.getAddress(), AccessMode.Public)).wait();
   });
 
   it("Should not allow depositing zero amount", async () => {
@@ -128,7 +128,7 @@ describe("L1ERC20Bridge tests", function () {
         .connect(randomSigner)
         .deposit(
           await randomSigner.getAddress(),
-          testnetERC20TokenContract.address,
+          await testnetERC20TokenContract.getAddress(),
           0,
           0,
           0,
@@ -221,7 +221,7 @@ async function depositERC20(
   l2GasLimit: number,
   l2RefundRecipient = ethers.ZeroAddress
 ) {
-  const gasPrice = await bridge.provider.getGasPrice();
+  const gasPrice = (await bridge.runner.provider.getFeeData()).gasPrice;
   const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
   const neededValue = await zksyncContract.l2TransactionBaseCost(gasPrice, l2GasLimit, gasPerPubdata);
 

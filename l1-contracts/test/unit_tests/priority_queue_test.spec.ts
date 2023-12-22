@@ -12,23 +12,23 @@ describe("Priority queue tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("PriorityQueueTest");
     const contract = await contractFactory.deploy();
-    priorityQueueTest = PriorityQueueTest__factory.connect(contract.address, contract.signer);
+    priorityQueueTest = PriorityQueueTest__factory.connect(await contract.getAddress(), contract.runner);
   });
 
   describe("on empty queue", function () {
     it("getSize", async () => {
       const size = await priorityQueueTest.getSize();
-      expect(size).equal(0);
+      expect(size).equal(0n);
     });
 
     it("getFirstUnprocessedPriorityTx", async () => {
       const firstUnprocessedTx = await priorityQueueTest.getFirstUnprocessedPriorityTx();
-      expect(firstUnprocessedTx).equal(0);
+      expect(firstUnprocessedTx).equal(0n);
     });
 
     it("getTotalPriorityTxs", async () => {
       const totalPriorityTxs = await priorityQueueTest.getTotalPriorityTxs();
-      expect(totalPriorityTxs).equal(0);
+      expect(totalPriorityTxs).equal(0n);
     });
 
     it("isEmpty", async () => {
@@ -73,7 +73,7 @@ describe("Priority queue tests", function () {
 
     it("getFirstUnprocessedPriorityTx", async () => {
       const firstUnprocessedTx = await priorityQueueTest.getFirstUnprocessedPriorityTx();
-      expect(firstUnprocessedTx).equal(0);
+      expect(firstUnprocessedTx).equal(0n);
     });
 
     it("getTotalPriorityTxs", async () => {

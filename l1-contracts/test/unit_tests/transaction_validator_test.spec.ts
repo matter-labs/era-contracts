@@ -9,7 +9,7 @@ describe("TransactionValidator tests", function () {
   before(async () => {
     const testerFactory = await hardhat.ethers.getContractFactory("TransactionValidatorTest");
     const testerContract = await testerFactory.deploy();
-    tester = TransactionValidatorTest__factory.connect(testerContract.address, testerContract.signer);
+    tester = TransactionValidatorTest__factory.connect(await testerContract.getAddress(), testerContract.runner);
   });
 
   describe("validateL1ToL2Transaction", function () {

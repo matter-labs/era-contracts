@@ -8,7 +8,7 @@
     "@matterlabs/hardhat-zksync-verify": "^1.2.1",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.2",
     "@nomicfoundation/hardhat-ethers": "^3.0.4",
-    "@nomicfoundation/hardhat-verify": "^3.0.5",
+    "@nomicfoundation/hardhat-verify": "^2.0.3",
     "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@nomiclabs/hardhat-solpp": "^2.0.0",
     "@openzeppelin/contracts": "4.6.0",

@@ -2,6 +2,7 @@ import type { BigNumberish, BytesLike } from "ethers";
 import { Overrides } from "ethers";
 import { ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/src/types";
+import { MailboxFacet } from "../../typechain-types";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
@@ -61,7 +62,7 @@ export async function getCallRevertReason(promise) {
 }
 
 export async function requestExecute(
-  mailbox: ethers.Contract,
+  mailbox: MailboxFacet,
   to: Address,
   l2Value: bigint,
   calldata: ethers.BytesLike,
@@ -79,7 +80,7 @@ export async function requestExecute(
       l2GasLimit,
       REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     );
-    overrides.value = baseCost.add(l2Value);
+    overrides.value = baseCost + l2Value;
   }
 
   return await mailbox.requestL2Transaction(

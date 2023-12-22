@@ -16,11 +16,11 @@ describe("Admin facet tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("AdminFacetTest");
     const contract = await contractFactory.deploy();
-    adminFacetTest = AdminFacetTest__factory.connect(contract.address, contract.signer);
+    adminFacetTest = AdminFacetTest__factory.connect(await contract.getAddress(), contract.runner);
 
     const governanceContract = await contractFactory.deploy();
-    const governance = Governance__factory.connect(governanceContract.address, governanceContract.signer);
-    await adminFacetTest.setPendingGovernor(governance.address);
+    const governance = Governance__factory.connect(await governanceContract.getAddress(), governanceContract.runner);
+    await adminFacetTest.setPendingGovernor(await governance.getAddress());
 
     randomSigner = (await hardhat.ethers.getSigners())[1];
   });

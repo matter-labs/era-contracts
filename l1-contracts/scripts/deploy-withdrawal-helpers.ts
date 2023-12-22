@@ -33,8 +33,8 @@ async function main() {
     });
 
     const outConfig = {
-      multicall_address: multicallContract.address,
-      revert_receive_address: revertReceiveAccount.address,
+      multicall_address: await multicallContract.getAddress(),
+      revert_receive_address: await revertReceiveAccount.getAddress(),
     };
     const outConfigPath = path.join(process.env.ZKSYNC_HOME, "etc/test_config/volatile/withdrawal-helpers.json");
     fs.writeFileSync(outConfigPath, JSON.stringify(outConfig), { encoding: "utf-8" });

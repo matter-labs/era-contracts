@@ -82,7 +82,7 @@ async function main() {
         requiredValueToInitializeBridge,
         {
           gasPrice,
-          value: requiredValueToInitializeBridge.mul(2),
+          value: requiredValueToInitializeBridge*2n,
         }
       );
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);

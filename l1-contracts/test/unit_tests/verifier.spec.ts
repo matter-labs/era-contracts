@@ -63,7 +63,7 @@ describe("Verifier test", function () {
   before(async function () {
     const verifierFactory = await hardhat.ethers.getContractFactory("VerifierTest");
     const verifierContract = await verifierFactory.deploy();
-    verifier = VerifierTest__factory.connect(verifierContract.address, verifierContract.runner);
+    verifier = VerifierTest__factory.connect(await verifierContract.getAddress(), verifierContract.runner);
   });
 
   it("Should verify proof", async () => {
@@ -253,7 +253,7 @@ describe("Verifier with recursive part test", function () {
   before(async function () {
     const verifierFactory = await hardhat.ethers.getContractFactory("VerifierRecursiveTest");
     const verifierContract = await verifierFactory.deploy();
-    verifier = VerifierTest__factory.connect(verifierContract.address, verifierContract.signer);
+    verifier = VerifierTest__factory.connect(await verifierContract.getAddress(), verifierContract.runner);
   });
 
   it("Should verify proof", async () => {

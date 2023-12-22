@@ -61,7 +61,7 @@ async function getL1TxInfo(
   );
 
   return {
-    to: zksync.address,
+    to: await zksync.getAddress(),
     data: l1Calldata,
     value: neededValue.toString(),
     gasPrice: gasPrice.toString(),

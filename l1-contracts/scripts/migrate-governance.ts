@@ -106,7 +106,7 @@ async function main() {
       ]);
       displayTx("zkSync Diamond Proxy migration calldata:", {
         data: zkSyncSetPendingGovernor,
-        to: zkSync.address,
+        to: await zkSync.getAddress(),
       });
 
       const allowListGovernorMigration = allowlist.interface.encodeFunctionData("transferOwnership", [
@@ -114,7 +114,7 @@ async function main() {
       ]);
       displayTx("AllowList migration calldata:", {
         data: allowListGovernorMigration,
-        to: allowlist.address,
+        to: await allowlist.getAddress(),
       });
 
       const validatorTimelockMigration = validatorTimelock.interface.encodeFunctionData("transferOwnership", [
@@ -122,7 +122,7 @@ async function main() {
       ]);
       displayTx("Validator timelock migration calldata:", {
         data: validatorTimelockMigration,
-        to: validatorTimelock.address,
+        to: await validatorTimelock.getAddress(),
       });
 
       // Below, we prepare the transactions to migrate the L2 contracts.
@@ -193,17 +193,17 @@ async function main() {
 
       const calls = [
         {
-          target: zkSync.address,
+          target: zkSync.getAddress(),
           value: 0,
           data: zkSync.interface.encodeFunctionData("acceptGovernor"),
         },
         {
-          target: allowlist.address,
+          target: allowlist.getAddress(),
           value: 0,
           data: allowlist.interface.encodeFunctionData("acceptOwnership"),
         },
         {
-          target: validatorTimelock.address,
+          target: validatorTimelock.getAddress(),
           value: 0,
           data: validatorTimelock.interface.encodeFunctionData("acceptOwnership"),
         },
@@ -223,13 +223,13 @@ async function main() {
       ]);
       displayTx("Schedule transparent calldata:\n", {
         data: scheduleTransparentCalldata,
-        to: governance.address,
+        to: await governance.getAddress(),
       });
 
       const executeCalldata = governance.interface.encodeFunctionData("execute", [operation]);
       displayTx("Execute calldata:\n", {
         data: executeCalldata,
-        to: governance.address,
+        to: await governance.getAddress(),
       });
     });
 

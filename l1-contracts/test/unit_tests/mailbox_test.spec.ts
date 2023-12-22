@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { MailboxFacet, MockExecutorFacet, AllowList, Forwarder } from "../../typechain-types";
+import type { MailboxFacet, MockExecutorFacet, AllowList, Forwarder, DiamondProxy } from "../../typechain-types";
 import {
   MailboxFacet__factory,
   MockExecutorFacet__factory,
@@ -17,12 +17,14 @@ import {
   requestExecute,
 } from "./utils";
 import * as ethers from "ethers";
+import { PayableOverrides } from "../../typechain-types/common";
+import { Contract } from "hardhat/internal/hardhat-network/stack-traces/model";
 
 describe("Mailbox tests", function () {
   let mailbox: MailboxFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   let allowList: AllowList;
-  let diamondProxyContract: ethers.Contract;
+  let diamondProxyContract: DiamondProxy;
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
@@ -34,24 +36,24 @@ describe("Mailbox tests", function () {
 
     const mailbox__factory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailbox__factory.deploy();
-    const mailboxFacet = MailboxFacet__factory.connect(mailboxContract.address, mailboxContract.signer);
+    const mailboxFacet = MailboxFacet__factory.connect(await mailboxContract.getAddress(), mailboxContract.runner);
 
     const mockExecutor__factory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
     const mockExecutorContract = await mockExecutor__factory.deploy();
     const mockExecutorFacet = MockExecutorFacet__factory.connect(
-      mockExecutorContract.address,
-      mockExecutorContract.signer
+      await mockExecutorContract.getAddress(),
+      mockExecutorContract.runner
     );
 
     const allowList__factory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowList__factory.deploy(await allowList__factory.signer.getAddress());
-    allowList = AllowList__factory.connect(allowListContract.address, allowListContract.signer);
+    const allowListContract = await allowList__factory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     // Note, that while this testsuit is focused on testing MailboxFaucet only,
     // we still need to initialize its storage via DiamondProxy
     const diamondInit__factory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInit__factory.deploy();
-    const diamondInit = DiamondInit__factory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
@@ -64,7 +66,7 @@ describe("Mailbox tests", function () {
         genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.ZeroHash,
-        allowList: allowList.address,
+        allowList: await allowList.getAddress(),
         verifierParams: {
           recursionCircuitsSetVksHash: ethers.ZeroHash,
           recursionLeafLevelVkHash: ethers.ZeroHash,
@@ -79,23 +81,23 @@ describe("Mailbox tests", function () {
     ]);
 
     const facetCuts = [
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false),
-      facetCut(mockExecutorFacet.address, mockExecutorFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, false),
+      facetCut(await mockExecutorFacet.getAddress(), mockExecutorFacet.interface, Action.Add, false),
     ];
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
     const diamondProxy__factory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     diamondProxyContract = await diamondProxy__factory.deploy(chainId, diamondCutData);
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
-    mailbox = MailboxFacet__factory.connect(diamondProxyContract.address, mailboxContract.signer);
-    proxyAsMockExecutor = MockExecutorFacet__factory.connect(diamondProxyContract.address, mockExecutorContract.signer);
+    mailbox = MailboxFacet__factory.connect(await diamondProxyContract.getAddress(), mailboxContract.runner);
+    proxyAsMockExecutor = MockExecutorFacet__factory.connect(await diamondProxyContract.getAddress(), mockExecutorContract.runner);
 
     const forwarder__factory = await hardhat.ethers.getContractFactory("Forwarder");
     const forwarderContract = await forwarder__factory.deploy();
-    forwarder = Forwarder__factory.connect(forwarderContract.address, forwarderContract.signer);
+    forwarder = Forwarder__factory.connect(await forwarderContract.getAddress(), forwarderContract.runner);
   });
 
   it("Should accept correctly formatted bytecode", async () => {
@@ -189,7 +191,7 @@ describe("Mailbox tests", function () {
     });
 
     it("Should accept depositing less than or equal to the deposit limit", async () => {
-      const gasPrice = await mailbox.provider.getGasPrice();
+      const gasPrice = (await mailbox.runner.provider.getFeeData()).gasPrice;
       const l2GasLimit = BigInt(1000000);
       const l2Cost = await mailbox.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
@@ -287,7 +289,7 @@ describe("Mailbox tests", function () {
     });
 
     it("Should not allow an un-whitelisted address to call", async () => {
-      await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Closed);
+      await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Closed);
 
       const revertReason = await getCallRevertReason(
         requestExecute(
@@ -304,8 +306,8 @@ describe("Mailbox tests", function () {
     });
 
     it("Should allow the whitelisted address to call", async () => {
-      await allowList.setAccessMode(diamondProxyContract.address, AccessMode.SpecialAccessOnly);
-      await allowList.setPermissionToCall(await owner.getAddress(), diamondProxyContract.address, "0xeb672419", true);
+      await allowList.setAccessMode( await diamondProxyContract.getAddress(), AccessMode.SpecialAccessOnly);
+      await allowList.setPermissionToCall(await owner.getAddress(), await  diamondProxyContract.getAddress(), "0xeb672419", true);
 
       const revertReason = await getCallRevertReason(
         requestExecute(
@@ -353,8 +355,8 @@ describe("Mailbox tests", function () {
         refundRecipient,
       ]);
 
-    const overrides: ethers.Overrides = {};
-    overrides.gasPrice = await mailbox.provider.getGasPrice();
+    const overrides: any = {};
+    overrides.gasPrice = (await mailbox.runner.provider.getFeeData()).gasPrice;
     overrides.value = await mailbox.l2TransactionBaseCost(
       overrides.gasPrice,
       l2GasLimit,
@@ -364,19 +366,19 @@ describe("Mailbox tests", function () {
 
     callViaForwarder = async (refundRecipient) => {
       return {
-        transaction: await forwarder.forward(mailbox.address, encodeRequest(refundRecipient), overrides),
-        expectedSender: aliasAddress(forwarder.address),
+        transaction: await forwarder.forward(mailbox.getAddress(), encodeRequest(refundRecipient), overrides),
+        expectedSender: aliasAddress(forwarder.getAddress()),
       };
     };
 
     callViaConstructorForwarder = async (refundRecipient) => {
       const constructorForwarder = await (
         await hardhat.ethers.getContractFactory("ConstructorForwarder")
-      ).deploy(mailbox.address, encodeRequest(refundRecipient), overrides);
+      ).deploy(mailbox.getAddress(), encodeRequest(refundRecipient), overrides);
 
       return {
-        transaction: constructorForwarder.deployTransaction,
-        expectedSender: aliasAddress(constructorForwarder.address),
+        transaction: constructorForwarder.deploymentTransaction,
+        expectedSender: aliasAddress(constructorForwarder.getAddress()),
       };
     };
   });
@@ -384,8 +386,8 @@ describe("Mailbox tests", function () {
   it("Should only alias externally-owned addresses", async () => {
     const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
-      [mailbox.address, false],
-      [await mailbox.signer.getAddress(), true],
+      [await mailbox.getAddress(), false],
+      [await owner.getAddress(), true],
     ];
 
     for (const sendTransaction of indirections) {

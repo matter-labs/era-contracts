@@ -12,7 +12,7 @@ describe("Merkle lib tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("MerkleTest");
     const contract = await contractFactory.deploy();
-    merkleTest = MerkleTest__factory.connect(contract.address, contract.signer);
+    merkleTest = MerkleTest__factory.connect(await contract.getAddress(), contract.runner);
   });
 
   describe("should calculate root correctly", function () {
