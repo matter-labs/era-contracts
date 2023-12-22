@@ -13,7 +13,7 @@ contract VerifierRecursiveTest is Test {
     uint256[] recursiveAggregationInput;
 
     Verifier verifier;
-    
+
     function setUp() public {
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);
 
@@ -107,7 +107,7 @@ contract VerifierRecursiveTest is Test {
         newPublicInputs[1] = publicInputs[0];
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
-        verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);   
+        verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
     }
 
     function testEmptyPublicInput_shouldRevert() public {
@@ -142,7 +142,9 @@ contract VerifierRecursiveTest is Test {
         for (uint256 i = 0; i < recursiveAggregationInput.length; i++) {
             newRecursiveAggregationInput[i] = recursiveAggregationInput[i];
         }
-        newRecursiveAggregationInput[newRecursiveAggregationInput.length - 1] = recursiveAggregationInput[recursiveAggregationInput.length - 1];
+        newRecursiveAggregationInput[newRecursiveAggregationInput.length - 1] = recursiveAggregationInput[
+            recursiveAggregationInput.length - 1
+        ];
 
         vm.expectRevert(bytes("loadProof: Proof is invalid"));
         verifier.verify(publicInputs, serializedProof, newRecursiveAggregationInput);
