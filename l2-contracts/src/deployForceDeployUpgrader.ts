@@ -23,7 +23,7 @@ async function main() {
     .name("deploy-force-deploy-upgrader")
     .description("Deploys the force deploy upgrader contract to L2");
 
-  program.option("--private-key <private-key>").action(async (cmd: Command) => {
+  program.option("--private-key <private-key>").action(async (cmd) => {
     const deployWallet = cmd.privateKey
       ? new Wallet(cmd.privateKey, provider)
       : Wallet.fromMnemonic(
