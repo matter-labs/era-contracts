@@ -6,15 +6,11 @@ RED='\033[0;31m'
 
 # Check that the code is formatted in the given directory provided in the first argument
 function check_prettier {
-    cd $1
     if ! yarn prettier:check; then
         echo "${RED}Commit error! Cannot commit unformatted code!${NC}"
-        echo "Prettier errors found in the ${CYAN}$(pwd)${NC} directory."
-        echo "Please format the code via ${CYAN}cd $1 && yarn prettier:fix${NC}!"
+        echo "Prettier errors found. Please format the code via ${CYAN}yarn prettier:fix${NC}!"
         exit 1
     fi
-    cd ..
 }
 
-check_prettier "ethereum"
-check_prettier "zksync"
+check_prettier

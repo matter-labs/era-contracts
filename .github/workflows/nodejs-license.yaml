@@ -8,6 +8,7 @@ env:
     BSD;
     ISC;
     Apache-2.0;
+    Apache 2.0;
     MPL-2.0;
     LGPL-3.0;
     LGPL-3.0-or-later;
@@ -20,7 +21,7 @@ env:
     WTFPL;
     Unlicense;
   # It has to be one line, there must be no space between packages.
-  EXCLUDE_PACKAGES: testrpc@0.0.1;uuid@2.0.1;
+  EXCLUDE_PACKAGES: testrpc@0.0.1;uuid@2.0.1;era-contracts@0.1.0;
 
 jobs:
   generate-matrix:
