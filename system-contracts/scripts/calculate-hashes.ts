@@ -3,7 +3,7 @@ import * as fs from "fs";
 import _ from "lodash";
 import os from "os";
 import { join } from "path";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/src/utils";
 
 type ContractDetails = {
   contractName: string;
@@ -79,7 +79,7 @@ const makePathAbsolute = (path: string): string => {
 const readSourceCode = (details: ContractDetails): string => {
   const absolutePath = makePathAbsolute(details.sourceCodePath);
   try {
-    return ethers.utils.hexlify(fs.readFileSync(absolutePath));
+    return ethers.hexlify(fs.readFileSync(absolutePath));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     throw new Error(`Failed to read source code for ${details.contractName}: ${absolutePath} Error: ${msg}`);
@@ -91,9 +91,9 @@ const readBytecode = (details: ContractDetails): string => {
   try {
     if (details.bytecodePath.endsWith(".json")) {
       const jsonFile = fs.readFileSync(absolutePath, "utf8");
-      return ethers.utils.hexlify(JSON.parse(jsonFile).bytecode);
+      return ethers.hexlify(JSON.parse(jsonFile).bytecode);
     } else {
-      return ethers.utils.hexlify(fs.readFileSync(absolutePath));
+      return ethers.hexlify(fs.readFileSync(absolutePath));
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
@@ -104,10 +104,10 @@ const readBytecode = (details: ContractDetails): string => {
 const getHashes = (contractName: string, sourceCode: string, bytecode: string): Hashes => {
   try {
     return {
-      bytecodeHash: ethers.utils.hexlify(hashBytecode(bytecode)),
+      bytecodeHash: ethers.hexlify(hashBytecode(bytecode)),
       // The extra checks performed by the hashBytecode function are not needed for the source code, therefore
       // sha256 is used for simplicity
-      sourceCodeHash: ethers.utils.sha256(sourceCode),
+      sourceCodeHash: ethers.sha256(sourceCode),
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";

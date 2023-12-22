@@ -1,9 +1,8 @@
 import { Command } from "commander";
-import type { BigNumber } from "ethers";
-import { ethers } from "ethers";
+import { ethers, HDNodeWallet } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Url } from "zk/build/utils";
+import { web3Url } from "../scripts/utils";
 import { deployViaCreate2 } from "../src.ts/deploy-utils";
 import { getFacetCutsForUpgrade } from "../src.ts/diamondCut";
 import { insertGasPrice } from "./utils";
@@ -12,14 +11,14 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function deployFacetCut(
-  wallet: ethers.Wallet,
+  wallet: ethers.Wallet | HDNodeWallet,
   name: string,
   create2Address: string,
   // eslint-disable-next-line @typescript-eslint/ban-types
   ethTxOptions: {},
   create2Salt?: string
 ) {
-  create2Salt = create2Salt ?? ethers.constants.HashZero;
+  create2Salt = create2Salt ?? ethers.ZeroHash;
 
   ethTxOptions["gasLimit"] = 10_000_000;
   const [address, txHash] = await deployViaCreate2(wallet, name, [], create2Salt, ethTxOptions, create2Address, true);
@@ -35,20 +34,19 @@ async function deployFacetCuts(
   file?: string,
   privateKey?: string,
   nonce?: number,
-  gasPrice?: BigNumber,
+  gasPrice?: bigint,
   create2Salt?: string
 ) {
-  const provider = new ethers.providers.JsonRpcProvider(l1Rpc);
+  const provider = new ethers.JsonRpcProvider(l1Rpc);
   const wallet = privateKey
     ? new ethers.Wallet(privateKey, provider)
-    : ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-        "m/44'/60'/0'/0/1"
-      ).connect(provider);
+    : ethers.Wallet.fromPhrase(
+        process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+      ).derivePath("m/44'/60'/0'/0/1").connect(provider);
   const deployedFacets = {};
   const ethTxOptions = {};
   if (!nonce) {
-    ethTxOptions["nonce"] = await wallet.getTransactionCount();
+    ethTxOptions["nonce"] = await wallet.getNonce();
   } else {
     ethTxOptions["nonce"] = nonce;
   }
@@ -76,9 +74,9 @@ async function getFacetCuts(
   adminAddress: string,
   file?: string
 ) {
-  const provider = new ethers.providers.JsonRpcProvider(l1Rpc);
+  const provider = new ethers.JsonRpcProvider(l1Rpc);
   // It's required to send read-only requests to the provider. So, we don't care about the privatekey.
-  const wallet = ethers.Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+  const wallet = ethers.Wallet.fromPhrase(ethTestConfig.mnemonic).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
   const facetCuts = await getFacetCutsForUpgrade(
     wallet,

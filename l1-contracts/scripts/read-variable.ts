@@ -1,37 +1,37 @@
 import { Command } from "commander";
-import { BigNumber, ethers } from "ethers";
+import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { web3Provider } from "./utils";
 
 const provider = web3Provider();
 
-const cache: Map<BigNumber, string> = new Map<BigNumber, string>();
+const cache: Map<bigint, string> = new Map<bigint, string>();
 
-async function getStorageAt(address: string, slot: BigNumber): Promise<string> {
+async function getStorageAt(address: string, slot: bigint): Promise<string> {
   if (!cache.has(slot)) {
-    cache.set(slot, await provider.getStorageAt(address, slot));
+    cache.set(slot, await provider.getStorage(address, slot));
   }
   return cache.get(slot);
 }
 
 // Read bytes from storage like hex string
-async function readBytes(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
+async function readBytes(slot: bigint, shift: number, bytes: number, address: string): Promise<string> {
   const data = await getStorageAt(address, slot);
   return "0x" + data.substr(66 - bytes * 2 - shift * 2, bytes * 2);
 }
 
 // Read dynamic sized bytes (encoding: bytes)
-async function readDynamicBytes(slot: BigNumber, address: string): Promise<string> {
+async function readDynamicBytes(slot: bigint, address: string): Promise<string> {
   const data = await getStorageAt(address, slot);
   if (Number.parseInt(data.substr(64, 2), 16) % 2 === 0) {
     const length = Number.parseInt(data.substr(64, 2), 16) / 2;
     return "0x" + data.substr(2, 2 * length);
   } else {
     const length = (Number.parseInt(data, 16) - 1) / 2;
-    const firstSlot = BigNumber.from(ethers.utils.solidityKeccak256(["uint"], [slot]));
+    const firstSlot = BigInt(ethers.solidityPackedKeccak256(["uint"], [slot]));
     const slots = [];
-    for (let slotShift = 0; slotShift * 32 < length; slotShift++) {
-      slots.push(getStorageAt(address, firstSlot.add(slotShift)));
+    for (let slotShift = 0n; slotShift * 32n < length; slotShift++) {
+      slots.push(getStorageAt(address, firstSlot + slotShift));
     }
 
     const lastLength = length % 32;
@@ -48,11 +48,11 @@ async function readDynamicBytes(slot: BigNumber, address: string): Promise<strin
 }
 
 // Functions for read all types, except user defined structs and arrays
-async function readString(slot: BigNumber, address: string): Promise<string> {
-  return ethers.utils.toUtf8String(await readDynamicBytes(slot, address));
+async function readString(slot: bigint, address: string): Promise<string> {
+  return ethers.toUtf8String(await readDynamicBytes(slot, address));
 }
 
-async function readNumber(slot: BigNumber, shift: number, label: string, address: string): Promise<string> {
+async function readNumber(slot: bigint, shift: number, label: string, address: string): Promise<string> {
   let bytes: number;
   if (label.substr(0, 3) === "int") {
     bytes = +label.substring(3, label.length) / 8;
@@ -60,19 +60,19 @@ async function readNumber(slot: BigNumber, shift: number, label: string, address
     bytes = +label.substring(4, label.length) / 8;
   }
   let data: string = await readBytes(slot, shift, bytes, address);
-  data = ethers.utils.hexZeroPad(data, 32);
-  return ethers.utils.defaultAbiCoder.decode([label], data).toString();
+  data = ethers.zeroPadValue(data, 32);
+  return ethers.AbiCoder.defaultAbiCoder().decode([label], data).toString();
 }
 
-async function readBoolean(slot: BigNumber, shift: number, address: string): Promise<boolean> {
+async function readBoolean(slot: bigint, shift: number, address: string): Promise<boolean> {
   return (await readNumber(slot, shift, "uint8", address)) !== "0";
 }
 
-async function readAddress(slot: BigNumber, shift: number, address: string): Promise<string> {
+async function readAddress(slot: bigint, shift: number, address: string): Promise<string> {
   return readBytes(slot, shift, 20, address);
 }
 
-async function readEnum(slot: BigNumber, shift: number, bytes: number, address: string): Promise<string> {
+async function readEnum(slot: bigint, shift: number, bytes: number, address: string): Promise<string> {
   return await readNumber(slot, shift, "uint" + bytes * 8, address);
 }
 
@@ -80,7 +80,7 @@ async function readEnum(slot: BigNumber, shift: number, bytes: number, address: 
 let types: any;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readPrimitive(slot: BigNumber, shift: number, address: string, type: string): Promise<any> {
+async function readPrimitive(slot: bigint, shift: number, address: string, type: string): Promise<any> {
   if (type.substr(0, 5) === "t_int" || type.substr(0, 6) === "t_uint") {
     return readNumber(slot, shift, types[type].label, address);
   }
@@ -105,13 +105,13 @@ async function readPrimitive(slot: BigNumber, shift: number, address: string, ty
 }
 
 // Read user defined struct
-async function readStruct(slot: BigNumber, address: string, type: string): Promise<object> {
+async function readStruct(slot: bigint, address: string, type: string): Promise<object> {
   const result = {};
   const data = new Map();
   types[type].members.forEach((member) => {
     data.set(
       member.label,
-      readVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type)
+      readVariable(slot + BigInt(Number.parseInt(member.slot, 10)), member.offset, address, member.type)
     );
   });
   for (const [key, value] of data) {
@@ -122,12 +122,12 @@ async function readStruct(slot: BigNumber, address: string, type: string): Promi
 
 // Read array (Static or dynamic sized)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readArray(slot: BigNumber, address: string, type: string): Promise<any[]> {
+async function readArray(slot: bigint, address: string, type: string): Promise<any[]> {
   let length: number;
   const baseType = types[type].base;
   if (types[type].encoding === "dynamic_array") {
     length = +(await readNumber(slot, 0, "uint256", address));
-    slot = BigNumber.from(ethers.utils.solidityKeccak256(["uint"], [slot]));
+    slot = BigInt(ethers.solidityPackedKeccak256(["uint"], [slot]));
   } else {
     length = Number.parseInt(type.substring(type.lastIndexOf(")") + 1, type.lastIndexOf("_")), 10);
   }
@@ -139,14 +139,14 @@ async function readArray(slot: BigNumber, address: string, type: string): Promis
       shift += baseBytes;
       if (shift + baseBytes > 32) {
         shift = 0;
-        slot = slot.add(1);
+        slot = slot + 1n;
       }
       data.push(readVariable(slot, shift, address, baseType));
     }
   } else {
     for (let i = 0; i < length; i++) {
       data.push(readVariable(slot, 0, address, baseType));
-      slot = slot.add(baseBytes / 32);
+      slot = slot + BigInt(baseBytes / 32);
     }
   }
   return Promise.all(data);
@@ -154,7 +154,7 @@ async function readArray(slot: BigNumber, address: string, type: string): Promis
 
 // Read any type, except mapping (it needs key for reading)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readVariable(slot: BigNumber, shift: number, address: string, type: string): Promise<any> {
+async function readVariable(slot: bigint, shift: number, address: string, type: string): Promise<any> {
   if (type.substr(0, 7) === "t_array") return readArray(slot, address, type);
   if (type.substr(0, 8) === "t_struct") return readStruct(slot, address, type);
   return readPrimitive(slot, shift, address, type);
@@ -162,31 +162,31 @@ async function readVariable(slot: BigNumber, shift: number, address: string, typ
 
 // Read field of struct
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readPartOfStruct(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
+async function readPartOfStruct(slot: bigint, address: string, type: string, params: string[]): Promise<any> {
   const last = params.pop();
   const member = types[type].members.find((element) => {
     return element.label === last;
   });
   if (!member) throw new Error("Invalid field name of struct");
-  return readPartOfVariable(slot.add(Number.parseInt(member.slot, 10)), member.offset, address, member.type, params);
+  return readPartOfVariable(slot + BigInt(Number.parseInt(member.slot, 10)), member.offset, address, member.type, params);
 }
 
 // Read array element by index
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readPartOfArray(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
+async function readPartOfArray(slot: bigint, address: string, type: string, params: string[]): Promise<any> {
   const index = +params.pop();
   const baseType = types[type].base;
   if (types[type].encoding === "dynamic_array") {
-    slot = BigNumber.from(ethers.utils.solidityKeccak256(["uint"], [slot]));
+    slot = BigInt(ethers.solidityPackedKeccak256(["uint"], [slot]));
   }
   const baseBytes = +types[baseType].numberOfBytes;
   if (baseBytes < 32) {
     const inOne = Math.floor(32 / baseBytes);
-    slot = slot.add(Math.floor(index / inOne));
+    slot = slot + BigInt(Math.floor(index / inOne));
     const shift = baseBytes * (index % inOne);
     return readPartOfVariable(slot, shift, address, baseType, params);
   } else {
-    slot = slot.add((index * baseBytes) / 32);
+    slot = slot + BigInt((index * baseBytes) / 32);
     return readPartOfVariable(slot, 0, address, baseType, params);
   }
 }
@@ -195,9 +195,9 @@ async function readPartOfArray(slot: BigNumber, address: string, type: string, p
 function encodeKey(key: string, type: string): string {
   if (type === "t_bool") {
     if (key === "false" || key === "0") {
-      return ethers.utils.defaultAbiCoder.encode(["bool"], [false]);
+      return ethers.AbiCoder.defaultAbiCoder().encode(["bool"], [false]);
     } else {
-      return ethers.utils.defaultAbiCoder.encode(["bool"], [true]);
+      return ethers.AbiCoder.defaultAbiCoder().encode(["bool"], [true]);
     }
   }
   if (type === "t_address" || type === "t_address_payable") {
@@ -208,7 +208,7 @@ function encodeKey(key: string, type: string): string {
     }
   }
   if (type === "t_string_memory_ptr") {
-    return ethers.utils.hexlify(ethers.utils.toUtf8Bytes(key));
+    return ethers.hexlify(ethers.toUtf8Bytes(key));
   }
   if (type === "t_bytes_memory_ptr") {
     if (key.substr(0, 2) === "0x") {
@@ -217,25 +217,25 @@ function encodeKey(key: string, type: string): string {
       return "0x" + key;
     }
   }
-  return ethers.utils.defaultAbiCoder.encode([types[type].label], [+key]);
+  return ethers.AbiCoder.defaultAbiCoder().encode([types[type].label], [+key]);
 }
 
 // Read mapping element by key
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readPartOfMap(slot: BigNumber, address: string, type: string, params: string[]): Promise<any> {
+async function readPartOfMap(slot: bigint, address: string, type: string, params: string[]): Promise<any> {
   const key = params.pop();
   const valueType = types[type].value;
   const keyType = types[type].key;
   const encodedKey = encodeKey(key, keyType);
-  const encodedSlot = ethers.utils.defaultAbiCoder.encode(["uint"], [slot]);
+  const encodedSlot = ethers.AbiCoder.defaultAbiCoder().encode(["uint"], [slot]);
   const hex = encodedKey + encodedSlot.substring(2, encodedSlot.length);
-  slot = BigNumber.from(ethers.utils.keccak256(ethers.utils.arrayify(hex)));
+  slot = BigInt(ethers.keccak256(ethers.toBeArray(hex)));
   return readPartOfVariable(slot, 0, address, valueType, params);
 }
 
 // Read part of variable (By indexes, field names, keys)
 async function readPartOfVariable(
-  slot: BigNumber,
+  slot: bigint,
   shift: number,
   address: string,
   type: string,
@@ -352,7 +352,7 @@ async function getValue(address: string, contractName: string, name: string): Pr
   if (!variable) {
     throw new Error("Invalid name");
   }
-  return readPartOfVariable(BigNumber.from(variable.slot), variable.offset, address, variable.type, params);
+  return readPartOfVariable(BigInt(variable.slot), variable.offset, address, variable.type, params);
 }
 
 async function main() {

@@ -2,7 +2,7 @@
 // for testing of the contracts required for the `withdrawal-helpers` library
 
 import * as hardhat from "hardhat";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
@@ -21,7 +21,7 @@ async function main() {
     const provider = web3Provider();
     provider.pollingInterval = 10;
 
-    const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(provider);
+    const deployWallet = ethers.Wallet.fromPhrase(ethTestConfig.test_mnemonic).derivePath("m/44'/60'/0'/0/0").connect(provider);
     const multicallFactory = await hardhat.ethers.getContractFactory("Multicall", deployWallet);
     const multicallContract = await multicallFactory.deploy({
       gasLimit: 5000000,
@@ -33,8 +33,8 @@ async function main() {
     });
 
     const outConfig = {
-      multicall_address: multicallContract.address,
-      revert_receive_address: revertReceiveAccount.address,
+      multicall_address: await multicallContract.getAddress(),
+      revert_receive_address: await revertReceiveAccount.getAddress(),
     };
     const outConfigPath = path.join(process.env.ZKSYNC_HOME, "etc/test_config/volatile/withdrawal-helpers.json");
     fs.writeFileSync(outConfigPath, JSON.stringify(outConfig), { encoding: "utf-8" });

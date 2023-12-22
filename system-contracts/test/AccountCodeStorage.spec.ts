@@ -1,14 +1,14 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import type { AccountCodeStorage } from "../typechain";
+import type { Wallet } from "zksync-ethers";
+import type { AccountCodeStorage } from "../typechain-types";
 import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS, EMPTY_STRING_KECCAK } from "./shared/constants";
 import { deployContract, getWallets } from "./shared/utils";
 
 describe("AccountCodeStorage tests", function () {
   let wallet: Wallet;
   let accountCodeStorage: AccountCodeStorage;
-  let deployerAccount: ethers.Signer;
+  let deployerAccount: any;
 
   const CONSTRUCTING_BYTECODE_HASH = "0x0101FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";
   const CONSTRUCTED_BYTECODE_HASH = "0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF";

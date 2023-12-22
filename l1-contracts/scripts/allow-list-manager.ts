@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { Interface } from "ethers/lib/utils";
+import { Interface } from "ethers";
 import * as hardhat from "hardhat";
 import type { AccessMode, PermissionToCall } from "./utils";
 import { getLowerCaseAddress, permissionToCallComparator, print } from "./utils";
@@ -35,13 +35,13 @@ function functionSelector(functionName: string): string {
   const selectors = new Array(0);
 
   try {
-    selectors.push(zkSync.getSighash(zkSync.getFunction(functionName)));
+    selectors.push(zkSync.getFunction(functionName).selector);
   } catch {
     // ignore
   }
 
   try {
-    selectors.push(l1ERC20Bridge.getSighash(l1ERC20Bridge.getFunction(functionName)));
+    selectors.push(l1ERC20Bridge.getFunction(functionName).selector);
   } catch {
     // ignore
   }

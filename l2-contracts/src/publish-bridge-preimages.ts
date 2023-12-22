@@ -28,7 +28,7 @@ async function main() {
     .action(async (cmd) => {
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);

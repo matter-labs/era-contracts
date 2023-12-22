@@ -1,14 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { MailboxFacet, MockExecutorFacet, AllowList, Forwarder } from "../../typechain";
+import type { MailboxFacet, MockExecutorFacet, AllowList, Forwarder, DiamondProxy } from "../../typechain-types";
 import {
-  MailboxFacetFactory,
-  MockExecutorFacetFactory,
-  DiamondInitFactory,
-  AllowListFactory,
-  ForwarderFactory,
-} from "../../typechain";
+  MailboxFacet__factory,
+  MockExecutorFacet__factory,
+  DiamondInit__factory,
+  AllowList__factory,
+  Forwarder__factory,
+} from "../../typechain-types";
 import {
   DEFAULT_REVERT_REASON,
   getCallRevertReason,
@@ -17,12 +17,14 @@ import {
   requestExecute,
 } from "./utils";
 import * as ethers from "ethers";
+import { PayableOverrides } from "../../typechain-types/common";
+import { Contract } from "hardhat/internal/hardhat-network/stack-traces/model";
 
 describe("Mailbox tests", function () {
   let mailbox: MailboxFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   let allowList: AllowList;
-  let diamondProxyContract: ethers.Contract;
+  let diamondProxyContract: DiamondProxy;
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
@@ -32,43 +34,43 @@ describe("Mailbox tests", function () {
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
-    const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
-    const mailboxContract = await mailboxFactory.deploy();
-    const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+    const mailbox__factory = await hardhat.ethers.getContractFactory("MailboxFacet");
+    const mailboxContract = await mailbox__factory.deploy();
+    const mailboxFacet = MailboxFacet__factory.connect(await mailboxContract.getAddress(), mailboxContract.runner);
 
-    const mockExecutorFactory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
-    const mockExecutorContract = await mockExecutorFactory.deploy();
-    const mockExecutorFacet = MockExecutorFacetFactory.connect(
-      mockExecutorContract.address,
-      mockExecutorContract.signer
+    const mockExecutor__factory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
+    const mockExecutorContract = await mockExecutor__factory.deploy();
+    const mockExecutorFacet = MockExecutorFacet__factory.connect(
+      await mockExecutorContract.getAddress(),
+      mockExecutorContract.runner
     );
 
-    const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
+    const allowList__factory = await hardhat.ethers.getContractFactory("AllowList");
+    const allowListContract = await allowList__factory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     // Note, that while this testsuit is focused on testing MailboxFaucet only,
     // we still need to initialize its storage via DiamondProxy
-    const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
-    const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit__factory = await hardhat.ethers.getContractFactory("DiamondInit");
+    const diamondInitContract = await diamondInit__factory.deploy();
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
-    const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const dummyAddress = ethers.hexlify(ethers.randomBytes(20));
     const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
       {
         verifier: dummyAddress,
         governor: dummyAddress,
         admin: dummyAddress,
-        genesisBatchHash: ethers.constants.HashZero,
+        genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
-        allowList: allowList.address,
+        genesisBatchCommitment: ethers.ZeroHash,
+        allowList: await allowList.getAddress(),
         verifierParams: {
-          recursionCircuitsSetVksHash: ethers.constants.HashZero,
-          recursionLeafLevelVkHash: ethers.constants.HashZero,
-          recursionNodeLevelVkHash: ethers.constants.HashZero,
+          recursionCircuitsSetVksHash: ethers.ZeroHash,
+          recursionLeafLevelVkHash: ethers.ZeroHash,
+          recursionNodeLevelVkHash: ethers.ZeroHash,
         },
         zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: dummyHash,
@@ -79,35 +81,35 @@ describe("Mailbox tests", function () {
     ]);
 
     const facetCuts = [
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false),
-      facetCut(mockExecutorFacet.address, mockExecutorFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, false),
+      facetCut(await mockExecutorFacet.getAddress(), mockExecutorFacet.interface, Action.Add, false),
     ];
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
-    const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
+    const diamondProxy__factory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
-    diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+    diamondProxyContract = await diamondProxy__factory.deploy(chainId, diamondCutData);
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
-    mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
-    proxyAsMockExecutor = MockExecutorFacetFactory.connect(diamondProxyContract.address, mockExecutorContract.signer);
+    mailbox = MailboxFacet__factory.connect(await diamondProxyContract.getAddress(), mailboxContract.runner);
+    proxyAsMockExecutor = MockExecutorFacet__factory.connect(await diamondProxyContract.getAddress(), mockExecutorContract.runner);
 
-    const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
-    const forwarderContract = await forwarderFactory.deploy();
-    forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
+    const forwarder__factory = await hardhat.ethers.getContractFactory("Forwarder");
+    const forwarderContract = await forwarder__factory.deploy();
+    forwarder = Forwarder__factory.connect(await forwarderContract.getAddress(), forwarderContract.runner);
   });
 
   it("Should accept correctly formatted bytecode", async () => {
     const revertReason = await getCallRevertReason(
       requestExecute(
         mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
+        ethers.ZeroAddress,
+        BigInt(0),
         "0x",
-        ethers.BigNumber.from(1000000),
+        BigInt(1000000),
         [new Uint8Array(32)],
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       )
     );
 
@@ -118,12 +120,12 @@ describe("Mailbox tests", function () {
     const revertReason = await getCallRevertReason(
       requestExecute(
         mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
+        ethers.ZeroAddress,
+        BigInt(0),
         "0x",
-        ethers.BigNumber.from(100000),
+        BigInt(100000),
         [new Uint8Array(63)],
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       )
     );
 
@@ -134,12 +136,12 @@ describe("Mailbox tests", function () {
     const revertReason = await getCallRevertReason(
       requestExecute(
         mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
+        ethers.ZeroAddress,
+        BigInt(0),
         "0x",
-        ethers.BigNumber.from(100000),
+        BigInt(100000),
         [new Uint8Array(64)],
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       )
     );
 
@@ -150,15 +152,15 @@ describe("Mailbox tests", function () {
     const revertReason = await getCallRevertReason(
       requestExecute(
         mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
+        ethers.ZeroAddress,
+        BigInt(0),
         "0x",
-        ethers.BigNumber.from(100000),
+        BigInt(100000),
         [
           // "+64" to keep the length in words odd and bytecode chunkable
           new Uint8Array(MAX_CODE_LEN_BYTES + 64),
         ],
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       )
     );
 
@@ -166,22 +168,22 @@ describe("Mailbox tests", function () {
   });
 
   describe("Deposit and Withdrawal limit functionality", function () {
-    const DEPOSIT_LIMIT = ethers.utils.parseEther("10");
+    const DEPOSIT_LIMIT = ethers.parseEther("10");
 
     before(async () => {
-      await allowList.setDepositLimit(ethers.constants.AddressZero, true, DEPOSIT_LIMIT);
+      await allowList.setDepositLimit(ethers.ZeroAddress, true, DEPOSIT_LIMIT);
     });
 
     it("Should not accept depositing more than the deposit limit", async () => {
       const revertReason = await getCallRevertReason(
         requestExecute(
           mailbox,
-          ethers.constants.AddressZero,
-          ethers.utils.parseEther("12"),
+          ethers.ZeroAddress,
+          ethers.parseEther("12"),
           "0x",
-          ethers.BigNumber.from(100000),
+          BigInt(100000),
           [new Uint8Array(32)],
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       );
 
@@ -189,19 +191,19 @@ describe("Mailbox tests", function () {
     });
 
     it("Should accept depositing less than or equal to the deposit limit", async () => {
-      const gasPrice = await mailbox.provider.getGasPrice();
-      const l2GasLimit = ethers.BigNumber.from(1000000);
+      const gasPrice = (await mailbox.runner.provider.getFeeData()).gasPrice;
+      const l2GasLimit = BigInt(1000000);
       const l2Cost = await mailbox.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
       const revertReason = await getCallRevertReason(
         requestExecute(
           mailbox,
-          ethers.constants.AddressZero,
-          DEPOSIT_LIMIT.sub(l2Cost),
+          ethers.ZeroAddress,
+          DEPOSIT_LIMIT - l2Cost,
           "0x",
           l2GasLimit,
           [new Uint8Array(32)],
-          ethers.constants.AddressZero,
+          ethers.ZeroAddress,
           { gasPrice }
         )
       );
@@ -213,12 +215,12 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         requestExecute(
           mailbox,
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(1),
+          ethers.ZeroAddress,
+          BigInt(1),
           "0x",
-          ethers.BigNumber.from(1000000),
+          BigInt(1000000),
           [new Uint8Array(32)],
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       );
 
@@ -231,7 +233,7 @@ describe("Mailbox tests", function () {
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
     const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
+    const AMOUNT = 1n;
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
     // MESSAGE_HASH = 0xf55ef1c502bb79468b8ffe79955af4557a068ec4894e2207010866b182445c52
@@ -269,7 +271,7 @@ describe("Mailbox tests", function () {
       await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
 
       const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
+      expect(balanceAfter - balanceBefore == AMOUNT);
     });
 
     it("Reverts when withdrawal is already finalized", async () => {
@@ -283,39 +285,39 @@ describe("Mailbox tests", function () {
   describe("Access mode functionality", function () {
     before(async () => {
       // We still need to set infinite amount of allowed deposit limit in order to ensure that every fee will be accepted
-      await allowList.setDepositLimit(ethers.constants.AddressZero, true, ethers.utils.parseEther("2000"));
+      await allowList.setDepositLimit(ethers.ZeroAddress, true, ethers.parseEther("2000"));
     });
 
     it("Should not allow an un-whitelisted address to call", async () => {
-      await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Closed);
+      await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Closed);
 
       const revertReason = await getCallRevertReason(
         requestExecute(
           mailbox.connect(randomSigner),
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(0),
+          ethers.ZeroAddress,
+          BigInt(0),
           "0x",
-          ethers.BigNumber.from(100000),
+          BigInt(100000),
           [new Uint8Array(32)],
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       );
       expect(revertReason).equal("nr");
     });
 
     it("Should allow the whitelisted address to call", async () => {
-      await allowList.setAccessMode(diamondProxyContract.address, AccessMode.SpecialAccessOnly);
-      await allowList.setPermissionToCall(await owner.getAddress(), diamondProxyContract.address, "0xeb672419", true);
+      await allowList.setAccessMode( await diamondProxyContract.getAddress(), AccessMode.SpecialAccessOnly);
+      await allowList.setPermissionToCall(await owner.getAddress(), await  diamondProxyContract.getAddress(), "0xeb672419", true);
 
       const revertReason = await getCallRevertReason(
         requestExecute(
           mailbox.connect(owner),
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(0),
+          ethers.ZeroAddress,
+          BigInt(0),
           "0x",
-          ethers.BigNumber.from(1000000),
+          BigInt(1000000),
           [new Uint8Array(32)],
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       );
       expect(revertReason).equal(DEFAULT_REVERT_REASON);
@@ -325,14 +327,14 @@ describe("Mailbox tests", function () {
   let callDirectly, callViaForwarder, callViaConstructorForwarder;
 
   before(async () => {
-    const l2GasLimit = ethers.BigNumber.from(10000000);
+    const l2GasLimit = BigInt(10000000);
 
     callDirectly = async (refundRecipient) => {
       return {
         transaction: await requestExecute(
           mailbox.connect(owner),
-          ethers.constants.AddressZero,
-          ethers.BigNumber.from(0),
+          ethers.ZeroAddress,
+          BigInt(0),
           "0x",
           l2GasLimit,
           [new Uint8Array(32)],
@@ -344,7 +346,7 @@ describe("Mailbox tests", function () {
 
     const encodeRequest = (refundRecipient) =>
       mailbox.interface.encodeFunctionData("requestL2Transaction", [
-        ethers.constants.AddressZero,
+        ethers.ZeroAddress,
         0,
         "0x",
         l2GasLimit,
@@ -353,8 +355,8 @@ describe("Mailbox tests", function () {
         refundRecipient,
       ]);
 
-    const overrides: ethers.PayableOverrides = {};
-    overrides.gasPrice = await mailbox.provider.getGasPrice();
+    const overrides: any = {};
+    overrides.gasPrice = (await mailbox.runner.provider.getFeeData()).gasPrice;
     overrides.value = await mailbox.l2TransactionBaseCost(
       overrides.gasPrice,
       l2GasLimit,
@@ -364,19 +366,19 @@ describe("Mailbox tests", function () {
 
     callViaForwarder = async (refundRecipient) => {
       return {
-        transaction: await forwarder.forward(mailbox.address, encodeRequest(refundRecipient), overrides),
-        expectedSender: aliasAddress(forwarder.address),
+        transaction: await forwarder.forward(mailbox.getAddress(), encodeRequest(refundRecipient), overrides),
+        expectedSender: aliasAddress(forwarder.getAddress()),
       };
     };
 
     callViaConstructorForwarder = async (refundRecipient) => {
       const constructorForwarder = await (
         await hardhat.ethers.getContractFactory("ConstructorForwarder")
-      ).deploy(mailbox.address, encodeRequest(refundRecipient), overrides);
+      ).deploy(mailbox.getAddress(), encodeRequest(refundRecipient), overrides);
 
       return {
-        transaction: constructorForwarder.deployTransaction,
-        expectedSender: aliasAddress(constructorForwarder.address),
+        transaction: constructorForwarder.deploymentTransaction,
+        expectedSender: aliasAddress(constructorForwarder.getAddress()),
       };
     };
   });
@@ -384,8 +386,8 @@ describe("Mailbox tests", function () {
   it("Should only alias externally-owned addresses", async () => {
     const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
-      [mailbox.address, false],
-      [await mailbox.signer.getAddress(), true],
+      [await mailbox.getAddress(), false],
+      [await owner.getAddress(), true],
     ];
 
     for (const sendTransaction of indirections) {
@@ -408,7 +410,5 @@ describe("Mailbox tests", function () {
 });
 
 function aliasAddress(address) {
-  return ethers.BigNumber.from(address)
-    .add("0x1111000000000000000000000000000000001111")
-    .mask(20 * 8);
+  return ethers.mask(BigInt(address) + BigInt("0x1111000000000000000000000000000000001111"),20 * 8);
 }

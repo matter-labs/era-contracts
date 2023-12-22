@@ -26,13 +26,12 @@ async function main() {
     .action(async (cmd) => {
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
       console.log(`Using wallet: ${wallet.address}`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await wallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await wallet.getNonce();
       console.log(`Using nonce: ${nonce}`);
 
       const deployer = new Deployer({ deployWallet: wallet });

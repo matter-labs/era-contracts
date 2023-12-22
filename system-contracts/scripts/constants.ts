@@ -1,8 +1,8 @@
 import type { BigNumberish, BytesLike } from "ethers";
-import { constants, ethers } from "ethers";
+import { ethers } from "ethers";
 
 export const BOOTLOADER_FORMAL_ADDRESS = "0x0000000000000000000000000000000000008001";
-export const ETH_ADDRESS = constants.AddressZero;
+export const ETH_ADDRESS = ethers.ZeroAddress;
 
 export enum Language {
   Solidity = "solidity",
@@ -427,5 +427,5 @@ export function getTransactionUtils(): string {
 }
 
 export function getRevertSelector(): string {
-  return ethers.utils.keccak256(ethers.utils.toUtf8Bytes("Error(string)")).substring(0, 10);
+  return ethers.keccak256(ethers.toUtf8Bytes("Error(string)")).substring(0, 10);
 }

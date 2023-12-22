@@ -1,5 +1,5 @@
 import * as hardhat from "hardhat";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
@@ -31,12 +31,12 @@ async function main() {
       const provider = web3Provider();
       provider.pollingInterval = 10;
 
-      const deployWallet = ethers.Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/0").connect(
+      const deployWallet = ethers.Wallet.fromPhrase(ethTestConfig.test_mnemonic).derivePath("m/44'/60'/0'/0/0").connect(
         provider
       );
 
       const deployer = new Deployer({ deployWallet, verbose: true });
-      await deployer.deployAll();
+      // await deployer.deployAll();
 
       const zkSyncContract = deployer.zkSyncContract(deployWallet);
       await (await zkSyncContract.setValidator(deployWallet.address, true)).wait();
@@ -44,16 +44,16 @@ async function main() {
       const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", deployWallet);
       const erc20 = await tokenFactory.deploy("Matter Labs Trial Token", "MLTT", 18, { gasLimit: 5000000 });
 
-      console.log(`CONTRACTS_TEST_ERC20=${erc20.address}`);
+      console.log(`CONTRACTS_TEST_ERC20=${await erc20.getAddress()}`);
 
       const failOnReceiveFactory = await hardhat.ethers.getContractFactory("FailOnReceive", deployWallet);
       const failOnReceive = await failOnReceiveFactory.deploy({
         gasLimit: 5000000,
       });
-      console.log(`CONTRACTS_FAIL_ON_RECEIVE=${failOnReceive.address}`);
+      console.log(`CONTRACTS_FAIL_ON_RECEIVE=${await failOnReceive.getAddress()}`);
 
       for (let i = 0; i < 10; ++i) {
-        const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic, "m/44'/60'/0'/0/" + i).connect(provider);
+        const testWallet = Wallet.fromPhrase(ethTestConfig.test_mnemonic).derivePath("m/44'/60'/0'/0/" + i).connect(provider);
         await (await erc20.mint(testWallet.address, "0x4B3B4CA85A86C47A098A224000000000")).wait();
       }
     });

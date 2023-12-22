@@ -1,6 +1,5 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { getTokens, web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 
@@ -54,7 +53,7 @@ async function main() {
 
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/0"
           ).connect(provider);

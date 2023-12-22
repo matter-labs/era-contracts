@@ -1,8 +1,8 @@
 import "@matterlabs/hardhat-zksync-chai-matchers";
 import "@matterlabs/hardhat-zksync-solc";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import "@nomiclabs/hardhat-solpp";
-import "hardhat-typechain";
+import "@typechain/hardhat";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const systemConfig = require("./SystemConfig.json");

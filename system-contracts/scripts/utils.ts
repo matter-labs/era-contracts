@@ -2,9 +2,9 @@ import * as hre from "hardhat";
 
 import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
-import { BigNumber, ethers } from "ethers";
+import { ethers } from "ethers";
 import * as fs from "fs";
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/src/utils";
 import type { YulContractDescrption } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 
@@ -23,7 +23,7 @@ export interface DeployedDependency {
 export function readYulBytecode(description: YulContractDescrption) {
   const contractName = description.codeName;
   const path = `contracts/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
-  return ethers.utils.hexlify(fs.readFileSync(path));
+  return ethers.hexlify(fs.readFileSync(path));
 }
 
 // The struct used to represent the parameters of a forced deployment -- a deployment during upgrade
@@ -54,7 +54,7 @@ export async function outputSystemContracts(): Promise<ForceDeployment[]> {
       const bytecodeHash = hashBytecode(bytecode);
 
       return {
-        bytecodeHash: ethers.utils.hexlify(bytecodeHash),
+        bytecodeHash: ethers.hexlify(bytecodeHash),
         newAddress: systemContractInfo.address,
         value: "0",
         input: "0x",
@@ -81,8 +81,8 @@ export async function getMarkers(dependencies: BytesLike[], deployer: Deployer):
   );
 
   const promises = dependencies.map(async (dep) => {
-    const hash = ethers.utils.hexlify(hashBytecode(dep));
-    const marker = BigNumber.from(await contract.getMarker(hash));
+    const hash = ethers.hexlify(hashBytecode(dep));
+    const marker = await contract.getMarker(hash);
 
     return [hash, marker.eq(1)] as [string, boolean];
   });
@@ -103,7 +103,7 @@ export async function checkMarkers(dependencies: BytesLike[], deployer: Deployer
 }
 
 export function totalBytesLength(dependencies: BytesLike[]): number {
-  return dependencies.reduce((prev, curr) => prev + ethers.utils.arrayify(curr).length, 0);
+  return dependencies.reduce((prev, curr) => prev + ethers.toBeArray(ethers.hexlify(curr)).length, 0);
 }
 
 export function getBytecodes(dependencies: Dependency[]): BytesLike[] {
@@ -114,7 +114,7 @@ export async function publishFactoryDeps(
   dependencies: Dependency[],
   deployer: Deployer,
   nonce: number,
-  gasPrice: BigNumber
+  gasPrice: bigint
 ) {
   if (dependencies.length == 0) {
     return [];
@@ -132,7 +132,7 @@ export async function publishFactoryDeps(
   console.log(`Combined length ${combinedLength}`);
 
   const txHandle = await deployer.zkWallet.requestExecute({
-    contractAddress: ethers.constants.AddressZero,
+    contractAddress: ethers.ZeroAddress,
     calldata: "0x",
     l2GasLimit: DEFAULT_L2_TX_GAS_LIMIT,
     factoryDeps: bytecodes,
@@ -167,7 +167,7 @@ export async function filterPublishedFactoryDeps(
   const hashesAndMarkers = await getMarkers(factoryDeps, deployer);
 
   for (let i = 0; i < factoryDeps.length; i++) {
-    const depLength = ethers.utils.arrayify(factoryDeps[i]).length;
+    const depLength = ethers.toBeArray(factoryDeps[i]).length;
     const [hash, marker] = hashesAndMarkers[i];
     console.log(`${hash} (length: ${depLength} bytes) (deployed: ${marker})`);
 

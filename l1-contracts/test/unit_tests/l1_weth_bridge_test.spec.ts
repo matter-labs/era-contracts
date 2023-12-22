@@ -1,22 +1,21 @@
 import { expect } from "chai";
-import { ethers } from "ethers";
+import { ethers, Interface } from "ethers";
 import * as hardhat from "hardhat";
 import { hashL2Bytecode } from "../../scripts/utils";
 import { Action, diamondCut, facetCut } from "../../src.ts/diamondCut";
-import type { AllowList, L1WethBridge, WETH9 } from "../../typechain";
+import type { AllowList, L1WethBridge, WETH9 } from "../../typechain-types";
 import {
-  AllowListFactory,
-  DiamondInitFactory,
-  GettersFacetFactory,
-  L1WethBridgeFactory,
-  MailboxFacetFactory,
-  WETH9Factory,
-} from "../../typechain";
-import type { IZkSync } from "../../typechain/IZkSync";
+  AllowList__factory,
+  DiamondInit__factory,
+  GettersFacet__factory,
+  L1WethBridge__factory,
+  MailboxFacet__factory,
+  WETH9__factory,
+} from "../../typechain-types";
+import type { IZkSync } from "../../typechain-types";
 import { AccessMode, getCallRevertReason } from "./utils";
 
-import { Interface } from "ethers/lib/utils";
-import type { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-ethers/build/src/types";
 
 const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -33,7 +32,7 @@ export async function create2DeployFromL1(
   const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  const gasPrice = await zkSync.provider.getGasPrice();
+  const gasPrice = (await zkSync.runner.provider.getFeeData()).gasPrice;
   const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
 
   await zkSync.requestL2Transaction(
@@ -63,36 +62,36 @@ describe("WETH Bridge tests", () => {
 
     const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
     const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+    const gettersFacet = GettersFacet__factory.connect(await gettersContract.getAddress(), gettersContract.runner);
 
     const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailboxFactory.deploy();
-    const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+    const mailboxFacet = MailboxFacet__factory.connect(await mailboxContract.getAddress(), mailboxContract.runner);
 
     const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
+    const allowListContract = await allowListFactory.deploy(owner);
+    allowList = AllowList__factory.connect(await allowListContract.getAddress(), allowListContract.runner);
 
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
     const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+    const diamondInit = DiamondInit__factory.connect(await diamondInitContract.getAddress(), diamondInitContract.runner);
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
-    const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const dummyAddress = ethers.hexlify(ethers.randomBytes(20));
     const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
       {
         verifier: dummyAddress,
         governor: await owner.getAddress(),
         admin: await owner.getAddress(),
-        genesisBatchHash: ethers.constants.HashZero,
+        genesisBatchHash: ethers.ZeroHash,
         genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
-        allowList: allowList.address,
+        genesisBatchCommitment: ethers.ZeroHash,
+        allowList: await allowList.getAddress(),
         verifierParams: {
-          recursionCircuitsSetVksHash: ethers.constants.HashZero,
-          recursionLeafLevelVkHash: ethers.constants.HashZero,
-          recursionNodeLevelVkHash: ethers.constants.HashZero,
+          recursionCircuitsSetVksHash: ethers.ZeroHash,
+          recursionLeafLevelVkHash: ethers.ZeroHash,
+          recursionNodeLevelVkHash: ethers.ZeroHash,
         },
         zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: dummyHash,
@@ -103,25 +102,25 @@ describe("WETH Bridge tests", () => {
     ]);
 
     const facetCuts = [
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true),
+      facetCut(await gettersFacet.getAddress(), gettersFacet.interface, Action.Add, false),
+      facetCut(await mailboxFacet.getAddress(), mailboxFacet.interface, Action.Add, true),
     ];
 
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+    const diamondCutData = diamondCut(facetCuts, await diamondInit.getAddress(), diamondInitData);
 
     const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     const diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(await diamondProxyContract.getAddress(), AccessMode.Public)).wait();
 
-    l1Weth = WETH9Factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
+    l1Weth = WETH9__factory.connect(await (await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).getAddress(), owner);
 
     // prepare the bridge
 
     const bridge = await (
       await hardhat.ethers.getContractFactory("L1WethBridge")
-    ).deploy(l1Weth.address, diamondProxyContract.address, allowListContract.address);
+    ).deploy(l1Weth.getAddress(), await  diamondProxyContract.getAddress(), await allowListContract.getAddress());
 
     // we don't test L2, so it is ok to give garbage factory deps and L2 address
     const garbageBytecode = "0x1111111111111111111111111111111111111111111111111111111111111111";
@@ -131,27 +130,27 @@ describe("WETH Bridge tests", () => {
       [garbageBytecode, garbageBytecode],
       garbageAddress,
       await owner.getAddress(),
-      ethers.constants.WeiPerEther,
-      ethers.constants.WeiPerEther,
+      ethers.WeiPerEther,
+      ethers.WeiPerEther,
     ]);
     const _bridgeProxy = await (
       await hardhat.ethers.getContractFactory("ERC1967Proxy")
-    ).deploy(bridge.address, bridgeInitData, { value: ethers.constants.WeiPerEther.mul(2) });
+    ).deploy(bridge.getAddress(), bridgeInitData, { value: ethers.WeiPerEther*2n });
 
-    bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
+    bridgeProxy = L1WethBridge__factory.connect(await _bridgeProxy.getAddress(), _bridgeProxy.runner);
   });
 
   it("Should not allow an un-whitelisted address to deposit", async () => {
     const revertReason = await getCallRevertReason(
       bridgeProxy
         .connect(randomSigner)
-        .deposit(await randomSigner.getAddress(), ethers.constants.AddressZero, 0, 0, 0, ethers.constants.AddressZero)
+        .deposit(await randomSigner.getAddress(), ethers.ZeroAddress, 0, 0, 0, ethers.ZeroAddress)
     );
 
     expect(revertReason).equal("nr");
 
     // This is only so the following tests don't need whitelisting
-    await (await allowList.setAccessMode(bridgeProxy.address, AccessMode.Public)).wait();
+    await (await allowList.setAccessMode(bridgeProxy.getAddress(), AccessMode.Public)).wait();
   });
 
   it("Should not allow depositing zero WETH", async () => {
@@ -164,7 +163,7 @@ describe("WETH Bridge tests", () => {
           0,
           0,
           0,
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
     );
 
@@ -173,17 +172,17 @@ describe("WETH Bridge tests", () => {
 
   it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
-    await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
+    await (await l1Weth.connect(randomSigner).approve(bridgeProxy.getAddress(), 100)).wait();
     await bridgeProxy
       .connect(randomSigner)
       .deposit(
         await randomSigner.getAddress(),
-        l1Weth.address,
+        l1Weth.getAddress(),
         100,
         1000000,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         await randomSigner.getAddress(),
-        { value: ethers.constants.WeiPerEther }
+        { value: ethers.WeiPerEther }
       );
   });
 
@@ -196,7 +195,7 @@ describe("WETH Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
-      bridgeProxy.connect(randomSigner).finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(96), [])
+      bridgeProxy.connect(randomSigner).finalizeWithdrawal(0, 0, 0, ethers.randomBytes(96), [])
     );
     expect(revertReason).equal("Incorrect ETH message function selector");
   });
@@ -205,7 +204,7 @@ describe("WETH Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       bridgeProxy
         .connect(randomSigner)
-        .finalizeWithdrawal(0, 0, 0, ethers.utils.hexConcat([functionSignature, ethers.utils.randomBytes(92)]), [])
+        .finalizeWithdrawal(0, 0, 0, ethers.concat([functionSignature, ethers.randomBytes(92)]), [])
     );
     expect(revertReason).equal("Wrong L1 ETH withdraw receiver");
   });
@@ -218,11 +217,11 @@ describe("WETH Bridge tests", () => {
           0,
           0,
           0,
-          ethers.utils.hexConcat([
+          ethers.concat([
             functionSignature,
-            bridgeProxy.address,
-            ethers.utils.randomBytes(32),
-            ethers.utils.randomBytes(40),
+            await bridgeProxy.getAddress(),
+            ethers.randomBytes(32),
+            ethers.randomBytes(40),
           ]),
           []
         )

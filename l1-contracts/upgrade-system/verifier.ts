@@ -1,9 +1,8 @@
 import { Command } from "commander";
-import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import { deployViaCreate2 } from "../src.ts/deploy-utils";
-import { web3Url } from "zk/build/utils";
+import { web3Url } from "../scripts/utils";
 import * as path from "path";
 import { insertGasPrice } from "./utils";
 
@@ -14,24 +13,23 @@ async function deployVerifier(
   l1Rpc: string,
   create2Address: string,
   nonce?: number,
-  gasPrice?: BigNumber,
+  gasPrice?: bigint,
   privateKey?: string,
   file?: string,
   create2Salt?: string
 ) {
-  const provider = new ethers.providers.JsonRpcProvider(l1Rpc);
+  const provider = new ethers.JsonRpcProvider(l1Rpc);
   const wallet = privateKey
     ? new ethers.Wallet(privateKey, provider)
-    : ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-        "m/44'/60'/0'/0/1"
-      ).connect(provider);
+    : ethers.Wallet.fromPhrase(
+        process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+      ).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
-  create2Salt = create2Salt ?? ethers.constants.HashZero;
+  create2Salt = create2Salt ?? ethers.ZeroHash;
 
   const ethTxOptions = {};
   if (!nonce) {
-    ethTxOptions["nonce"] = await wallet.getTransactionCount();
+    ethTxOptions["nonce"] = await wallet.getNonce();
   }
   if (!gasPrice) {
     await insertGasPrice(provider, ethTxOptions);

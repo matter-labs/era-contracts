@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { renderFile } from "template-file";
-import { utils } from "zksync-web3";
+import { utils } from "zksync-ethers";
 import { SYSTEM_CONTRACTS, getRevertSelector, getTransactionUtils } from "./constants";
 import type { ForceDeployment } from "./utils";
 
@@ -21,9 +21,9 @@ function path(...args: string[]): string {
 
 function getSelector(contractName: string, method: string): string {
   const artifact = hre.artifacts.readArtifactSync(contractName);
-  const contractInterface = new ethers.utils.Interface(artifact.abi);
+  const contractInterface = new ethers.Interface(artifact.abi);
 
-  return contractInterface.getSighash(method);
+  return contractInterface.getFunction(method)?.selector!;
 }
 
 // Methods from ethers do zero pad from left, but we need to pad from the right
@@ -44,7 +44,7 @@ function getPaddedSelector(contractName: string, method: string): string {
 
 function getSystemContextExpectedHash() {
   const artifact = hre.artifacts.readArtifactSync("SystemContext");
-  return ethers.utils.hexlify(utils.hashBytecode(artifact.bytecode));
+  return ethers.hexlify(utils.hashBytecode(artifact.bytecode));
 }
 
 function upgradeSystemContextCalldata() {
@@ -52,7 +52,7 @@ function upgradeSystemContextCalldata() {
   // it into writing of the calldata into the bootloader memory.
 
   const newHash = getSystemContextExpectedHash();
-  const artifact = new ethers.utils.Interface(hre.artifacts.readArtifactSync("ContractDeployer").abi);
+  const artifact = new ethers.Interface(hre.artifacts.readArtifactSync("ContractDeployer").abi);
 
   const forceDeplyment: ForceDeployment = {
     bytecodeHash: newHash,

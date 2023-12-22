@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { ethers } from "hardhat";
-import type { PriorityQueueTest } from "../../typechain";
-import { PriorityQueueTestFactory } from "../../typechain";
+import type { PriorityQueueTest } from "../../typechain-types";
+import { PriorityQueueTest__factory } from "../../typechain-types";
 import { getCallRevertReason } from "./utils";
 
 describe("Priority queue tests", function () {
@@ -12,23 +12,23 @@ describe("Priority queue tests", function () {
   before(async () => {
     const contractFactory = await hardhat.ethers.getContractFactory("PriorityQueueTest");
     const contract = await contractFactory.deploy();
-    priorityQueueTest = PriorityQueueTestFactory.connect(contract.address, contract.signer);
+    priorityQueueTest = PriorityQueueTest__factory.connect(await contract.getAddress(), contract.runner);
   });
 
   describe("on empty queue", function () {
     it("getSize", async () => {
       const size = await priorityQueueTest.getSize();
-      expect(size).equal(0);
+      expect(size).equal(0n);
     });
 
     it("getFirstUnprocessedPriorityTx", async () => {
       const firstUnprocessedTx = await priorityQueueTest.getFirstUnprocessedPriorityTx();
-      expect(firstUnprocessedTx).equal(0);
+      expect(firstUnprocessedTx).equal(0n);
     });
 
     it("getTotalPriorityTxs", async () => {
       const totalPriorityTxs = await priorityQueueTest.getTotalPriorityTxs();
-      expect(totalPriorityTxs).equal(0);
+      expect(totalPriorityTxs).equal(0n);
     });
 
     it("isEmpty", async () => {
@@ -52,7 +52,7 @@ describe("Priority queue tests", function () {
 
     before(async () => {
       for (let i = 0; i < NUMBER_OPERATIONS; ++i) {
-        const dummyOp = { canonicalTxHash: ethers.constants.HashZero, expirationTimestamp: i, layer2Tip: i };
+        const dummyOp = { canonicalTxHash: ethers.ZeroHash, expirationTimestamp: i, layer2Tip: i };
         queue.push(dummyOp);
         await priorityQueueTest.pushBack(dummyOp);
       }
@@ -73,7 +73,7 @@ describe("Priority queue tests", function () {
 
     it("getFirstUnprocessedPriorityTx", async () => {
       const firstUnprocessedTx = await priorityQueueTest.getFirstUnprocessedPriorityTx();
-      expect(firstUnprocessedTx).equal(0);
+      expect(firstUnprocessedTx).equal(0n);
     });
 
     it("getTotalPriorityTxs", async () => {

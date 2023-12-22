@@ -1,7 +1,6 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { ethers, formatUnits, parseUnits, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider } from "./utils";
 
 import * as fs from "fs";
@@ -23,16 +22,15 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
+        : Wallet.fromPhrase(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
-      console.log(`Using deployer wallet: ${deployWallet.address}`);
+          ).derivePath("m/44'/60'/0'/0/1").connect(provider);
+      console.log(`Using deployer wallet: ${deployWallet.getAddress()}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
+      const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.getAddress();
 
       const deployer = new Deployer({
         deployWallet,
@@ -52,21 +50,21 @@ async function main() {
         deployWallet
       );
 
-      await (await erc20Bridge.changeAdmin(governance.address)).wait();
-      await (await wethBridge.changeAdmin(governance.address)).wait();
+      await (await erc20Bridge.changeAdmin(await governance.getAddress())).wait();
+      await (await wethBridge.changeAdmin(await governance.getAddress())).wait();
 
-      await (await zkSync.setPendingGovernor(governance.address)).wait();
+      await (await zkSync.setPendingGovernor(await governance.getAddress())).wait();
 
       const call = {
-        target: zkSync.address,
+        target: await zkSync.getAddress(),
         value: 0,
         data: zkSync.interface.encodeFunctionData("acceptGovernor"),
       };
 
       const operation = {
         calls: [call],
-        predecessor: ethers.constants.HashZero,
-        salt: ethers.constants.HashZero,
+        predecessor: ethers.ZeroHash,
+        salt: ethers.ZeroHash,
       };
 
       await (await governance.scheduleTransparent(operation, 0)).wait();

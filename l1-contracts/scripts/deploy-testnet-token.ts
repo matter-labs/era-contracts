@@ -1,4 +1,4 @@
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 import { ArgumentParser } from "argparse";
 import { Wallet } from "ethers";
 import * as fs from "fs";
@@ -29,7 +29,7 @@ async function main() {
   const provider = web3Provider();
   const wallet = args.deployerPrivateKey
     ? new Wallet(args.deployerPrivateKey, provider)
-    : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
+    : Wallet.fromPhrase(ethTestConfig.mnemonic).derivePath("m/44'/60'/0'/0/1").connect(provider);
 
   if (process.env.CHAIN_ETH_NETWORK === "mainnet") {
     throw new Error("Test ERC20 tokens should not be deployed to mainnet");
@@ -73,10 +73,10 @@ async function main() {
 
     console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
     const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", wallet);
-    const erc20 = await tokenFactory.deploy(...constructorArgs);
+    const erc20 = await tokenFactory.deploy(constructorArgs[0], constructorArgs[1], constructorArgs[2], constructorArgs[3]);
 
     const testnetToken = token;
-    testnetToken.address = erc20.address;
+    testnetToken.address = await erc20.getAddress();
     result.push(testnetToken);
   }
 

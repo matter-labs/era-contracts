@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import { web3Provider } from "./utils";
@@ -23,19 +22,18 @@ async function main() {
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
-          ).connect(provider);
+        : Wallet.fromPhrase(
+            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic
+          ).derivePath("m/44'/60'/0'/0/0").connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
-      console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
+      const gasPrice = cmd.gasPrice ? ethers.parseUnits(cmd.gasPrice, "gwei") : (await provider.getFeeData()).gasPrice;
+      console.log(`Using gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
 
-      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getNonce();
       console.log(`Using nonce: ${nonce}`);
 
-      const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
+      const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.hexlify(ethers.randomBytes(32));
 
       const deployer = new Deployer({
         deployWallet,

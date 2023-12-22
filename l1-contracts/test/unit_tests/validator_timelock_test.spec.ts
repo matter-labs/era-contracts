@@ -1,9 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
-import type { DummyExecutor, ValidatorTimelock } from "../../typechain";
-import { DummyExecutorFactory, ValidatorTimelockFactory } from "../../typechain";
-import { getCallRevertReason } from "./utils";
+import { DummyExecutor, ValidatorTimelock, ValidatorTimelock__factory, DummyExecutor__factory } from "../../typechain-types";
+import { CommitBatchInfo, getCallRevertReason, StoredBatchInfo } from "./utils";
 
 describe("ValidatorTimelock tests", function () {
   let owner: ethers.Signer;
@@ -17,31 +16,31 @@ describe("ValidatorTimelock tests", function () {
     serializedProof: [],
   };
 
-  function getMockCommitBatchInfo(batchNumber: number, timestamp: number = 0) {
+  function getMockCommitBatchInfo(batchNumber: number, timestamp: number = 0): CommitBatchInfo {
     return {
       batchNumber,
       timestamp,
       indexRepeatedStorageChanges: 0,
-      newStateRoot: ethers.constants.HashZero,
+      newStateRoot: ethers.ZeroHash,
       numberOfLayer1Txs: 0,
-      priorityOperationsHash: ethers.constants.HashZero,
-      bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-      eventsQueueStateHash: ethers.utils.randomBytes(32),
-      systemLogs: [],
+      priorityOperationsHash: ethers.ZeroHash,
+      bootloaderHeapInitialContentsHash: ethers.randomBytes(32),
+      eventsQueueStateHash: ethers.randomBytes(32),
+      systemLogs: new Uint8Array(0),
       totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
   }
 
-  function getMockStoredBatchInfo(batchNumber: number, timestamp: number = 0) {
+  function getMockStoredBatchInfo(batchNumber: number, timestamp: number = 0): StoredBatchInfo {
     return {
       batchNumber,
-      batchHash: ethers.constants.HashZero,
+      batchHash: ethers.ZeroHash,
       indexRepeatedStorageChanges: 0,
       numberOfLayer1Txs: 0,
-      priorityOperationsHash: ethers.constants.HashZero,
-      l2LogsTreeRoot: ethers.constants.HashZero,
+      priorityOperationsHash: ethers.ZeroHash,
+      l2LogsTreeRoot: ethers.ZeroHash,
       timestamp,
-      commitment: ethers.constants.HashZero,
+      commitment: ethers.ZeroHash,
     };
   }
 
@@ -50,18 +49,18 @@ describe("ValidatorTimelock tests", function () {
 
     const dummyExecutorFactory = await hardhat.ethers.getContractFactory("DummyExecutor");
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
-    dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
+    dummyExecutor = DummyExecutor__factory.connect(await dummyExecutorContract.getAddress(), dummyExecutorContract.runner);
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
     const validatorTimelockContract = await validatorTimelockFactory.deploy(
       await owner.getAddress(),
-      dummyExecutor.address,
+      await dummyExecutor.getAddress(),
       0,
-      ethers.constants.AddressZero
+      ethers.ZeroAddress
     );
-    validatorTimelock = ValidatorTimelockFactory.connect(
-      validatorTimelockContract.address,
-      validatorTimelockContract.signer
+    validatorTimelock = ValidatorTimelock__factory.connect(
+      await validatorTimelockContract.getAddress(),
+      validatorTimelockContract.runner
     );
   });
 

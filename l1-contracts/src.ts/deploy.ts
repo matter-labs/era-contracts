@@ -1,17 +1,16 @@
 import * as hardhat from "hardhat";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-ethers";
 
-import type { BigNumberish, providers, Signer, Wallet } from "ethers";
+import { BigNumberish, HDNodeWallet, hexlify, Interface, Provider, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
-import { Interface, hexlify } from "ethers/lib/utils";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
-import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
-import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
-import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
-import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
-import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { AllowListFactory } from "../typechain";
-import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import { IZkSync__factory } from "../typechain-types";
+import { L1ERC20Bridge__factory } from "../typechain-types";
+import { L1WethBridge__factory } from "../typechain-types";
+import { ValidatorTimelock__factory } from "../typechain-types";
+import { SingletonFactory__factory } from "../typechain-types";
+import { AllowList__factory } from "../typechain-types";
+import { TransparentUpgradeableProxy__factory } from "../typechain-types";
 import {
   readSystemContractsBytecode,
   hashL2Bytecode,
@@ -22,7 +21,7 @@ import {
   getTokens,
 } from "../scripts/utils";
 import { deployViaCreate2 } from "./deploy-utils";
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { IGovernance__factory } from "../typechain-types";
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
@@ -52,7 +51,7 @@ export interface DeployedAddresses {
 }
 
 export interface DeployerConfig {
-  deployWallet: Wallet;
+  deployWallet: Wallet | HDNodeWallet;
   ownerAddress?: string;
   verbose?: boolean;
 }
@@ -85,7 +84,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
 
 export class Deployer {
   public addresses: DeployedAddresses;
-  private deployWallet: Wallet;
+  private deployWallet: Wallet | HDNodeWallet;
   private verbose: boolean;
   private ownerAddress: string;
 
@@ -147,7 +146,7 @@ export class Deployer {
     return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
   }
 
-  public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
+  public async deployCreate2Factory(ethTxOptions?: ethers.TransactionRequest) {
     if (this.verbose) {
       console.log("Deploying Create2 factory");
     }
@@ -156,15 +155,15 @@ export class Deployer {
       signer: this.deployWallet,
     });
 
-    const create2Factory = await contractFactory.deploy(...[ethTxOptions]);
-    const rec = await create2Factory.deployTransaction.wait();
-
+    const create2Factory = await contractFactory.deploy({gasPrice: ethTxOptions?.gasPrice, nonce: ethTxOptions?.nonce });
+    const rec = await create2Factory.waitForDeployment();
+  
     if (this.verbose) {
-      console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${create2Factory.address}`);
-      console.log(`Create2 factory deployed, gasUsed: ${rec.gasUsed.toString()}`);
+      console.log(`CONTRACTS_CREATE2_FACTORY_ADDR=${await create2Factory.getAddress()}`);
+      // console.log(`Create2 factory deployed, gasUsed: ${create2Factory.g .toString()}`);
     }
 
-    this.addresses.Create2Factory = create2Factory.address;
+    this.addresses.Create2Factory = await create2Factory.getAddress();
   }
 
   private async deployViaCreate2(
@@ -172,7 +171,7 @@ export class Deployer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     args: any[],
     create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest,
+    ethTxOptions: ethers.TransactionRequest,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     libraries?: any
   ) {
@@ -189,12 +188,12 @@ export class Deployer {
     return result[0];
   }
 
-  public async deployGovernance(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployGovernance(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "Governance",
       // TODO: load parameters from config
-      [this.ownerAddress, ethers.constants.AddressZero, 0],
+      [this.ownerAddress, ethers.ZeroAddress, 0],
       create2Salt,
       ethTxOptions
     );
@@ -206,7 +205,7 @@ export class Deployer {
     this.addresses.Governance = contractAddress;
   }
 
-  public async deployAllowList(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployAllowList(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("AllowList", [this.ownerAddress], create2Salt, ethTxOptions);
 
@@ -217,7 +216,7 @@ export class Deployer {
     this.addresses.AllowList = contractAddress;
   }
 
-  public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("MailboxFacet", [], create2Salt, ethTxOptions);
 
@@ -228,7 +227,7 @@ export class Deployer {
     this.addresses.ZkSync.MailboxFacet = contractAddress;
   }
 
-  public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("AdminFacet", [], create2Salt, ethTxOptions);
 
@@ -239,7 +238,7 @@ export class Deployer {
     this.addresses.ZkSync.AdminFacet = contractAddress;
   }
 
-  public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("ExecutorFacet", [], create2Salt, ethTxOptions);
 
@@ -250,7 +249,7 @@ export class Deployer {
     this.addresses.ZkSync.ExecutorFacet = contractAddress;
   }
 
-  public async deployGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployGettersFacet(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("GettersFacet", [], create2Salt, ethTxOptions);
 
@@ -261,7 +260,7 @@ export class Deployer {
     this.addresses.ZkSync.GettersFacet = contractAddress;
   }
 
-  public async deployVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployVerifier(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
 
@@ -272,7 +271,7 @@ export class Deployer {
     this.addresses.ZkSync.Verifier = contractAddress;
   }
 
-  public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
@@ -288,7 +287,7 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeImplementation = contractAddress;
   }
 
-  public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -304,7 +303,7 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
   }
 
-  public async deployWethToken(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployWethToken(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("WETH9", [], create2Salt, ethTxOptions);
 
@@ -313,7 +312,7 @@ export class Deployer {
     }
   }
 
-  public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
 
@@ -332,7 +331,7 @@ export class Deployer {
     this.addresses.Bridges.WethBridgeImplementation = contractAddress;
   }
 
-  public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -348,7 +347,7 @@ export class Deployer {
     this.addresses.Bridges.WethBridgeProxy = contractAddress;
   }
 
-  public async deployDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDiamondInit(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("DiamondInit", [], create2Salt, ethTxOptions);
 
@@ -362,7 +361,7 @@ export class Deployer {
   public async deployDiamondUpgradeInit(
     create2Salt: string,
     contractVersion: number,
-    ethTxOptions: ethers.providers.TransactionRequest
+    ethTxOptions: ethers.TransactionRequest
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
@@ -379,7 +378,7 @@ export class Deployer {
     this.addresses.ZkSync.DiamondUpgradeInit = contractAddress;
   }
 
-  public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("DefaultUpgrade", [], create2Salt, ethTxOptions);
 
@@ -390,7 +389,7 @@ export class Deployer {
     this.addresses.ZkSync.DefaultUpgrade = contractAddress;
   }
 
-  public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
@@ -410,7 +409,7 @@ export class Deployer {
   }
 
   public async deployZkSyncContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getNonce();
 
     // deploy zkSync contract
     const independentZkSyncDeployPromises = [
@@ -427,20 +426,20 @@ export class Deployer {
   }
 
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getNonce();
 
     await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
   }
 
   public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getNonce();
 
     await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
     await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
   }
 
-  public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
     const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
@@ -458,7 +457,7 @@ export class Deployer {
     this.addresses.ValidatorTimeLock = contractAddress;
   }
 
-  public async deployMulticall3(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployMulticall3(create2Salt: string, ethTxOptions: ethers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("Multicall3", [], create2Salt, ethTxOptions);
 
@@ -467,35 +466,35 @@ export class Deployer {
     }
   }
 
-  public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+  public transparentUpgradableProxyContract(address, signerOrProvider: Signer | Provider) {
+    return TransparentUpgradeableProxy__factory.connect(address, signerOrProvider);
   }
 
-  public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {
-    return SingletonFactoryFactory.connect(this.addresses.Create2Factory, signerOrProvider);
+  public create2FactoryContract(signerOrProvider: Signer | Provider) {
+    return SingletonFactory__factory.connect(this.addresses.Create2Factory, signerOrProvider);
   }
 
-  public governanceContract(signerOrProvider: Signer | providers.Provider) {
-    return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
+  public governanceContract(signerOrProvider: Signer | Provider) {
+    return IGovernance__factory.connect(this.addresses.Governance, signerOrProvider);
   }
 
-  public zkSyncContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncFactory.connect(this.addresses.ZkSync.DiamondProxy, signerOrProvider);
+  public zkSyncContract(signerOrProvider: Signer | Provider) {
+    return IZkSync__factory.connect(this.addresses.ZkSync.DiamondProxy, signerOrProvider);
   }
 
-  public validatorTimelock(signerOrProvider: Signer | providers.Provider) {
-    return ValidatorTimelockFactory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
+  public validatorTimelock(signerOrProvider: Signer | Provider) {
+    return ValidatorTimelock__factory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
   }
 
-  public l1AllowList(signerOrProvider: Signer | providers.Provider) {
-    return AllowListFactory.connect(this.addresses.AllowList, signerOrProvider);
+  public l1AllowList(signerOrProvider: Signer | Provider) {
+    return AllowList__factory.connect(this.addresses.AllowList, signerOrProvider);
   }
 
-  public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {
-    return L1ERC20BridgeFactory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
+  public defaultERC20Bridge(signerOrProvider: Signer | Provider) {
+    return L1ERC20Bridge__factory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
   }
 
-  public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {
-    return L1WethBridgeFactory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
+  public defaultWethBridge(signerOrProvider: Signer | Provider) {
+    return L1WethBridge__factory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
   }
 }
