@@ -143,4 +143,7 @@ struct AppStorage {
     address admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
     address pendingAdmin;
+    /// @notice MERGE CAREFULLY: CALLOUT IF THIS IS STILL HERE IN PR:
+    /// @notice Address of the contracts that functions like HASH_OPCODE_BYTE from EIP 4844
+    address blobVersionedHashGetter;
 }

@@ -4,12 +4,12 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, POINT_EVALUATION_INPUT_SIZE} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {VerifierParams} from "../Storage.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
@@ -23,11 +23,12 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
+    /// @custom:todo ADD BACK VIEW ONCE WE HAVE THE BLOB VERSIONED HASHES
     function _commitOneBatch(
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal view returns (StoredBatchInfo memory) {
+    ) internal returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         // Check that batch contain all meta information for L2 logs.
@@ -38,8 +39,11 @@ contract ExecutorFacet is Base, IExecutor {
             bytes32 previousBatchHash,
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp
+            uint256 packedBatchAndL2BlockTimestamp,
+            bytes32 blobLinearHash
         ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+
+        bytes32 blobCommitmentRollingHash = _verifyBlobInformation(_newBatch.pubdataCommitments, blobLinearHash);
 
         require(_previousBatch.batchHash == previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -51,7 +55,7 @@ contract ExecutorFacet is Base, IExecutor {
         _verifyBatchTimestamp(packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(_newBatch, stateDiffHash);
+        bytes32 commitment = _createBatchCommitment(_newBatch, stateDiffHash, blobCommitmentRollingHash);
 
         return
             StoredBatchInfo(
@@ -109,7 +113,8 @@ contract ExecutorFacet is Base, IExecutor {
             bytes32 previousBatchHash,
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp
+            uint256 packedBatchAndL2BlockTimestamp,
+            bytes32 blobLinearHash
         )
     {
         // Copy L2 to L1 logs into memory.
@@ -118,8 +123,6 @@ contract ExecutorFacet is Base, IExecutor {
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
-
-        bytes32 providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
 
         // linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
@@ -138,7 +141,7 @@ contract ExecutorFacet is Base, IExecutor {
                 l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                require(providedL2ToL1PubdataHash == logValue, "wp");
+                // might be okay to remove this value
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 stateDiffHash = logValue;
@@ -157,18 +160,21 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
+            } else if (logKey == uint256(SystemLogKey.BLOBS_LINEAR_HASH_KEY)) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
+                blobLinearHash = logValue;
             } else {
                 revert("ul");
             }
         }
 
         // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
-        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // Without the protocol upgrade we expect 8 logs: 2^9 - 2^7 - 1 = 383
+        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            require(processedLogs == 127, "b7");
+            require(processedLogs == 383, "b7");
         } else {
-            require(processedLogs == 255, "b8");
+            require(processedLogs == 511, "b8");
         }
     }
 
@@ -423,11 +429,12 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Creates batch commitment from its data
     function _createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash
+        bytes32 _stateDiffHash,
+        bytes32 _blobCommitmentRollingHash
     ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash));
+        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitmentRollingHash));
 
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
@@ -448,7 +455,8 @@ contract ExecutorFacet is Base, IExecutor {
 
     function _batchAuxiliaryOutput(
         CommitBatchInfo calldata _batch,
-        bytes32 _stateDiffHash
+        bytes32 _stateDiffHash,
+        bytes32 _blobCommitmentRollingHash
     ) internal pure returns (bytes memory) {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
@@ -459,7 +467,8 @@ contract ExecutorFacet is Base, IExecutor {
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash
+                _batch.eventsQueueStateHash,
+                _blobCommitmentRollingHash
             );
     }
 
@@ -481,25 +490,40 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Calls the point evaluation precompile and verifies the output
     // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
     // Also verify that the provided commitment matches the provided versioned_hash.
-    function _pointEvaluationPrecompile(
-        bytes32 _versionedHash, 
-        uint256 _inputPoint, 
-        uint256 _claimedValue, 
-        bytes memory _commitment, 
-        bytes memory _proof
-    ) internal returns (bytes32) {
-        bytes memory precompileInput = abi.encodePacked(
-            _versionedHash,
-            _inputPoint,
-            _claimedValue,
-            _commitment,
-            _proof
-        );
+    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal returns (bytes32) {
+        bytes memory precompileInput = abi.encodePacked(_versionedHash, _inputPoint, _valueCommitmentProof);
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.call(precompileInput);
 
         require(success, "failed to call point evaluation precompile");
         uint256 result = abi.decode(data, (uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
+    }
+
+    function _verifyBlobInformation(bytes calldata _pubdataCommitments, bytes32 _blobLinearHash) internal returns (bytes32 blobCommitmentRollingHash) {
+        uint256 versionedHashIndex = 0;
+
+        for (uint256 i = 0; i < _pubdataCommitments.length; i += POINT_EVALUATION_INPUT_SIZE) {
+            (bool success, bytes memory data) = s.blobVersionedHashGetter.call(abi.encode(versionedHashIndex));
+            require(success, "vc");
+            bytes32 versionedHash = abi.decode(data, (bytes32));
+            bytes32 evalutationPoint = keccak256(abi.encode(versionedHash, _blobLinearHash));
+            versionedHashIndex += 1;
+
+            require(versionedHash != bytes32(0), "vh");
+
+            _pointEvaluationPrecompile(versionedHash, evalutationPoint, _pubdataCommitments[i:i + POINT_EVALUATION_INPUT_SIZE]);
+
+            blobCommitmentRollingHash = keccak256(
+                abi.encode(
+                    blobCommitmentRollingHash,
+                    abi.encodePacked(
+                        versionedHash,
+                        evalutationPoint,
+                        _pubdataCommitments[i:i+32]
+                    )
+                )
+            );
+        }
     }
 }

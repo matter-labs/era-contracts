@@ -13,6 +13,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
+import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -63,6 +64,10 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
 
+IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x11)
+);
+
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
@@ -92,7 +97,8 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
+    BLOBS_LINEAR_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
@@ -122,3 +128,6 @@ uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
 uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;
 /// @dev The offset of the final value in a storage diff.
 uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
+
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 32 bytes per field element/
+uint256 constant BLOB_SIZE_BYTES = 131_072;

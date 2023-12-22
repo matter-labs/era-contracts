@@ -14,9 +14,10 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash
+        bytes32 _stateDiffHash,
+        bytes32 _blobCommitmentRollingHash
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash);
+        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitmentRollingHash);
     }
 
     function processL2Logs(
@@ -31,7 +32,8 @@ contract ExecutorProvingTest is ExecutorFacet {
             bytes32 previousBatchHash,
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp
+            uint256 packedBatchAndL2BlockTimestamp,
+            bytes32 blobLinearHash
         )
     {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);

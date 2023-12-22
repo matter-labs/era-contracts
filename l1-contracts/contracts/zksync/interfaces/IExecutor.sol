@@ -13,7 +13,8 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
+    BLOBS_LINEAR_HASH_KEY
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -25,9 +26,12 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
-/// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the 
+/// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the
 /// point evaluation precompile
 uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
+
+/// @dev Total size of the input for point evaluation precompile without the version hash
+uint256 constant POINT_EVALUATION_INPUT_SIZE = 160;
 
 interface IExecutor is IBase {
     /// @notice Rollup batch stored data
@@ -60,7 +64,8 @@ interface IExecutor is IBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param pubdataCommitments Packed pubdata commitments. # commitments || ∑ (versioned hash || input point || claimed value || commitment || proof)
+    /// @param pubdataCommitments Packed pubdata commitments. ∑ claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+    /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
     struct CommitBatchInfo {
         uint64 batchNumber;
         uint64 timestamp;

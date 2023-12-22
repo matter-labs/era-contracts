@@ -31,3 +31,6 @@ address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(0x800b);
 
 /// @dev The address of the bytecode compressor system contract
 address constant L2_BYTECODE_COMPRESSOR_SYSTEM_CONTRACT_ADDR = address(0x800e);
+
+/// @dev The address of the pubdata chunk publisher contract
+address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(0x8011);
