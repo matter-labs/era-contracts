@@ -8,9 +8,7 @@ contract PushOperationsTest is PriorityQueueSharedTest {
     uint public constant NUMBER_OPERATIONS = 10;
 
     function setUp() public {
-        
-          push_mock_entries(NUMBER_OPERATIONS);
-
+        push_mock_entries(NUMBER_OPERATIONS);
     }
 
     function test_front() public {
