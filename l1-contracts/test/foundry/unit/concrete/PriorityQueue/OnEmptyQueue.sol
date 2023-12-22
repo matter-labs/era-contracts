@@ -3,7 +3,6 @@ pragma solidity 0.8.20;
 import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 
 contract OnEmptyQueueTest is PriorityQueueSharedTest {
-
     function test_gets() public {
         assertEq(0, priorityQueue.getSize());
         assertEq(0, priorityQueue.getFirstUnprocessedPriorityTx());

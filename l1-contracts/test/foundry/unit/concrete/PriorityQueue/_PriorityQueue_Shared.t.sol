@@ -5,9 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {PriorityQueueTest} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/PriorityQueueTest.sol";
 import {PriorityOperation} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/PriorityQueueTest.sol";
 
-
 contract PriorityQueueSharedTest is Test {
-
     PriorityQueueTest internal priorityQueue;
 
     constructor() {
@@ -23,7 +21,6 @@ contract PriorityQueueSharedTest is Test {
                 layer2Tip: uint192(i)
             });
             priorityQueue.pushBack(dummyOp);
-          }
+        }
     }
-    
 }
