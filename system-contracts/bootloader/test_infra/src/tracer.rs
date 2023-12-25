@@ -8,7 +8,7 @@ use multivm::interface::{
     tracer::{TracerExecutionStatus, TracerExecutionStopReason},
 };
 use multivm::vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState};
-use multivm::zk_evm_1_4_0::tracing::{BeforeExecutionData, VmLocalStateData};
+use multivm::zk_evm_1_4_1::tracing::{BeforeExecutionData, VmLocalStateData};
 
 use zksync_state::{StoragePtr, WriteStorage};
 

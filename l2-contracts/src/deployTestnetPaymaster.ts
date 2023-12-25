@@ -20,7 +20,7 @@ async function main() {
 
   program.version("0.1.0").name("deploy-testnet-paymaster").description("Deploys the testnet paymaster to L2");
 
-  program.option("--private-key <private-key>").action(async (cmd: Command) => {
+  program.option("--private-key <private-key>").action(async (cmd) => {
     const deployWallet = cmd.privateKey
       ? new Wallet(cmd.privateKey, provider)
       : Wallet.fromMnemonic(

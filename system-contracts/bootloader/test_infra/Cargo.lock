@@ -5306,11 +5306,7 @@ dependencies = [
 [[package]]
 name = "vlog"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "chrono",
  "sentry",
@@ -5320,29 +5316,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
-=======
-name = "vm"
-version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
-dependencies = [
- "anyhow",
- "hex",
- "itertools",
- "once_cell",
- "thiserror",
- "tracing",
- "vise",
- "zk_evm",
- "zksync_config",
- "zksync_contracts",
- "zksync_state",
- "zksync_types",
- "zksync_utils",
-]
-
-[[package]]
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 name = "walkdir"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5901,11 +5874,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "serde",
  "serde_json",
@@ -5915,11 +5884,7 @@ dependencies = [
 [[package]]
 name = "zksync_concurrency"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/era-consensus.git?rev=da015d4c94b19962bc11622b6cc256e214256555#da015d4c94b19962bc11622b6cc256e214256555"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "anyhow",
  "once_cell",
@@ -5984,11 +5949,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "envy",
  "ethabi",
@@ -6002,11 +5963,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "base64 0.13.1",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6021,11 +5978,7 @@ dependencies = [
 [[package]]
 name = "zksync_dal"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -6058,11 +6011,7 @@ dependencies = [
 [[package]]
 name = "zksync_health_check"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "async-trait",
  "futures",
@@ -6075,11 +6024,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -6089,11 +6034,7 @@ dependencies = [
 [[package]]
 name = "zksync_protobuf"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/era-consensus.git?rev=da015d4c94b19962bc11622b6cc256e214256555#da015d4c94b19962bc11622b6cc256e214256555"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "anyhow",
  "bit-vec",
@@ -6144,11 +6085,7 @@ dependencies = [
 [[package]]
 name = "zksync_storage"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "num_cpus",
  "once_cell",
@@ -6178,11 +6115,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "anyhow",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6216,11 +6149,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "0.1.0"
-<<<<<<< HEAD:system-contracts/bootloader/test_infra/Cargo.lock
 source = "git+https://github.com/matter-labs/zksync-era.git?branch=ad-update-sc-paths#a161f013c8a1e45399b6e04157d7cac5a4d46e60"
-=======
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=boojum-with-big-batch#3a6ec3ea0a0366e8ef54df0c39d002a00ad71dc3"
->>>>>>> @{-1}:bootloader/test_infra/Cargo.lock
 dependencies = [
  "anyhow",
  "bigdecimal",
