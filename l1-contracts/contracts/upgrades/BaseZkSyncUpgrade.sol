@@ -27,6 +27,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
     /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
     /// the previous protocol version.
+    /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
     struct ProposedUpgrade {
         IMailbox.L2CanonicalTransaction l2ProtocolUpgradeTx;
         bytes[] factoryDeps;
@@ -38,6 +39,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         bytes postUpgradeCalldata;
         uint256 upgradeTimestamp;
         uint256 newProtocolVersion;
+        address newAllowList;
     }
 
     /// @notice Changes the protocol version
