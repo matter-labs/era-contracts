@@ -2,7 +2,7 @@ import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
+import { deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
 import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";

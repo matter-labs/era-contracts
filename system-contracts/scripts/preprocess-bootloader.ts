@@ -9,7 +9,7 @@ import { getRevertSelector, getTransactionUtils } from "./constants";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const preprocess = require("preprocess");
-const SYSTEM_PARAMS = require("../SystemConfig.json");
+const SYSTEM_PARAMS = require("../../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
 const OUTPUT_DIR = "bootloader/build";
