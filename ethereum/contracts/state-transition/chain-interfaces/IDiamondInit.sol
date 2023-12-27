@@ -22,6 +22,8 @@ struct InitializeData {
     uint256 protocolVersion;
     address governor;
     address admin;
+    address baseToken;
+    address baseTokenBridge;
     bytes32 storedBatchZero;
     IVerifier verifier;
     VerifierParams verifierParams;

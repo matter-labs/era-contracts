@@ -226,6 +226,7 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
 
         // construct init data
         bytes memory initData;
+        /// all together 4+9*32=292 bytes
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
@@ -234,6 +235,8 @@ contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
             bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_governor))),
             bytes32(uint256(uint160(_governor))),
+            bytes32(uint256(uint160(_baseToken))),
+            bytes32(uint256(uint160(_baseTokenBridge))),
             bytes32(storedBatchZero),
             diamondCut.initCalldata
         );

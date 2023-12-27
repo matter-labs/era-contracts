@@ -10,8 +10,6 @@ import "../../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 contract DiamondUpgradeInit6 is MailboxFacet {
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {}
 
     function forceDeploy(
         bytes calldata _upgradeL2WethTokenCalldata,

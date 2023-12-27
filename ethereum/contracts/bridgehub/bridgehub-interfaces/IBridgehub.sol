@@ -97,5 +97,12 @@ interface IBridgehub {
 
     function newStateTransition(address _stateTransition) external;
 
+    function newToken(address _token) external;
+
+    function newTokenBridge(address _tokenBridge) external;
+
+    function setWethBridge(address _wethBridge) external;
+
+
     event NewChain(uint64 indexed chainId, address stateTransition, address indexed chainGovernance);
 }

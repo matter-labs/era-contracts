@@ -38,6 +38,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev Era's chainID
     uint256 public immutable eraChainId;
 
+    address public constant ETH_TOKEN_ADDRESS = address(1); 
+
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
     /// @dev this is just used for ERA for backwards compatibility reasons
@@ -90,6 +92,9 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev A mapping chainId => account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256)))) internal depositAmount;
+
+    /// @dev used for extra security until hyperbridging happens. 
+    mapping(uint256 => mapping(address => uint256)) public chainBalance;
 
     function l2Bridge() external view returns (address) {
         return l2BridgeAddress[eraChainId];
@@ -187,7 +192,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1ERC20Bridge: invalid factory deps");
         }
         // The caller miscalculated deploy transactions fees
-        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == address(0);
+        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
             uint256 mintValue = _mintValue;
             if (ethIsBaseToken) {
@@ -216,15 +221,17 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             // Prepare the proxy constructor data
             bytes memory l2BridgeProxyConstructorData;
             {
+                address proxyAdmin = readProxyAdmin();
+                address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
                 address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(
                     IL2ERC20Bridge.initialize,
-                    (address(this), l2TokenProxyBytecodeHash, l2Governor)
+                    (address(this), l2TokenProxyBytecodeHash, l2ProxyAdmin, l2Governor)
                 );
                 l2BridgeProxyConstructorData = abi.encode(
                     bridgeImplementationAddr,
-                    l2Governor,
+                    l2ProxyAdmin, 
                     proxyInitializationParams
                 );
             }
@@ -399,7 +406,9 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
             require(amount == _amount, "1T"); // The token has non-standard transfer logic
 
-            bool ethIsBaseToken = (baseToken == address(0));
+            chainBalance[_chainId][_l1Token] += _amount;
+
+            bool ethIsBaseToken = (baseToken == ETH_TOKEN_ADDRESS);
             if (ethIsBaseToken) {
                 mintValue = msg.value;
             } else {
@@ -446,7 +455,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(_amount != 0, "2T"); // empty deposit amount
         uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "1T"); // The token has non-standard transfer logic
-
+        
+        chainBalance[_chainId][_l1Token] += _amount;
         // Note we don't save the depistedAmounts, as this is for the base token, which gets sent to the refundRecipient if the txfails
     }
 
@@ -459,6 +469,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) internal returns (bytes32 l2TxHash) {
+        // note msg.value is 0 for not eth base tokens. 
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
             _chainId,
             l2BridgeAddress[_chainId],
@@ -547,6 +558,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         } else {
             delete depositAmount[_chainId][_depositSender][_l1Token][_l2TxHash];
         }
+
+        // check that the chain has sufficient balance
+        require(chainBalance[_chainId][_l1Token] >= amount, "L1ERC20Bridge: chain does not have enough funds");
+        chainBalance[_chainId][_l1Token] -= amount;
         // Withdraw funds
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
@@ -584,6 +599,10 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             _message,
             _merkleProof
         );
+
+        // check that the chain has sufficient balance
+        require(chainBalance[_chainId][l1Token] >= amount, "L1ERC20Bridge: chain does not have enough funds");
+        chainBalance[_chainId][l1Token] -= amount;
 
         // Withdraw funds
         IERC20(l1Token).safeTransfer(l1Receiver, amount);
@@ -672,7 +691,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
         } else {
-            revert("pk");
+            require(false, "Incorrect message function selector");
         }
     }
 
@@ -688,5 +707,15 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
                 l2TokenProxyBytecodeHash,
                 constructorInputHash
             );
+    }
+
+    /// @dev returns address of proxyAdmin
+    function readProxyAdmin() public view returns (address) {
+        address proxyAdmin;
+        assembly {
+            /// @dev proxy admin storage slot
+            proxyAdmin := sload(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103)
+        }
+        return proxyAdmin;
     }
 }

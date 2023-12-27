@@ -40,6 +40,8 @@ import "../vendor/AddressAliasHelper.sol";
 contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     using SafeERC20 for IERC20;
 
+    address public constant ETH_TOKEN_ADDRESS = address(1); 
+
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
 
@@ -95,6 +97,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
+    /// @dev A mapping chainId => amount. Used before we activate hyperbridging. 
+    mapping(uint256 => uint256) public chainBalance;
+
     /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
     /// @param to The address to which the funds were sent
     /// @param amount The amount of funds that were sent
@@ -111,8 +116,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     }
 
     /// @notice Checks that the message sender is the governor
-    modifier onlyBridgehubOrEra() {
-        require((msg.sender == address(bridgehub)) || (msg.sender == eraDiamondProxy), "L1WETHBridge: not governor");
+    modifier onlyBridgehubOrEthChain(uint256 _chainId) {
+        require((msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS), "L1WETHBridge: not bridgehub or eth chain");
         _;
     }
 
@@ -207,11 +212,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
 
             bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this));
-            ethIsBaseToken = (bridgehub.baseToken(_chainId) == address(0));
+            ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             if (ethIsBaseToken) {
                 mintValue = msg.value;
             } else {
                 require(msg.value == 0, "L1WethBridge: msg.value not 0 for non eth base token");
+                /// we could also add this feature later if we want to
             }
 
             require(
@@ -251,16 +257,18 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         }
         // Prepare the proxy constructor data
         bytes memory l2WethBridgeProxyConstructorData;
-        {
+        {   
+            address proxyAdmin = readProxyAdmin();
+            address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
             address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, l2Governor)
+                (address(this), l1WethAddress, l2ProxyAdmin, l2Governor)
             );
             l2WethBridgeProxyConstructorData = abi.encode(
                 wethBridgeImplementationAddr,
-                l2Governor,
+                l2ProxyAdmin,
                 proxyInitializationParams
             );
         }
@@ -373,8 +381,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
         // if ETH is the base token we have to have enough value
         uint256 mintValue = _mintValue;
-        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == address(0);
+        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         if (ethIsBaseToken) {
+            require(bridgehub.baseTokenBridge(_chainId) == address(this), "L1WETH Bridge: other eth bridge not supported");
             mintValue = msg.value + _amount;
             // we check this in the Mailbox as well
             require(_mintValue <= mintValue, "L1WETH Bridge: Incorrect amount of ETH sent");
@@ -426,7 +435,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         address _refundRecipient
     ) internal returns (bytes32 txHash) {
         if (_ethIsBaseToken) {
-            // note to have a unified interface with ERC20s we transfer value and deposit it later.
+            // note to have a unified interface with ERC20s we transfer all the value and  redeposit it with bridgehubDeposit.
+            // we don't increase chainBalance because we will add it in BridgehubDeposit
+            // we don't save the depositAmount because base asset is sent to refundrecipient
             txHash = bridgehub.requestL2Transaction{value: _mintValue}(
                 _chainId,
                 l2BridgeAddress[_chainId],
@@ -440,6 +451,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             );
         } else {
             depositAmount[_chainId][msg.sender][txHash] = _amount;
+            chainBalance[_chainId] += _amount;
             txHash = bridgehub.requestL2Transaction(
                 _chainId,
                 l2BridgeAddress[_chainId],
@@ -459,8 +471,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 _chainId,
         address _token,
         uint256 _amount
-    ) external payable override onlyBridgehubOrEra {
-        require(_token == address(0), "L1WETHBridge: Invalid token");
+    ) external payable override onlyBridgehubOrEthChain(_chainId) {
+        require(_token == ETH_TOKEN_ADDRESS, "L1WETHBridge: Invalid token");
+        chainBalance[_chainId] += _amount;
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 WETH bridge contract
@@ -503,6 +516,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 amount = 0;
         amount = depositAmount[_chainId][_depositSender][_l2TxHash];
         require(amount > 0, "L1WethBridge: amount is zero");
+        require(chainBalance[_chainId] >= amount, "L1WethBridge: chainBalance is too low");
+        chainBalance[_chainId] -= amount;
 
         delete depositAmount[_chainId][_depositSender][_l2TxHash];
 
@@ -548,7 +563,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             _message,
             _merkleProof
         );
-
+        require(chainBalance[_chainId] >= amount, "L1WethBridge: chainBalance is too low");
+        chainBalance[_chainId] -= amount;
         if (wrapToWeth) {
             // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
             IWETH9(l1WethAddress).deposit{value: amount}();
@@ -581,6 +597,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal view returns (address l1Receiver, uint256 amount, bool wrapToWeth) {
+        (l1Receiver, amount, wrapToWeth) = _parseL2WithdrawalMessage(_chainId, _message);
+
         L2Message memory l2ToL1Message;
         {
             bool thisIsBaseTokenBridge = bridgehub.baseTokenBridge(_chainId) == address(this);
@@ -589,6 +607,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             // Check that the specified message was actually sent while withdrawing eth from L2.
             l2ToL1Message = L2Message({txNumberInBatch: _l2TxNumberInBatch, sender: l2Sender, data: _message});
         }
+
         {
             bool success = bridgehub.proveL2MessageInclusion(
                 _chainId,
@@ -600,12 +619,11 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             require(success, "vq");
         }
 
-        (l1Receiver, amount, wrapToWeth) = _parseL2EthWithdrawalMessage(_chainId, _message);
     }
 
     /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken
     /// contract
-    function _parseL2EthWithdrawalMessage(
+    function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _message
     ) internal view returns (address l1Receiver, uint256 ethAmount, bool wrapToWeth) {
@@ -619,32 +637,35 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
 
         // So the data is expected to be at least 56 bytes long.
-        require(_message.length >= 56, "pm");
+        require(_message.length >= 56, "Incorrect ETH message with additional data length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        require(
-            bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector,
-            "Incorrect ETH message function selector"
-        );
-        (ethAmount, offset) = UnsafeBytes.readUint256(_message, offset);
-
-        (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
-        wrapToWeth = false;
-        if (l1Receiver == address(this)) {
-            wrapToWeth = true;
-
-            // Check that the message length is correct.
-            // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
-            // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
-            // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
-            require(_message.length == 96, "Incorrect ETH message with additional data length");
-
-            address l2Sender;
-            (l2Sender, offset) = UnsafeBytes.readAddress(_message, offset);
-            require(l2Sender == l2BridgeAddress[_chainId], "The withdrawal was not initiated by L2 bridge");
-
-            // Parse additional data
+        
+        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector){
             (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
+            (ethAmount, offset) = UnsafeBytes.readUint256(_message, offset);
+            wrapToWeth = false;
+        
+            if (l1Receiver == address(this)) {
+                wrapToWeth = true;
+
+                // Check that the message length is correct.
+                // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
+                // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
+                // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
+                require(_message.length == 96, "Incorrect ETH message with additional data length 2");
+
+                address l2Sender;
+                (l2Sender, offset) = UnsafeBytes.readAddress(_message, offset);
+                require(l2Sender == l2BridgeAddress[_chainId], "The withdrawal was not initiated by L2 bridge");
+
+                // Parse additional data
+                (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
+            }
+        } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
+            require(false, "We don't support weth as erc20 on other chains with other base tokens yet");
+        } else {
+            require(false, "Incorrect message function selector");
         }
     }
 
@@ -659,5 +680,15 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         // 1. l1 WETH sends ether on `withdraw`
         require(msg.sender == l1WethAddress, "pn");
         emit EthReceived(msg.value);
+    }
+
+    /// @dev returns address of proxyAdmin
+    function readProxyAdmin() public view returns (address) {
+        address proxyAdmin;
+        assembly {
+            /// @dev proxy admin storage slot
+            proxyAdmin := sload(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103)
+        }
+        return proxyAdmin;
     }
 }

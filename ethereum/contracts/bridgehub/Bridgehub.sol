@@ -10,7 +10,7 @@ import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard {
     string public constant override getName = "Bridgehub";
-    address public constant ethTokenAddress = address(0);
+    address public constant ethTokenAddress = address(1);
 
     /// @notice Address which will exercise critical changes
     address public governor;

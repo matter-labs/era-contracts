@@ -13,8 +13,6 @@ contract DiamondUpgradeInit1 is MailboxFacet {
     /// @dev Request priority operation on behalf of force deployer address to the deployer system contract
     /// @return The message indicating the successful force deployment of contract on L2
 
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {}
 
     function forceDeployL2Contract(
         bytes calldata _forceDeployCalldata,

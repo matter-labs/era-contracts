@@ -110,5 +110,6 @@ struct StateTransitionChainStorage {
     uint256 chainId;
     address bridgehub;
     address stateTransition;
+    address baseToken;
     address baseTokenBridge;
 }

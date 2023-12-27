@@ -28,8 +28,10 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
         require(_initializeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
         chainStorage.chainId = _initializeData.chainId;
-        chainStorage.stateTransition = _initializeData.stateTransition;
         chainStorage.bridgehub = _initializeData.bridgehub;
+        chainStorage.stateTransition = _initializeData.stateTransition;
+        chainStorage.baseToken = _initializeData.baseToken;
+        chainStorage.baseTokenBridge = _initializeData.baseTokenBridge;
         chainStorage.protocolVersion = _initializeData.protocolVersion;
 
         chainStorage.verifier = _initializeData.verifier;

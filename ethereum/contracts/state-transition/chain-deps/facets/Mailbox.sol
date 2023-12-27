@@ -28,15 +28,10 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "MailboxFacet";
+    address public constant ETH_TOKEN_ADDRESS = address(1); 
 
     /// @dev Era's chainID
-    uint256 public immutable eraChainId;
-
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _eraChainId) reentrancyGuardInitializer {
-        eraChainId = _eraChainId;
-    }
+    uint256 public constant eraChainId = $(ERA_CHAIN_ID);
 
     // this is implemented in the bridghead, does not go through the router.
     function bridgehubRequestL2Transaction(
@@ -211,9 +206,9 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        require(chainStorage.chainId != eraChainId, " finalizeEthWithdrawal only available for Era on mailbox");
+        require(chainStorage.baseToken == ETH_TOKEN_ADDRESS, " finalizeEthWithdrawal only available for Eth chains on mailbox");
         IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(
-            eraChainId,
+            chainStorage.chainId,
             _l2BatchNumber,
             _l2MessageIndex,
             _l2TxNumberInBatch,
@@ -232,7 +227,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(chainStorage.chainId == eraChainId, " requestL2Transaction only available for Era on mailbox");
+        require(chainStorage.baseToken == ETH_TOKEN_ADDRESS, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
             msg.sender,
             _contractL2,
