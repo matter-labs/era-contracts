@@ -1,7 +1,9 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import type { Forwarder, MockExecutorFacet } from "../../typechain";
-import { BridgehubFactory, MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
+import { BridgehubFactory,Bridgehub,  MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
+import {IBridgehub } from "../../typechain/IBridgehub";
+import { IMailbox } from "../../typechain/IMailbox";
 
 import {
   DEFAULT_REVERT_REASON,
@@ -23,9 +25,9 @@ import { Action, facetCut } from "../../src.ts/diamondCut";
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Mailbox tests", function () {
-  let mailbox: ethers.Contract;
+  let mailbox: IMailbox;
   let proxyAsMockExecutor: MockExecutorFacet;
-  let bridgehub: ethers.Contract;
+  let bridgehub: Bridgehub;
   let owner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
@@ -185,7 +187,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("pi");
+      expect(revertReason).equal("vq");
     });
 
     it("Successful withdrawal", async () => {
@@ -200,7 +202,7 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("jj");
+      expect(revertReason).equal("Withdrawal is already finalized");
     });
   });
 
@@ -230,11 +232,12 @@ describe("Mailbox tests", function () {
         chainId,
         ethers.constants.AddressZero,
         0,
+        0,
         "0x",
         l2GasLimit,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         [new Uint8Array(32)],
-        refundRecipient,
+        refundRecipient
       ]);
 
     const overrides: ethers.PayableOverrides = {};
@@ -249,7 +252,7 @@ describe("Mailbox tests", function () {
 
     callViaForwarder = async (refundRecipient) => {
       return {
-        transaction: await forwarder.forward(bridgehub.address, encodeRequest(refundRecipient), overrides),
+        transaction: await forwarder.forward(bridgehub.address, await encodeRequest(refundRecipient), overrides),
         expectedSender: aliasAddress(forwarder.address),
       };
     };

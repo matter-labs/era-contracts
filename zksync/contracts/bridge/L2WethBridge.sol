@@ -33,6 +33,9 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @dev WETH token address on L2.
     address public l2WethAddress;
 
+    /// @dev governor address (on L1 and aliased)
+    address public governor;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
@@ -44,7 +47,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @param _l1WethAddress The address of the L1 WETH token.
     /// @param _governor The address of the L1 governor aliased.
     /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
-    function initialize(address _l1Bridge, address _l1WethAddress, address _governor) external initializer {
+    function initialize(address _l1Bridge, address _l1WethAddress, address _proxyAdmin, address _governor) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
         require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
 
@@ -55,10 +58,10 @@ contract L2WethBridge is IL2Bridge, Initializable {
         bytes memory initData = abi.encodeWithSelector(L2Weth.initialize.selector, "Wrapped Ether", "WETH");
         TransparentUpgradeableProxy l2Weth = new TransparentUpgradeableProxy{salt: bytes32(0)}(
             l2WethImplementation,
-            _governor,
+            _proxyAdmin,
             initData
         );
-        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress);
+        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _governor);
         l2WethAddress = address(l2Weth);
     }
 

@@ -3,7 +3,7 @@ import { Wallet } from "ethers";
 import * as zksync from "zksync-web3";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider } from "./utils";
+import { web3Provider, deployedAddressesFromEnv } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -57,6 +57,7 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
+        addresses: deployedAddressesFromEnv(),
         ownerAddress: deployWallet.address,
         verbose: true,
       });

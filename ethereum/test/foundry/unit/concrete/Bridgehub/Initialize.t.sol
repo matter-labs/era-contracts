@@ -34,7 +34,7 @@ contract InitializeTest is BridgehubTest {
     // function test_InitializeSuccessfully() public {
     //     bridgehub.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
 
-    //     assertEq(bridgehub.getGovernor(), governor);
+    //     assertEq(bridgehub.governor(), governor);
     //     assertEq(bridgehub.getChainImplementation(), chainImplementation);
     //     assertEq(bridgehub.getChainProxyAdmin(), chainProxyAdmin);
     //     assertEq(address(bridgehub.getAllowList()), address(allowList));

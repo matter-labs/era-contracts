@@ -4,12 +4,22 @@ import type { Address } from "zksync-web3/build/src/types";
 import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
+import { deployTestnetTokens } from "../../src.ts/deploy-testnet-token";
+import { initializeWethBridge } from "../../src.ts/weth-initialize";
+import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
+
+import {GovernanceFactory } from "../../typechain";
+
+
+import { IBridgehub } from "../../typechain/IBridgehub";
 
 import * as fs from "fs";
 
 const testConfigPath = "./test/test_config/constant";
 export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
+const testnetTokenPath = `${testConfigPath}/hardhat.json`;
+const testnetTokens = JSON.parse(fs.readFileSync(testnetTokenPath, { encoding: "utf-8" }));;
 
 export const CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -94,9 +104,25 @@ export async function getCallRevertReason(promise) {
   return revertReason;
 }
 
+export async function executeUpgrade(
+  deployer: Deployer,
+  deployWallet: Wallet,
+  targetAddress: string,
+  value: BigNumberish,
+  callData: string
+){
+  const governance = GovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
+  const operation = {calls: [{target: targetAddress, value: value, data: callData}], predecessor: ethers.constants.HashZero, salt: ethers.constants.HashZero};
+  await governance.scheduleTransparent(operation, 0 )
+  await governance.execute(operation);
+  if (deployer.verbose){
+    console.log("Upgrade with target ", targetAddress, "executed: ", await governance.isOperationDone(await governance.hashOperation(operation)));
+  }
+}
+
 export async function requestExecute(
   chainId: ethers.BigNumberish,
-  bridgehub: ethers.Contract,
+  bridgehub: IBridgehub,
   to: Address,
   l2Value: ethers.BigNumber,
   calldata: ethers.BytesLike,
@@ -107,11 +133,11 @@ export async function requestExecute(
 ) {
   overrides ??= {};
   overrides.gasPrice ??= bridgehub.provider.getGasPrice();
-
+  // overrides.gasLimit ??= 30000000;
   if (!overrides.value) {
     const baseCost = await bridgehub.l2TransactionBaseCost(
       chainId,
-      overrides.gasPrice,
+      await overrides.gasPrice,
       l2GasLimit,
       REQUIRED_L2_GAS_PRICE_PER_PUBDATA
     );
@@ -121,6 +147,7 @@ export async function requestExecute(
   return await bridgehub.requestL2Transaction(
     chainId,
     to,
+    await overrides.value,
     l2Value,
     calldata,
     l2GasLimit,
@@ -301,6 +328,10 @@ export async function initialDeployment(
 
   let nonce = await deployWallet.getTransactionCount();
 
+  await deployTestnetTokens(testnetTokens, deployWallet, testnetTokenPath, deployer.verbose);
+  
+  nonce = await deployWallet.getTransactionCount();
+
   await deployer.deployCreate2Factory({ gasPrice, nonce });
   nonce++;
 
@@ -317,13 +348,16 @@ export async function initialDeployment(
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
   await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
+  await deployer.deployGovernance(create2Salt, {gasPrice});
 
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
   await deployer.deployBridgeContracts(create2Salt, gasPrice);
-  await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+  await initializeErc20Bridge(deployer, deployWallet, gasPrice, null);
 
+  await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+  await initializeWethBridge(deployer, deployWallet, gasPrice);
   await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
 
   return deployer;

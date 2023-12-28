@@ -1,20 +1,19 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { hashL2Bytecode } from "../../scripts/utils";
+import { getTokens, ADDRESS_ONE} from "../../scripts/utils";
 import type { L1WethBridge, WETH9 } from "../../typechain";
 import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 
-import type { IBridgehubMailbox } from "../../typechain/IBridgehubMailbox";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
-import {
-  calculateWethAddresses,
-  L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
-  L2_WETH_BRIDGE_PROXY_BYTECODE,
-} from "../../scripts/utils-bytecode";
+import type { IBridgehub } from "../../typechain/IBridgehub";
+import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION , executeUpgrade} from "./utils";
+
+import { startInitializeChain } from "../../src.ts/weth-initialize";
+
 
 import * as fs from "fs";
-import { EraLegacyChainId } from "../../src.ts/deploy";
+// import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
+import { hashL2Bytecode } from "../../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
 import type { Address } from "zksync-web3/build/src/types";
@@ -29,7 +28,7 @@ const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../../SystemConfig.json").
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 export async function create2DeployFromL1(
-  bridgehub: IBridgehubMailbox,
+  bridgehub: IBridgehub,
   chainId: ethers.BigNumberish,
   walletAddress: Address,
   bytecode: ethers.BytesLike,
@@ -51,6 +50,7 @@ export async function create2DeployFromL1(
   await bridgehub.requestL2Transaction(
     chainId,
     DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    expectedCost,
     0,
     calldata,
     l2GasLimit,
@@ -93,34 +93,30 @@ describe("WETH Bridge tests", () => {
 
     chainId = deployer.chainId;
 
-    l1Weth = WETH9Factory.connect((await (await hardhat.ethers.getContractFactory("WETH9")).deploy()).address, owner);
+    const tokens = getTokens("hardhat");
+    const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    l1Weth = WETH9Factory.connect(l1WethTokenAddress, owner);
     // prepare the bridge
 
-    const bridge = await (
-      await hardhat.ethers.getContractFactory("L1WethBridge")
-    ).deploy(l1Weth.address, deployer.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId);
+    bridgeProxy = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
+    const nonce = await deployWallet.getTransactionCount(); 
 
-    const _bridgeProxy = await (await hardhat.ethers.getContractFactory("ERC1967Proxy")).deploy(bridge.address, "0x");
+    await startInitializeChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
-    bridgeProxy = L1WethBridgeFactory.connect(_bridgeProxy.address, _bridgeProxy.signer);
+    const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
+    const upgradeCall =  l1WethBridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address,address)",  
+      [chainId, ADDRESS_ONE, ADDRESS_ONE]);
 
-    const { l2WethProxyAddress, l2WethBridgeProxyAddress } = calculateWethAddresses(
-      await owner.getAddress(),
-      bridgeProxy.address,
-      l1Weth.address
-    );
-
-    await bridgeProxy.initialize();
-
-    await bridgeProxy.initializeV2(
-      [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-      l2WethProxyAddress,
-      l2WethBridgeProxyAddress,
-      await owner.getAddress()
-    );
-
-    await bridgeProxy.initializeChainGovernance(chainId, l2WethProxyAddress, l2WethBridgeProxyAddress);
+    await executeUpgrade(deployer,deployWallet, bridgeProxy.address, 0, upgradeCall);
   });
+
+  it("Check startInitializeChain", async () => {
+
+    const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
+
+    expect(txHash).not.equal(ethers.constants.HashZero);
+  })
 
   it("Should not allow depositing zero WETH", async () => {
     const revertReason = await getCallRevertReason(
@@ -133,11 +129,12 @@ describe("WETH Bridge tests", () => {
           0,
           0,
           0,
+          0,
           ethers.constants.AddressZero
         )
     );
 
-    expect(revertReason).equal("Amount cannot be zero");
+    expect(revertReason).equal("L1WETH Bridge: Amount cannot be zero");
   });
 
   it("Should deposit successfully", async () => {
@@ -150,6 +147,7 @@ describe("WETH Bridge tests", () => {
         await randomSigner.getAddress(),
         l1Weth.address,
         100,
+        100,
         1000000,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         await randomSigner.getAddress(),
@@ -161,31 +159,32 @@ describe("WETH Bridge tests", () => {
     const revertReason = await getCallRevertReason(
       bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
     );
-    expect(revertReason).equal("pm");
+    expect(revertReason).equal("Incorrect ETH message with additional data length");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       bridgeProxy.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
-    expect(revertReason).equal("is");
+    expect(revertReason).equal("Incorrect message function selector");
   });
 
-  it("Should revert on finalizing a withdrawal with wrong receiver", async () => {
-    const revertReason = await getCallRevertReason(
-      bridgeProxy
-        .connect(randomSigner)
-        .finalizeWithdrawal(
-          chainId,
-          0,
-          0,
-          0,
-          ethers.utils.hexConcat([functionSignature, ethers.utils.randomBytes(92)]),
-          [ethers.constants.HashZero]
-        )
-    );
-    expect(revertReason).equal("pi");
-  });
+  // not valid anymore, weth bridge is also eth bridge, receiver gets the eth. 
+  // it("Should revert on finalizing a withdrawal with wrong receiver", async () => {
+  //   const revertReason = await getCallRevertReason(
+  //     bridgeProxy
+  //       .connect(randomSigner)
+  //       .finalizeWithdrawal(
+  //         chainId,
+  //         0,
+  //         0,
+  //         0,
+  //         ethers.utils.hexConcat([functionSignature, ethers.utils.randomBytes(92)]),
+  //         [ethers.constants.HashZero]
+  //       )
+  //   );
+  //   expect(revertReason).equal("pi");
+  // });
 
   it("Should revert on finalizing a withdrawal with wrong L2 sender", async () => {
     const revertReason = await getCallRevertReason(
@@ -205,6 +204,6 @@ describe("WETH Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("pi");
+    expect(revertReason).equal("The withdrawal was not initiated by L2 bridge");
   });
 });

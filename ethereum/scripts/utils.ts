@@ -1,15 +1,11 @@
 import * as chalk from "chalk";
-import type { BytesLike } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import { DeployedAddresses } from "../src.ts/deploy";
 
 const warning = chalk.bold.yellow;
-const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
-export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
@@ -27,7 +23,7 @@ export function web3Provider() {
   }
 
   // Short polling interval for local network
-  if (network === "localhost") {
+  if ((network === "localhost") || (network === "hardhat")){
     provider.pollingInterval = 100;
   }
 
@@ -58,20 +54,39 @@ export function getNumberFromEnv(envName: string): string {
   return number;
 }
 
-const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
-
-export function applyL1ToL2Alias(address: string): string {
-  return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+export function deployedAddressesFromEnv(): DeployedAddresses {
+  return {
+    Bridgehub: {
+      BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
+      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
+    },
+    StateTransition: {
+      StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
+      StateTransitionImplementation: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_IMPL_ADDR"),
+      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
+      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
+      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
+      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
+      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
+      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
+      GenesisUpgrade: getAddressFromEnv("CONTRACTS_GENESIS_UPGRADE_ADDR"),
+      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
+      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
+      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
+    },
+    Bridges: {
+      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
+      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
+      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
+      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
+    },
+    TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
+    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
+    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+  };
 }
 
-export function readBytecode(path: string, fileName: string) {
-  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).bytecode;
-}
-
-export function readInterface(path: string, fileName: string) {
-  const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
-  return new ethers.utils.Interface(abi);
-}
 
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "etc/system-contracts/bootloader");
@@ -86,55 +101,7 @@ export function readSystemContractsBytecode(fileName: string) {
   return JSON.parse(artifact.toString()).bytecode;
 }
 
-export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
-  // For getting the consistent length we first convert the bytecode to UInt8Array
-  const bytecodeAsArray = ethers.utils.arrayify(bytecode);
 
-  if (bytecodeAsArray.length % 32 != 0) {
-    throw new Error("The bytecode length in bytes must be divisible by 32");
-  }
-
-  const hashStr = ethers.utils.sha256(bytecodeAsArray);
-  const hash = ethers.utils.arrayify(hashStr);
-
-  // Note that the length of the bytecode
-  // should be provided in 32-byte words.
-  const bytecodeLengthInWords = bytecodeAsArray.length / 32;
-  if (bytecodeLengthInWords % 2 == 0) {
-    throw new Error("Bytecode length in 32-byte words must be odd");
-  }
-  const bytecodeLength = ethers.utils.arrayify(bytecodeAsArray.length / 32);
-  if (bytecodeLength.length > 2) {
-    throw new Error("Bytecode length must be less than 2^16 bytes");
-  }
-  // The bytecode should always take the first 2 bytes of the bytecode hash,
-  // so we pad it from the left in case the length is smaller than 2 bytes.
-  const bytecodeLengthPadded = ethers.utils.zeroPad(bytecodeLength, 2);
-
-  const codeHashVersion = new Uint8Array([1, 0]);
-  hash.set(codeHashVersion, 0);
-  hash.set(bytecodeLengthPadded, 2);
-
-  return hash;
-}
-
-export function computeL2Create2Address(
-  deployWallet: string,
-  bytecode: BytesLike,
-  constructorInput: BytesLike,
-  create2Salt: BytesLike
-) {
-  const senderBytes = ethers.utils.hexZeroPad(deployWallet, 32);
-  const bytecodeHash = hashL2Bytecode(bytecode);
-
-  const constructorInputHash = ethers.utils.keccak256(constructorInput);
-
-  const data = ethers.utils.keccak256(
-    ethers.utils.concat([CREATE2_PREFIX, senderBytes, create2Salt, bytecodeHash, constructorInputHash])
-  );
-
-  return ethers.utils.hexDataSlice(data, 12);
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function print(name: string, data: any) {
@@ -153,9 +120,9 @@ export type L1Token = {
 };
 
 export function getTokens(network: string): L1Token[] {
-  const configPath = process.env.ZKSYNC_HOME
-    ? `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`
-    : `./test/test_config/constant/${network}.json`;
+  const configPath = (network == "hardhat")
+    ? `./test/test_config/constant/${network}.json`
+    : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
   return JSON.parse(
     fs.readFileSync(configPath, {
       encoding: "utf-8",

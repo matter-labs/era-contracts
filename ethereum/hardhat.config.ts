@@ -31,6 +31,7 @@ const prodConfig = {
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: false,
   EOA_GOVERNOR: false,
+  ERA_CHAIN_ID: 324,
 };
 const testnetConfig = {
   UPGRADE_NOTICE_PERIOD: 0,
@@ -41,6 +42,7 @@ const testnetConfig = {
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
+  ERA_CHAIN_ID: 300,
 };
 const testConfig = {
   UPGRADE_NOTICE_PERIOD: 0,
@@ -50,11 +52,19 @@ const testConfig = {
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
+  ERA_CHAIN_ID: 9,
 };
 const localConfig = {
   ...prodConfig,
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
+  ERA_CHAIN_ID: 9,
+};
+const hardhatConfig = {
+  ...prodConfig,
+  DUMMY_VERIFIER: true,
+  EOA_GOVERNOR: true,
+  ERA_CHAIN_ID: 9,
 };
 
 const contractDefs = {
@@ -65,6 +75,7 @@ const contractDefs = {
   mainnet: prodConfig,
   test: testConfig,
   localhost: localConfig,
+  hardhat: hardhatConfig
 };
 
 export default {

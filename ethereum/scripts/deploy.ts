@@ -4,7 +4,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Provider } from "./utils";
+import { web3Provider, deployedAddressesFromEnv } from "./utils";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -46,12 +46,13 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
+        addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
       });
 
       // Create2 factory already deployed on the public networks, only deploy it on local node
-      if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+      if ((process.env.CHAIN_ETH_NETWORK === "localhost") || (process.env.CHAIN_ETH_NETWORK === "hardhat")){
         await deployer.deployCreate2Factory({ gasPrice, nonce });
         nonce++;
 

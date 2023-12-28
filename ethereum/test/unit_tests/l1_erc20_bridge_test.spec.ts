@@ -1,15 +1,18 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
+import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { TestnetERC20Token, Bridgehub } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory } from "../../typechain";
+import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory, L1ERC20Bridge, GovernanceFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
+import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
+import { ADDRESS_ONE, getTokens} from "../../scripts/utils";
+import { startInitializeChain } from "../../src.ts/erc20-initialize";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -21,8 +24,9 @@ describe("L1ERC20Bridge tests", function () {
   let randomSigner: ethers.Signer;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1Bridge;
-  let erc20TestToken: TestnetERC20Token;
-  let testnetERC20TokenContract: ethers.Contract;
+  let l1ERC20BridgeInit: L1ERC20Bridge;
+  // let erc20TestToken: TestnetERC20Token;
+  let erc20TestToken: ethers.Contract;
   let l1Erc20BridgeContract: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "0";
@@ -48,26 +52,47 @@ describe("L1ERC20Bridge tests", function () {
     await owner.sendTransaction(tx);
 
     const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
-
     chainId = deployer.chainId.toString();
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
-    const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
-    l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(deployer.addresses.Bridgehub.BridgehubProxy, 0);
-    l1ERC20BridgeAddress = l1Erc20BridgeContract.address;
+    // const l1Erc20BridgeFactory = await hardhat.ethers.getContractFactory("L1ERC20Bridge");
+    // l1Erc20BridgeContract = await l1Erc20BridgeFactory.deploy(deployer.addresses.Bridgehub.BridgehubProxy, 0);
+    l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
+    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
+
     l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
 
-    const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
-    testnetERC20TokenContract = await testnetERC20TokenFactory.deploy("TestToken", "TT", 18);
+
+    // const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
+    // testnetERC20TokenContract = await testnetERC20TokenFactory.deploy("TestToken", "TT", 18);
+    const tokens = getTokens("hardhat");
+    const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(
-      testnetERC20TokenContract.address,
-      testnetERC20TokenContract.signer
+      tokenAddress,
+      owner
     );
+
+    const nonce = await deployWallet.getTransactionCount(); 
+
+    await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
+    
+    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
+    const upgradeCall =  l1ERC20BridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address,address)",  
+      [chainId, ADDRESS_ONE, ADDRESS_ONE]);
+
+    await executeUpgrade(deployer,deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
   });
+
+  it("Check startInitializeChain", async () => {
+    const txHash = await l1ERC20BridgeInit.bridgeImplDeployOnL2TxHash(chainId);
+
+    expect(txHash).not.equal(ethers.constants.HashZero);
+  })
 
   it("Should not allow depositing zero amount", async () => {
     const revertReason = await getCallRevertReason(
@@ -76,7 +101,8 @@ describe("L1ERC20Bridge tests", function () {
         .deposit(
           chainId,
           await randomSigner.getAddress(),
-          testnetERC20TokenContract.address,
+          erc20TestToken.address,
+          0,
           0,
           0,
           0,
@@ -93,7 +119,7 @@ describe("L1ERC20Bridge tests", function () {
       bridgehub,
       chainId,
       depositorAddress,
-      testnetERC20TokenContract.address,
+      erc20TestToken.address,
       ethers.utils.parseUnits("800", 18),
       10000000
     );
@@ -103,7 +129,7 @@ describe("L1ERC20Bridge tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("nq");
+    expect(revertReason).equal("pm");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -112,7 +138,7 @@ describe("L1ERC20Bridge tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("nq");
+    expect(revertReason).equal("Incorrect message function selector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
@@ -121,7 +147,7 @@ describe("L1ERC20Bridge tests", function () {
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
       l1Receiver,
-      testnetERC20TokenContract.address,
+      erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
@@ -136,7 +162,7 @@ describe("L1ERC20Bridge tests", function () {
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
       l1Receiver,
-      testnetERC20TokenContract.address,
+      erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
@@ -151,7 +177,7 @@ describe("L1ERC20Bridge tests", function () {
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
       l1Receiver,
-      testnetERC20TokenContract.address,
+      erc20TestToken.address,
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
@@ -181,6 +207,7 @@ async function depositERC20(
     chainId,
     l2Receiver,
     l1Token,
+    neededValue,
     amount,
     l2GasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,

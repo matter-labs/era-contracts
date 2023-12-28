@@ -89,6 +89,8 @@ describe("Diamond proxy tests", function () {
         protocolVersion: 0,
         governor: governorAddress,
         admin: governorAddress,
+        baseToken: "0x0000000000000000000000000000000000000001",
+        baseTokenBridge: "0x0000000000000000000000000000000000000001", 
         storedBatchZero: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
         verifier: "0x0000000000000000000000000000000000000001",
         verifierParams: dummyVerifierParams,

@@ -1,6 +1,8 @@
 import { Command } from "commander";
-import { Wallet } from "ethers";
+import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
+import {initializeErc20Bridge} from '../src.ts/erc20-initialize'
+import {initializeWethBridge} from '../src.ts/weth-initialize'
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, deployedAddressesFromEnv } from "./utils";
 
@@ -12,49 +14,43 @@ const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
+
+
+
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("initialize-governance");
+  program.version("0.1.0").name("initialize-bridges-chain");
 
   program
     .option("--private-key <private-key>")
-    .option("--owner-address <owner-address>")
+    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
+    .option("--nonce <nonce>")
+    .option("--erc20-bridge <erc20-bridge>")
     .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
+            "m/44'/60'/0'/0/0"
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
       const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      console.log(`Using nonce: ${nonce}`);
 
       const deployer = new Deployer({
         deployWallet,
         addresses: deployedAddressesFromEnv(),
-        ownerAddress,
         verbose: true,
       });
-
-      const governance = deployer.governanceContract(deployWallet);
-
-      const erc20Bridge = deployer.transparentUpgradableProxyContract(
-        deployer.addresses.Bridges.ERC20BridgeProxy,
-        deployWallet
-      );
-      // const wethBridge = deployer.transparentUpgradableProxyContract(
-      //   deployer.addresses.Bridges.WethBridgeProxy,
-      //   deployWallet
-      // );
-
-      // await (await erc20Bridge.changeAdmin(governance.address)).wait();
-      // await (await wethBridge.changeAdmin(governance.address)).wait();
+      deployer.chainId = parseInt(chainId) || 270;
+      await initializeErc20Bridge(deployer, deployWallet, gasPrice, cmd.erc20Bridge);
     });
 
   await program.parseAsync(process.argv);

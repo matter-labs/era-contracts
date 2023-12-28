@@ -1,6 +1,6 @@
 import { artifacts } from "hardhat";
 
-import { deployedAddressesFromEnv } from "../../ethereum/src.ts/deploy";
+import { deployedAddressesFromEnv } from "../../ethereum/scripts/utils";
 import { IBridgehubFactory } from "../../ethereum/typechain/IBridgehubFactory";
 import { Interface } from "ethers/lib/utils";
 
@@ -96,6 +96,7 @@ export async function create2DeployFromL1(
   return await zkSync.requestL2Transaction(
     chainId,
     DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    expectedCost,
     0,
     calldata,
     l2GasLimit,
