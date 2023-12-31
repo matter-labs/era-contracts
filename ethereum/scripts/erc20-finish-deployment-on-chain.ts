@@ -68,7 +68,6 @@ async function main() {
       const implDeployTxHash = await erc20Bridge.bridgeImplDeployOnL2TxHash(chainId);
       const proxyDeployTxHash = await erc20Bridge.bridgeProxyDeployOnL2TxHash(chainId);
 
-      console.log();
       const {
         l1BatchNumber: implL1BatchNumber,
         l2MessageIndex: implL2MessageIndex,

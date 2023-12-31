@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.20;
 
+import "../../bridge/interfaces/IL1Bridge.sol";
 import "../../common/Messaging.sol";
 import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../../common/libraries/Diamond.sol";
@@ -19,6 +20,8 @@ interface IBridgehub {
     function tokenIsRegistered(address _baseToken) external view returns (bool);
 
     function baseToken(uint256 _chainId) external view returns (address);
+
+    function wethBridge() external view returns (IL1Bridge);
 
     function tokenBridgeIsRegistered(address _baseTokenBridge) external view returns (bool);
 

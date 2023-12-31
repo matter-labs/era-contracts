@@ -99,8 +99,7 @@ async function main() {
 
       const receipts = await tx.wait(2);
 
-      console.log(`ERC20 bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
-      console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await wethBridge.l2Bridge()}`);
+      console.log(`Weth bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
     });
 
   await program.parseAsync(process.argv);

@@ -64,6 +64,8 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
       console.log(`WETH bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);
       console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddress}`);
       console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddress}`);
+      console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${l2WethBridgeProxyAddress}`);
+
     }
 
   }
@@ -128,5 +130,7 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
     if (deployer.verbose) {
       console.log(`WETH bridge priority tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
       console.log(`WETH bridge initialized for chain ${chainId}, gasUsed: ${receipts[1].gasUsed.toString()}`);
+      console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await l1WethBridge.l2BridgeStandardAddress()}`);
+      console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${await l1WethBridge.l2WethStandardAddress()}`);
     }
   }
