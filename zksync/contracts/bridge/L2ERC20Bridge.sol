@@ -16,7 +16,8 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The "default" bridge implementation for the ERC20 tokens.
+/// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not 
+/// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
