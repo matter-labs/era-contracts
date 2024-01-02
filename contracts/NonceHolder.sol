@@ -25,10 +25,10 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
  * here serve more as a help to users to prevent from doing mistakes, rather than any invariants.
  */
 contract NonceHolder is INonceHolder, ISystemContract {
-    uint256 constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
+    uint256 constant private DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
     /// The minNonce can be increased by at 2^32 at a time to prevent it from
     /// overflowing beyond 2**128.
-    uint256 constant MAXIMAL_MIN_NONCE_INCREMENT = 2 ** 32;
+    uint256 constant private MAXIMAL_MIN_NONCE_INCREMENT = 2 ** 32;
 
     /// RawNonces for accounts are stored in format
     /// minNonce + 2^128 * deploymentNonce, where deploymentNonce
