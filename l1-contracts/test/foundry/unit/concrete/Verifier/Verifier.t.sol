@@ -2,19 +2,20 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {VerifierTest as Verifier} from "solpp/dev-contracts/test/VerifierTest.sol";
+import {VerifierTest} from "solpp/dev-contracts/test/VerifierTest.sol";
+import {Verifier} from "solpp/zksync/Verifier.sol";
 
 contract VerifierTestTest is Test {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
-    uint256[] publicInputs;
-    uint256[] serializedProof;
-    uint256[] recursiveAggregationInput;
+    uint256[] public publicInputs;
+    uint256[] public serializedProof;
+    uint256[] public recursiveAggregationInput;
 
-    Verifier verifier;
+    Verifier public verifier;
 
-    function setUp() public {
+    function setUp() public virtual {
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);
 
         serializedProof.push(10032255692304426541958487424837706541667730769782503366592797609781788557424);
@@ -62,7 +63,7 @@ contract VerifierTestTest is Test {
         serializedProof.push(7419167499813234488108910149511390953153207250610705609008080038658070088540);
         serializedProof.push(11628425014048216611195735618191126626331446742771562481735017471681943914146);
 
-        verifier = new Verifier();
+        verifier = new VerifierTest();
     }
 
     function testShouldVerify() public view {
@@ -155,7 +156,7 @@ contract VerifierTestTest is Test {
         verifier.verify(newPublicInputs, serializedProof, recursiveAggregationInput);
     }
 
-    function testVerificationKeyHash() public {
+    function testVerificationKeyHash() public virtual {
         bytes32 verificationKeyHash = verifier.verificationKeyHash();
         assertEq(verificationKeyHash, 0x6625fa96781746787b58306d414b1e25bd706d37d883a9b3acf57b2bd5e0de52);
     }
