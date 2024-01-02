@@ -1,5 +1,7 @@
 import { artifacts } from "hardhat";
 
+import { deployedAddressesFromEnv } from "../../ethereum/scripts/utils";
+import { IBridgehubFactory } from "../../ethereum/typechain/IBridgehubFactory";
 import { Interface } from "ethers/lib/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
@@ -72,6 +74,7 @@ export function computeL2Create2Address(
 }
 
 export async function create2DeployFromL1(
+  chainId: ethers.BigNumberish,
   wallet: ethers.Wallet,
   bytecode: ethers.BytesLike,
   constructor: ethers.BytesLike,
@@ -79,17 +82,24 @@ export async function create2DeployFromL1(
   l2GasLimit: ethers.BigNumberish,
   gasPrice?: ethers.BigNumberish
 ) {
-  const zkSyncAddress = deployedAddressesFromEnv().ZkSync.DiamondProxy;
-  const zkSync = IZkSyncFactory.connect(zkSyncAddress, wallet);
+  const zkSyncAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
+  const zkSync = IBridgehubFactory.connect(zkSyncAddress, wallet);
 
   const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
   gasPrice ??= await zkSync.provider.getGasPrice();
-  const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+  const expectedCost = await zkSync.l2TransactionBaseCost(
+    chainId,
+    gasPrice,
+    l2GasLimit,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );
 
   return await zkSync.requestL2Transaction(
+    chainId,
     DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    expectedCost,
     0,
     calldata,
     l2GasLimit,

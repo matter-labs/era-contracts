@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/libraries/Diamond.sol";
-import "../../zksync/facets/Base.sol";
+import "../../common/libraries/Diamond.sol";
+import "../../state-transition/chain-deps/facets/Base.sol";
 
-contract DiamondProxyTest is Base {
+contract DiamondProxyTest is StateTransitionChainBase {
     function setFreezability(bool _freeze) external returns (bytes32) {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
         diamondStorage.isFrozen = _freeze;

@@ -43,14 +43,15 @@ export async function deployViaCreate2(
   }
 
   const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
-  const receipt = await tx.wait(2);
 
+  const waitBlocks = (await deployWallet.provider.getNetwork()).chainId == 31337 ? 1 : 2; //hardhat chainId
+  const receipt = await tx.wait(waitBlocks);
   const gasUsed = receipt.gasUsed;
   log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
 
   const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
   if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
-    throw new Error("Failed to deploy bytecode via create2 factory");
+    throw new Error(`Failed to deploy ${contractName} bytecode via create2 factory`);
   }
 
   return [expectedAddress, tx.hash];

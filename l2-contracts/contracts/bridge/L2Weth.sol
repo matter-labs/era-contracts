@@ -25,6 +25,10 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @dev Address of the L1 WETH token. It can be deposited to mint this L2 token.
     address public override l1Address;
 
+
+    /// @dev address of governor (on L1 aliased)
+    address public override governor;
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -49,11 +53,12 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
-    function initializeV2(address _l2Bridge, address _l1Address) external reinitializer(2) {
+    function initializeV2(address _l2Bridge, address _l1Address, address _governor) external reinitializer(2) {
         require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
         require(_l1Address != address(0), "L1 WETH token address cannot be zero");
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
+        governor = _governor;
     }
 
     modifier onlyBridge() {

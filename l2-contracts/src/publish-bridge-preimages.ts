@@ -23,9 +23,11 @@ async function main() {
 
   program
     .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
     .option("--nonce <nonce>")
     .option("--gas-price <gas-price>")
     .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
@@ -41,9 +43,10 @@ async function main() {
       console.log(`Using gas price: ${gasPrice}`);
 
       const deployer = new Deployer({ deployWallet: wallet });
-      const zkSync = deployer.zkSyncContract(wallet);
+      const zkSync = deployer.bridgehubContract(wallet);
 
       const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
+        chainId,
         ethers.constants.AddressZero,
         0,
         "0x",

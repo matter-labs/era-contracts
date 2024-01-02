@@ -6,9 +6,9 @@ import "../../bridge/L1ERC20Bridge.sol";
 
 /// @author Matter Labs
 contract L1ERC20BridgeTest is L1ERC20Bridge {
-    constructor(IZkSync _zkSync) L1ERC20Bridge(_zkSync) {}
+    constructor(IBridgehub _zkSync) L1ERC20Bridge(_zkSync, 270) {}
 
-    function getZkSyncMailbox() public view returns (IMailbox) {
-        return zkSync;
+    function getBridgehub() public view returns (IBridgehub) {
+        return bridgehub;
     }
 }

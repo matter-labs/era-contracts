@@ -4,36 +4,55 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { Interface, hexlify } from "ethers/lib/utils";
+import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
-import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
+import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
 import {
-  readSystemContractsBytecode,
-  hashL2Bytecode,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
+  readSystemContractsBytecode,
   readBatchBootloaderBytecode,
   getTokens,
+  ADDRESS_ONE,
+  deployedAddressesFromEnv
 } from "../scripts/utils";
+
+import {
+  hashL2Bytecode,
+} from "./utils"
+
 import { deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { ERC20Factory } from "../typechain";
 
-const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
+let L2_BOOTLOADER_BYTECODE_HASH: string;
+let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
+export const EraLegacyChainId = 324;
+export const EraLegacyDiamondProxyAddress = "0x32400084C286CF3E17e7B677ea9583e60a000324"
 
 export interface DeployedAddresses {
-  ZkSync: {
-    MailboxFacet: string;
+  Bridgehub: {
+    BridgehubProxy: string;
+    BridgehubImplementation: string;
+  };
+  StateTransition: {
+    StateTransitionProxy: string;
+    StateTransitionImplementation: string;
+    Verifier: string;
     AdminFacet: string;
+    MailboxFacet: string;
     ExecutorFacet: string;
     GettersFacet: string;
-    Verifier: string;
     DiamondInit: string;
+    GenesisUpgrade: string;
     DiamondUpgradeInit: string;
     DefaultUpgrade: string;
     DiamondProxy: string;
@@ -44,6 +63,7 @@ export interface DeployedAddresses {
     WethBridgeImplementation: string;
     WethBridgeProxy: string;
   };
+  TransparentProxyAdmin: string;
   Governance: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
@@ -51,60 +71,43 @@ export interface DeployedAddresses {
 
 export interface DeployerConfig {
   deployWallet: Wallet;
+  addresses?: DeployedAddresses;
   ownerAddress?: string;
   verbose?: boolean;
-}
-
-export function deployedAddressesFromEnv(): DeployedAddresses {
-  return {
-    ZkSync: {
-      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
-      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
-      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
-      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
-      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
-      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
-      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
-      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
-      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
-    },
-    Bridges: {
-      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
-      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
-      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
-      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
-    },
-    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
-    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
-    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-  };
+  bootloaderBytecodeHash?: string;
+  defaultAccountBytecodeHash?: string;
 }
 
 export class Deployer {
   public addresses: DeployedAddresses;
   private deployWallet: Wallet;
-  private verbose: boolean;
+  public verbose: boolean;
+  public chainId: number;
   private ownerAddress: string;
 
   constructor(config: DeployerConfig) {
     this.deployWallet = config.deployWallet;
     this.verbose = config.verbose != null ? config.verbose : false;
-    this.addresses = deployedAddressesFromEnv();
+    this.addresses = config.addresses ? config.addresses : deployedAddressesFromEnv();
+    L2_BOOTLOADER_BYTECODE_HASH = config.bootloaderBytecodeHash
+      ? config.bootloaderBytecodeHash
+      : hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
+    L2_DEFAULT_ACCOUNT_BYTECODE_HASH = config.defaultAccountBytecodeHash
+      ? config.defaultAccountBytecodeHash
+      : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
   }
 
-  public async initialProxyDiamondCut() {
-    const facetCuts = Object.values(
+  public async initialStateTransitionChainDiamondCut(extraFacets?: FacetCut[]) {
+    let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
-        this.addresses.ZkSync.AdminFacet,
-        this.addresses.ZkSync.GettersFacet,
-        this.addresses.ZkSync.MailboxFacet,
-        this.addresses.ZkSync.ExecutorFacet
+        this.addresses.StateTransition.AdminFacet,
+        this.addresses.StateTransition.GettersFacet,
+        this.addresses.StateTransition.MailboxFacet,
+        this.addresses.StateTransition.ExecutorFacet
       )
     );
-    const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
-    const genesisIndexRepeatedStorageChanges = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
-    const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
+    facetCuts = facetCuts.concat(extraFacets ?? []);
 
     const verifierParams =
       process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
@@ -119,28 +122,33 @@ export class Deployer {
             recursionCircuitsSetVksHash: getHashFromEnv("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH"),
           };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-    const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
+      // these first 7 values are set in the contract
       {
-        verifier: this.addresses.ZkSync.Verifier,
-        governor: this.ownerAddress,
-        admin: this.ownerAddress,
-        genesisBatchHash,
-        genesisIndexRepeatedStorageChanges,
-        genesisBatchCommitment,
+        chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        bridgehub: "0x0000000000000000000000000000000000001234",
+        stateTransition: "0x0000000000000000000000000000000000002234",
+        protocolVersion: "0x0000000000000000000000000000000000002234",
+        governor: "0x0000000000000000000000000000000000003234",
+        admin: "0x0000000000000000000000000000000000004234",
+        baseToken: "0x0000000000000000000000000000000000004234",
+        baseTokenBridge: "0x0000000000000000000000000000000000004234",
+        storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
+        verifier: this.addresses.StateTransition.Verifier,
         verifierParams,
-        zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
-        initialProtocolVersion,
       },
     ]);
 
-    // @ts-ignore
-    return diamondCut(facetCuts, this.addresses.ZkSync.DiamondInit, diamondInitCalldata);
+    return diamondCut(
+      facetCuts,
+      this.addresses.StateTransition.DiamondInit,
+      "0x" + diamondInitCalldata.slice(2 + 292 * 2)
+    );
   }
 
   public async deployCreate2Factory(ethTxOptions?: ethers.providers.TransactionRequest) {
@@ -202,15 +210,111 @@ export class Deployer {
     this.addresses.Governance = contractAddress;
   }
 
-  public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployBridgehubImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("Bridgehub", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_BRIDGEHUB_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.MailboxFacet = contractAddress;
+    this.addresses.Bridgehub.BridgehubImplementation = contractAddress;
+  }
+
+  public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("ProxyAdmin", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.TransparentProxyAdmin = contractAddress;
+  }
+
+  public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+
+    const bridgehub = new Interface(hardhat.artifacts.readArtifactSync("Bridgehub").abi);
+
+    const initCalldata = bridgehub.encodeFunctionData("initialize", [this.ownerAddress]);
+
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [this.addresses.Bridgehub.BridgehubImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_BRIDGEHUB_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridgehub.BridgehubProxy = contractAddress;
+  }
+
+  public async deployStateTransitionImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "ZkSyncStateTransition",
+      [this.addresses.Bridgehub.BridgehubProxy],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_STATE_TRANSITION_IMPL_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.StateTransitionImplementation = contractAddress;
+  }
+
+  public async deployStateTransitionProxy(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest,
+    extraFacets?: FacetCut[]
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
+    const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
+    const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
+    const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
+    const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
+
+    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("ZkSyncStateTransition").abi);
+
+    const initCalldata = stateTransition.encodeFunctionData("initialize", [
+      {
+        governor: this.ownerAddress,
+        genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
+        genesisBatchHash,
+        genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
+        genesisBatchCommitment,
+        diamondCut,
+        protocolVersion,
+      },
+    ]);
+    // console.log('kl todo 1', diamondCut)
+
+    const contractAddress = await this.deployViaCreate2(
+      "TransparentUpgradeableProxy",
+      [
+        this.addresses.StateTransition.StateTransitionImplementation,
+        this.addresses.TransparentProxyAdmin,
+        initCalldata,
+      ],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.StateTransitionProxy = contractAddress;
   }
 
   public async deployAdminFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -221,7 +325,18 @@ export class Deployer {
       console.log(`CONTRACTS_ADMIN_FACET_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.AdminFacet = contractAddress;
+    this.addresses.StateTransition.AdminFacet = contractAddress;
+  }
+
+  public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("MailboxFacet", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.MailboxFacet = contractAddress;
   }
 
   public async deployExecutorFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -232,7 +347,7 @@ export class Deployer {
       console.log(`CONTRACTS_EXECUTOR_FACET_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.ExecutorFacet = contractAddress;
+    this.addresses.StateTransition.ExecutorFacet = contractAddress;
   }
 
   public async deployGettersFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -243,7 +358,7 @@ export class Deployer {
       console.log(`CONTRACTS_GETTERS_FACET_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.GettersFacet = contractAddress;
+    this.addresses.StateTransition.GettersFacet = contractAddress;
   }
 
   public async deployVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -254,14 +369,14 @@ export class Deployer {
       console.log(`CONTRACTS_VERIFIER_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.Verifier = contractAddress;
+    this.addresses.StateTransition.Verifier = contractAddress;
   }
 
   public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.ZkSync.DiamondProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId],
       create2Salt,
       ethTxOptions
     );
@@ -277,7 +392,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridges.ERC20BridgeImplementation, this.ownerAddress, "0x"],
+      [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, "0x"],
       create2Salt,
       ethTxOptions
     );
@@ -287,6 +402,18 @@ export class Deployer {
     }
 
     this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
+  }
+
+  public async registerERC20Bridge(ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+
+    const tx = await bridgehub.newTokenBridge(this.addresses.Bridges.ERC20BridgeProxy);
+
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log(`ERC20 bridge was registered, gas used: ${receipt.gasUsed.toString()}`);
+    }
   }
 
   public async deployWethToken(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -301,11 +428,11 @@ export class Deployer {
   public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-
+    const l1Weth = ERC20Factory.connect(l1WethToken, this.deployWallet);
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.ZkSync.DiamondProxy],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId, EraLegacyDiamondProxyAddress],
       create2Salt,
       ethTxOptions
     );
@@ -321,7 +448,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridges.WethBridgeImplementation, this.ownerAddress, "0x"],
+      [this.addresses.Bridges.WethBridgeImplementation, this.addresses.TransparentProxyAdmin, "0x"],
       create2Salt,
       ethTxOptions
     );
@@ -333,7 +460,28 @@ export class Deployer {
     this.addresses.Bridges.WethBridgeProxy = contractAddress;
   }
 
-  public async deployDiamondInit(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerWETHBridge(ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+
+    const tx = await bridgehub.newTokenBridge(this.addresses.Bridges.WethBridgeProxy);
+    const receipt = await tx.wait();
+
+    /// registering ETH as a valid token, with address 1. 
+    const tx2 = await bridgehub.newToken(ADDRESS_ONE);
+    const receipt2 = await tx2.wait();
+
+    const tx3 = await bridgehub.setWethBridge(this.addresses.Bridges.WethBridgeProxy);
+    const receipt3 = await tx3.wait();
+    if (this.verbose) {
+      console.log(`WETH bridge was registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`);
+    }
+  }
+
+  public async deployStateTransitionDiamondInit(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("DiamondInit", [], create2Salt, ethTxOptions);
 
@@ -341,7 +489,7 @@ export class Deployer {
       console.log(`CONTRACTS_DIAMOND_INIT_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.DiamondInit = contractAddress;
+    this.addresses.StateTransition.DiamondInit = contractAddress;
   }
 
   public async deployDiamondUpgradeInit(
@@ -361,7 +509,7 @@ export class Deployer {
       console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.DiamondUpgradeInit = contractAddress;
+    this.addresses.StateTransition.DiamondUpgradeInit = contractAddress;
   }
 
   public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -372,43 +520,118 @@ export class Deployer {
       console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.DefaultUpgrade = contractAddress;
+    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 
-  public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployGenesisUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-
-    const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
-    const initialDiamondCut = await this.initialProxyDiamondCut();
-    const contractAddress = await this.deployViaCreate2(
-      "DiamondProxy",
-      [chainId, initialDiamondCut],
-      create2Salt,
-      ethTxOptions
-    );
+    const contractAddress = await this.deployViaCreate2("GenesisUpgrade", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
-      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_GENESIS_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.ZkSync.DiamondProxy = contractAddress;
+    this.addresses.StateTransition.GenesisUpgrade = contractAddress;
   }
 
-  public async deployZkSyncContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deployBridgehubContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    // deploy zkSync contract
-    const independentZkSyncDeployPromises = [
-      this.deployMailboxFacet(create2Salt, { gasPrice, nonce }),
-      this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce + 1 }),
-      this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 2 }),
-      this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 }),
-      this.deployDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 }),
-    ];
-    await Promise.all(independentZkSyncDeployPromises);
-    nonce += 5;
+    await this.deployBridgehubImplementation(create2Salt, { gasPrice, nonce });
+    await this.deployBridgehubProxy(create2Salt, { gasPrice });
+  }
 
-    await this.deployDiamondProxy(create2Salt, { gasPrice, nonce });
+  public async deployStateTransitionContract(
+    create2Salt: string,
+    extraFacets?: FacetCut[],
+    gasPrice?: BigNumberish,
+    nonce?
+  ) {
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+
+    await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
+    await this.deployStateTransitionImplementation(create2Salt, { gasPrice });
+    await this.deployStateTransitionProxy(create2Salt, { gasPrice }, extraFacets);
+    await this.registerStateTransition();
+  }
+
+  public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+
+    await this.deployExecutorFacet(create2Salt, { gasPrice, nonce: nonce });
+    await this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 1 });
+    await this.deployMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
+    await this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 });
+    await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 });
+    await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 });
+  }
+
+  public async registerStateTransition() {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+
+    const tx = await bridgehub.newStateTransition(this.addresses.StateTransition.StateTransitionProxy);
+
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log(`StateTransition System registered, gas used: ${receipt.gasUsed.toString()}`);
+    }
+  }
+
+  public async registerHyperchain(create2Salt: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
+    const gasLimit = 10_000_000;
+
+    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
+
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+    const stateTransition = this.stateTransitionContract(this.deployWallet);
+
+    // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
+    const inputChainId = 0;
+    const governor = this.ownerAddress;
+    const diamondCutData = await this.initialStateTransitionChainDiamondCut(extraFacets);
+    const initialDiamondCut = new ethers.utils.AbiCoder().encode(
+      [
+        "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)",
+      ],
+      [diamondCutData]
+    );
+
+    const tx = await bridgehub.newChain(
+      inputChainId,
+      this.addresses.StateTransition.StateTransitionProxy,
+      ADDRESS_ONE,
+      this.addresses.Bridges.WethBridgeProxy,
+      Date.now(),
+      governor,
+      initialDiamondCut,
+      {
+        gasPrice,
+        nonce,
+        gasLimit,
+      }
+    );
+    const receipt = await tx.wait();
+    const chainId = receipt.logs.find((log) => log.topics[0] == bridgehub.interface.getEventTopic("NewChain"))
+      .topics[1];
+
+    nonce++;
+
+    const diamondProxyAddress =
+      "0x" +
+      receipt.logs
+        .find((log) => log.topics[0] == stateTransition.interface.getEventTopic("StateTransitionNewChain"))
+        .topics[2].slice(26);
+
+    this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
+
+    if (this.verbose) {
+      console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
+      console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
+
+      console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
+      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
+    }
+    this.chainId = parseInt(chainId, 16);
   }
 
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -416,6 +639,7 @@ export class Deployer {
 
     await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 })
   }
 
   public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -423,6 +647,7 @@ export class Deployer {
 
     await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
     await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
+    await this.registerWETHBridge({ gasPrice, nonce: nonce++ })
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -431,7 +656,7 @@ export class Deployer {
     const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+      [this.ownerAddress, this.addresses.StateTransition.DiamondProxy, executionDelay, validatorAddress],
       create2Salt,
       ethTxOptions
     );
@@ -460,12 +685,20 @@ export class Deployer {
     return SingletonFactoryFactory.connect(this.addresses.Create2Factory, signerOrProvider);
   }
 
-  public governanceContract(signerOrProvider: Signer | providers.Provider) {
-    return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
+  public bridgehubContract(signerOrProvider: Signer | providers.Provider) {
+    return IBridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
   }
 
-  public zkSyncContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncFactory.connect(this.addresses.ZkSync.DiamondProxy, signerOrProvider);
+  public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
+    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
+  }
+
+  public stateTransitionChainContract(signerOrProvider: Signer | providers.Provider) {
+    return IStateTransitionChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+  }
+
+  public governanceContract(signerOrProvider: Signer | providers.Provider) {
+    return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);
   }
 
   public validatorTimelock(signerOrProvider: Signer | providers.Provider) {

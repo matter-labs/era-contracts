@@ -2,11 +2,10 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/interfaces/IExecutor.sol";
+import "../../state-transition/chain-interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
-/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing
-/// purposes.
+/// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyExecutor is IExecutor {
     address owner;
 
@@ -32,7 +31,13 @@ contract DummyExecutor is IExecutor {
         _;
     }
 
-    /// @notice Allows the owner to set whether the contract should revert during commit batches operation
+    /// @notice Removing txs from the priority queue
+    function removePriorityQueueFront(uint256 _index) external {
+        // KL todo
+        // s.priorityQueue.removeFront(_index);
+    }
+
+    /// @notice Allows the owner to set whether the contract should revert during commit blocks operation
     function setShouldRevertOnCommitBatches(bool _shouldRevert) external onlyOwner {
         shouldRevertOnCommitBatches = _shouldRevert;
     }
@@ -76,7 +81,7 @@ contract DummyExecutor is IExecutor {
         require(_committedBatches.length == 1, "DummyExecutor: Can prove only one batch");
         require(
             _committedBatches[0].batchNumber == _prevBatch.batchNumber + 1,
-            "DummyExecutor: Can't prove batch out of order"
+            "DummyExecutor 1: Can't prove batch out of order"
         );
 
         getTotalBatchesVerified += 1;
@@ -95,7 +100,7 @@ contract DummyExecutor is IExecutor {
         getTotalBatchesExecuted += nBatches;
         require(
             getTotalBatchesExecuted <= getTotalBatchesVerified,
-            "DummyExecutor: Can't execute batches more than committed and proven currently"
+            "DummyExecutor 2: Can't execute batches more than committed and proven currently"
         );
     }
 

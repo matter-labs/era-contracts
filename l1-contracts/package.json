@@ -2,6 +2,9 @@
   "name": "l1-contracts",
   "version": "0.1.0",
   "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@nomiclabs/hardhat-etherscan": "^3.1.0",
@@ -51,8 +54,8 @@
     "test:fork": "CONTRACT_TESTS=1 TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
     "coverage:foundry": "hardhat solpp && forge coverage",
     "deploy-no-build": "ts-node scripts/deploy.ts",
+    "register-hyperchain": "ts-node scripts/register-hyperchain.ts",
     "deploy-weth-bridges": "ts-node scripts/deploy-weth-bridges.ts",
-    "initialize-weth-bridges": "ts-node scripts/initialize-weth-bridges.ts",
     "initialize-l2-weth-token": "ts-node scripts/initialize-l2-weth-token.ts",
     "deploy-erc20": "ts-node scripts/deploy-erc20.ts",
     "token-info": "ts-node scripts/token-info.ts",
@@ -60,11 +63,17 @@
     "verify": "hardhat run --network env scripts/verify.ts",
     "deploy-testnet-erc20": "ts-node scripts/deploy-testnet-token.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
-    "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
+    "erc20-deploy-on-chain": "ts-node scripts/erc20-deploy-on-chain.ts",
+    "erc20-finish-deployment-on-chain": "ts-node scripts/erc20-finish-deployment-on-chain.ts",
+    "weth-deploy-on-chain": "ts-node scripts/weth-deploy-on-chain.ts",
+    "weth-finish-deployment-on-chain": "ts-node scripts/weth-finish-deployment-on-chain.ts",
+    "initialize-erc20-bridge": "ts-node scripts/initialize-erc20-bridge.ts",
+    "initialize-weth-bridge": "ts-node scripts/initialize-weth-bridge.ts",
     "initialize-allow-list": "ts-node scripts/initialize-l1-allow-list.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
     "initialize-governance": "ts-node scripts/initialize-governance.ts",
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
+    "initialize-governance-chain": "ts-node scripts/initialize-governance-chain.ts",
     "upgrade-1": "ts-node scripts/upgrades/upgrade-1.ts",
     "upgrade-2": "ts-node scripts/upgrades/upgrade-2.ts",
     "upgrade-3": "ts-node scripts/upgrades/upgrade-3.ts",
@@ -74,9 +83,10 @@
     "upgrade-system": "ts-node upgrade-system/index.ts"
   },
   "dependencies": {
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "solhint-plugin-prettier": "^0.0.5"
   },
   "optionalDependencies": {
-    "zksync-web3": "^0.14.3"
+    "zksync-web3": "file:../../../zksync2-js"
   }
 }

@@ -1,14 +1,15 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain";
+import * as fs from "fs";
+import { diamondCut } from "../../src.ts/diamondCut";
+import type { ExecutorFacet, GettersFacet, AdminFacet, ZkSyncStateTransition } from "../../typechain";
 import {
-  DiamondInitFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
   AdminFacetFactory,
   DefaultUpgradeFactory,
   CustomUpgradeTestFactory,
+  ZkSyncStateTransitionFactory,
 } from "../../typechain";
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
@@ -21,10 +22,21 @@ import {
   SYSTEM_LOG_KEYS,
   constructL2Log,
   packBatchTimestampAndBatchTimestamp,
+  initialDeployment,
+  createSystemLogsWithUpgrade,
 } from "./utils";
 import * as ethers from "ethers";
 import type { BigNumberish, BytesLike } from "ethers";
+import { Wallet } from "ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-web3/build/src/utils";
+
+// process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
+
+const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
+const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+
+const testConfigPath = "./test/test_config/constant";
+const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 
@@ -33,120 +45,130 @@ describe("L2 upgrade test", function () {
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
 
-  let diamondProxyContract: ethers.Contract;
+  let stateTransition: ZkSyncStateTransition;
+
   let owner: ethers.Signer;
 
-  let batch1Info: CommitBatchInfo;
-  let storedBatch1Info: StoredBatchInfo;
+  let batch1InfoChainIdUpgrade: CommitBatchInfo;
+  let storedBatch1InfoChainIdUpgrade: StoredBatchInfo;
+
+  let batch2Info: CommitBatchInfo;
+  let storedBatch2Info: StoredBatchInfo;
 
   let verifier: string;
-  let verifierParams: VerifierParams;
   const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
+  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  // let priorityOperationsHash: string;
+  let initialProtocolVersion = 0;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
 
-    const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
-    const executorContract = await executorFactory.deploy();
-    const executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
+    const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
+    const ownerAddress = await deployWallet.getAddress();
 
-    const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
-    const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+    const gasPrice = await owner.provider.getGasPrice();
 
-    const adminFacetFactory = await hardhat.ethers.getContractFactory("AdminFacet");
-    const adminFacetContract = await adminFacetFactory.deploy();
-    const adminFacet = AdminFacetFactory.connect(adminFacetContract.address, adminFacetContract.signer);
-
-    // Note, that while this testsuit is focused on testing MailboxFaucet only,
-    // we still need to initialize its storage via DiamondProxy
-    const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
-    const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
-
-    const dummyHash = new Uint8Array(32);
-    dummyHash.set([1, 0, 0, 1]);
-    verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-    verifierParams = {
-      recursionCircuitsSetVksHash: ethers.constants.HashZero,
-      recursionLeafLevelVkHash: ethers.constants.HashZero,
-      recursionNodeLevelVkHash: ethers.constants.HashZero,
+    const tx = {
+      from: owner.getAddress(),
+      to: deployWallet.address,
+      value: ethers.utils.parseEther("1000"),
+      nonce: owner.getTransactionCount(),
+      gasLimit: 100000,
+      gasPrice: gasPrice,
     };
-    const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
+
+    await owner.sendTransaction(tx);
+
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
+
+    chainId = deployer.chainId;
+    verifier = deployer.addresses.StateTransition.Verifier;
+
+    proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+
+    stateTransition = ZkSyncStateTransitionFactory.connect(
+      deployer.addresses.StateTransition.StateTransitionProxy,
+      deployWallet
+    );
+
+    await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
+
+    //     let priorityOp = await proxyGetters.priorityQueueFrontOperation();
+    //     // priorityOpTxHash = priorityOp[0];
+    //     priorityOperationsHash = keccak256(
+    //         ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
+    //     );
+
+    // do initial setChainIdUpgrade
+    const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
+    batch1InfoChainIdUpgrade = await buildCommitBatchInfoWithUpgrade(
+      genesisStoredBatchInfo(),
       {
-        verifier,
-        governor: await owner.getAddress(),
-        admin: await owner.getAddress(),
-        genesisBatchHash: ethers.constants.HashZero,
-        genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
-        verifierParams,
-        zkPorterIsAvailable: false,
-        l2BootloaderBytecodeHash: dummyHash,
-        l2DefaultAccountBytecodeHash: dummyHash,
-        priorityTxMaxGasLimit: 10000000,
-        initialProtocolVersion: 0,
+        batchNumber: 1,
+        // priorityOperationsHash: priorityOperationsHash,
+        // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+        priorityOperationsHash: EMPTY_STRING_KECCAK,
+        numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
+        // systemLogs
       },
-    ]);
+      upgradeTxHash
+    );
 
-    const facetCuts = [
-      // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
-      // That means if the admin will be freezable, the proxy can NEVER be unfrozen.
-      facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
-      // Should be unfreezable. There are getters, that users can expect to be available.
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
-    ];
-
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
-
-    const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
-    const chainId = hardhat.network.config.chainId;
-    diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
-
-    proxyExecutor = ExecutorFacetFactory.connect(diamondProxyContract.address, owner);
-    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, owner);
-    proxyAdmin = AdminFacetFactory.connect(diamondProxyContract.address, owner);
-
-    await (await proxyAdmin.setValidator(await owner.getAddress(), true)).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+    ).wait();
+    const commitment = commitReceipt.events[0].args.commitment;
+    storedBatch1InfoChainIdUpgrade = getBatchStoredInfo(batch1InfoChainIdUpgrade, commitment);
+    await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1InfoChainIdUpgrade], []);
   });
 
   it("Upgrade should work even if not all batches are processed", async () => {
-    batch1Info = await buildCommitBatchInfo(genesisStoredBatchInfo(), {
-      batchNumber: 1,
+    batch2Info = await buildCommitBatchInfo(storedBatch1InfoChainIdUpgrade, {
+      batchNumber: 2,
+      // priorityOperationsHash: priorityOperationsHash,
+      // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
+      priorityOperationsHash: EMPTY_STRING_KECCAK,
+      numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      // systemLogs
     });
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1Info])).wait();
+    const commitReceipt = await (
+      await proxyExecutor.commitBatches(storedBatch1InfoChainIdUpgrade, [batch2Info])
+    ).wait();
     const commitment = commitReceipt.events[0].args.commitment;
 
-    expect(await proxyGetters.getProtocolVersion()).to.equal(0);
+    expect(await proxyGetters.getProtocolVersion()).to.equal(initialProtocolVersion);
     expect(await proxyGetters.getL2SystemContractsUpgradeTxHash()).to.equal(ethers.constants.HashZero);
 
     await (
-      await executeUpgrade(proxyGetters, proxyAdmin, {
-        newProtocolVersion: 1,
+      await executeUpgrade(chainId, proxyGetters, stateTransition, {
+        newProtocolVersion: 1 + initialProtocolVersion,
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     ).wait();
 
-    expect(await proxyGetters.getProtocolVersion()).to.equal(1);
+    expect(await proxyGetters.getProtocolVersion()).to.equal(1 + initialProtocolVersion);
 
-    storedBatch1Info = getBatchStoredInfo(batch1Info, commitment);
+    storedBatch2Info = getBatchStoredInfo(batch2Info, commitment);
 
-    await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1Info], []);
+    await makeExecutedEqualCommitted(proxyExecutor, storedBatch1InfoChainIdUpgrade, [storedBatch2Info], []);
   });
 
   it("Timestamp should behave correctly", async () => {
     // Upgrade was scheduled for now should work fine
     const timeNow = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-    await executeUpgrade(proxyGetters, proxyAdmin, {
+    await executeUpgrade(chainId, proxyGetters, stateTransition, {
       upgradeTimestamp: ethers.BigNumber.from(timeNow),
       l2ProtocolUpgradeTx: noopUpgradeTransaction,
     });
 
     // Upgrade that was scheduled for the future should not work now
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         upgradeTimestamp: ethers.BigNumber.from(timeNow).mul(2),
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
@@ -159,12 +181,13 @@ describe("L2 upgrade test", function () {
       txType: 255,
     });
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
+        newProtocolVersion: 3 + initialProtocolVersion,
       })
     );
 
-    expect(revertReason).to.equal("L2 system upgrade tx type is wrong");
+    expect(revertReason).to.equal("L2 sys upgrade tx type is wrong");
   });
 
   it("Should include the new protocol version as part of nonce", async () => {
@@ -174,9 +197,9 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -190,7 +213,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: 0,
       })
@@ -206,7 +229,7 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         newProtocolVersion: 100000,
       })
@@ -222,9 +245,9 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -238,9 +261,9 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -255,9 +278,9 @@ describe("L2 upgrade test", function () {
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -269,14 +292,14 @@ describe("L2 upgrade test", function () {
     const wrongFactoryDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [wrongFactoryDepHash],
-      nonce: 3,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -287,14 +310,14 @@ describe("L2 upgrade test", function () {
     const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: [],
-      nonce: 3,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: [myFactoryDep],
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -307,14 +330,14 @@ describe("L2 upgrade test", function () {
 
     const wrongTx = buildL2CanonicalTransaction({
       factoryDeps: Array(33).fill(randomDepHash),
-      nonce: 3,
+      nonce: 3 + 1 + initialProtocolVersion,
     });
 
     const revertReason = await getCallRevertReason(
-      executeUpgrade(proxyGetters, proxyAdmin, {
+      executeUpgrade(chainId, proxyGetters, stateTransition, {
         l2ProtocolUpgradeTx: wrongTx,
         factoryDeps: Array(33).fill(myFactoryDep),
-        newProtocolVersion: 3,
+        newProtocolVersion: 3 + 1 + initialProtocolVersion,
       })
     );
 
@@ -336,7 +359,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
-      nonce: 4,
+      nonce: 4 + 1 + initialProtocolVersion,
     });
 
     const upgrade = {
@@ -347,10 +370,10 @@ describe("L2 upgrade test", function () {
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       factoryDeps: [myFactoryDep],
-      newProtocolVersion: 4,
+      newProtocolVersion: 4 + 1 + initialProtocolVersion,
     };
 
-    const upgradeReceipt = await (await executeUpgrade(proxyGetters, proxyAdmin, upgrade)).wait();
+    const upgradeReceipt = await (await executeUpgrade(chainId, proxyGetters, stateTransition, upgrade)).wait();
 
     const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");
     const upgradeEvents = upgradeReceipt.logs.map((log) => {
@@ -362,9 +385,7 @@ describe("L2 upgrade test", function () {
           name: event.name,
           args: parsedArgs,
         };
-      } catch (_) {
-        // @ts-ignore
-      }
+      } catch (_) {}
     });
     l2UpgradeTxHash = upgradeEvents.find((event) => event.name == "UpgradeComplete").args.l2UpgradeTxHash;
 
@@ -372,7 +393,7 @@ describe("L2 upgrade test", function () {
     expect(await proxyGetters.getL2BootloaderBytecodeHash()).to.equal(bootloaderHash);
     expect(await proxyGetters.getL2DefaultAccountBytecodeHash()).to.equal(defaultAccountHash);
     expect((await proxyGetters.getVerifier()).toLowerCase()).to.equal(newVerifier.toLowerCase());
-    expect(await proxyGetters.getProtocolVersion()).to.equal(4);
+    expect(await proxyGetters.getProtocolVersion()).to.equal(4 + 1 + initialProtocolVersion);
 
     const newVerifierParams = await proxyGetters.getVerifierParams();
     expect(newVerifierParams.recursionNodeLevelVkHash).to.equal(newerVerifierParams.recursionNodeLevelVkHash);
@@ -380,8 +401,8 @@ describe("L2 upgrade test", function () {
     expect(newVerifierParams.recursionCircuitsSetVksHash).to.equal(newerVerifierParams.recursionCircuitsSetVksHash);
 
     expect(upgradeEvents[0].name).to.eq("NewProtocolVersion");
-    expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq("2");
-    expect(upgradeEvents[0].args.newProtocolVersion.toString()).to.eq("4");
+    expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq((2 + initialProtocolVersion).toString());
+    expect(upgradeEvents[0].args.newProtocolVersion.toString()).to.eq((4 + 1 + initialProtocolVersion).toString());
 
     expect(upgradeEvents[1].name).to.eq("NewVerifier");
     expect(upgradeEvents[1].args.oldVerifier.toLowerCase()).to.eq(verifier.toLowerCase());
@@ -396,15 +417,11 @@ describe("L2 upgrade test", function () {
     expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
 
     expect(upgradeEvents[3].name).to.eq("NewL2BootloaderBytecodeHash");
-    expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(
-      "0x0100000100000000000000000000000000000000000000000000000000000000"
-    );
+    expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(L2_BOOTLOADER_BYTECODE_HASH);
     expect(upgradeEvents[3].args.newBytecodeHash).to.eq(bootloaderHash);
 
     expect(upgradeEvents[4].name).to.eq("NewL2DefaultAccountBytecodeHash");
-    expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(
-      "0x0100000100000000000000000000000000000000000000000000000000000000"
-    );
+    expect(upgradeEvents[4].args.previousBytecodeHash).to.eq(L2_DEFAULT_ACCOUNT_BYTECODE_HASH);
     expect(upgradeEvents[4].args.newBytecodeHash).to.eq(defaultAccountHash);
   });
 
@@ -422,7 +439,7 @@ describe("L2 upgrade test", function () {
     const myFactoryDepHash = hashBytecode(myFactoryDep);
     const upgradeTx = buildL2CanonicalTransaction({
       factoryDeps: [myFactoryDepHash],
-      nonce: 4,
+      nonce: 5 + 1 + initialProtocolVersion,
     });
 
     const upgrade = {
@@ -433,10 +450,10 @@ describe("L2 upgrade test", function () {
       executeUpgradeTx: true,
       l2ProtocolUpgradeTx: upgradeTx,
       factoryDeps: [myFactoryDep],
-      newProtocolVersion: 5,
+      newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
-    const revertReason = await getCallRevertReason(executeUpgrade(proxyGetters, proxyAdmin, upgrade));
-
+    const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransition, upgrade));
+    await rollBackToVersion((4 + 1 + initialProtocolVersion).toString(), stateTransition, upgrade);
     expect(revertReason).to.equal("Previous upgrade has not been finalized");
   });
 
@@ -445,11 +462,11 @@ describe("L2 upgrade test", function () {
       throw new Error("Can not perform this test without l2UpgradeTxHash");
     }
 
-    const batch2InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch1Info, {
-      batchNumber: 2,
+    const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
+      batchNumber: 3,
     });
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
+      proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
     );
     expect(revertReason).to.equal("b8");
   });
@@ -480,18 +497,18 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch2InfoNoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch3InfoNoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 2,
+        batchNumber: 3,
       },
       systemLogs
     );
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoNoUpgradeTx])
+      proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoNoUpgradeTx])
     );
     expect(revertReason).to.equal("kp");
   });
@@ -511,20 +528,20 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 2,
+        batchNumber: 3,
         timestamp,
       },
       systemLogs
     );
 
     const revertReason = await getCallRevertReason(
-      proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])
+      proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])
     );
     expect(revertReason).to.equal("ut");
   });
@@ -544,25 +561,25 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 2,
+        batchNumber: 3,
         timestamp,
       },
       systemLogs
     );
 
-    await (await proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])).wait();
+    await (await proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
 
-    expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(2);
+    expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
   });
 
   it("Should commit successfully when batch was reverted and reupgraded", async () => {
-    await (await proxyExecutor.revertBatches(1)).wait();
+    await (await proxyExecutor.revertBatches(2)).wait();
     const timestamp = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
     const systemLogs = createSystemLogs();
     systemLogs.push(
@@ -577,33 +594,33 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch2InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 2,
+        batchNumber: 3,
         timestamp,
       },
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch2InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch3InfoTwoUpgradeTx])).wait();
 
-    expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(2);
+    expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(3);
     const commitment = commitReceipt.events[0].args.commitment;
-    const newBatchStoredInfo = getBatchStoredInfo(batch2InfoTwoUpgradeTx, commitment);
-    await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
+    const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
+    await makeExecutedEqualCommitted(proxyExecutor, storedBatch2Info, [newBatchStoredInfo], []);
 
-    storedBatch1Info = newBatchStoredInfo;
+    storedBatch2Info = newBatchStoredInfo;
   });
 
   it("Should successfully commit a sequential upgrade", async () => {
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
     await (
-      await executeUpgrade(proxyGetters, proxyAdmin, {
-        newProtocolVersion: 5,
+      await executeUpgrade(chainId, proxyGetters, stateTransition, {
+        newProtocolVersion: 5 + 1 + initialProtocolVersion,
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     ).wait();
@@ -614,35 +631,35 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch4InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 3,
+        batchNumber: 4,
         timestamp,
       },
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch4InfoTwoUpgradeTx])).wait();
     const commitment = commitReceipt.events[0].args.commitment;
-    const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
+    const newBatchStoredInfo = getBatchStoredInfo(batch4InfoTwoUpgradeTx, commitment);
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
 
-    await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
+    await makeExecutedEqualCommitted(proxyExecutor, storedBatch2Info, [newBatchStoredInfo], []);
 
-    storedBatch1Info = newBatchStoredInfo;
+    storedBatch2Info = newBatchStoredInfo;
 
     expect(await proxyGetters.getL2SystemContractsUpgradeBatchNumber()).to.equal(0);
   });
 
   it("Should successfully commit custom upgrade", async () => {
     const upgradeReceipt = await (
-      await executeCustomUpgrade(proxyGetters, proxyAdmin, {
-        newProtocolVersion: 6,
+      await executeCustomUpgrade(chainId, proxyGetters, stateTransition, {
+        newProtocolVersion: 6 + 1 + initialProtocolVersion,
         l2ProtocolUpgradeTx: noopUpgradeTransaction,
       })
     ).wait();
@@ -668,25 +685,25 @@ describe("L2 upgrade test", function () {
       true,
       L2_SYSTEM_CONTEXT_ADDRESS,
       SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY,
-      ethers.utils.hexlify(storedBatch1Info.batchHash)
+      ethers.utils.hexlify(storedBatch2Info.batchHash)
     );
 
-    const batch3InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
-      storedBatch1Info,
+    const batch5InfoTwoUpgradeTx = await buildCommitBatchInfoWithCustomLogs(
+      storedBatch2Info,
       {
-        batchNumber: 4,
+        batchNumber: 5,
         timestamp,
       },
       systemLogs
     );
 
-    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch1Info, [batch3InfoTwoUpgradeTx])).wait();
+    const commitReceipt = await (await proxyExecutor.commitBatches(storedBatch2Info, [batch5InfoTwoUpgradeTx])).wait();
     const commitment = commitReceipt.events[0].args.commitment;
-    const newBatchStoredInfo = getBatchStoredInfo(batch3InfoTwoUpgradeTx, commitment);
+    const newBatchStoredInfo = getBatchStoredInfo(batch5InfoTwoUpgradeTx, commitment);
 
-    await makeExecutedEqualCommitted(proxyExecutor, storedBatch1Info, [newBatchStoredInfo], []);
+    await makeExecutedEqualCommitted(proxyExecutor, storedBatch2Info, [newBatchStoredInfo], []);
 
-    storedBatch1Info = newBatchStoredInfo;
+    storedBatch2Info = newBatchStoredInfo;
 
     expect(upgradeEvents[1].name).to.equal("Test");
   });
@@ -701,7 +718,7 @@ async function buildCommitBatchInfo(
   info: CommitBatchInfoWithTimestamp
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const systemLogs = createSystemLogs();
+  const systemLogs = createSystemLogs(info.priorityOperationsHash, info.numberOfLayer1Txs, prevInfo.batchHash);
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -729,6 +746,34 @@ async function buildCommitBatchInfoWithCustomLogs(
   systemLogs: string[]
 ): Promise<CommitBatchInfo> {
   const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+    true,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+  );
+
+  return {
+    timestamp,
+    indexRepeatedStorageChanges: 0,
+    newStateRoot: ethers.utils.randomBytes(32),
+    numberOfLayer1Txs: 0,
+    priorityOperationsHash: EMPTY_STRING_KECCAK,
+    systemLogs: ethers.utils.hexConcat(systemLogs),
+    totalL2ToL1Pubdata: ethers.constants.HashZero,
+    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    ...info,
+  };
+}
+
+async function buildCommitBatchInfoWithUpgrade(
+  prevInfo: StoredBatchInfo,
+  info: CommitBatchInfoWithTimestamp,
+  upgradeTxHash: string
+): Promise<CommitBatchInfo> {
+  const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
   systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
     true,
     L2_SYSTEM_CONTEXT_ADDRESS,
@@ -865,8 +910,9 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 }
 
 async function executeUpgrade(
+  chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  proxyAdmin: AdminFacet,
+  stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -887,13 +933,47 @@ async function executeUpgrade(
 
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
 
+  const oldProtocolVersion = await proxyGetters.getProtocolVersion();
   // This promise will be handled in the tests
-  return proxyAdmin.executeUpgrade(diamondCutData);
+  (
+    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+  ).wait();
+  return stateTransition.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+}
+
+// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
+async function rollBackToVersion(
+  protocolVersion: string,
+  stateTransition: ZkSyncStateTransition,
+  partialUpgrade: Partial<ProposedUpgrade>
+) {
+  partialUpgrade.newProtocolVersion = protocolVersion;
+
+  const upgrade = buildProposeUpgrade(partialUpgrade);
+
+  const defaultUpgradeFactory = await hardhat.ethers.getContractFactory("DefaultUpgrade");
+
+  const defaultUpgrade = await defaultUpgradeFactory.deploy();
+  const diamondUpgradeInit = DefaultUpgradeFactory.connect(defaultUpgrade.address, defaultUpgrade.signer);
+
+  const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
+
+  const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+
+  // This promise will be handled in the tests
+  (
+    await stateTransition.setNewVersionUpgrade(
+      diamondCutData,
+      (parseInt(protocolVersion) - 1).toString(),
+      protocolVersion
+    )
+  ).wait();
 }
 
 async function executeCustomUpgrade(
+  chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  proxyAdmin: AdminFacet,
+  stateTransition: ZkSyncStateTransition,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -913,9 +993,13 @@ async function executeCustomUpgrade(
   const upgradeCalldata = diamondUpgradeInit.interface.encodeFunctionData("upgrade", [upgrade]);
 
   const diamondCutData = diamondCut([], diamondUpgradeInit.address, upgradeCalldata);
+  const oldProtocolVersion = await proxyGetters.getProtocolVersion();
 
   // This promise will be handled in the tests
-  return proxyAdmin.executeUpgrade(diamondCutData);
+  (
+    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+  ).wait();
+  return stateTransition.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
 }
 
 async function makeExecutedEqualCommitted(

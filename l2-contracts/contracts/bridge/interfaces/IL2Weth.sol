@@ -11,4 +11,6 @@ interface IL2Weth {
     function depositTo(address _to) external payable;
 
     function withdrawTo(address _to, uint256 _amount) external;
+
+    function governor() external returns (address);
 }

@@ -2,30 +2,30 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/facets/Admin.sol";
+import "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
     constructor() {
-        s.governor = msg.sender;
+        chainStorage.governor = msg.sender;
     }
 
     function getPorterAvailability() external view returns (bool) {
-        return s.zkPorterIsAvailable;
+        return chainStorage.zkPorterIsAvailable;
     }
 
     function isValidator(address _address) external view returns (bool) {
-        return s.validators[_address];
+        return chainStorage.validators[_address];
     }
 
     function getPriorityTxMaxGasLimit() external view returns (uint256) {
-        return s.priorityTxMaxGasLimit;
+        return chainStorage.priorityTxMaxGasLimit;
     }
 
     function getGovernor() external view returns (address) {
-        return s.governor;
+        return chainStorage.governor;
     }
 
     function getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+        return chainStorage.pendingGovernor;
     }
 }

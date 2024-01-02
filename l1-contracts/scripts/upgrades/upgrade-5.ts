@@ -116,10 +116,10 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
-      const zkSyncContract = deployer.zkSyncContract(deployWallet);
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

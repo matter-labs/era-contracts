@@ -20,7 +20,9 @@ See the [documentation](https://era.zksync.io/docs/dev/fundamentals/rollups.html
   addresses.
 - **Security council** - an address of the Gnosis multisig with the trusted owners that can decrease upgrade timelock.
 - **Validator/Operator** - a privileged address that can commit/verify/execute L2 batches.
-- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks, the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple L2 blocks.
+- **L2 batch (or just batch)** - An aggregation of multiple L2 blocks. Note, that while the API operates on L2 blocks,
+  the prove system operates on batches, which represent a single proved VM execution, which typically contains multiple
+  L2 blocks.
 - **Facet** - implementation contract. The word comes from the EIP-2535.
 - **Gas** - a unit that measures the amount of computational effort required to execute specific operations on the
   zkSync Era network.
@@ -44,9 +46,9 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or its owner
-unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade system and then
-the diamond will be frozen forever.
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or its
+owner unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade
+system and then the diamond will be frozen forever.
 
 #### DiamondInit
 
@@ -59,20 +61,20 @@ Implementation detail - function returns a magic value just like it is designed 
 #### GettersFacet
 
 Separate facet, whose only function is providing `view` and `pure` methods. It also implements
-[diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier.
-This contract must never be frozen.
+[diamond loupe](https://eips.ethereum.org/EIPS/eip-2535#diamond-loupe) which makes managing facets easier. This contract
+must never be frozen.
 
 #### AdminFacet
 
 Controls changing the privileged addresses such as governor and validators or one of the system parameters (L2
-bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and execution of
-upgrades in the diamond proxy.
+bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and
+execution of upgrades in the diamond proxy.
 
 #### Governance
 
-This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to be scheduled,
-executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating upgrades and changes in all
-zkSync Era governed contracts.
+This contract manages operations (calls with preconditions) for governance tasks. The contract allows for operations to
+be scheduled, executed, and canceled with appropriate permissions and delays. It is used for managing and coordinating
+upgrades and changes in all zkSync Era governed contracts.
 
 Each upgrade consists of two steps:
 
@@ -176,6 +178,7 @@ enum SystemLogKey {
   NUMBER_OF_LAYER_1_TXS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
+
 ```
 
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
@@ -248,15 +251,16 @@ investigation and mitigation before resuming normal operations.
 It is a temporary solution to prevent any significant impact of the validator hot key leakage, while the network is in
 the Alpha stage.
 
-This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`, that
-can be called only by the validator.
+This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`,
+that can be called only by the validator.
 
-When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
-`call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
-the time these batches are commited by the validator to enforce a delay between committing and execution of batches. Then, the
-validator can prove the already commited batches regardless of the mentioned timestamp, and again the same calldata (related
-to the `proveBatches` function) will be propogated to the zkSync contract. After, the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propogate the same calldata to zkSync contract.
+When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy`
+through `call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these
+batches to track the time these batches are commited by the validator to enforce a delay between committing and
+execution of batches. Then, the validator can prove the already commited batches regardless of the mentioned timestamp,
+and again the same calldata (related to the `proveBatches` function) will be propogated to the zkSync contract. After,
+the `delay` is elapsed, the validator is allowed to call `executeBatches` to propogate the same calldata to zkSync
+contract.
 
 ### L2 specifics
 

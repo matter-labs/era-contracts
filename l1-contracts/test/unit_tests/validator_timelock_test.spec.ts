@@ -199,7 +199,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(2)])
     );
 
-    expect(revertReason).equal("DummyExecutor: Can't execute batches more than committed and proven currently");
+    expect(revertReason).equal("DummyExecutor 2: Can");
   });
 
   // These tests primarily needed to make gas statistics be more accurate.

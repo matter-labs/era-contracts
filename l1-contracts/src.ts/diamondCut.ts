@@ -1,10 +1,10 @@
 import * as hardhat from "hardhat";
 import type { Interface } from "ethers/lib/utils";
 import "@nomiclabs/hardhat-ethers";
-import type { Wallet } from "ethers";
+import type { Wallet, BigNumberish } from "ethers";
 import { ethers } from "ethers";
-import { IZkSyncFactory } from "../typechain/IZkSyncFactory";
-import { IBaseFactory } from "../typechain/IBaseFactory";
+import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
+import { IStateTransitionChainBaseFactory } from "../typechain/IStateTransitionChainBaseFactory";
 
 // Some of the facets are to be removed with the upcoming upgrade.
 const UNCONDITIONALLY_REMOVED_FACETS = ["DiamondCutFacet", "GovernanceFacet"];
@@ -26,6 +26,20 @@ export interface DiamondCut {
   facetCuts: FacetCut[];
   initAddress: string;
   initCalldata: string;
+}
+
+export interface InitializeData {
+  bridgehub: BigNumberish;
+  verifier: BigNumberish;
+  governor: BigNumberish;
+  admin: BigNumberish;
+  genesisBatchHash: string;
+  genesisIndexRepeatedStorageChanges: BigNumberish;
+  genesisBatchCommitment: string;
+  allowList: BigNumberish;
+  l2BootloaderBytecodeHash: string;
+  l2DefaultAccountBytecodeHash: string;
+  priorityTxMaxGasLimit: BigNumberish;
 }
 
 export function facetCut(address: string, contract: Interface, action: Action, isFreezable: boolean): FacetCut {
@@ -74,6 +88,7 @@ export async function getCurrentFacetCutsForAdd(
     facetsCuts["GettersFacet"] = facetCut(getters.address, getters.interface, Action.Add, false);
   }
   // These contracts implement the logic without which we can get out of the freeze.
+  // These contracts implement the logic without which we can get out of the freeze.
   if (mailboxAddress) {
     const mailbox = await hardhat.ethers.getContractAt("MailboxFacet", mailboxAddress);
     facetsCuts["MailboxFacet"] = facetCut(mailbox.address, mailbox.interface, Action.Add, true);
@@ -87,12 +102,12 @@ export async function getCurrentFacetCutsForAdd(
 }
 
 export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddress: string, updatedFaceNames: string[]) {
-  const mainContract = IZkSyncFactory.connect(zkSyncAddress, wallet);
+  const mainContract = IStateTransitionChainFactory.connect(zkSyncAddress, wallet);
   const diamondCutFacets = await mainContract.facets();
   // We don't care about freezing, because we are removing the facets.
   const result = [];
   for (const { addr, selectors } of diamondCutFacets) {
-    const facet = IBaseFactory.connect(addr, wallet);
+    const facet = IStateTransitionChainBaseFactory.connect(addr, wallet);
     const facetName = await facet.getName();
     if (updatedFaceNames.includes(facetName)) {
       result.push({
@@ -103,6 +118,7 @@ export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddres
       });
     }
   }
+
   return result;
 }
 

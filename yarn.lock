@@ -1080,6 +1080,43 @@
     picocolors "^1.0.0"
     tslib "^2.6.0"
 
+"@openzeppelin/hardhat-upgrades@1.22.0":
+  version "1.22.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/hardhat-upgrades/-/hardhat-upgrades-1.22.0.tgz#2a432c72a428a9f277201646bc1a248021538f06"
+  integrity sha512-1qyZnDaxl0C8tne7ykNRa/fxw3FrNCY2M3fGuCiQW5DDkJoXhLgm3JVsXwl6X7q9mQSrik4vgBbI3ErmxmZTYg==
+  dependencies:
+    "@openzeppelin/upgrades-core" "^1.20.0"
+    chalk "^4.1.0"
+    debug "^4.1.1"
+    proper-lockfile "^4.1.1"
+
+"@openzeppelin/upgrades-core@1.20.5":
+  version "1.20.5"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/upgrades-core/-/upgrades-core-1.20.5.tgz#1650b7805a847a5ccc097cd676ec12316a5a4b8d"
+  integrity sha512-Wp4uUov9/8cY0H4xHYsGCkLh0EItrpusSdQPWOTI1Q/YDDfu4uTH3LYyTeVAavzEvkAuKCCuTOPnZBibLZGxSw==
+  dependencies:
+    cbor "^8.0.0"
+    chalk "^4.1.0"
+    compare-versions "^5.0.0"
+    debug "^4.1.1"
+    ethereumjs-util "^7.0.3"
+    proper-lockfile "^4.1.1"
+    solidity-ast "^0.4.15"
+
+"@openzeppelin/upgrades-core@^1.20.0":
+  version "1.30.0"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/upgrades-core/-/upgrades-core-1.30.0.tgz#6087a41c8703228561a4daa910dd7f605a00f8c7"
+  integrity sha512-guW3EaTp/cet/O1uAmEcupHhtEGMzzYGsru2LMllFL5INWmRfeCHSVQu4TjkCLpoYHJoOIGSvosjoCyJL4oEaQ==
+  dependencies:
+    cbor "^9.0.0"
+    chalk "^4.1.0"
+    compare-versions "^6.0.0"
+    debug "^4.1.1"
+    ethereumjs-util "^7.0.3"
+    minimist "^1.2.7"
+    proper-lockfile "^4.1.1"
+    solidity-ast "^0.4.51"
+
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/@resolver-engine/core/-/core-0.3.3.tgz#590f77d85d45bc7ecc4e06c654f41345db6ca967"
@@ -3113,10 +3150,17 @@ catering@^2.1.0, catering@^2.1.1:
   resolved "https://registry.yarnpkg.com/catering/-/catering-2.1.1.tgz#66acba06ed5ee28d5286133982a927de9a04b510"
   integrity sha512-K7Qy8O9p76sL3/3m7/zLKbRkyOlSZAgzEaLhyj2mXS8PsCud2Eo4hAb8aLtZqHh0QGqLcb9dlJSu6lHRVENm1w==
 
-cbor@^8.1.0:
+cbor@^8.0.0, cbor@^8.1.0:
   version "8.1.0"
   resolved "https://registry.yarnpkg.com/cbor/-/cbor-8.1.0.tgz#cfc56437e770b73417a2ecbfc9caf6b771af60d5"
   integrity sha512-DwGjNW9omn6EwP70aXsn7FQJx5kO12tX0bZkaTjzdVFM6/7nhA4t0EENocKGx6D2Bch9PE2KzCUf5SceBdeijg==
+  dependencies:
+    nofilter "^3.1.0"
+
+cbor@^9.0.0:
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/cbor/-/cbor-9.0.1.tgz#b16e393d4948d44758cd54ac6151379d443b37ae"
+  integrity sha512-/TQOWyamDxvVIv+DY9cOLNuABkoyz8K/F3QE56539pGVYohx0+MEA1f4lChFTX79dBTBS7R1PF6ovH7G+VtBfQ==
   dependencies:
     nofilter "^3.1.0"
 
@@ -4780,7 +4824,11 @@ ethereumjs-util@^5.0.0, ethereumjs-util@^5.0.1, ethereumjs-util@^5.1.1, ethereum
     rlp "^2.0.0"
     safe-buffer "^5.1.1"
 
+<<<<<<< HEAD:yarn.lock
 ethereumjs-util@^7.0.2:
+=======
+ethereumjs-util@^7.0.2, ethereumjs-util@^7.0.3, ethereumjs-util@^7.1.0:
+>>>>>>> origin/kl-factory:ethereum/yarn.lock
   version "7.1.5"
   resolved "https://registry.yarnpkg.com/ethereumjs-util/-/ethereumjs-util-7.1.5.tgz#9ecf04861e4fbbeed7465ece5f23317ad1129181"
   integrity sha512-SDl5kKrQAudFBUe5OJM9Ac6WmMyYmXX/6sTmLZ3ffG2eY6ZIGBes3pEDxNN6V72WyOw4CPD5RomKdsa8DAAwLg==
@@ -5545,7 +5593,30 @@ get-func-name@^2.0.1, get-func-name@^2.0.2:
   resolved "https://registry.yarnpkg.com/get-func-name/-/get-func-name-2.0.2.tgz#0d7cf20cd13fda808669ffa88f4ffc7a3943fc41"
   integrity sha512-8vXOvuE167CtIc3OyItco7N/dpRtBbYOsPsXCz7X/PMnlGjYjSGuZJgM1Y7mmew7BKf9BqvLX2tnOVy1BBUsxQ==
 
+<<<<<<< HEAD:yarn.lock
 get-intrinsic@^1.0.2, get-intrinsic@^1.1.1, get-intrinsic@^1.1.3, get-intrinsic@^1.2.0, get-intrinsic@^1.2.1, get-intrinsic@^1.2.2:
+=======
+get-intrinsic@^1.0.2, get-intrinsic@^1.1.1, get-intrinsic@^1.1.3:
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/get-intrinsic/-/get-intrinsic-1.1.3.tgz#063c84329ad93e83893c7f4f243ef63ffa351385"
+  integrity sha512-QJVz1Tj7MS099PevUG5jvnt9tSkXN8K14dxQlikJuPt4uD9hHAHjLyLBiLR5zELelBdD9QNRAXZzsJx0WaDL9A==
+  dependencies:
+    function-bind "^1.1.1"
+    has "^1.0.3"
+    has-symbols "^1.0.3"
+
+get-intrinsic@^1.2.0, get-intrinsic@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/get-intrinsic/-/get-intrinsic-1.2.1.tgz#d295644fed4505fc9cde952c37ee12b477a83d82"
+  integrity sha512-2DcsyfABl+gVHEfCOaTrWgyt+tb6MSEGmKq+kI5HwLbIYgjgmMcV8KQ41uaKz1xxUcn9tJtgFbQUEVcEbd0FYw==
+  dependencies:
+    function-bind "^1.1.1"
+    has "^1.0.3"
+    has-proto "^1.0.1"
+    has-symbols "^1.0.3"
+
+get-intrinsic@^1.2.1, get-intrinsic@^1.2.2:
+>>>>>>> origin/kl-factory:ethereum/yarn.lock
   version "1.2.2"
   resolved "https://registry.yarnpkg.com/get-intrinsic/-/get-intrinsic-1.2.2.tgz#281b7622971123e1ef4b3c90fd7539306da93f3b"
   integrity sha512-0gSo4ml/0j98Y3lngkFEot/zhiCeWsbYIlZ+uZOVgzLyLaUw7wxUL+nCTP0XJvJg1AXulJRI3UJi8GsbDuxdGA==
@@ -8568,7 +8639,11 @@ promise@^8.0.0:
   dependencies:
     asap "~2.0.6"
 
+<<<<<<< HEAD:yarn.lock
 proper-lockfile@^4.1.2:
+=======
+proper-lockfile@^4.1.1:
+>>>>>>> origin/kl-factory:ethereum/yarn.lock
   version "4.1.2"
   resolved "https://registry.yarnpkg.com/proper-lockfile/-/proper-lockfile-4.1.2.tgz#c8b9de2af6b2f1601067f98e01ac66baa223141f"
   integrity sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==
@@ -9558,6 +9633,13 @@ solhint@^3.6.2:
     text-table "^0.2.0"
   optionalDependencies:
     prettier "^2.8.3"
+
+solidity-ast@^0.4.15, solidity-ast@^0.4.51:
+  version "0.4.52"
+  resolved "https://registry.yarnpkg.com/solidity-ast/-/solidity-ast-0.4.52.tgz#9f1a9abc7e5ba28bbf91146ecd07aec7e70f3c85"
+  integrity sha512-iOya9BSiB9jhM8Vf40n8lGELGzwrUc57rl5BhfNtJ5cvAaMvRcNlHeAMNvqJJyjoUnczqRbHqdivEqK89du3Cw==
+  dependencies:
+    array.prototype.findlast "^1.2.2"
 
 solidity-comments-extractor@^0.0.7:
   version "0.0.7"

@@ -39,13 +39,15 @@ function getL2Calldata(l2WethBridgeAddress: string, l1WethTokenAddress: string, 
 
 async function getL1TxInfo(
   deployer: Deployer,
+  chainId: string,
   to: string,
   l2Calldata: string,
   refundRecipient: string,
   gasPrice: ethers.BigNumber
 ) {
-  const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+  const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
+    chainId,
     to,
     0,
     l2Calldata,
@@ -56,6 +58,7 @@ async function getL1TxInfo(
   ]);
 
   const neededValue = await zksync.l2TransactionBaseCost(
+    chainId,
     gasPrice,
     DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
@@ -83,8 +86,10 @@ async function main() {
   program
     .command("prepare-calldata")
     .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       if (!l1WethTokenAddress) {
         console.log("Base Layer WETH address not provided. Skipping.");
         return;
@@ -109,6 +114,7 @@ async function main() {
       const l2Calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
       const l1TxInfo = await getL1TxInfo(
         deployer,
+        chainId,
         l2WethTokenProxyAddress,
         l2Calldata,
         ethers.constants.AddressZero,
@@ -121,9 +127,11 @@ async function main() {
   program
     .command("instant-call")
     .option("--private-key <private-key>")
+    .option("--chain-id <chain-id>")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .action(async (cmd) => {
+      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       if (!l1WethTokenAddress) {
         console.log("Base Layer WETH address not provided. Skipping.");
         return;
@@ -148,8 +156,9 @@ async function main() {
         verbose: true,
       });
 
-      const zkSync = deployer.zkSyncContract(deployWallet);
+      const zkSync = deployer.bridgehubContract(deployWallet);
       const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
+        chainId,
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
@@ -157,6 +166,7 @@ async function main() {
       const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
       const tx = await zkSync.requestL2Transaction(
+        chainId,
         l2WethTokenProxyAddress,
         0,
         calldata,

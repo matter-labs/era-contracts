@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as hardhat from "hardhat";
 import * as path from "path";
 import { web3Provider } from "./utils";
+import { deployTestnetTokens } from "../src.ts/deploy-testnet-token";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
@@ -61,29 +62,7 @@ async function main() {
     // return;
   }
 
-  const result = [];
-
-  for (const token of mainnetTokens) {
-    const constructorArgs = [
-      `${token.name} (${process.env.CHAIN_ETH_NETWORK})`,
-      token.symbol,
-      token.decimals,
-      { gasLimit: 800000 },
-    ];
-
-    console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
-    const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", wallet);
-    const erc20 = await tokenFactory.deploy(...constructorArgs);
-
-    const testnetToken = token;
-    testnetToken.address = erc20.address;
-    result.push(testnetToken);
-  }
-
-  fs.writeFileSync(
-    `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_NETWORK}.json`,
-    JSON.stringify(result, null, 2)
-  );
+  await deployTestnetTokens(mainnetTokens, wallet, `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_NETWORK}.json`);
 }
 
 main()

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/interfaces/IZkSync.sol";
+import "../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -22,31 +22,50 @@ library BridgeInitializationHelper {
 
     /// @notice Requests L2 transaction that will deploy a contract with a given bytecode hash and constructor data.
     /// NOTE: it is always used to deploy via create2 with ZERO salt
-    /// @param _zkSync The address of the zkSync contract
+    /// @param _bridgehub The address of the zkSync contract
     /// @param _deployTransactionFee The fee that will be paid for the L1 -> L2 transaction
     /// @param _bytecodeHash The hash of the bytecode of the contract to be deployed
     /// @param _constructorData The data to be passed to the contract constructor
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment
     function requestDeployTransaction(
-        IZkSync _zkSync,
+        bool ethIsBaseToken,
+        uint256 _chainId,
+        IBridgehub _bridgehub,
         uint256 _deployTransactionFee,
         bytes32 _bytecodeHash,
         bytes memory _constructorData,
         bytes[] memory _factoryDeps
-    ) internal returns (address deployedAddress) {
+    ) internal returns (address deployedAddress, bytes32 txHash) {
         bytes memory deployCalldata = abi.encodeCall(
             IL2ContractDeployer.create2,
             (bytes32(0), _bytecodeHash, _constructorData)
         );
-        _zkSync.requestL2Transaction{value: _deployTransactionFee}(
-            L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            0,
-            deployCalldata,
-            DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps,
-            msg.sender
-        );
+
+        if (ethIsBaseToken) {
+            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
+                _chainId,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+                _deployTransactionFee,
+                0,
+                deployCalldata,
+                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                _factoryDeps,
+                msg.sender
+            );
+        } else {
+            txHash = _bridgehub.requestL2Transaction(
+                _chainId,
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+                _deployTransactionFee,
+                0,
+                deployCalldata,
+                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                _factoryDeps,
+                msg.sender
+            );
+        }
 
         deployedAddress = L2ContractHelper.computeCreate2Address(
             // Apply the alias to the address of the bridge contract, to get the `msg.sender` in L2.

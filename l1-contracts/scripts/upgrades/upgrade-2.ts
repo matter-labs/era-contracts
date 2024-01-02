@@ -1,12 +1,12 @@
 import { Command } from "commander";
-import { diamondCut } from "../src.ts/diamondCut";
+import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { ethers } from "hardhat";
 import { Provider } from "zksync-web3";
 import "@nomiclabs/hardhat-ethers";
-import { web3Provider } from "./utils";
-import { Deployer } from "../src.ts/deploy";
+import { web3Provider } from "../utils";
+import { Deployer } from "../../src.ts/deploy";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -96,10 +96,10 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
-      const zkSyncContract = deployer.zkSyncContract(deployWallet);
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

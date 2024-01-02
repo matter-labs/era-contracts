@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../zksync/libraries/Diamond.sol";
+import "../common/libraries/Diamond.sol";
 import "./BaseZkSyncUpgrade.sol";
 
 /// @author Matter Labs

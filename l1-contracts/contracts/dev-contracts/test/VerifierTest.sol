@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/Verifier.sol";
+import "../../state-transition/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierTest is Verifier {

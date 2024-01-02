@@ -21,9 +21,11 @@ async function main() {
   program
     .version("0.1.0")
     .name("deploy-force-deploy-upgrader")
+    .option("--chain-id <chain-id>")
     .description("Deploys the force deploy upgrader contract to L2");
 
   program.option("--private-key <private-key>").action(async (cmd: Command) => {
+    const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
     const deployWallet = cmd.privateKey
       ? new Wallet(cmd.privateKey, provider)
       : Wallet.fromMnemonic(
@@ -42,7 +44,14 @@ async function main() {
     );
 
     // TODO: request from API how many L2 gas needs for the transaction.
-    await create2DeployFromL1(deployWallet, forceDeployUpgraderBytecode, "0x", create2Salt, priorityTxMaxGasLimit);
+    await create2DeployFromL1(
+      chainId,
+      deployWallet,
+      forceDeployUpgraderBytecode,
+      "0x",
+      create2Salt,
+      priorityTxMaxGasLimit
+    );
 
     console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
   });

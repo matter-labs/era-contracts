@@ -2,44 +2,45 @@
 
 pragma solidity 0.8.20;
 
-import "../zksync/facets/Base.sol";
-import "../zksync/interfaces/IMailbox.sol";
-import "../zksync/interfaces/IVerifier.sol";
+import "../state-transition/chain-deps/facets/Base.sol";
+import "../state-transition/chain-interfaces/IMailbox.sol";
+import "../state-transition/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
-import "../zksync/libraries/TransactionValidator.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../zksync/Config.sol";
+import "../common/Messaging.sol";
+import "../state-transition/libraries/TransactionValidator.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
+
+/// @notice The struct that represents the upgrade proposal.
+/// @param l2ProtocolUpgradeTx The system upgrade transaction.
+/// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
+/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
+/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
+/// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
+/// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
+/// in each upgrade. Usually empty.
+/// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
+/// upgrade. Usually empty.
+/// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
+/// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
+/// the previous protocol version.
+struct ProposedUpgrade {
+    L2CanonicalTransaction l2ProtocolUpgradeTx;
+    bytes[] factoryDeps;
+    bytes32 bootloaderHash;
+    bytes32 defaultAccountHash;
+    address verifier;
+    VerifierParams verifierParams;
+    bytes l1ContractsUpgradeCalldata;
+    bytes postUpgradeCalldata;
+    uint256 upgradeTimestamp;
+    uint256 newProtocolVersion;
+}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is Base {
-    /// @notice The struct that represents the upgrade proposal.
-    /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-    /// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
-    /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-    /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-    /// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
-    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
-    /// in each upgrade. Usually empty.
-    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
-    /// upgrade. Usually empty.
-    /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
-    /// the previous protocol version.
-    struct ProposedUpgrade {
-        IMailbox.L2CanonicalTransaction l2ProtocolUpgradeTx;
-        bytes[] factoryDeps;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        address verifier;
-        VerifierParams verifierParams;
-        bytes l1ContractsUpgradeCalldata;
-        bytes postUpgradeCalldata;
-        uint256 upgradeTimestamp;
-        uint256 newProtocolVersion;
-    }
-
+abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -77,10 +78,10 @@ abstract contract BaseZkSyncUpgrade is Base {
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousDefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
+        bytes32 previousDefaultAccountBytecodeHash = chainStorage.l2DefaultAccountBytecodeHash;
 
         // Change the default account bytecode hash
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
+        chainStorage.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
     }
 
@@ -94,10 +95,10 @@ abstract contract BaseZkSyncUpgrade is Base {
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousBootloaderBytecodeHash = s.l2BootloaderBytecodeHash;
+        bytes32 previousBootloaderBytecodeHash = chainStorage.l2BootloaderBytecodeHash;
 
         // Change the bootloader bytecode hash
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
+        chainStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
         emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
@@ -112,8 +113,8 @@ abstract contract BaseZkSyncUpgrade is Base {
             return;
         }
 
-        IVerifier oldVerifier = s.verifier;
-        s.verifier = _newVerifier;
+        IVerifier oldVerifier = chainStorage.verifier;
+        chainStorage.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
 
@@ -128,8 +129,8 @@ abstract contract BaseZkSyncUpgrade is Base {
             return;
         }
 
-        VerifierParams memory oldVerifierParams = s.verifierParams;
-        s.verifierParams = _newVerifierParams;
+        VerifierParams memory oldVerifierParams = chainStorage.verifierParams;
+        chainStorage.verifierParams = _newVerifierParams;
         emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
     }
 
@@ -154,7 +155,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        IMailbox.L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
+        L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
         uint256 _newProtocolVersion
     ) internal returns (bytes32) {
@@ -163,14 +164,14 @@ abstract contract BaseZkSyncUpgrade is Base {
             return bytes32(0);
         }
 
-        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
+        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 sys upgrade tx type is wrong");
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
             encodedTransaction,
-            s.priorityTxMaxGasLimit
+            chainStorage.priorityTxMaxGasLimit
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);
@@ -185,7 +186,9 @@ abstract contract BaseZkSyncUpgrade is Base {
         _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
-        s.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
+
+        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
+
         return l2ProtocolUpgradeTxHash;
     }
 
@@ -206,8 +209,8 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal {
-        uint256 previousProtocolVersion = s.protocolVersion;
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
+        uint256 previousProtocolVersion = chainStorage.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
@@ -218,13 +221,13 @@ abstract contract BaseZkSyncUpgrade is Base {
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-        require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
+        require(chainStorage.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            s.l2SystemContractsUpgradeBatchNumber == 0,
+            chainStorage.l2SystemContractsUpgradeBatchNumber == 0,
             "The batch number of the previous upgrade has not been cleaned"
         );
 
-        s.protocolVersion = _newProtocolVersion;
+        chainStorage.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
 }

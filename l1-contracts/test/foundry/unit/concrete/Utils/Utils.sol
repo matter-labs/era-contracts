@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -133,12 +133,66 @@ library Utils {
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
-        selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
-        selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[3] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[4] = MailboxFacet.requestL2Transaction.selector;
-        selectors[5] = MailboxFacet.l2TransactionBaseCost.selector;
+        selectors[0] = MailboxFacet.isEthWithdrawalFinalized.selector;
+        selectors[1] = MailboxFacet.finalizeEthWithdrawalBridgehub.selector;
+        selectors[2] = MailboxFacet.requestL2TransactionBridgehub.selector;
+        selectors[3] = MailboxFacet.proveL2MessageInclusion.selector;
+        selectors[4] = MailboxFacet.proveL2LogInclusion.selector;
+        selectors[5] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[6] = MailboxFacet.finalizeEthWithdrawal.selector;
+        selectors[7] = MailboxFacet.requestL2Transaction.selector;
+        selectors[8] = MailboxFacet.l2TransactionBaseCost.selector;
         return selectors;
+    }
+
+    function initial_deployment() public returns (address[] memory) {
+        GettersFacet gettersFacet = new GettersFacet();
+        MailboxFacet mailboxFacet = new MailboxFacet();
+        allowList = new AllowList(owner);
+        DiamondInit diamondInit = new DiamondInit();
+
+        bytes8 dummyHash = 0x1234567890123456;
+        address dummyAddress = makeAddr("dummyAddress");
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            dummyAddress,
+            owner,
+            owner,
+            0,
+            0,
+            0,
+            allowList,
+            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
+            false,
+            dummyHash,
+            dummyHash,
+            10000000
+        );
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(gettersFacet),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getGettersSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(mailboxFacet),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMailboxSelectors()
+        });
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        uint256 chainId = block.chainid;
+        DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
+
+        vm.prank(owner);
+        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
     }
 }
