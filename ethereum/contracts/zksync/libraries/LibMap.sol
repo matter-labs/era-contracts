@@ -31,7 +31,7 @@ library LibMap {
 
     /// @dev Updates the uint32 value at `_index` in `map`.
     /// @param _map The Uint32Map instance containing the packed uint32 values.
-    /// @param _index The index of the uint32 value to retrieve.
+    /// @param _index The index of the uint32 value to set.
     /// @param _value The new value at the specified index.
     function set(Uint32Map storage _map, uint256 _index, uint32 _value) internal {
         unchecked {
