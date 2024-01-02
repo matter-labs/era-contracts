@@ -310,7 +310,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             compressedStateDiffs
         );
 
-        bytes32 blobLinearHash = PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
+        bytes32[] memory blobHashes = PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
+        require(blobHashes.length == 2, "only two blobs currently supported");
 
         /// Check for calldata strict format
         require(calldataPtr == _totalL2ToL1PubdataAndStateDiffs.length, "Extra data in the totalL2ToL1Pubdata array");
@@ -323,7 +324,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
             EfficientCall.keccak(totalL2ToL1Pubdata)
         );
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.STATE_DIFF_HASH_KEY)), stateDiffHash);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOBS_LINEAR_HASH_KEY)), blobLinearHash);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blobHashes[0]);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blobHashes[1]);
 
         /// Clear logs state
         chainedLogsHash = bytes32(0);

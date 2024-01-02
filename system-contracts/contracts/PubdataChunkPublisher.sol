@@ -14,18 +14,21 @@ import {EfficientCall} from "./libraries/EfficientCall.sol";
 contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @notice Chunks pubdata into pieces that can fit into blobs.
     /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
-    /// @return blobLinearHash A linear hash of the pubdata chunks.
+    /// @return blobHashes Array of hashes corresponding to each blob being published.
+    /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
     function chunkAndPublishPubdata(
         bytes calldata _pubdata
-    ) external view onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32 blobLinearHash) {
-        require(_pubdata.length <= BLOB_SIZE_BYTES * 3, "pubdata should fit in 3 blobs");
+    ) external view onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32[] memory blobHashes) {
+        require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
+        blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
         for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {
             uint256 end = i + BLOB_SIZE_BYTES > _pubdata.length ? _pubdata.length : i + BLOB_SIZE_BYTES;
 
+            // ToDo: Need to right pad with 0s up to BLOB_SIZE_BYTES
             bytes calldata blob = _pubdata[i:end];
             bytes32 blobHash = EfficientCall.keccak(blob);
 
-            blobLinearHash = keccak256(abi.encode(blobLinearHash, blobHash));
+            blobHashes[i / BLOB_SIZE_BYTES] = blobHash;
         }
     }
 }

@@ -98,7 +98,8 @@ enum SystemLogKey {
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
-    BLOBS_LINEAR_HASH_KEY
+    BLOB_ONE_HASH_KEY,
+    BLOB_TWO_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
