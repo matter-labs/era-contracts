@@ -11,12 +11,12 @@ contract OnEmptyQueueTest is PriorityQueueSharedTest {
     }
 
     function test_failGetFront() public {
-        vm.expectRevert(bytes.concat("D"));
+        vm.expectRevert(bytes("D"));
         priorityQueue.front();
     }
 
     function test_failPopFront() public {
-        vm.expectRevert(bytes.concat("s"));
+        vm.expectRevert(bytes("s"));
         priorityQueue.popFront();
     }
 }
