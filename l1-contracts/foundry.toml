@@ -1,0 +1,8 @@
+[profile.default]
+src = 'cache/solpp-generated-contracts'
+out = 'artifacts-forge'
+libs = ['node_modules', 'lib']
+cache_path = 'cache-forge'
+test = 'test/foundry'
+
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
