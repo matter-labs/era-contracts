@@ -5,7 +5,6 @@ import {VerifierTestTest} from "./Verifier.t.sol";
 import {VerifierRecursiveTest} from "solpp/dev-contracts/test/VerifierRecursiveTest.sol";
 
 contract VerifierRecursiveTestTest is VerifierTestTest {
-
     function setUp() public override {
         super.setUp();
 
