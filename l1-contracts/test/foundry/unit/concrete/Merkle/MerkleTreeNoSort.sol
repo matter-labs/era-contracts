@@ -8,7 +8,7 @@ contract MerkleTreeNoSort is MurkyBase {
      * HASHING FUNCTION *
      ********************/
 
-    /// ascending sort and concat prior to hashing
+    /// The original Merkle tree contains the ascending sort and concat prior to hashing, so we need to override it
     function hashLeafPairs(bytes32 left, bytes32 right) public pure override returns (bytes32 _hash) {
         assembly {
             mstore(0x0, left)
