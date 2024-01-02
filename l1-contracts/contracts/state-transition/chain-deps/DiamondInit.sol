@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.13;
 
-import "../../common/libraries/Diamond.sol";
+import "../libraries/Diamond.sol";
 import "./facets/Base.sol";
 
 import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE} from "../../common/Config.sol";

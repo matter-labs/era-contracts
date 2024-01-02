@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import "./Base.sol";
-import "../../../common/libraries/Diamond.sol";
+import "../../libraries/Diamond.sol";
 import "../../../state-transition/libraries/PriorityQueue.sol";
 import "../../../common/libraries/UncheckedMath.sol";
 import "../../chain-interfaces/IGetters.sol";

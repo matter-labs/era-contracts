@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import "../Verifier.sol";
 import "../chain-deps/StateTransitionChainStorage.sol";
 import "./IBase.sol";
-import {Diamond} from "../../common/libraries/Diamond.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
 interface IAdmin is IStateTransitionChainBase {

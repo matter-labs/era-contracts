@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../common/libraries/Diamond.sol";
+import "../libraries/Diamond.sol";
 import "../chain-deps/facets/Base.sol";
 
 // import "../interfaces/IVerifier.sol";

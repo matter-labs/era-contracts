@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import "../../chain-interfaces/IAdmin.sol";
-import "../../../common/libraries/Diamond.sol";
+import "../../libraries/Diamond.sol";
 import "../../../common/libraries/L2ContractHelper.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import "./Base.sol";

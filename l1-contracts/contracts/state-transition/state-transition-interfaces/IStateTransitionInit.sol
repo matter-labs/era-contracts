@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {Diamond} from "../../common/libraries/Diamond.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 
 /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error

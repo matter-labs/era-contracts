@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../common/libraries/Diamond.sol";
+import "../../state-transition/libraries/Diamond.sol";
 import "../../state-transition/chain-deps/facets/Getters.sol";
 
 contract DiamondCutTestContract is GettersFacet {

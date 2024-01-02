@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import "../chain-deps/facets/Mailbox.sol";
-import "../../common/libraries/Diamond.sol";
+import "../libraries/Diamond.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import "../../common/L2ContractAddresses.sol";
 import "../../common/Config.sol";

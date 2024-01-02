@@ -8,7 +8,7 @@ import "./IGetters.sol";
 import "./IMailbox.sol";
 
 // kl to do remove this, needed for the server for now
-import "../../common/libraries/Diamond.sol";
+import "../libraries/Diamond.sol";
 
 interface IStateTransitionChain is IAdmin, IExecutor, IGetters, IMailbox {
     function initialize(

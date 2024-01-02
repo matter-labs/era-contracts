@@ -7,7 +7,7 @@ import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../
 
 import "../common/ReentrancyGuard.sol";
 import "./chain-interfaces/IStateTransitionChain.sol";
-import "../common/DiamondProxy.sol";
+import "./chain-deps/DiamondProxy.sol";
 import {ZkSyncStateTransitionInitializeData} from "./state-transition-interfaces/IStateTransitionInit.sol";
 import {IZkSyncStateTransition} from "./state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
