@@ -15,6 +15,8 @@ import "./interfaces/IL2StandardToken.sol";
 /// - It does not have a silent fallback method and will revert if it's called for a method it hasn't implemented.
 /// - It implements `receive` method to allow users to deposit ether directly.
 /// - It implements `permit` method to allow users to sign a message instead of calling `approve`.
+/// - It implements `depositTo` method to allow users to deposit to another address.
+/// - It implements `withdrawTo` method to allow users to withdraw to another address.
 ///
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
