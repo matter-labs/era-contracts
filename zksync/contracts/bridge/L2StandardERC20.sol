@@ -105,7 +105,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         ERC20Getters calldata _availableGetters,
         string memory _newName,
         string memory _newSymbol,
-        uint8 _newDecimals,
         uint8 _version
     ) external onlyNextVersion(_version) reinitializer(_version) {
         // It is expected that this token is deployed as a beacon proxy, so we'll
@@ -115,10 +114,9 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
 
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);
-        decimals_ = _newDecimals;
         availableGetters = _availableGetters;
 
-        emit BridgeInitialize(l1Address, _newName, _newSymbol, _newDecimals);
+        emit BridgeInitialize(l1Address, _newName, _newSymbol, _decimals);
     }
 
     modifier onlyBridge() {
