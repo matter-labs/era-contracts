@@ -1,6 +1,7 @@
 import type { CompilerPaths } from "./utils";
 import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
+import fsextra from "fs-extra";
 import { Command } from "commander";
 
 const COMPILER_VERSION = "1.3.14";
@@ -34,6 +35,17 @@ async function main() {
   program.command("compile-precompiles").action(async () => {
     await compileYulFolder("contracts-preprocessed");
     await compileYulFolder("contracts-preprocessed/precompiles");
+
+    await fsextra.move(
+      `${__dirname}/../contracts-preprocessed/precompiles`,
+      `${__dirname}/../artifacts-zk/contracts-preprocessed/precompiles`,
+      { overwrite: true }
+    );
+    await fsextra.move(
+      `${__dirname}/../contracts-preprocessed/artifacts`,
+      `${__dirname}/../artifacts-zk/contracts-preprocessed/artifacts`,
+      { overwrite: true }
+    );
   });
 
   await program.parseAsync(process.argv);

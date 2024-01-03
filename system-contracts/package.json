@@ -6,9 +6,11 @@
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
     "@nomiclabs/hardhat-solpp": "^2.0.1",
+    "@types/fs-extra": "^11.0.4",
     "commander": "^9.4.1",
     "ethers": "^5.7.0",
     "fast-glob": "^3.3.2",
+    "fs-extra": "^11.2.0",
     "hardhat": "^2.18.3",
     "preprocess": "^3.2.0",
     "zksync-web3": "^0.14.3"
@@ -16,7 +18,7 @@
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
-    "@matterlabs/hardhat-zksync-solc": "^0.4.2",
+    "@matterlabs/hardhat-zksync-solc": "^1.0.6",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
