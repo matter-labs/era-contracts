@@ -13,8 +13,9 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
-    BLOBS_LINEAR_HASH_KEY
+    BLOB_ONE_HASH_KEY,
+    BLOB_TWO_HASH_KEY,
+    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -32,6 +33,9 @@ uint256 constant BLS_MODULUS = 5243587517512619047944774050818596583769055250052
 
 /// @dev Total size of the input for point evaluation precompile without the version hash
 uint256 constant POINT_EVALUATION_INPUT_SIZE = 160;
+
+/// @dev Packed pubdata commitments. ∑ claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+uint256 constant PUBDATA_COMMITMENT_SIZE = 128;
 
 interface IExecutor is IBase {
     /// @notice Rollup batch stored data

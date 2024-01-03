@@ -213,7 +213,7 @@ contract ExecutorTest is Test {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
-            totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
+            pubdataCommitments: abi.encodePacked(uint256(0))
         });
     }
 }

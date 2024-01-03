@@ -33,7 +33,8 @@ contract ExecutorProvingTest is ExecutorFacet {
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp,
-            bytes32 blobLinearHash
+            bytes32 blob1Hash,
+            bytes32 blob2Hash
         )
     {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
