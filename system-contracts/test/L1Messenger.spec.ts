@@ -1,7 +1,7 @@
 import { ethers, network } from "hardhat";
 import { L1MessengerFactory } from "../typechain";
 import type { L1Messenger } from "../typechain"; 
-import { prepareEnvironment } from "./shared/mocks";
+import { prepareEnvironment, setResult } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import type { Wallet } from "zksync-web3";
 import {
@@ -39,6 +39,10 @@ describe("L1Messenger tests", () => {
       method: "hardhat_stopImpersonatingAccount",
       params: [TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS],
     });
+    await network.provider.request({
+      method: "hardhat_stopImpersonatingAccount",
+      params: [TEST_BOOTLOADER_FORMAL_ADDRESS],
+    });
   });
 
   describe("sendL2ToL1Message", async () => {
@@ -56,6 +60,7 @@ describe("L1Messenger tests", () => {
     // txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock() to fixed value
 
     it("should emit L2ToL1LogSent event when called by the system contract", async () => {
+
       const isService = true;
       const key = ethers.utils.hexlify(randomBytes(32));
       const value = ethers.utils.hexlify(randomBytes(32));
