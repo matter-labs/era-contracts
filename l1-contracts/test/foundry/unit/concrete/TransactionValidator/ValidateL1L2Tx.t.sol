@@ -3,7 +3,6 @@ pragma solidity 0.8.20;
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
 
-
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequest() public view {
         IMailbox.L2CanonicalTransaction memory testTx = createTestTransaction();
@@ -61,5 +60,4 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         vm.expectRevert();
         validator.validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
     }
-
 }
