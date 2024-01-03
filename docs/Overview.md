@@ -178,7 +178,6 @@ enum SystemLogKey {
   NUMBER_OF_LAYER_1_TXS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
-
 ```
 
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:

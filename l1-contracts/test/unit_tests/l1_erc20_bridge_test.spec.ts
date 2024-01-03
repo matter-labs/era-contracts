@@ -7,11 +7,17 @@ import * as fs from "fs";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { TestnetERC20Token, Bridgehub } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory, L1ERC20Bridge, GovernanceFactory } from "../../typechain";
+import {
+  TestnetERC20TokenFactory,
+  BridgehubFactory,
+  L1ERC20BridgeFactory,
+  L1ERC20Bridge,
+  GovernanceFactory,
+} from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
-import { ADDRESS_ONE, getTokens} from "../../scripts/utils";
+import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import { startInitializeChain } from "../../src.ts/erc20-initialize";
 
 const testConfigPath = "./test/test_config/constant";
@@ -63,26 +69,23 @@ describe("L1ERC20Bridge tests", function () {
 
     l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
 
-
     // const testnetERC20TokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token");
     // testnetERC20TokenContract = await testnetERC20TokenFactory.deploy("TestToken", "TT", 18);
     const tokens = getTokens("hardhat");
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
-    erc20TestToken = TestnetERC20TokenFactory.connect(
-      tokenAddress,
-      owner
-    );
+    erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
 
-    const nonce = await deployWallet.getTransactionCount(); 
+    const nonce = await deployWallet.getTransactionCount();
 
     await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
-    
-    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const upgradeCall =  l1ERC20BridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address,address)",  
-      [chainId, ADDRESS_ONE, ADDRESS_ONE]);
 
-    await executeUpgrade(deployer,deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
+    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
+    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address,address)",
+      [chainId, ADDRESS_ONE, ADDRESS_ONE]
+    );
+
+    await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
@@ -92,7 +95,7 @@ describe("L1ERC20Bridge tests", function () {
     const txHash = await l1ERC20BridgeInit.bridgeImplDeployOnL2TxHash(chainId);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
-  })
+  });
 
   it("Should not allow depositing zero amount", async () => {
     const revertReason = await getCallRevertReason(

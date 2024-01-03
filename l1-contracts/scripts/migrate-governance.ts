@@ -6,7 +6,8 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
+import { applyL1ToL2Alias } from "../src.ts/utils";
+import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 
 import { getL1TxInfo } from "../../l2-contracts/src/utils";
 

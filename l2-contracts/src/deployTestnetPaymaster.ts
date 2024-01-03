@@ -23,7 +23,7 @@ async function main() {
   program
     .option("--private-key <private-key>")
     .option("--chain-id <chain-id>")
-    .action(async (cmd: Command) => {
+    .action(async (cmd) => {
       const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)

@@ -1,11 +1,9 @@
 import { artifacts } from "hardhat";
 
-import { deployedAddressesFromEnv } from "../../ethereum/scripts/utils";
-import { IBridgehubFactory } from "../../ethereum/typechain/IBridgehubFactory";
+import { deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
+import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { Interface } from "ethers/lib/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
-import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
@@ -150,7 +148,7 @@ export async function getL1TxInfo(
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
 ) {
-  const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+  const zksync = deployer.stateTransitionChainContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
     to,
     0,

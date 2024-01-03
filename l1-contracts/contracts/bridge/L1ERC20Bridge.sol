@@ -38,7 +38,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev Era's chainID
     uint256 public immutable eraChainId;
 
-    address public constant ETH_TOKEN_ADDRESS = address(1); 
+    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -93,7 +93,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256)))) internal depositAmount;
 
-    /// @dev used for extra security until hyperbridging happens. 
+    /// @dev used for extra security until hyperbridging happens.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
 
     function l2Bridge() external view returns (address) {
@@ -231,7 +231,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
                 );
                 l2BridgeProxyConstructorData = abi.encode(
                     bridgeImplementationAddr,
-                    l2ProxyAdmin, 
+                    l2ProxyAdmin,
                     proxyInitializationParams
                 );
             }
@@ -455,7 +455,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(_amount != 0, "2T"); // empty deposit amount
         uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "1T"); // The token has non-standard transfer logic
-        
+
         chainBalance[_chainId][_l1Token] += _amount;
         // Note we don't save the depistedAmounts, as this is for the base token, which gets sent to the refundRecipient if the txfails
     }
@@ -469,7 +469,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) internal returns (bytes32 l2TxHash) {
-        // note msg.value is 0 for not eth base tokens. 
+        // note msg.value is 0 for not eth base tokens.
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
             _chainId,
             l2BridgeAddress[_chainId],

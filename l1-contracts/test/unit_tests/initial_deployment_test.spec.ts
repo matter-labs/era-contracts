@@ -1,7 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import type { Forwarder, MockExecutorFacet, ZkSyncStateTransition } from "../../typechain";
-import { BridgehubFactory,Bridgehub,  MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory, ZkSyncStateTransitionFactory } from "../../typechain";
+import {
+  BridgehubFactory,
+  Bridgehub,
+  MailboxFacetFactory,
+  ForwarderFactory,
+  MockExecutorFacetFactory,
+  ZkSyncStateTransitionFactory,
+} from "../../typechain";
 import { IMailbox } from "../../typechain/IMailbox";
 
 import {
@@ -57,8 +64,10 @@ describe("Initial Deployment", function () {
     chainId = deployer.chainId;
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = ZkSyncStateTransitionFactory.connect(deployer.addresses.StateTransition.StateTransitionProxy, deployWallet);
-
+    stateTransition = ZkSyncStateTransitionFactory.connect(
+      deployer.addresses.StateTransition.StateTransitionProxy,
+      deployWallet
+    );
   });
 
   it("Check addresses", async () => {
@@ -70,9 +79,7 @@ describe("Initial Deployment", function () {
     const stateTransitionChainAddress2 = await stateTransition.stateTransitionChain(chainId);
     expect(stateTransitionChainAddress1.toLowerCase()).equal(stateTransitionChainAddress2.toLowerCase());
 
-        
     const stateTransitionChainAddress3 = await bridgehub.getStateTransitionChain(chainId);
     expect(stateTransitionChainAddress1.toLowerCase()).equal(stateTransitionChainAddress3.toLowerCase());
   });
-
 });

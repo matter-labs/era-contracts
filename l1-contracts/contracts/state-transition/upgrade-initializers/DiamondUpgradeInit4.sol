@@ -21,7 +21,6 @@ interface IOldContractDeployer {
 
 /// @author Matter Labs
 contract DiamondUpgradeInit4 is MailboxFacet {
-
     function forceDeploy2(
         bytes calldata _upgradeDeployerCalldata,
         bytes calldata _upgradeSystemContractsCalldata,

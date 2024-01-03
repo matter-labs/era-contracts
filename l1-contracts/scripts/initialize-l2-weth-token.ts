@@ -2,7 +2,8 @@ import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { getNumberFromEnv, getTokens, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, web3Provider } from "./utils";
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "../src.ts/utils";
+import { getNumberFromEnv, getTokens, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";

@@ -8,10 +8,10 @@ import { deployTestnetTokens } from "../../src.ts/deploy-testnet-token";
 import { initializeWethBridge } from "../../src.ts/weth-initialize";
 import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
 
-import {GovernanceFactory } from "../../typechain";
-
+import { GovernanceFactory } from "../../typechain";
 
 import { IBridgehub } from "../../typechain/IBridgehub";
+import { IMailbox } from "../../typechain/IMailbox";
 
 import * as fs from "fs";
 
@@ -19,7 +19,7 @@ const testConfigPath = "./test/test_config/constant";
 export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
-const testnetTokens = JSON.parse(fs.readFileSync(testnetTokenPath, { encoding: "utf-8" }));;
+const testnetTokens = JSON.parse(fs.readFileSync(testnetTokenPath, { encoding: "utf-8" }));
 
 export const CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -110,13 +110,22 @@ export async function executeUpgrade(
   targetAddress: string,
   value: BigNumberish,
   callData: string
-){
+) {
   const governance = GovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
-  const operation = {calls: [{target: targetAddress, value: value, data: callData}], predecessor: ethers.constants.HashZero, salt: ethers.constants.HashZero};
-  await governance.scheduleTransparent(operation, 0 )
+  const operation = {
+    calls: [{ target: targetAddress, value: value, data: callData }],
+    predecessor: ethers.constants.HashZero,
+    salt: ethers.constants.HashZero,
+  };
+  await governance.scheduleTransparent(operation, 0);
   await governance.execute(operation);
-  if (deployer.verbose){
-    console.log("Upgrade with target ", targetAddress, "executed: ", await governance.isOperationDone(await governance.hashOperation(operation)));
+  if (deployer.verbose) {
+    console.log(
+      "Upgrade with target ",
+      targetAddress,
+      "executed: ",
+      await governance.isOperationDone(await governance.hashOperation(operation))
+    );
   }
 }
 
@@ -160,7 +169,7 @@ export async function requestExecute(
 
 // due to gas reasons we call tha chains's contract directly, instead of the bridgehub.
 export async function requestExecuteDirect(
-  mailbox: ethers.Contract,
+  mailbox: IMailbox,
   to: Address,
   l2Value: ethers.BigNumber,
   calldata: ethers.BytesLike,
@@ -329,7 +338,7 @@ export async function initialDeployment(
   let nonce = await deployWallet.getTransactionCount();
 
   await deployTestnetTokens(testnetTokens, deployWallet, testnetTokenPath, deployer.verbose);
-  
+
   nonce = await deployWallet.getTransactionCount();
 
   await deployer.deployCreate2Factory({ gasPrice, nonce });
@@ -348,7 +357,7 @@ export async function initialDeployment(
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
 
   await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
-  await deployer.deployGovernance(create2Salt, {gasPrice});
+  await deployer.deployGovernance(create2Salt, { gasPrice });
 
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);

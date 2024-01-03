@@ -62,7 +62,11 @@ async function main() {
     // return;
   }
 
-  await deployTestnetTokens(mainnetTokens, wallet, `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_NETWORK}.json`);
+  await deployTestnetTokens(
+    mainnetTokens,
+    wallet,
+    `${process.env.ZKSYNC_HOME}/etc/tokens/${process.env.CHAIN_ETH_NETWORK}.json`
+  );
 }
 
 main()

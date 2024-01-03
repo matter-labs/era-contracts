@@ -40,7 +40,7 @@ import "../vendor/AddressAliasHelper.sol";
 contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     using SafeERC20 for IERC20;
 
-    address public constant ETH_TOKEN_ADDRESS = address(1); 
+    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
@@ -97,7 +97,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
 
-    /// @dev A mapping chainId => amount. Used before we activate hyperbridging. 
+    /// @dev A mapping chainId => amount. Used before we activate hyperbridging.
     mapping(uint256 => uint256) public chainBalance;
 
     /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
@@ -117,7 +117,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
     /// @notice Checks that the message sender is the governor
     modifier onlyBridgehubOrEthChain(uint256 _chainId) {
-        require((msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS), "L1WETHBridge: not bridgehub or eth chain");
+        require(
+            (msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS),
+            "L1WETHBridge: not bridgehub or eth chain"
+        );
         _;
     }
 
@@ -257,7 +260,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         }
         // Prepare the proxy constructor data
         bytes memory l2WethBridgeProxyConstructorData;
-        {   
+        {
             address proxyAdmin = readProxyAdmin();
             address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
             address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
@@ -383,7 +386,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 mintValue = _mintValue;
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         if (ethIsBaseToken) {
-            require(bridgehub.baseTokenBridge(_chainId) == address(this), "L1WETH Bridge: other eth bridge not supported");
+            require(
+                bridgehub.baseTokenBridge(_chainId) == address(this),
+                "L1WETH Bridge: other eth bridge not supported"
+            );
             mintValue = msg.value + _amount;
             // we check this in the Mailbox as well
             require(_mintValue <= mintValue, "L1WETH Bridge: Incorrect amount of ETH sent");
@@ -618,7 +624,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             );
             require(success, "vq");
         }
-
     }
 
     /// @dev Decode the ETH withdraw message with additional data about WETH withdrawal that came from L2EthToken
@@ -640,12 +645,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         require(_message.length >= 56, "Incorrect ETH message with additional data length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_message, 0);
-        
-        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector){
+
+        if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
             (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
             (ethAmount, offset) = UnsafeBytes.readUint256(_message, offset);
             wrapToWeth = false;
-        
+
             if (l1Receiver == address(this)) {
                 wrapToWeth = true;
 

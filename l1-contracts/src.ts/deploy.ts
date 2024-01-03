@@ -22,12 +22,10 @@ import {
   readBatchBootloaderBytecode,
   getTokens,
   ADDRESS_ONE,
-  deployedAddressesFromEnv
+  deployedAddressesFromEnv,
 } from "../scripts/utils";
 
-import {
-  hashL2Bytecode,
-} from "./utils"
+import { hashL2Bytecode } from "./utils";
 
 import { deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -36,7 +34,7 @@ import { ERC20Factory } from "../typechain";
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 export const EraLegacyChainId = 324;
-export const EraLegacyDiamondProxyAddress = "0x32400084C286CF3E17e7B677ea9583e60a000324"
+export const EraLegacyDiamondProxyAddress = "0x32400084C286CF3E17e7B677ea9583e60a000324";
 
 export interface DeployedAddresses {
   Bridgehub: {
@@ -467,14 +465,16 @@ export class Deployer {
     const tx = await bridgehub.newTokenBridge(this.addresses.Bridges.WethBridgeProxy);
     const receipt = await tx.wait();
 
-    /// registering ETH as a valid token, with address 1. 
+    /// registering ETH as a valid token, with address 1.
     const tx2 = await bridgehub.newToken(ADDRESS_ONE);
     const receipt2 = await tx2.wait();
 
     const tx3 = await bridgehub.setWethBridge(this.addresses.Bridges.WethBridgeProxy);
     const receipt3 = await tx3.wait();
     if (this.verbose) {
-      console.log(`WETH bridge was registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`);
+      console.log(
+        `WETH bridge was registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
+      );
     }
   }
 
@@ -639,7 +639,7 @@ export class Deployer {
 
     await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 })
+    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 });
   }
 
   public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -647,7 +647,7 @@ export class Deployer {
 
     await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
     await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
-    await this.registerWETHBridge({ gasPrice, nonce: nonce++ })
+    await this.registerWETHBridge({ gasPrice, nonce: nonce++ });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

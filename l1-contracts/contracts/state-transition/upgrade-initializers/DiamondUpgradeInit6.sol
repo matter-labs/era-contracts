@@ -10,7 +10,6 @@ import "../../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 contract DiamondUpgradeInit6 is MailboxFacet {
-
     function forceDeploy(
         bytes calldata _upgradeL2WethTokenCalldata,
         bytes calldata _upgradeSystemContractsCalldata,

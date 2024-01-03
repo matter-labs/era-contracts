@@ -120,7 +120,16 @@ async function getTokenBeaconUpgradeTxInfo(
 ) {
   const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(deployer, chainId,  proxy, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
+  return await getL1TxInfo(
+    deployer,
+    chainId,
+    proxy,
+    l2Calldata,
+    refundRecipient,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    provider
+  );
 }
 
 async function getTxInfo(

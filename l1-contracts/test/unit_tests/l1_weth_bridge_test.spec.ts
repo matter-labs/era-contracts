@@ -1,15 +1,14 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { getTokens, ADDRESS_ONE} from "../../scripts/utils";
+import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
 import type { L1WethBridge, WETH9 } from "../../typechain";
 import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION , executeUpgrade} from "./utils";
+import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
 
 import { startInitializeChain } from "../../src.ts/weth-initialize";
-
 
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
@@ -99,24 +98,25 @@ describe("WETH Bridge tests", () => {
     // prepare the bridge
 
     bridgeProxy = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
-    const nonce = await deployWallet.getTransactionCount(); 
+    const nonce = await deployWallet.getTransactionCount();
 
     await startInitializeChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
     const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
-    const upgradeCall =  l1WethBridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address,address)",  
-      [chainId, ADDRESS_ONE, ADDRESS_ONE]);
+    const upgradeCall = l1WethBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [
+      chainId,
+      ADDRESS_ONE,
+      ADDRESS_ONE,
+    ]);
 
-    await executeUpgrade(deployer,deployWallet, bridgeProxy.address, 0, upgradeCall);
+    await executeUpgrade(deployer, deployWallet, bridgeProxy.address, 0, upgradeCall);
   });
 
   it("Check startInitializeChain", async () => {
-
     const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
-  })
+  });
 
   it("Should not allow depositing zero WETH", async () => {
     const revertReason = await getCallRevertReason(
@@ -169,7 +169,7 @@ describe("WETH Bridge tests", () => {
     expect(revertReason).equal("Incorrect message function selector");
   });
 
-  // not valid anymore, weth bridge is also eth bridge, receiver gets the eth. 
+  // not valid anymore, weth bridge is also eth bridge, receiver gets the eth.
   // it("Should revert on finalizing a withdrawal with wrong receiver", async () => {
   //   const revertReason = await getCallRevertReason(
   //     bridgeProxy

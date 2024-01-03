@@ -44,7 +44,7 @@ async function main() {
         verbose: true,
       });
 
-     await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
+      await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
     });
 
   await program.parseAsync(process.argv);

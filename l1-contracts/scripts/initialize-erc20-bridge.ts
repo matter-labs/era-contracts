@@ -1,11 +1,10 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import {initializeErc20Bridge} from '../src.ts/erc20-initialize'
-import {initializeWethBridge} from '../src.ts/weth-initialize'
+import { initializeErc20Bridge } from "../src.ts/erc20-initialize";
+import { initializeWethBridge } from "../src.ts/weth-initialize";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, deployedAddressesFromEnv } from "./utils";
-
 
 import * as fs from "fs";
 import * as path from "path";
@@ -13,9 +12,6 @@ import * as path from "path";
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-
-
 
 async function main() {
   const program = new Command();

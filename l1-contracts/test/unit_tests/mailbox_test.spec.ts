@@ -1,8 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import type { Forwarder, MockExecutorFacet } from "../../typechain";
-import { BridgehubFactory,Bridgehub,  MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
-import {IBridgehub } from "../../typechain/IBridgehub";
+import {
+  BridgehubFactory,
+  Bridgehub,
+  MailboxFacetFactory,
+  ForwarderFactory,
+  MockExecutorFacetFactory,
+} from "../../typechain";
+import { IBridgehub } from "../../typechain/IBridgehub";
 import { IMailbox } from "../../typechain/IMailbox";
 
 import {
@@ -237,7 +243,7 @@ describe("Mailbox tests", function () {
         l2GasLimit,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         [new Uint8Array(32)],
-        refundRecipient
+        refundRecipient,
       ]);
 
     const overrides: ethers.PayableOverrides = {};

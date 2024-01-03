@@ -4,7 +4,6 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, getNumberFromEnv } from "./utils";
 
-
 import * as fs from "fs";
 import * as path from "path";
 import { startInitializeChain } from "../src.ts/erc20-initialize";
@@ -47,7 +46,6 @@ async function main() {
       });
 
       await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice, cmd.erc20Bridge);
-      
     });
 
   await program.parseAsync(process.argv);

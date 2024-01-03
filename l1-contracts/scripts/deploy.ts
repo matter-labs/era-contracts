@@ -52,7 +52,7 @@ async function main() {
       });
 
       // Create2 factory already deployed on the public networks, only deploy it on local node
-      if ((process.env.CHAIN_ETH_NETWORK === "localhost") || (process.env.CHAIN_ETH_NETWORK === "hardhat")){
+      if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
         await deployer.deployCreate2Factory({ gasPrice, nonce });
         nonce++;
 

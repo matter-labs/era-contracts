@@ -75,7 +75,7 @@ const contractDefs = {
   mainnet: prodConfig,
   test: testConfig,
   localhost: localConfig,
-  hardhat: hardhatConfig
+  hardhat: hardhatConfig,
 };
 
 export default {

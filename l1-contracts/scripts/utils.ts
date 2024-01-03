@@ -23,7 +23,7 @@ export function web3Provider() {
   }
 
   // Short polling interval for local network
-  if ((network === "localhost") || (network === "hardhat")){
+  if (network === "localhost" || network === "hardhat") {
     provider.pollingInterval = 100;
   }
 
@@ -87,21 +87,18 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
   };
 }
 
-
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
-  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
+  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
   const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
   const artifact = fs.readFileSync(
-    `${systemContractsPath}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
+    `${systemContractsPath}/artifacts-zk/contracts-preprocessed/${fileName}.sol/${fileName}.json`
   );
   return JSON.parse(artifact.toString()).bytecode;
 }
-
-
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function print(name: string, data: any) {
@@ -120,9 +117,10 @@ export type L1Token = {
 };
 
 export function getTokens(network: string): L1Token[] {
-  const configPath = (network == "hardhat")
-    ? `./test/test_config/constant/${network}.json`
-    : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+  const configPath =
+    network == "hardhat"
+      ? `./test/test_config/constant/${network}.json`
+      : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
   return JSON.parse(
     fs.readFileSync(configPath, {
       encoding: "utf-8",

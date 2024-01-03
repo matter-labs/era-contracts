@@ -28,7 +28,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
     using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "MailboxFacet";
-    address public constant ETH_TOKEN_ADDRESS = address(1); 
+    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// @dev Era's chainID
     uint256 public constant eraChainId = $(ERA_CHAIN_ID);
@@ -206,7 +206,10 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        require(chainStorage.baseToken == ETH_TOKEN_ADDRESS, " finalizeEthWithdrawal only available for Eth chains on mailbox");
+        require(
+            chainStorage.baseToken == ETH_TOKEN_ADDRESS,
+            " finalizeEthWithdrawal only available for Eth chains on mailbox"
+        );
         IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(
             chainStorage.chainId,
             _l2BatchNumber,

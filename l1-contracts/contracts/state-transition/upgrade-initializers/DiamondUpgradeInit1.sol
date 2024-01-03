@@ -13,7 +13,6 @@ contract DiamondUpgradeInit1 is MailboxFacet {
     /// @dev Request priority operation on behalf of force deployer address to the deployer system contract
     /// @return The message indicating the successful force deployment of contract on L2
 
-
     function forceDeployL2Contract(
         bytes calldata _forceDeployCalldata,
         bytes[] calldata _factoryDeps,

@@ -24,7 +24,7 @@ async function main() {
     .option("--chain-id <chain-id>")
     .description("Deploys the force deploy upgrader contract to L2");
 
-  program.option("--private-key <private-key>").action(async (cmd: Command) => {
+  program.option("--private-key <private-key>").action(async (cmd) => {
     const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
     const deployWallet = cmd.privateKey
       ? new Wallet(cmd.privateKey, provider)
