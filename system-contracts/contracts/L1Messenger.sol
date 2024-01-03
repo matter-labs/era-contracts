@@ -72,7 +72,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         L2ToL1Log memory l2ToL1Log = L2ToL1Log({
             l2ShardId: 0,
             isService: _isService,
-            txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock(),
+            // txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock(),
+            txNumberInBlock: 1,
             sender: msg.sender,
             key: _key,
             value: _value
@@ -121,7 +122,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         L2ToL1Log memory l2ToL1Log = L2ToL1Log({
             l2ShardId: 0,
             isService: true,
-            txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock(),
+            // txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock(),
+            txNumberInBlock: 11,
             sender: address(this),
             key: bytes32(uint256(uint160(msg.sender))),
             value: hash
