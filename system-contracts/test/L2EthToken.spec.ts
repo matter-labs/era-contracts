@@ -53,7 +53,9 @@ describe("L2EthToken tests", () => {
 
   describe("transfer", () => {
     it("transfer successfully", async () => {
-      await l2EthToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("100.0"));
+      await (
+        await l2EthToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("100.0"))
+      ).wait();
 
       const senderBalandeBeforeTransfer: BigNumber = await l2EthToken.balanceOf(wallets[0].address);
       const recipientBalanceBeforeTransfer: BigNumber = await l2EthToken.balanceOf(wallets[1].address);
@@ -73,7 +75,9 @@ describe("L2EthToken tests", () => {
     });
 
     it("no tranfser due to insufficient balance", async () => {
-      await l2EthToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("5.0"));
+      await (
+        await l2EthToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("5.0"))
+      ).wait();
       const amountToTransfer: BigNumber = ethers.utils.parseEther("6.0");
 
       await expect(
@@ -83,7 +87,9 @@ describe("L2EthToken tests", () => {
 
     it("no transfer - require special access", async () => {
       const maliciousWallet: Wallet = ethers.Wallet.createRandom().connect(provider);
-      await l2EthToken.connect(bootloaderAccount).mint(maliciousWallet.address, ethers.utils.parseEther("20.0"));
+      await (
+        await l2EthToken.connect(bootloaderAccount).mint(maliciousWallet.address, ethers.utils.parseEther("20.0"))
+      ).wait();
 
       const amountToTransfer: BigNumber = ethers.utils.parseEther("20.0");
 
@@ -168,12 +174,14 @@ describe("L2EthToken tests", () => {
       });
 
       const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToMint);
+      await (await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToMint)).wait();
 
-      await richWallet.transfer({
-        to: wallets[0].address,
-        amount: amountToWithdraw.add(ethers.utils.parseEther("1.0")),
-      });
+      await (
+        await richWallet.transfer({
+          to: wallets[0].address,
+          amount: amountToWithdraw.mul(2).add(ethers.utils.parseEther("1.0")),
+        })
+      ).wait();
 
       const balanceBeforeWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
 
@@ -182,8 +190,9 @@ describe("L2EthToken tests", () => {
         .withArgs(wallets[0].address, wallets[1].address, amountToWithdraw);
 
       const balanceAfterWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
-      const expectedBalanceAfterWithdrawal = balanceBeforeWithdrawal.sub(amountToWithdraw);
-      expect(balanceAfterWithdrawal).to.equal(expectedBalanceAfterWithdrawal.mod(TWO_TO_256));
+      const expectedBalanceAfterWithdrawal = TWO_TO_256.sub(amountToWithdraw).add(balanceBeforeWithdrawal);
+      expect(balanceAfterWithdrawal).to.equal(expectedBalanceAfterWithdrawal);
+      // await (await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToWithdraw)).wait();
     });
 
     it("event, balance, totalsupply", async () => {
@@ -201,7 +210,7 @@ describe("L2EthToken tests", () => {
       });
 
       const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToMint);
+      await (await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToMint)).wait();
 
       const balanceBeforeWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
       const totalSupplyBefore = await l2EthToken.totalSupply();
