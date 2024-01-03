@@ -20,7 +20,7 @@
     "@typescript-eslint/parser": "^6.7.4",
     "argparse": "^1.0.10",
     "axios": "^0.21.1",
-    "chai": "^4.3.4",
+    "chai": "^4.3.10",
     "chai-as-promised": "^7.1.1",
     "chalk": "^4.1.0",
     "collections": "^5.1.12",
