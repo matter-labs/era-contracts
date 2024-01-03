@@ -192,6 +192,8 @@ describe("L2EthToken tests", () => {
       const balanceAfterWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
       const expectedBalanceAfterWithdrawal = TWO_TO_256.sub(amountToWithdraw).add(balanceBeforeWithdrawal);
       expect(balanceAfterWithdrawal).to.equal(expectedBalanceAfterWithdrawal);
+
+      // It is needed to make the balance of the contract to be 0 for the next tests
       // await (await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToWithdraw)).wait();
     });
 
