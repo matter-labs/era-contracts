@@ -60,22 +60,37 @@ describe("L1Messenger tests", () => {
     // txNumberInBlock: SYSTEM_CONTEXT_CONTRACT.txNumberInBlock() to fixed value
 
     it("should emit L2ToL1LogSent event when called by the system contract", async () => {
-
       const isService = true;
       const key = ethers.utils.hexlify(randomBytes(32));
       const value = ethers.utils.hexlify(randomBytes(32));
+      
+      const txNumberInBlock = 1;
+      const callResult = {
+        failure: false,
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+      };
+      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+
       await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value))
         .to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([0, isService, 1, l1MessengerAccount.address, key, value]);
+        .withArgs([0, isService, txNumberInBlock, l1MessengerAccount.address, key, value]);
     });
 
     it("should emit L2ToL1LogSent event when called by the system contract with isService false", async () => {
       const isService = false;
       const key = ethers.utils.hexlify(randomBytes(32));
       const value = ethers.utils.hexlify(randomBytes(32));
+
+      const txNumberInBlock = 1;
+      const callResult = {
+        failure: false,
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+      };
+
+      await setResult("SystemContext", "txNumberInBlock", [], callResult);
       await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value))
         .to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([0, isService, 1, l1MessengerAccount.address, key, value]);
+        .withArgs([0, isService, txNumberInBlock, l1MessengerAccount.address, key, value]);
     });
 
     it("should revert when called by the system contract with empty key & value", async () => {
@@ -100,22 +115,38 @@ describe("L1Messenger tests", () => {
       const expectedKey = ethers.utils
         .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
         .toLowerCase();
+  
+      const txNumberInBlock = 1; 
+      const callResult = {
+        failure: false,
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+      };
+      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+  
       await expect(l1Messenger.connect(l1MessengerAccount).sendToL1(message))
         .to.emit(l1Messenger, "L1MessageSent")
         .withArgs(l1MessengerAccount.address, expectedHash, message)
         .and.to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([0, true, 11, l1Messenger.address, expectedKey, expectedHash]);
+        .withArgs([0, true, txNumberInBlock, l1Messenger.address, expectedKey, expectedHash]);
     });
-
+  
     it("should emit L1MessageSent & L2ToL1LogSent events when called with default account", async () => {
       const message = ethers.utils.hexlify(randomBytes(64));
       const expectedHash = ethers.utils.keccak256(message);
       const expectedKey = ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(wallet.address), 32).toLowerCase();
+  
+      const txNumberInBlock = 1;
+      const callResult = {
+        failure: false,
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+      };
+      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+  
       await expect(l1Messenger.sendToL1(message))
         .to.emit(l1Messenger, "L1MessageSent")
         .withArgs(wallet.address, expectedHash, message)
         .and.to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([0, true, 11, l1Messenger.address, expectedKey, expectedHash]);
+        .withArgs([0, true, txNumberInBlock, l1Messenger.address, expectedKey, expectedHash]);
     });
   });
 
