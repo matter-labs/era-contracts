@@ -2,14 +2,14 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {TransactionValidatorTest} from "solpp/dev-contracts/test/TransactionValidatorTest.sol";
 import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
+//import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
+import {TransactionValidator} from "cache/solpp-generated-contracts/zksync/libraries/TransactionValidator.sol";
+
 
 contract TransactionValidatorSharedTest is Test {
-    TransactionValidatorTest internal validator;
 
     constructor() {
-        validator = new TransactionValidatorTest();
     }
 
     function createTestTransaction() public pure returns (IMailbox.L2CanonicalTransaction memory testTx) {
@@ -38,4 +38,12 @@ contract TransactionValidatorSharedTest is Test {
         testTx.from = uint256(0x8001);
         testTx.to = uint256(0x8007);
     }
+
+    function validateL1ToL2Transaction(
+        IMailbox.L2CanonicalTransaction memory _transaction,
+        uint256 _priorityTxMaxGasLimit
+    ) public pure {
+        TransactionValidator.validateL1ToL2Transaction(_transaction, abi.encode(_transaction), _priorityTxMaxGasLimit);
+    }
+    
 }
