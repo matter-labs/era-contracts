@@ -20,7 +20,9 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         bytes calldata _pubdata
     ) external view onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32[] memory blobHashes) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
-        blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
+        // ToDo: Update for dynamic number of hashes: 
+        //       blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
+        blobHashes = new bytes32[](2);
         for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {
             uint256 end = i + BLOB_SIZE_BYTES > _pubdata.length ? _pubdata.length : i + BLOB_SIZE_BYTES;
 
