@@ -2,8 +2,8 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {TransactionValidatorTest} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/TransactionValidatorTest.sol";
-import {IMailbox} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IMailbox.sol";
+import {TransactionValidatorTest} from "solpp/dev-contracts/test/TransactionValidatorTest.sol";
+import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
 
 
 contract TransactionValidatorSharedTest is Test {
@@ -17,10 +17,10 @@ contract TransactionValidatorSharedTest is Test {
         testTx = IMailbox.L2CanonicalTransaction(
             {
                 txType: 0,
-                from: uint256(uint160(0)),
+                from: uint256(uint160(1_000_000_000)),
                 to: uint256(uint160(0)),
-                gasLimit: 0,
-                gasPerPubdataByteLimit: 0,
+                gasLimit: 500000,
+                gasPerPubdataByteLimit: 800,
                 maxFeePerGas: uint256(0),
                 maxPriorityFeePerGas: uint256(0),
                 paymaster: uint256(0),
@@ -35,4 +35,11 @@ contract TransactionValidatorSharedTest is Test {
             }
         );
     }
+
+    function createUpgradeTransaction() public pure returns (IMailbox.L2CanonicalTransaction memory testTx){
+        testTx = createTestTransaction();
+        testTx.from = uint256(0x8001);
+        testTx.to = uint256(0x8007);
+    }
+
 }
