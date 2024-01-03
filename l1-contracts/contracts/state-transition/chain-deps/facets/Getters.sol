@@ -42,6 +42,16 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
         return address(chainStorage.stateTransition);
     }
 
+    /// @return The address of the base token 
+    function getBaseToken() external view returns (address) {
+        return address(chainStorage.baseToken);
+    }
+
+    /// @return The address of the base token bridge
+    function getBaseTokenBridge() external view returns (address) {
+        return address(chainStorage.baseTokenBridge);
+    }
+
     /// @return The address of the verifier smart contract
     function getVerifier() external view returns (address) {
         return address(chainStorage.verifier);

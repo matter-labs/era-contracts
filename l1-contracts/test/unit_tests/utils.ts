@@ -177,7 +177,8 @@ export async function requestExecuteDirect(
   factoryDeps: BytesLike[],
   refundRecipient: string
 ) {
-  const overrides = { gasPrice: 0 as BigNumberish, value: 0 as BigNumberish, gasLimit: 28000000 as BigNumberish };
+  let overrides ;
+  overrides ??= {};
   overrides.gasPrice = await mailbox.provider.getGasPrice();
 
   // we call bridgehubChain direcetly to avoid running out of gas.
