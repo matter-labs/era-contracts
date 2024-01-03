@@ -52,5 +52,14 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         validator.validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
     }
 
+    function test_RevertWhen_HugePubdata() public {
+        IMailbox.L2CanonicalTransaction memory testTx = createTestTransaction();
+        uint256 priorityTxMaxGasLimit = 500000;
+        testTx.gasLimit = 400000;
+        // Setting huge pubdata limit should cause the panic.
+        testTx.gasPerPubdataByteLimit = type(uint256).max;
+        vm.expectRevert();
+        validator.validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
+    }
 
 }
