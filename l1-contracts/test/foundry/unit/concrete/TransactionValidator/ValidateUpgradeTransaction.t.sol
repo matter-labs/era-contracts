@@ -4,7 +4,6 @@ import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.s
 import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
 import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
 
-
 contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
     function test_BasicRequest() public pure {
         IMailbox.L2CanonicalTransaction memory testTx = createUpgradeTransaction();

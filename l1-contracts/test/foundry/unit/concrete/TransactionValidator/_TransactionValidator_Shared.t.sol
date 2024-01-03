@@ -6,11 +6,8 @@ import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
 //import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
 import {TransactionValidator} from "cache/solpp-generated-contracts/zksync/libraries/TransactionValidator.sol";
 
-
 contract TransactionValidatorSharedTest is Test {
-
-    constructor() {
-    }
+    constructor() {}
 
     function createTestTransaction() public pure returns (IMailbox.L2CanonicalTransaction memory testTx) {
         testTx = IMailbox.L2CanonicalTransaction({
@@ -45,5 +42,4 @@ contract TransactionValidatorSharedTest is Test {
     ) public pure {
         TransactionValidator.validateL1ToL2Transaction(_transaction, abi.encode(_transaction), _priorityTxMaxGasLimit);
     }
-    
 }
