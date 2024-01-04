@@ -18,6 +18,23 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
+/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can extend.
+enum PubdataSource {
+    CALLDATA,
+    BLOB
+}
+
+struct LogProcessingOutput {
+    uint256 numberOfLayer1Txs;
+    bytes32 chainedPriorityTxsHash;
+    bytes32 previousBatchHash;
+    bytes32 stateDiffHash;
+    bytes32 l2LogsTreeRoot;
+    uint256 packedBatchAndL2BlockTimestamp;
+    bytes32 blob1Hash;
+    bytes32 blob2Hash;
+}
+
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 
@@ -68,7 +85,10 @@ interface IExecutor is IBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param pubdataCommitments Packed pubdata commitments. ∑ claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+    /// @param pubdataCommitments Packed pubdata commitments/data. 
+    /// @dev pubdataCommitments format: 1 byte pubdata location
+    ///                             kzg: ∑ claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+    ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
     /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
     struct CommitBatchInfo {
         uint64 batchNumber;

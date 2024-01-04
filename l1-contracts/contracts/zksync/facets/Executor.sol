@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, POINT_EVALUATION_INPUT_SIZE, PUBDATA_COMMITMENT_SIZE} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, POINT_EVALUATION_INPUT_SIZE, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -31,33 +31,30 @@ contract ExecutorFacet is Base, IExecutor {
     ) internal returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
+        uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
+        require(pubdataSource == uint8(PubdataSource.CALLDATA) || pubdataSource == uint8(PubdataSource.BLOB), "us");
+
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        (
-            uint256 expectedNumberOfLayer1Txs,
-            bytes32 expectedPriorityOperationsHash,
-            bytes32 previousBatchHash,
-            bytes32 stateDiffHash,
-            bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp,
-            bytes32 blob1Hash,
-            bytes32 blob2Hash
-        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataSource);
 
         // ToDo: Adapt to handle dynamic number of blobs
-        bytes32 blobCommitmentRollingHash = _verifyBlobInformation(_newBatch.pubdataCommitments, blob1Hash, blob2Hash);
+        bytes32 blobCommitmentRollingHash;
+        if (pubdataSource == uint8(PubdataSource.BLOB)) {
+            blobCommitmentRollingHash = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blob1Hash,logOutput.blob2Hash);
+        }
 
-        require(_previousBatch.batchHash == previousBatchHash, "l");
+        require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
-        require(expectedPriorityOperationsHash == _newBatch.priorityOperationsHash, "t");
+        require(logOutput.chainedPriorityTxsHash == _newBatch.priorityOperationsHash, "t");
         // Check that the number of processed priority operations is as expected
-        require(expectedNumberOfLayer1Txs == _newBatch.numberOfLayer1Txs, "ta");
+        require(logOutput.numberOfLayer1Txs == _newBatch.numberOfLayer1Txs, "ta");
 
         // Check the timestamp of the new batch
-        _verifyBatchTimestamp(packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
+        _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(_newBatch, stateDiffHash, blobCommitmentRollingHash);
+        bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitmentRollingHash);
 
         return
             StoredBatchInfo(
@@ -66,7 +63,7 @@ contract ExecutorFacet is Base, IExecutor {
                 _newBatch.indexRepeatedStorageChanges,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
-                l2LogsTreeRoot,
+                logOutput.l2LogsTreeRoot,
                 _newBatch.timestamp,
                 commitment
             );
@@ -105,20 +102,12 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        uint256 _pubdataSource
     )
         internal
         pure
-        returns (
-            uint256 numberOfLayer1Txs,
-            bytes32 chainedPriorityTxsHash,
-            bytes32 previousBatchHash,
-            bytes32 stateDiffHash,
-            bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp,
-            bytes32 blob1Hash,
-            bytes32 blob2Hash
-        )
+        returns (LogProcessingOutput memory logOutput)
     {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
@@ -141,32 +130,39 @@ contract ExecutorFacet is Base, IExecutor {
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
-                l2LogsTreeRoot = logValue;
+                logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                 // might be okay to remove this branch (TOTAL_L2_TO_L1_PUBDATA_KEY)
                 // might also need to add it back it to the batch commitment
+                if (_pubdataSource == uint8(PubdataSource.CALLDATA)) {
+                    require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
+                    require(logValue == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
+                }
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
-                stateDiffHash = logValue;
+                logOutput.stateDiffHash = logValue;
             } else if (logKey == uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sc");
-                packedBatchAndL2BlockTimestamp = uint256(logValue);
+                logOutput.packedBatchAndL2BlockTimestamp = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.PREV_BATCH_HASH_KEY)) {
                 require(logSender == L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, "sv");
-                previousBatchHash = logValue;
+                logOutput.previousBatchHash = logValue;
             } else if (logKey == uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bl");
-                chainedPriorityTxsHash = logValue;
+                logOutput.chainedPriorityTxsHash = logValue;
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
-                numberOfLayer1Txs = uint256(logValue);
+                logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.BLOB_ONE_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
-                blob1Hash = logValue;
+                if (_pubdataSource == uint8(PubdataSource.BLOB)){
+                    require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
+                    logOutput.blob1Hash = logValue;
+                }
             } else if (logKey == uint256(SystemLogKey.BLOB_TWO_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                blob2Hash = logValue;
+                if (_pubdataSource == uint8(PubdataSource.BLOB)) {
+                    require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                    logOutput.blob2Hash = logValue;
+                }
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
@@ -503,6 +499,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.call(precompileInput);
 
+        // ToDo: Check output against spec, should have field elements prepended but other clients dont use it.
         require(success, "failed to call point evaluation precompile");
         uint256 result = abi.decode(data, (uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
@@ -512,7 +509,7 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 versionedHashIndex = 0;
 
         // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
-        require(_pubdataCommitments.length == PUBDATA_COMMITMENT_SIZE * 2);
+        require(_pubdataCommitments.length == PUBDATA_COMMITMENT_SIZE * 2, "bs");
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += POINT_EVALUATION_INPUT_SIZE) {
             (bool success, bytes memory data) = s.blobVersionedHashGetter.call(abi.encode(versionedHashIndex));
