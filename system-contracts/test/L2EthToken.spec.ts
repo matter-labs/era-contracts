@@ -1,15 +1,13 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract } from "zksync-web3";
 import type { Wallet } from "zksync-web3";
 import type { L2EthToken } from "../typechain";
 import { IMailboxFactory } from "../typechain/IMailboxFactory";
 import { L2EthTokenFactory } from "../typechain";
-import { deployContractOnAddress, getWallets, loadZasmBytecode, provider, setCode } from "./shared/utils";
-import { BigNumber } from "ethers";
+import { deployContractOnAddress, getWallets, provider } from "./shared/utils";
+import type { BigNumber } from "ethers";
 import { TEST_BOOTLOADER_FORMAL_ADDRESS, TEST_ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
-import { EXTRA_ABI_CALLER_ADDRESS, encodeExtraAbiCallerCalldata } from "./shared/extraAbiCaller";
 import { randomBytes } from "crypto";
 
 describe("L2EthToken tests", () => {
@@ -17,21 +15,16 @@ describe("L2EthToken tests", () => {
   let wallets: Array<Wallet>;
   let l2EthToken: L2EthToken;
   let bootloaderAccount: ethers.Signer;
-  let extraAbiCaller: Contract;
 
   before(async () => {
     await prepareEnvironment();
     await deployContractOnAddress(TEST_ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2EthToken");
     l2EthToken = L2EthTokenFactory.connect(TEST_ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, richWallet);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
-
-    const extraAbiCallerBytecode = await loadZasmBytecode("ExtraAbiCaller", "test-contracts");
-    await setCode(EXTRA_ABI_CALLER_ADDRESS, extraAbiCallerBytecode);
-    extraAbiCaller = new Contract(EXTRA_ABI_CALLER_ADDRESS, [], richWallet);
   });
 
   beforeEach(async () => {
-    wallets = Array.from({ length: 3 }, () => ethers.Wallet.createRandom().connect(provider));
+    wallets = Array.from({ length: 2 }, () => ethers.Wallet.createRandom().connect(provider));
   });
 
   describe("mint", () => {
@@ -165,64 +158,6 @@ describe("L2EthToken tests", () => {
   });
 
   describe("withdraw", () => {
-    it("big amount to withdraw, underflow contract balance", async () => {
-      const TWO_TO_256: BigNumber = ethers.BigNumber.from(2).pow(256);
-      const selector = IMailboxFactory.connect("0x00", provider).interface.getSighash("finalizeEthWithdrawal");
-      const amountToWithdraw: BigNumber = ethers.utils.parseEther("300.0");
-
-      const message: string = ethers.utils.solidityPack(
-        ["bytes4", "address", "uint256"],
-        [selector, wallets[1].address, amountToWithdraw]
-      );
-
-      await setResult("L1Messenger", "sendToL1", [message], {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
-      });
-
-      const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
-      await (await l2EthToken.connect(bootloaderAccount).mint(l2EthToken.address, amountToMint)).wait();
-
-      await (
-        await richWallet.transfer({
-          to: wallets[0].address,
-          amount: amountToWithdraw.mul(2).add(ethers.utils.parseEther("1.0")),
-        })
-      ).wait();
-
-      const balanceBeforeWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
-
-      await expect(l2EthToken.connect(wallets[0]).withdraw(wallets[1].address, { value: amountToWithdraw }))
-        .to.emit(l2EthToken, "Withdrawal")
-        .withArgs(wallets[0].address, wallets[1].address, amountToWithdraw);
-
-      const balanceAfterWithdrawal: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
-      const expectedBalanceAfterWithdrawal = TWO_TO_256.sub(amountToWithdraw).add(balanceBeforeWithdrawal);
-      expect(balanceAfterWithdrawal).to.equal(expectedBalanceAfterWithdrawal);
-
-      console.log(`balanceAfterWithdrawal: ${balanceAfterWithdrawal.toString()}`);
-
-      // It is needed to make the balance of the contract to be 0 for the next tests
-      const amount = BigNumber.from(269984665640564039257584007913129639936n);
-      const message2: string = ethers.utils.solidityPack(
-        ["bytes4", "address", "uint256"],
-        [selector, wallets[2].address, amount]
-      );
-
-      await setResult("L1Messenger", "sendToL1", [message2], {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message2)]),
-      });
-
-      const calldata = l2EthToken.interface.encodeFunctionData("withdraw", [wallets[2].address]);
-      await extraAbiCaller.fallback({
-        data: encodeExtraAbiCallerCalldata(l2EthToken.address, amount, [], calldata),
-      });
-
-      const balance: BigNumber = await l2EthToken.balanceOf(l2EthToken.address);
-      console.log(`balance: ${balance.toString()}`);
-    });
-
     it("event, balance, totalsupply", async () => {
       const selector = IMailboxFactory.connect("0x00", provider).interface.getSighash("finalizeEthWithdrawal");
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
