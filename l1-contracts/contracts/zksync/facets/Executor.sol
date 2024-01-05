@@ -3,8 +3,8 @@
 pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, POINT_EVALUATION_INPUT_SIZE, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput} from "../interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -32,16 +32,16 @@ contract ExecutorFacet is Base, IExecutor {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
-        require(pubdataSource == uint8(PubdataSource.CALLDATA) || pubdataSource == uint8(PubdataSource.BLOB), "us");
+        require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataSource);
+        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataSource(pubdataSource));
 
         // ToDo: Adapt to handle dynamic number of blobs
-        bytes32 blobCommitmentRollingHash;
-        if (pubdataSource == uint8(PubdataSource.BLOB)) {
-            blobCommitmentRollingHash = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blob1Hash,logOutput.blob2Hash);
+        bytes32[] memory blobCommitments;
+        if (pubdataSource == uint8(PubdataSource.Blob)) {
+            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blob1Hash, logOutput.blob2Hash);
         }
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
@@ -54,7 +54,7 @@ contract ExecutorFacet is Base, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitmentRollingHash);
+        bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitments);
 
         return
             StoredBatchInfo(
@@ -103,7 +103,7 @@ contract ExecutorFacet is Base, IExecutor {
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
-        uint256 _pubdataSource
+        PubdataSource _pubdataSource
     )
         internal
         pure
@@ -134,7 +134,7 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
                 // might be okay to remove this branch (TOTAL_L2_TO_L1_PUBDATA_KEY)
                 // might also need to add it back it to the batch commitment
-                if (_pubdataSource == uint8(PubdataSource.CALLDATA)) {
+                if (_pubdataSource == PubdataSource.Calldata) {
                     require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                     require(logValue == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
                 }
@@ -154,12 +154,12 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.BLOB_ONE_HASH_KEY)) {
-                if (_pubdataSource == uint8(PubdataSource.BLOB)){
+                if (_pubdataSource == PubdataSource.Blob){
                     require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
                     logOutput.blob1Hash = logValue;
                 }
             } else if (logKey == uint256(SystemLogKey.BLOB_TWO_HASH_KEY)) {
-                if (_pubdataSource == uint8(PubdataSource.BLOB)) {
+                if (_pubdataSource == PubdataSource.Blob) {
                     require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
                     logOutput.blob2Hash = logValue;
                 }
@@ -434,11 +434,11 @@ contract ExecutorFacet is Base, IExecutor {
     function _createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
-        bytes32 _blobCommitmentRollingHash
+        bytes32[] memory _blobCommitments
     ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitmentRollingHash));
+        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments));
 
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
@@ -460,7 +460,7 @@ contract ExecutorFacet is Base, IExecutor {
     function _batchAuxiliaryOutput(
         CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
-        bytes32 _blobCommitmentRollingHash
+        bytes32[] memory _blobCommitments
     ) internal pure returns (bytes memory) {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
@@ -472,7 +472,10 @@ contract ExecutorFacet is Base, IExecutor {
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
-                _blobCommitmentRollingHash
+                _blobCommitments[0],
+                _blobCommitments[1],
+                bytes32(0),
+                bytes32(0)
             );
     }
 
@@ -505,16 +508,20 @@ contract ExecutorFacet is Base, IExecutor {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
-    function _verifyBlobInformation(bytes calldata _pubdataCommitments, bytes32 _blob1Hash, bytes32 _blob2Hash) internal returns (bytes32 blobCommitmentRollingHash) {
+    function _verifyBlobInformation(
+        bytes calldata _pubdataCommitments, 
+        bytes32 _blob1Hash, 
+        bytes32 _blob2Hash
+    ) internal returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
         // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
         require(_pubdataCommitments.length == PUBDATA_COMMITMENT_SIZE * 2, "bs");
+        blobCommitments = new bytes32[](2);
+        bytes32 versionedHash;
 
-        for (uint256 i = 0; i < _pubdataCommitments.length; i += POINT_EVALUATION_INPUT_SIZE) {
-            (bool success, bytes memory data) = s.blobVersionedHashGetter.call(abi.encode(versionedHashIndex));
-            require(success, "vc");
-            bytes32 versionedHash = abi.decode(data, (bytes32));
+        for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
+            versionedHash = _getBlobVersionedHash(versionedHashIndex);
 
             // ToDo: this can be made to be dynamic where evalutationPoint = keccak256(abi.encode(versionedHash, hashes[i / PUBDATA_COMMITMENT_SIZE]));
             bytes32 evalutationPoint;
@@ -523,28 +530,29 @@ contract ExecutorFacet is Base, IExecutor {
             } else {
                 evalutationPoint = keccak256(abi.encode(versionedHash, _blob2Hash));
             }
-            versionedHashIndex += 1;
-
+            
             require(versionedHash != bytes32(0), "vh");
-
-            _pointEvaluationPrecompile(versionedHash, evalutationPoint, _pubdataCommitments[i:i + POINT_EVALUATION_INPUT_SIZE]);
-
-            blobCommitmentRollingHash = keccak256(
-                abi.encode(
-                    blobCommitmentRollingHash,
-                    abi.encodePacked(
-                        versionedHash,
-                        evalutationPoint,
-                        _pubdataCommitments[i:i+32]
-                    )
+            
+            _pointEvaluationPrecompile(versionedHash, evalutationPoint, _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]);
+            
+            blobCommitments[versionedHashIndex] = keccak256(
+                abi.encodePacked(
+                    versionedHash,
+                    evalutationPoint,
+                    _pubdataCommitments[i:i+32]
                 )
             );
+            versionedHashIndex += 1;
         }
 
         // This check is required because we want to ensure that there arent any extra blobs trying to be published.
-        (bool success, bytes memory data) = s.blobVersionedHashGetter.call(abi.encode(versionedHashIndex));
-        require(success, "lc");
-        bytes32 versionedHash = abi.decode(data, (bytes32));
+        versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
+    }
+
+    function _getBlobVersionedHash(uint256 _index) internal view returns (bytes32 versionedHash) {
+        (bool success, bytes memory data) = BLOB_VERSIONED_HASH_GETTER_ADDR.staticcall(abi.encode(_index));
+        require(success, "vc");
+        versionedHash = abi.decode(data, (bytes32));
     }
 }
