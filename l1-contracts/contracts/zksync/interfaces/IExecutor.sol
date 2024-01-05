@@ -49,11 +49,11 @@ uint256 constant L2_LOG_VALUE_OFFSET = 56;
 uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
 
 /// @dev Total size of the input for point evaluation precompile without the version hash
-/// @dev Format: inputs of opening point (32 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+/// @dev Format: list of: opening point (32 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
 uint256 constant POINT_EVALUATION_INPUT_SIZE = 160;
 
 /// @dev Packed pubdata commitments. 
-/// @dev Format: commitments of claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+/// @dev Format: list of: claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
 uint256 constant PUBDATA_COMMITMENT_SIZE = 128;
 
 interface IExecutor is IBase {
@@ -89,7 +89,7 @@ interface IExecutor is IBase {
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
     /// @param pubdataCommitments Packed pubdata commitments/data. 
     /// @dev pubdataCommitments format: 1 byte pubdata location
-    ///                             kzg: commitments of claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
+    ///                             kzg: list of: claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
     ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
     /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
     struct CommitBatchInfo {
