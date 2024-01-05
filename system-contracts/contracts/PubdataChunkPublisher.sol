@@ -26,7 +26,6 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {
             uint256 end = i + BLOB_SIZE_BYTES > _pubdata.length ? _pubdata.length : i + BLOB_SIZE_BYTES;
 
-            // ToDo: Need to right pad with 0s up to BLOB_SIZE_BYTES
             bytes calldata blob = _pubdata[i:end];
             bytes32 blobHash = EfficientCall.keccak(blob);
 
