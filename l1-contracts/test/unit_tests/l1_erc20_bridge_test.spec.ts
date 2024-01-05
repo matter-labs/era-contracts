@@ -6,15 +6,16 @@ import * as hardhat from "hardhat";
 import * as fs from "fs";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { TestnetERC20Token, Bridgehub } from "../../typechain";
-import {
-  TestnetERC20TokenFactory,
-  BridgehubFactory,
-  L1ERC20BridgeFactory,
-  L1ERC20Bridge,
-} from "../../typechain";
+import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory, L1ERC20Bridge } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, depositERC20 } from "./utils";
+import {
+  getCallRevertReason,
+  initialDeployment,
+  CONTRACTS_LATEST_PROTOCOL_VERSION,
+  executeUpgrade,
+  depositERC20,
+} from "./utils";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import { startInitializeChain } from "../../src.ts/erc20-initialize";
 

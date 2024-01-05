@@ -476,9 +476,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 refundRecipient: _refundRecipient
             });
 
-            txHash = bridgehub.requestL2Transaction(
-                request
-            );
+            txHash = bridgehub.requestL2Transaction(request);
         }
     }
 

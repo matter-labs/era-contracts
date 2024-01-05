@@ -1,17 +1,9 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import type { Forwarder, ZkSyncStateTransition } from "../../typechain";
-import {
-  BridgehubFactory,
-  Bridgehub,
-  ZkSyncStateTransitionFactory,
-} from "../../typechain";
+import { BridgehubFactory, Bridgehub, ZkSyncStateTransitionFactory } from "../../typechain";
 
-import {
-  ethTestConfig,
-  initialDeployment,
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
-} from "./utils";
+import { ethTestConfig, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
 
 import { Deployer } from "../../src.ts/deploy";
 import * as ethers from "ethers";

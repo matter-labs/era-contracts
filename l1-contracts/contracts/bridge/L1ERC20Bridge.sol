@@ -485,8 +485,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             refundRecipient: _refundRecipient
         });
 
-        l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
-            request);
+        l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(request);
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address

@@ -53,8 +53,8 @@ async function main() {
       });
 
       let baseTokenAddress = cmd.baseTokenAddress ? cmd.baseTokenAddress : ADDRESS_ONE;
-      if ((baseTokenAddress != ethers.constants.AddressZero) && (baseTokenAddress != ADDRESS_ONE)){
-        if (await deployWallet.provider.getCode(cmd.baseTokenAddress) == "0x") {
+      if (baseTokenAddress != ethers.constants.AddressZero && baseTokenAddress != ADDRESS_ONE) {
+        if ((await deployWallet.provider.getCode(cmd.baseTokenAddress)) == "0x") {
           throw new Error(`Token ${cmd.baseTokenAddress} is not deployed`);
         }
       } else if (baseTokenAddress == ADDRESS_ONE) {
@@ -72,7 +72,7 @@ async function main() {
       }
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerToken(baseTokenAddress,  gasPrice);
+        await deployer.registerToken(baseTokenAddress, gasPrice);
       }
 
       await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);

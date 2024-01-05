@@ -3,11 +3,23 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
 import type { L1ERC20Bridge, L1WethBridge, WETH9 } from "../../typechain";
-import { L1ERC20BridgeFactory, L1WethBridgeFactory, TestnetERC20TokenFactory, TestnetERC20Token, WETH9Factory } from "../../typechain";
+import {
+  L1ERC20BridgeFactory,
+  L1WethBridgeFactory,
+  TestnetERC20TokenFactory,
+  TestnetERC20Token,
+  WETH9Factory,
+} from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, depositERC20 } from "./utils";
+import {
+  getCallRevertReason,
+  initialDeployment,
+  CONTRACTS_LATEST_PROTOCOL_VERSION,
+  executeUpgrade,
+  depositERC20,
+} from "./utils";
 
 import { startInitializeChain } from "../../src.ts/erc20-initialize";
 
@@ -51,16 +63,18 @@ export async function create2DeployFromL1(
   );
 
   await bridgehub.requestL2Transaction(
-    {chainId,
-    payer: walletAddress,
-    l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    mintValue: expectedCost,
-    l2Value: 0,
-    l2Calldata: calldata,
-    l2GasLimit,
-    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    factoryDeps:[bytecode],
-    refundRecipient: walletAddress},
+    {
+      chainId,
+      payer: walletAddress,
+      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+      mintValue: expectedCost,
+      l2Value: 0,
+      l2Calldata: calldata,
+      l2GasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: [bytecode],
+      refundRecipient: walletAddress,
+    },
     { value: expectedCost, gasPrice }
   );
 }
@@ -109,17 +123,16 @@ describe("Custom base token tests", () => {
     // prepare the bridge
 
     l1ERC20Bridge = IL1BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
-    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);    
+    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
     const nonce = await deployWallet.getTransactionCount();
 
     await startInitializeChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [
-      chainId,
-      ADDRESS_ONE,
-      ADDRESS_ONE,
-    ]);
+    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address,address)",
+      [chainId, ADDRESS_ONE, ADDRESS_ONE]
+    );
 
     await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
   });
@@ -133,48 +146,45 @@ describe("Custom base token tests", () => {
 
   it("Should not allow depositing zero value", async () => {
     // const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .deposit(
-          chainId,
-          await randomSigner.getAddress(),
-          l1TokenAddress,
-          0,
-          0,
-          0,
-          0,
-          ethers.constants.AddressZero
-        )
+    l1ERC20Bridge
+      .connect(randomSigner)
+      .deposit(chainId, await randomSigner.getAddress(), l1TokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero);
     // );
 
     // expect(revertReason).equal("L1WETH Bridge: Amount cannot be zero");
   });
 
   it("Should deposit base token successfully", async () => {
-    await l1ERCToken.connect(randomSigner).mint( await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
-    await (await l1ERCToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))).wait();
+    await l1ERCToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
+    await (
+      await l1ERCToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
+    ).wait();
     await bridgehub
       .connect(randomSigner)
-      .requestL2Transaction(
-        {chainId,
+      .requestL2Transaction({
+        chainId,
         payer: await randomSigner.getAddress(),
         l2Contract: await randomSigner.getAddress(),
         mintValue: ethers.utils.parseUnits("800", 18),
         l2Value: 1,
-        l2Calldata:  "0x", 
+        l2Calldata: "0x",
         l2GasLimit: 10000000,
         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         factoryDeps: [],
-        refundRecipient:  await randomSigner.getAddress()},
-      );
+        refundRecipient: await randomSigner.getAddress(),
+      });
   });
 
   it("Should deposit some alternative token successfully", async () => {
-    await altToken.connect(randomSigner).mint( await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
-    await (await altToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))).wait();
+    await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
+    await (
+      await altToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
+    ).wait();
 
-    await l1ERCToken.connect(randomSigner).mint( await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
-    await (await l1ERCToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))).wait();
+    await l1ERCToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
+    await (
+      await l1ERCToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
+    ).wait();
 
     const depositorAddress = await randomSigner.getAddress();
     await depositERC20(
@@ -195,7 +205,7 @@ describe("Custom base token tests", () => {
     //     l2Contract: await randomSigner.getAddress(),
     //     mintValue: ethers.utils.parseUnits("800", 18),
     //     l2Value: 1,
-    //     l2Calldata:  "0x", 
+    //     l2Calldata:  "0x",
     //     l2GasLimit: 10000000,
     //     l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     //     factoryDeps: [],

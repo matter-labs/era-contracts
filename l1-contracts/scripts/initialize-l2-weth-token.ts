@@ -48,17 +48,18 @@ async function getL1TxInfo(
 ) {
   const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2Transaction", [
-    {chainId,
-    payer: ethers.constants.AddressZero,
-    l2Contract: to,
-    mintValue: 0,
-    l2Value: 0,
-    l2Calldata,
-    l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    factoryDeps: [], // It is assumed that the target has already been deployed
-    refundRecipient,
-    }
+    {
+      chainId,
+      payer: ethers.constants.AddressZero,
+      l2Contract: to,
+      mintValue: 0,
+      l2Value: 0,
+      l2Calldata,
+      l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: [], // It is assumed that the target has already been deployed
+      refundRecipient,
+    },
   ]);
 
   const neededValue = await bridgehub.l2TransactionBaseCost(
@@ -169,17 +170,19 @@ async function main() {
       );
       const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
-      const tx = await bridgehub.requestL2Transaction({
-        chainId,
-        payer: ethers.constants.AddressZero,
-        l2Contract: l2WethTokenProxyAddress,
-        mintValue: requiredValueToInitializeBridge,
-        l2Value: 0,
-        l2Calldata: calldata,
-        l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        factoryDeps: [],
-        refundRecipient: deployWallet.address},
+      const tx = await bridgehub.requestL2Transaction(
+        {
+          chainId,
+          payer: ethers.constants.AddressZero,
+          l2Contract: l2WethTokenProxyAddress,
+          mintValue: requiredValueToInitializeBridge,
+          l2Value: 0,
+          l2Calldata: calldata,
+          l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+          factoryDeps: [],
+          refundRecipient: deployWallet.address,
+        },
         {
           gasPrice,
           value: requiredValueToInitializeBridge,

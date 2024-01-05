@@ -235,16 +235,18 @@ describe("Mailbox tests", function () {
 
     const encodeRequest = (refundRecipient) =>
       bridgehub.interface.encodeFunctionData("requestL2Transaction", [
-        {chainId,
-        payer:  ethers.constants.AddressZero,
-        l2Contract: ethers.constants.AddressZero,
-        mintValue: 0,
-        l2Value: 0,
-        l2Calldata: "0x",
-        l2GasLimit,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        factoryDeps: [new Uint8Array(32)],
-        refundRecipient}
+        {
+          chainId,
+          payer: ethers.constants.AddressZero,
+          l2Contract: ethers.constants.AddressZero,
+          mintValue: 0,
+          l2Value: 0,
+          l2Calldata: "0x",
+          l2GasLimit,
+          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+          factoryDeps: [new Uint8Array(32)],
+          refundRecipient,
+        },
       ]);
 
     const overrides: ethers.PayableOverrides = {};

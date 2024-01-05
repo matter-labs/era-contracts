@@ -42,7 +42,7 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
         return address(chainStorage.stateTransition);
     }
 
-    /// @return The address of the base token 
+    /// @return The address of the base token
     function getBaseToken() external view returns (address) {
         return address(chainStorage.baseToken);
     }

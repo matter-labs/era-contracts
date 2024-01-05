@@ -579,7 +579,13 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(baseTokenAddress: string, create2Salt: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
+  public async registerHyperchain(
+    baseTokenAddress: string,
+    create2Salt: string,
+    extraFacets?: FacetCut[],
+    gasPrice?: BigNumberish,
+    nonce?
+  ) {
     const gasLimit = 10_000_000;
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -602,7 +608,9 @@ export class Deployer {
       inputChainId,
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
-      baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy,
+      baseTokenAddress == ADDRESS_ONE
+        ? this.addresses.Bridges.WethBridgeProxy
+        : this.addresses.Bridges.ERC20BridgeProxy,
       Date.now(),
       governor,
       initialDiamondCut,
@@ -626,7 +634,10 @@ export class Deployer {
 
     this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
     this.addresses.BaseToken = baseTokenAddress;
-    this.addresses.Bridges.BaseTokenBridge = baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy
+    this.addresses.Bridges.BaseTokenBridge =
+      baseTokenAddress == ADDRESS_ONE
+        ? this.addresses.Bridges.WethBridgeProxy
+        : this.addresses.Bridges.ERC20BridgeProxy;
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
       console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
@@ -634,7 +645,13 @@ export class Deployer {
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
       console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
-      console.log(`CONTRACTS_BASE_TOKEN_BRIDGE_ADDR=${baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy}`);
+      console.log(
+        `CONTRACTS_BASE_TOKEN_BRIDGE_ADDR=${
+          baseTokenAddress == ADDRESS_ONE
+            ? this.addresses.Bridges.WethBridgeProxy
+            : this.addresses.Bridges.ERC20BridgeProxy
+        }`
+      );
     }
     this.chainId = parseInt(chainId, 16);
   }

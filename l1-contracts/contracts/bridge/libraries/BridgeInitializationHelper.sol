@@ -55,13 +55,9 @@ library BridgeInitializationHelper {
         });
 
         if (ethIsBaseToken) {
-            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
-                request
-            );
+            txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(request);
         } else {
-            txHash = _bridgehub.requestL2Transaction(
-                request
-            );
+            txHash = _bridgehub.requestL2Transaction(request);
         }
 
         deployedAddress = L2ContractHelper.computeCreate2Address(

@@ -77,7 +77,12 @@ interface IL1Bridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function bridgehubDeposit(uint256 _chainId, address _l1Token, uint256 _amoun, address _prevMsgSender) external payable;
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _l1Token,
+        uint256 _amoun,
+        address _prevMsgSender
+    ) external payable;
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

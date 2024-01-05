@@ -71,7 +71,15 @@ async function getTransparentProxyUpgradeTxInfo(
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
+  return await getL1TxInfo(
+    deployer,
+    proxyAddress,
+    l2Calldata,
+    refundRecipient,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    provider
+  );
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -84,15 +92,7 @@ async function getTokenBeaconUpgradeTxInfo(
 ) {
   const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(
-    deployer,
-    proxy,
-    l2Calldata,
-    refundRecipient,
-    gasPrice,
-    priorityTxMaxGasLimit,
-    provider
-  );
+  return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
 }
 
 async function getTxInfo(
