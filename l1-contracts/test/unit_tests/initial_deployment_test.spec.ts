@@ -1,24 +1,13 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Forwarder, MockExecutorFacet, ZkSyncStateTransition } from "../../typechain";
+import type { Forwarder, ZkSyncStateTransition } from "../../typechain";
 import {
   BridgehubFactory,
   Bridgehub,
-  MailboxFacetFactory,
-  ForwarderFactory,
-  MockExecutorFacetFactory,
   ZkSyncStateTransitionFactory,
 } from "../../typechain";
-import { IMailbox } from "../../typechain/IMailbox";
 
 import {
-  DEFAULT_REVERT_REASON,
-  getCallRevertReason,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  requestExecute,
-  requestExecuteDirect,
-  L2_TO_L1_MESSENGER,
-  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
   ethTestConfig,
   initialDeployment,
   CONTRACTS_LATEST_PROTOCOL_VERSION,

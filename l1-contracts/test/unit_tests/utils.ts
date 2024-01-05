@@ -12,8 +12,12 @@ import { GovernanceFactory } from "../../typechain";
 
 import { IBridgehub } from "../../typechain/IBridgehub";
 import { IMailbox } from "../../typechain/IMailbox";
+import type { IL1Bridge } from "../../typechain/IL1Bridge";
+
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";;
 
 import * as fs from "fs";
+import { ADDRESS_ONE } from "../../scripts/utils";
 
 const testConfigPath = "./test/test_config/constant";
 export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -154,15 +158,16 @@ export async function requestExecute(
   }
 
   return await bridgehub.requestL2Transaction(
-    chainId,
-    to,
-    await overrides.value,
+    {chainId,
+    payer: await bridgehub.signer.getAddress(),
+    l2Contract: to,
+    mintValue: await overrides.value,
     l2Value,
-    calldata,
+    l2Calldata: calldata,
     l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     factoryDeps,
-    refundRecipient,
+    refundRecipient},
     overrides
   );
 }
@@ -321,7 +326,8 @@ export async function initialDeployment(
   deployWallet: Wallet,
   ownerAddress: string,
   gasPrice: BigNumberish,
-  extraFacets: FacetCut[]
+  extraFacets: FacetCut[],
+  baseTokenName?: string
 ): Promise<Deployer> {
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
@@ -339,6 +345,7 @@ export async function initialDeployment(
   let nonce = await deployWallet.getTransactionCount();
 
   await deployTestnetTokens(testnetTokens, deployWallet, testnetTokenPath, deployer.verbose);
+  const baseTokenAddress = baseTokenName? testnetTokens.find((token: { symbol: string }) => token.symbol == baseTokenName).address : ADDRESS_ONE;
 
   nonce = await deployWallet.getTransactionCount();
 
@@ -368,8 +375,12 @@ export async function initialDeployment(
 
   await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
   await initializeWethBridge(deployer, deployWallet, gasPrice);
-  await deployer.registerHyperchain(create2Salt, extraFacets, gasPrice);
 
+  if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
+    await deployer.registerToken(baseTokenAddress,  gasPrice );
+  }
+
+  await deployer.registerHyperchain(baseTokenAddress, create2Salt, extraFacets, gasPrice);
   return deployer;
 }
 
@@ -395,4 +406,34 @@ export interface CommitBatchInfo {
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
   totalL2ToL1Pubdata: BytesLike;
+}
+
+export async function depositERC20(
+  bridge: IL1Bridge,
+  bridgehubContract: IBridgehub,
+  chainId: string,
+  l2Receiver: string,
+  l1Token: string,
+  amount: ethers.BigNumber,
+  l2GasLimit: number,
+  l2RefundRecipient = ethers.constants.AddressZero
+) {
+  const gasPrice = await bridge.provider.getGasPrice();
+  const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
+  const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
+  const ethIsBaseToken = ((await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE);
+  
+  await bridge.deposit(
+    chainId,
+    l2Receiver,
+    l1Token,
+    neededValue,
+    amount,
+    l2GasLimit,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    l2RefundRecipient,
+    {
+      value: ethIsBaseToken? neededValue : 0,
+    }
+  );
 }

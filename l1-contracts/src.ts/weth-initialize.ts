@@ -10,11 +10,13 @@ import {
   calculateWethAddresses,
 } from "./utils-bytecode";
 
-import { getNumberFromEnv } from "../scripts/utils";
+import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IERC20Factory } from "zksync-web3/build/typechain";
+import { TestnetERC20TokenFactory } from "../typechain";
 
 export async function initializeWethBridge(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumberish) {
   const bridgehub = deployer.bridgehubContract(deployWallet);
@@ -71,7 +73,7 @@ export async function startInitializeChain(
 ) {
   const bridgehub = deployer.bridgehubContract(deployWallet);
   const l1WethBridge = deployer.defaultWethBridge(deployWallet);
-
+  const ethIsBaseToken = (ADDRESS_ONE == deployer.addresses.BaseToken);
   // There will be two deployments done during the initial initialization
   const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
     chainId,
@@ -88,19 +90,32 @@ export async function startInitializeChain(
     priorityTxMaxGasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  
+  if (!ethIsBaseToken) {
+    const erc20 = deployer.baseTokenContract(deployWallet);
+    const testErc20 = TestnetERC20TokenFactory.connect(deployer.addresses.BaseToken, deployWallet);
+    const mintTx = await testErc20.mint(deployWallet.address, requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2)));
+    await mintTx.wait(1);
 
-  const tx1 = await bridgehub.requestL2Transaction(
+    const approveTx = await erc20.approve(deployer.addresses.Bridges.BaseTokenBridge, requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2)));
+    await approveTx.wait(1);
+
+  }
+  nonce = await deployWallet.getTransactionCount();
+  const tx1 = await bridgehub.requestL2Transaction({
     chainId,
-    ethers.constants.AddressZero,
-    0,
-    0,
-    "0x",
-    priorityTxMaxGasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
-    deployWallet.address,
-    { gasPrice, nonce, value: requiredValueToPublishBytecodes }
+    payer: await deployWallet.getAddress(),
+    l2Contract: ethers.constants.AddressZero,
+    mintValue: requiredValueToPublishBytecodes,
+    l2Value: 0,
+    l2Calldata: "0x",
+    l2GasLimit: priorityTxMaxGasLimit,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: [L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
+    refundRecipient: deployWallet.address},
+    { gasPrice, nonce, value: ethIsBaseToken? requiredValueToPublishBytecodes: 0 }
   );
+
   const tx2 = await l1WethBridge.startInitializeChain(
     chainId,
     requiredValueToInitializeBridge.mul(2),
@@ -110,7 +125,7 @@ export async function startInitializeChain(
     {
       gasPrice,
       nonce: nonce + 1,
-      value: requiredValueToInitializeBridge.mul(2),
+      value: ethIsBaseToken? requiredValueToInitializeBridge.mul(2) : 0,
     }
   );
 

@@ -60,7 +60,9 @@ export interface DeployedAddresses {
     ERC20BridgeProxy: string;
     WethBridgeImplementation: string;
     WethBridgeProxy: string;
+    BaseTokenBridge: string;
   };
+  BaseToken: string;
   TransparentProxyAdmin: string;
   Governance: string;
   ValidatorTimeLock: string;
@@ -577,7 +579,7 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(create2Salt: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
+  public async registerHyperchain(baseTokenAddress: string, create2Salt: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
     const gasLimit = 10_000_000;
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -599,8 +601,8 @@ export class Deployer {
     const tx = await bridgehub.newChain(
       inputChainId,
       this.addresses.StateTransition.StateTransitionProxy,
-      ADDRESS_ONE,
-      this.addresses.Bridges.WethBridgeProxy,
+      baseTokenAddress,
+      baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy,
       Date.now(),
       governor,
       initialDiamondCut,
@@ -623,15 +625,29 @@ export class Deployer {
         .topics[2].slice(26);
 
     this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
-
+    this.addresses.BaseToken = baseTokenAddress;
+    this.addresses.Bridges.BaseTokenBridge = baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
       console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
       console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
+      console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
+      console.log(`CONTRACTS_BASE_TOKEN_BRIDGE_ADDR=${baseTokenAddress == ADDRESS_ONE ? this.addresses.Bridges.WethBridgeProxy : this.addresses.Bridges.ERC20BridgeProxy}`);
     }
     this.chainId = parseInt(chainId, 16);
+  }
+
+  public async registerToken(tokenAddress: string, gasPrice?: BigNumberish) {
+    const bridgehub = this.bridgehubContract(this.deployWallet);
+
+    const tx = await bridgehub.newToken(tokenAddress);
+
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log(`Token ${tokenAddress} was registered, gas used: ${receipt.gasUsed.toString()}`);
+    }
   }
 
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -711,5 +727,9 @@ export class Deployer {
 
   public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {
     return L1WethBridgeFactory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
+  }
+
+  public baseTokenContract(signerOrProvider: Signer | providers.Provider) {
+    return ERC20Factory.connect(this.addresses.BaseToken, signerOrProvider);
   }
 }

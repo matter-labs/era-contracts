@@ -1,6 +1,6 @@
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { getNumberFromEnv } from "../scripts/utils";
+import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
 
 import { applyL1ToL2Alias, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
@@ -12,6 +12,7 @@ import {
   L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
   L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
 } from "./utils-bytecode";
+import { TestnetERC20TokenFactory } from "../typechain";
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
@@ -74,6 +75,7 @@ export async function startInitializeChain(
   const erc20Bridge = erc20BridgeAddress
     ? deployer.defaultERC20Bridge(deployWallet).attach(erc20BridgeAddress)
     : deployer.defaultERC20Bridge(deployWallet);
+  const ethIsBaseToken = (ADDRESS_ONE == deployer.addresses.BaseToken);
 
   const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
@@ -91,18 +93,31 @@ export async function startInitializeChain(
     priorityTxMaxGasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  
+  if (!ethIsBaseToken) {
+    const erc20 = deployer.baseTokenContract(deployWallet);
+    const testErc20 = TestnetERC20TokenFactory.connect(deployer.addresses.BaseToken, deployWallet);
+    const mintTx = await testErc20.mint(deployWallet.address, requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2)));
+    await mintTx.wait(1);
+
+    const approveTx = await erc20.approve(deployer.addresses.Bridges.BaseTokenBridge, requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2)));
+    await approveTx.wait(1);
+  }
+  nonce = await deployWallet.getTransactionCount();
 
   const tx1 = await bridgehub.requestL2Transaction(
-    chainId,
-    ethers.constants.AddressZero,
-    requiredValueToPublishBytecodes,
-    0,
-    "0x",
-    priorityTxMaxGasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
-    deployWallet.address,
-    { gasPrice, nonce, value: requiredValueToPublishBytecodes }
+    {chainId,
+    payer: deployWallet.address,
+    l2Contract: ethers.constants.AddressZero,
+    mintValue: requiredValueToPublishBytecodes,
+    l2Value: 0,
+    l2Calldata: "0x",
+    l2GasLimit: priorityTxMaxGasLimit,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
+    refundRecipient: deployWallet.address
+    }, 
+    { gasPrice, nonce, value: ethIsBaseToken? requiredValueToPublishBytecodes: 0 }
   );
   const tx2 = await erc20Bridge.startInitializeChain(
     chainId,
@@ -113,7 +128,7 @@ export async function startInitializeChain(
     {
       gasPrice,
       nonce: nonce + 1,
-      value: requiredValueToInitializeBridge.mul(2),
+      value: ethIsBaseToken? requiredValueToInitializeBridge.mul(2):0,
     }
   );
 

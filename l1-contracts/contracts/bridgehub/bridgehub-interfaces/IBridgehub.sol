@@ -55,16 +55,21 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
+    struct L2TransactionRequest {
+        uint256 chainId;
+        address payer;
+        address l2Contract;
+        uint256 mintValue;
+        uint256 l2Value;
+        bytes l2Calldata;
+        uint256 l2GasLimit;
+        uint256 l2GasPerPubdataByteLimit;
+        bytes[] factoryDeps;
+        address refundRecipient;
+    }
+
     function requestL2Transaction(
-        uint256 _chainId,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        L2TransactionRequest memory _request
     ) external payable returns (bytes32 canonicalTxHash);
 
     // function requestL2TransactionSkipDeposit(

@@ -5,7 +5,7 @@ pragma solidity ^0.8.2;
 
 // import "../../utils/AddressUpgradeable.sol";
 
-/// this contract is a copy of the openzeppelin Initializable.sol contract, with storage at random locationsop
+/// this contract is a copy of the openzeppelin Initializable.sol contract, with storage at random locations
 
 /**
  * @dev This is a base contract to aid in writing upgradeable contracts, or any kind of contract that will be deployed

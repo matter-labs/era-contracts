@@ -46,19 +46,22 @@ async function getL1TxInfo(
   refundRecipient: string,
   gasPrice: ethers.BigNumber
 ) {
-  const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
-    chainId,
-    to,
-    0,
+  const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
+  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2Transaction", [
+    {chainId,
+    payer: ethers.constants.AddressZero,
+    l2Contract: to,
+    mintValue: 0,
+    l2Value: 0,
     l2Calldata,
-    DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [], // It is assumed that the target has already been deployed
+    l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: [], // It is assumed that the target has already been deployed
     refundRecipient,
+    }
   ]);
 
-  const neededValue = await zksync.l2TransactionBaseCost(
+  const neededValue = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
     DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
@@ -66,7 +69,7 @@ async function getL1TxInfo(
   );
 
   return {
-    to: zksync.address,
+    to: bridgehub.address,
     data: l1Calldata,
     value: neededValue.toString(),
     gasPrice: gasPrice.toString(),
@@ -157,8 +160,8 @@ async function main() {
         verbose: true,
       });
 
-      const zkSync = deployer.bridgehubContract(deployWallet);
-      const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
+      const bridgehub = deployer.bridgehubContract(deployWallet);
+      const requiredValueToInitializeBridge = await bridgehub.l2TransactionBaseCost(
         chainId,
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
@@ -166,15 +169,17 @@ async function main() {
       );
       const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
-      const tx = await zkSync.requestL2Transaction(
+      const tx = await bridgehub.requestL2Transaction({
         chainId,
-        l2WethTokenProxyAddress,
-        0,
-        calldata,
-        DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        [],
-        deployWallet.address,
+        payer: ethers.constants.AddressZero,
+        l2Contract: l2WethTokenProxyAddress,
+        mintValue: requiredValueToInitializeBridge,
+        l2Value: 0,
+        l2Calldata: calldata,
+        l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        factoryDeps: [],
+        refundRecipient: deployWallet.address},
         {
           gasPrice,
           value: requiredValueToInitializeBridge,

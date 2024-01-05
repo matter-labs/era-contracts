@@ -41,29 +41,26 @@ library BridgeInitializationHelper {
             (bytes32(0), _bytecodeHash, _constructorData)
         );
 
+        IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
+            chainId: _chainId,
+            payer: msg.sender,
+            l2Contract: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            mintValue: _deployTransactionFee, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the other bridge for gas
+            l2Value: 0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
+            l2Calldata: deployCalldata,
+            l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: _factoryDeps,
+            refundRecipient: msg.sender
+        });
+
         if (ethIsBaseToken) {
             txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(
-                _chainId,
-                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-                _deployTransactionFee,
-                0,
-                deployCalldata,
-                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                _factoryDeps,
-                msg.sender
+                request
             );
         } else {
             txHash = _bridgehub.requestL2Transaction(
-                _chainId,
-                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-                _deployTransactionFee,
-                0,
-                deployCalldata,
-                DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                _factoryDeps,
-                msg.sender
+                request
             );
         }
 

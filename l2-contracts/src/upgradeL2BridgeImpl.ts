@@ -61,53 +61,17 @@ async function getBeaconProxyUpgradeCalldata(target: string) {
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
 }
 
-// async function getL1TxInfo(
-//   deployer: Deployer,
-//   chainId: string,
-//   to: string,
-//   l2Calldata: string,
-//   refundRecipient: string,
-//   gasPrice: BigNumber
-// ) {
-//   const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-//   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
-//     chainId,
-//     to,
-//     0,
-//     l2Calldata,
-//     priorityTxMaxGasLimit,
-//     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-//     [], // It is assumed that the target has already been deployed
-//     refundRecipient,
-//   ]);
-
-//   const neededValue = await zksync.l2TransactionBaseCost(
-//     chainId,
-//     gasPrice,
-//     priorityTxMaxGasLimit,
-//     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
-//   );
-
-//   return {
-//     to: zksync.address,
-//     data: l1Calldata,
-//     value: neededValue.toString(),
-//     gasPrice: gasPrice.toString(),
-//   };
-// }
-
 async function getTransparentProxyUpgradeTxInfo(
   deployer: Deployer,
   chainId: string,
   proxyAddress: string,
   target: string,
-  proxyAddress: string,
   refundRecipient: string,
   gasPrice: BigNumber
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(deployer, chainId, proxyAddress, l2Calldata, refundRecipient, gasPrice, provider);
+  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -122,7 +86,6 @@ async function getTokenBeaconUpgradeTxInfo(
 
   return await getL1TxInfo(
     deployer,
-    chainId,
     proxy,
     l2Calldata,
     refundRecipient,
@@ -383,7 +346,7 @@ async function main() {
 
       const deployer = new Deployer({ deployWallet: Wallet.createRandom().connect(provider) });
       const zksync = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-
+      const chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const neededValue = await zksync.l2TransactionBaseCost(
         chainId,
         gasPrice,

@@ -444,30 +444,40 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             // note to have a unified interface with ERC20s we transfer all the value and  redeposit it with bridgehubDeposit.
             // we don't increase chainBalance because we will add it in BridgehubDeposit
             // we don't save the depositAmount because base asset is sent to refundrecipient
-            txHash = bridgehub.requestL2Transaction{value: _mintValue}(
-                _chainId,
-                l2BridgeAddress[_chainId],
-                _mintValue,
-                _amount,
-                _l2TxCalldata,
-                _l2TxGasLimit,
-                _l2TxGasPerPubdataByte,
-                new bytes[](0),
-                _refundRecipient
-            );
+
+            IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
+                chainId: _chainId,
+                payer: msg.sender,
+                l2Contract: l2BridgeAddress[_chainId],
+                mintValue: _mintValue,
+                l2Value: _amount,
+                l2Calldata: _l2TxCalldata,
+                l2GasLimit: _l2TxGasLimit,
+                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+                factoryDeps: new bytes[](0),
+                refundRecipient: _refundRecipient
+            });
+
+            txHash = bridgehub.requestL2Transaction{value: _mintValue}(request);
         } else {
             depositAmount[_chainId][msg.sender][txHash] = _amount;
             chainBalance[_chainId] += _amount;
+
+            IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
+                chainId: _chainId,
+                payer: msg.sender,
+                l2Contract: l2BridgeAddress[_chainId],
+                mintValue: _mintValue, // the bridgehub will withdraw the mintValue from the other bridge for gas
+                l2Value: 0, // the l2Value is 0, we are not tranferring the base asset
+                l2Calldata: _l2TxCalldata,
+                l2GasLimit: _l2TxGasLimit,
+                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+                factoryDeps: new bytes[](0),
+                refundRecipient: _refundRecipient
+            });
+
             txHash = bridgehub.requestL2Transaction(
-                _chainId,
-                l2BridgeAddress[_chainId],
-                _mintValue, // the bridgehub will withdraw the mintValue from the other bridge for gas
-                0, // the l2Value is 0, we are not tranferring the base asset
-                _l2TxCalldata,
-                _l2TxGasLimit,
-                _l2TxGasPerPubdataByte,
-                new bytes[](0),
-                _refundRecipient
+                request
             );
         }
     }
@@ -476,7 +486,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     function bridgehubDeposit(
         uint256 _chainId,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        address //_prevMsgSender
     ) external payable override onlyBridgehubOrEthChain(_chainId) {
         require(_token == ETH_TOKEN_ADDRESS, "L1WETHBridge: Invalid token");
         chainBalance[_chainId] += _amount;

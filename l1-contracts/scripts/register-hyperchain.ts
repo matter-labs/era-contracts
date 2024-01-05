@@ -4,7 +4,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Provider } from "./utils";
+import { web3Provider, getTokens, ADDRESS_ONE } from "./utils";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -24,6 +24,8 @@ async function main() {
     .option("--create2-salt <create2-salt>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
+    .option("--base-token-name <base-token-name>")
+    .option("--base-token-address <base-token-address>")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -50,7 +52,30 @@ async function main() {
         verbose: true,
       });
 
-      await deployer.registerHyperchain(create2Salt, null, gasPrice);
+      let baseTokenAddress = cmd.baseTokenAddress ? cmd.baseTokenAddress : ADDRESS_ONE;
+      if ((baseTokenAddress != ethers.constants.AddressZero) && (baseTokenAddress != ADDRESS_ONE)){
+        if (await deployWallet.provider.getCode(cmd.baseTokenAddress) == "0x") {
+          throw new Error(`Token ${cmd.baseTokenAddress} is not deployed`);
+        }
+      } else if (baseTokenAddress == ADDRESS_ONE) {
+        // base token is eth, we are ok.
+      } else if (cmd.baseTokenName) {
+        const tokens = getTokens(process.env.CHAIN_ETH_NETWORK);
+        const token = tokens.find((token: { symbol: string }) => token.symbol == cmd.baseTokenName);
+        if (!token) {
+          throw new Error(`Token ${cmd.baseTokenName} not found`);
+        } else if (!token.address) {
+          throw new Error(`Token ${cmd.baseTokenName} has no address`);
+        }
+        baseTokenAddress = token.address;
+        console.log(`Using base token ${cmd.baseTokenName} at ${baseTokenAddress}`);
+      }
+
+      if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
+        await deployer.registerToken(baseTokenAddress,  gasPrice);
+      }
+
+      await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);
       await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
     });
 

@@ -80,30 +80,31 @@ export async function create2DeployFromL1(
   l2GasLimit: ethers.BigNumberish,
   gasPrice?: ethers.BigNumberish
 ) {
-  const zkSyncAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
-  const zkSync = IBridgehubFactory.connect(zkSyncAddress, wallet);
+  const bridgehubAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
+  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
 
   const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  gasPrice ??= await zkSync.provider.getGasPrice();
-  const expectedCost = await zkSync.l2TransactionBaseCost(
+  gasPrice ??= await bridgehub.provider.getGasPrice();
+  const expectedCost = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
 
-  return await zkSync.requestL2Transaction(
+  return await bridgehub.requestL2Transaction({
     chainId,
-    DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    expectedCost,
-    0,
-    calldata,
+    payer: wallet.address,
+    l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    mintValue: expectedCost,
+    l2Value: 0,
+    l2Calldata: calldata,
     l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [bytecode],
-    wallet.address,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: [bytecode],
+    refundRecipient: wallet.address},
     { value: expectedCost, gasPrice }
   );
 }

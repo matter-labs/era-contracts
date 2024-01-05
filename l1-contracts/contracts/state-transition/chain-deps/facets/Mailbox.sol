@@ -245,7 +245,8 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         IL1Bridge(chainStorage.baseTokenBridge).bridgehubDeposit{value: msg.value}(
             chainStorage.chainId,
             address(0),
-            msg.value
+            msg.value,
+            msg.sender
         );
     }
 

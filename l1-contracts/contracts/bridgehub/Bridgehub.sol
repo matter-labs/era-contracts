@@ -197,35 +197,27 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
     }
 
     function requestL2Transaction(
-        uint256 _chainId,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        L2TransactionRequest memory _request
     ) public payable override returns (bytes32 canonicalTxHash) {
         {
-            address token = baseToken[_chainId];
-            // address tokenBridge = baseTokenBridge[_chainId];
+            address token = baseToken[_request.chainId];
+            // address tokenBridge = baseTokenBridge[_request.chainId];
 
             if (token == ethTokenAddress) {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit{value: msg.value}(_chainId, token, msg.value);
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDeposit{value: msg.value}(_request.chainId, token, msg.value, _request.payer);
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(baseTokenBridge[_chainId]).bridgehubDeposit(_chainId, token, _mintValue);
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDeposit(_request.chainId, token, _request.mintValue, _request.payer);
             }
         }
 
         // to avoid stack too deep error we check the same condition twice for different varialbes
-        uint256 mintValue = _mintValue;
+        uint256 mintValue = _request.mintValue;
         {
-            address token = baseToken[_chainId];
-            // address tokenBridge = baseTokenBridge[_chainId];
+            address token = baseToken[_request.chainId];
+            // address tokenBridge = baseTokenBridge[_request.chainId];
 
             if (token == ethTokenAddress) {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
@@ -233,17 +225,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
             }
         }
 
-        address stateTransitionChain = getStateTransitionChain(_chainId);
+        address stateTransitionChain = getStateTransitionChain(_request.chainId);
         canonicalTxHash = IStateTransitionChain(stateTransitionChain).bridgehubRequestL2Transaction(
             msg.sender,
-            _contractL2,
+            _request.l2Contract,
             mintValue,
-            _l2Value,
-            _calldata,
-            _l2GasLimit,
-            _l2GasPerPubdataByteLimit,
-            _factoryDeps,
-            _refundRecipient
+            _request.l2Value,
+            _request.l2Calldata,
+            _request.l2GasLimit,
+            _request.l2GasPerPubdataByteLimit,
+            _request.factoryDeps,
+            _request.refundRecipient
         );
     }
 }

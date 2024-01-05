@@ -450,10 +450,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     function bridgehubDeposit(
         uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging
         address _l1Token,
-        uint256 _amount
-    ) public payable nonReentrant onlyBridgehub {
+        uint256 _amount,
+        address _prevMsgSender
+    ) public payable onlyBridgehub {
         require(_amount != 0, "2T"); // empty deposit amount
-        uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
+        uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
         require(amount == _amount, "1T"); // The token has non-standard transfer logic
 
         chainBalance[_chainId][_l1Token] += _amount;
@@ -470,17 +471,22 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         address _refundRecipient
     ) internal returns (bytes32 l2TxHash) {
         // note msg.value is 0 for not eth base tokens.
+
+        IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
+            chainId: _chainId,
+            payer: msg.sender,
+            l2Contract: l2BridgeAddress[_chainId],
+            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the other bridge for gas
+            l2Value: 0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
+            l2Calldata: _l2TxCalldata,
+            l2GasLimit: _l2TxGasLimit,
+            l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+            factoryDeps: new bytes[](0),
+            refundRecipient: _refundRecipient
+        });
+
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(
-            _chainId,
-            l2BridgeAddress[_chainId],
-            _mintValue, // l2 gas + l2 msg.Value
-            0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
-            _l2TxCalldata,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
-            new bytes[](0),
-            _refundRecipient
-        );
+            request);
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
@@ -653,7 +659,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
                 l2ToL1Message,
                 _merkleProof
             );
-            require(success, "nq");
+            require(success, "L1ERC20Bridge: withdrawal proof failed");
         }
     }
 
@@ -672,7 +678,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
 
         // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "pm");
+        require(_l2ToL1message.length >= 56, "L1ERC20Bridge: invalid message length");
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {

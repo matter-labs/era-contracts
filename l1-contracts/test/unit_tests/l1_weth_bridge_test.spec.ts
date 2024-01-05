@@ -47,15 +47,16 @@ export async function create2DeployFromL1(
   );
 
   await bridgehub.requestL2Transaction(
-    chainId,
-    DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    expectedCost,
-    0,
-    calldata,
+    {chainId,
+    payer: walletAddress,
+    l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    mintValue: expectedCost,
+    l2Value: 0,
+    l2Calldata: calldata,
     l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [bytecode],
-    walletAddress,
+    l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps: [bytecode],
+    refundRecipient: walletAddress},
     { value: expectedCost, gasPrice }
   );
 }

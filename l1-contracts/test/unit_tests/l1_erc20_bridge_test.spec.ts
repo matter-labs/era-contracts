@@ -4,7 +4,6 @@ import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 
 import * as fs from "fs";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { TestnetERC20Token, Bridgehub } from "../../typechain";
 import {
@@ -12,11 +11,10 @@ import {
   BridgehubFactory,
   L1ERC20BridgeFactory,
   L1ERC20Bridge,
-  GovernanceFactory,
 } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
+import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, depositERC20 } from "./utils";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import { startInitializeChain } from "../../src.ts/erc20-initialize";
 
@@ -132,7 +130,7 @@ describe("L1ERC20Bridge tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("pm");
+    expect(revertReason).equal("L1ERC20Bridge: invalid message length");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -188,35 +186,6 @@ describe("L1ERC20Bridge tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
-    expect(revertReason).equal("nq");
+    expect(revertReason).equal("L1ERC20Bridge: withdrawal proof failed");
   });
 });
-
-async function depositERC20(
-  bridge: IL1Bridge,
-  zksyncContract: IBridgehub,
-  chainId: string,
-  l2Receiver: string,
-  l1Token: string,
-  amount: ethers.BigNumber,
-  l2GasLimit: number,
-  l2RefundRecipient = ethers.constants.AddressZero
-) {
-  const gasPrice = await bridge.provider.getGasPrice();
-  const gasPerPubdata = REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT;
-  const neededValue = await zksyncContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
-
-  await bridge.deposit(
-    chainId,
-    l2Receiver,
-    l1Token,
-    neededValue,
-    amount,
-    l2GasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-    l2RefundRecipient,
-    {
-      value: neededValue,
-    }
-  );
-}

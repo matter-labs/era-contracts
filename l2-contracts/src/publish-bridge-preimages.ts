@@ -43,17 +43,19 @@ async function main() {
       console.log(`Using gas price: ${gasPrice}`);
 
       const deployer = new Deployer({ deployWallet: wallet });
-      const zkSync = deployer.bridgehubContract(wallet);
+      const bridgehub = deployer.bridgehubContract(wallet);
 
-      const publishL2ERC20BridgeTx = await zkSync.requestL2Transaction(
+      const publishL2ERC20BridgeTx = await bridgehub.requestL2Transaction({
         chainId,
-        ethers.constants.AddressZero,
-        0,
-        "0x",
-        PRIORITY_TX_MAX_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        [getContractBytecode("L2ERC20Bridge")],
-        wallet.address,
+        payer: wallet.address,
+        l2Contract: ethers.constants.AddressZero,
+        mintValue: 0,
+        l2Value: 0,
+        l2Calldata: "0x",
+        l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        factoryDeps: [getContractBytecode("L2ERC20Bridge")],
+        refundRecipient: wallet.address},
         { nonce, gasPrice }
       );
       await publishL2ERC20BridgeTx.wait();
