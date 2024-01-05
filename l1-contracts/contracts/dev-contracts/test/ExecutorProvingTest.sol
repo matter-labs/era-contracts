@@ -17,9 +17,9 @@ contract ExecutorProvingTest is ExecutorFacet {
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
-        bytes32 _blobCommitmentRollingHash
+        bytes32[] memory _blobCommitments
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitmentRollingHash);
+        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments);
     }
 
     function processL2Logs(
@@ -30,7 +30,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         pure
         returns (LogProcessingOutput memory logOutput)
     {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, uint(PubdataSource.CALLDATA));
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataSource.Calldata);
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.
