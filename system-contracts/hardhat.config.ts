@@ -1,15 +1,12 @@
 import "@matterlabs/hardhat-zksync-chai-matchers";
+import "@matterlabs/hardhat-zksync-node";
 import "@matterlabs/hardhat-zksync-solc";
 import "@nomiclabs/hardhat-ethers";
-import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const systemConfig = require("./SystemConfig.json");
 
 export default {
   zksolc: {
-    version: "1.3.14",
+    version: "1.3.18",
     compilerSource: "binary",
     settings: {
       isSystem: true,
@@ -33,15 +30,6 @@ export default {
       },
     },
   },
-  solpp: {
-    defs: (() => {
-      return {
-        ECRECOVER_COST_GAS: systemConfig.ECRECOVER_COST_GAS,
-        KECCAK_ROUND_COST_GAS: systemConfig.KECCAK_ROUND_COST_GAS,
-        SHA256_ROUND_COST_GAS: systemConfig.SHA256_ROUND_COST_GAS,
-      };
-    })(),
-  },
   networks: {
     hardhat: {
       zksync: true,
@@ -51,5 +39,8 @@ export default {
       ethNetwork: "",
       zksync: true,
     },
+  },
+  paths: {
+    sources: "./contracts-preprocessed",
   },
 };

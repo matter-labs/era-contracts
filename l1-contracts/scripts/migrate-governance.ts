@@ -61,13 +61,19 @@ async function main() {
       // one as the user provided manually.
       const governanceAddressFromEnv = getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR").toLowerCase();
       const userProvidedAddress = cmd.newGovernanceAddress.toLowerCase();
+
+      console.log(`Using governance address from env: ${governanceAddressFromEnv}`);
+      console.log(`Using governance address from user: ${userProvidedAddress}`);
+
       if (governanceAddressFromEnv !== userProvidedAddress) {
         throw new Error("Governance mismatch");
       }
 
       // We won't be making any transactions with this wallet, we just need
       // it to initialize the Deployer object.
-      const deployWallet = Wallet.createRandom();
+      const deployWallet = Wallet.createRandom().connect(
+        new ethers.providers.JsonRpcProvider(process.env.ETH_CLIENT_WEB3_URL!)
+      );
       const deployer = new Deployer({
         deployWallet,
         verbose: true,
@@ -88,7 +94,6 @@ async function main() {
 
       // Below we are preparing the calldata for the L1 transactions
       const zkSync = deployer.zkSyncContract(deployWallet);
-      const allowlist = deployer.l1AllowList(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
 
       const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
@@ -108,14 +113,6 @@ async function main() {
       displayTx("zkSync Diamond Proxy migration calldata:", {
         data: zkSyncSetPendingGovernor,
         to: zkSync.address,
-      });
-
-      const allowListGovernorMigration = allowlist.interface.encodeFunctionData("transferOwnership", [
-        governanceAddressFromEnv,
-      ]);
-      displayTx("AllowList migration calldata:", {
-        data: allowListGovernorMigration,
-        to: allowlist.address,
       });
 
       const validatorTimelockMigration = validatorTimelock.interface.encodeFunctionData("transferOwnership", [
@@ -190,18 +187,12 @@ async function main() {
       // However, the following do require:
       // - zkSync Diamond Proxy
       // - ValidatorTimelock.
-      // - Allowlist.
 
       const calls = [
         {
           target: zkSync.address,
           value: 0,
           data: zkSync.interface.encodeFunctionData("acceptGovernor"),
-        },
-        {
-          target: allowlist.address,
-          value: 0,
-          data: allowlist.interface.encodeFunctionData("acceptOwnership"),
         },
         {
           target: validatorTimelock.address,

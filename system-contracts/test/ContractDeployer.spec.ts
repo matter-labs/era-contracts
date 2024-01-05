@@ -2,28 +2,35 @@ import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/type
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-web3";
-import { Contract, utils } from "zksync-web3";
-import type { ContractDeployer, NonceHolder } from "../typechain";
-import { ContractDeployerFactory, DeployableFactory, NonceHolderFactory } from "../typechain";
+import { utils } from "zksync-web3";
+import type { ContractDeployer } from "../typechain";
+import { ContractDeployerFactory, DeployableFactory } from "../typechain";
 import {
-  DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-  FORCE_DEPLOYER_ADDRESS,
-  NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
+  ONE_BYTES32_HEX,
+  TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_FORCE_DEPLOYER_ADDRESS,
 } from "./shared/constants";
-import { deployContract, getCode, getWallets, loadArtifact, publishBytecode, setCode } from "./shared/utils";
+import { prepareEnvironment, setResult } from "./shared/mocks";
+import {
+  deployContract,
+  deployContractOnAddress,
+  getWallets,
+  loadArtifact,
+  publishBytecode,
+  setConstructingCodeHash,
+} from "./shared/utils";
 
 describe("ContractDeployer tests", function () {
   let wallet: Wallet;
-  let contractDeployer: ContractDeployer;
-  let contractDeployerSystemCall: ContractDeployer;
-  let contractDeployerNotSystemCall: ContractDeployer;
-  let nonceHolder: NonceHolder;
-  let deployableArtifact: ZkSyncArtifact;
   let deployerAccount: ethers.Signer;
   let forceDeployer: ethers.Signer;
 
-  const EOA = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
-  const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbee1");
+  let contractDeployer: ContractDeployer;
+  let contractDeployerSystemCall: ContractDeployer;
+
+  let deployableArtifact: ZkSyncArtifact;
+
+  const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
   const RANDOM_ADDRESS_2 = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbee2");
   const RANDOM_ADDRESS_3 = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbee3");
   const EMPTY_KERNEL_ADDRESS = ethers.utils.getAddress("0x0000000000000000000000000000000000000101");
@@ -32,57 +39,31 @@ describe("ContractDeployer tests", function () {
   const NONCE_ORDERING_SEQUENTIAL = 0;
   const NONCE_ORDERING_ARBITRARY = 1;
 
-  let _contractDeployerCode: string;
-
   before(async () => {
+    await prepareEnvironment();
     wallet = getWallets()[0];
 
-    _contractDeployerCode = await getCode(DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
-    const contractDeployerArtifact = await loadArtifact("ContractDeployer");
-    await setCode(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, contractDeployerArtifact.bytecode);
-    contractDeployer = ContractDeployerFactory.connect(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
-
-    nonceHolder = NonceHolderFactory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
+    await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer");
+    contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
 
     const contractDeployerSystemCallContract = await deployContract("SystemCaller", [contractDeployer.address]);
-    contractDeployerSystemCall = new Contract(
-      contractDeployerSystemCallContract.address,
-      contractDeployerArtifact.abi,
-      wallet
-    ) as ContractDeployer;
-
-    const contractDeployerNotSystemCallContract = await deployContract("NotSystemCaller", [contractDeployer.address]);
-    contractDeployerNotSystemCall = new Contract(
-      contractDeployerNotSystemCallContract.address,
-      contractDeployerArtifact.abi,
-      wallet
-    ) as ContractDeployer;
+    contractDeployerSystemCall = ContractDeployerFactory.connect(contractDeployerSystemCallContract.address, wallet);
 
     deployableArtifact = await loadArtifact("Deployable");
-    await publishBytecode(deployableArtifact.bytecode);
 
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
-    });
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [FORCE_DEPLOYER_ADDRESS],
-    });
-    deployerAccount = await ethers.getSigner(DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
-    forceDeployer = await ethers.getSigner(FORCE_DEPLOYER_ADDRESS);
+    deployerAccount = await ethers.getImpersonatedSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
+    forceDeployer = await ethers.getImpersonatedSigner(TEST_FORCE_DEPLOYER_ADDRESS);
   });
 
   after(async () => {
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
-      params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
+      params: [TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
     });
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
-      params: [FORCE_DEPLOYER_ADDRESS],
+      params: [TEST_FORCE_DEPLOYER_ADDRESS],
     });
-    await setCode(DEPLOYER_SYSTEM_CONTRACT_ADDRESS, _contractDeployerCode);
   });
 
   describe("updateAccountVersion", function () {
@@ -156,21 +137,28 @@ describe("ContractDeployer tests", function () {
     });
 
     it("EOA", async () => {
-      expect(await contractDeployer.extendedAccountVersion(EOA)).to.be.eq(AA_VERSION_1);
+      await setResult("AccountCodeStorage", "getRawCodeHash", [RANDOM_ADDRESS], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      expect(await contractDeployer.extendedAccountVersion(RANDOM_ADDRESS)).to.be.eq(AA_VERSION_1);
     });
 
     it("Empty address", async () => {
-      // Double checking that the address is indeed empty
-      expect(await wallet.provider.getCode(EMPTY_KERNEL_ADDRESS)).to.be.eq("0x");
-
+      await setResult("AccountCodeStorage", "getRawCodeHash", [EMPTY_KERNEL_ADDRESS], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
       // Now testing that the system contracts with empty bytecode are still treated as AA_VERSION_NONE
       expect(await contractDeployer.extendedAccountVersion(EMPTY_KERNEL_ADDRESS)).to.be.eq(AA_VERSION_NONE);
     });
 
     it("not AA", async () => {
-      expect(await contractDeployer.extendedAccountVersion(contractDeployerSystemCall.address)).to.be.eq(
-        AA_VERSION_NONE
-      );
+      await setResult("AccountCodeStorage", "getRawCodeHash", [RANDOM_ADDRESS], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+      expect(await contractDeployer.extendedAccountVersion(RANDOM_ADDRESS)).to.be.eq(AA_VERSION_NONE);
     });
   });
 
@@ -209,9 +197,37 @@ describe("ContractDeployer tests", function () {
   // - constructor behavior (failed, invalid immutables array)
   // - more cases for force deployments
   describe("createAccount", function () {
+    let expectedAddress: string;
+
+    before(async () => {
+      await setResult("NonceHolder", "incrementDeploymentNonce", [contractDeployerSystemCall.address], {
+        failure: false,
+        returnData: "0x00000000000000000000000000000000000000000000000000000000deadbeef",
+      });
+
+      expectedAddress = utils.createAddress(contractDeployerSystemCall.address, "0xdeadbeef");
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("NonceHolder", "getRawNonce", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+
+      // We still need to set in the real account code storage to make VM decommitment work.
+      await publishBytecode(deployableArtifact.bytecode);
+      await setConstructingCodeHash(expectedAddress, deployableArtifact.bytecode);
+    });
+
     it("non system call failed", async () => {
       await expect(
-        contractDeployerNotSystemCall.createAccount(
+        contractDeployer.createAccount(
           ethers.constants.HashZero,
           utils.hashBytecode(deployableArtifact.bytecode),
           "0x",
@@ -232,6 +248,12 @@ describe("ContractDeployer tests", function () {
     });
 
     it("not known bytecode hash failed", async () => {
+      await setResult(
+        "KnownCodesStorage",
+        "getMarker",
+        ["0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"],
+        { failure: false, returnData: ethers.constants.HashZero }
+      );
       await expect(
         contractDeployerSystemCall.createAccount(
           ethers.constants.HashZero,
@@ -242,11 +264,10 @@ describe("ContractDeployer tests", function () {
       ).to.be.revertedWith("The code hash is not known");
     });
 
+    // TODO: other mock events can be checked as well
     it("successfully deployed", async () => {
-      const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-      const expectedAddress = utils.createAddress(wallet.address, nonce);
       await expect(
-        contractDeployer.createAccount(
+        contractDeployerSystemCall.createAccount(
           ethers.constants.HashZero,
           utils.hashBytecode(deployableArtifact.bytecode),
           "0xdeadbeef",
@@ -254,7 +275,7 @@ describe("ContractDeployer tests", function () {
         )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
         .withArgs(0, "0xdeadbeef");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
@@ -263,10 +284,8 @@ describe("ContractDeployer tests", function () {
     });
 
     it("non-zero value deployed", async () => {
-      const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-      const expectedAddress = utils.createAddress(wallet.address, nonce);
       await expect(
-        contractDeployer.createAccount(
+        contractDeployerSystemCall.createAccount(
           ethers.constants.HashZero,
           utils.hashBytecode(deployableArtifact.bytecode),
           "0x",
@@ -275,7 +294,7 @@ describe("ContractDeployer tests", function () {
         )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
         .withArgs(11111111, "0x");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
@@ -285,12 +304,44 @@ describe("ContractDeployer tests", function () {
   });
 
   describe("create2Account", function () {
+    let expectedAddress: string;
+
+    before(async () => {
+      await setResult("NonceHolder", "incrementDeploymentNonce", [contractDeployerSystemCall.address], {
+        failure: false,
+        returnData: "0x00000000000000000000000000000000000000000000000000000000deadbee1",
+      });
+
+      expectedAddress = utils.create2Address(
+        contractDeployerSystemCall.address,
+        utils.hashBytecode(deployableArtifact.bytecode),
+        "0x1234567891234567891234512222122167891123456789123456787654323456",
+        "0xdeadbeef"
+      );
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("NonceHolder", "getRawNonce", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+
+      // We still need to set in the real account code storage to make VM decommitment work.
+      await publishBytecode(deployableArtifact.bytecode);
+      await setConstructingCodeHash(expectedAddress, deployableArtifact.bytecode);
+    });
+
     it("non system call failed", async () => {
       await expect(
-        contractDeployerNotSystemCall.create2Account(
+        contractDeployer.create2Account(
           "0x1234567891234567891234512222122167891123456789123456787654323456",
           utils.hashBytecode(deployableArtifact.bytecode),
-          "0x",
+          "0xdeadbeef",
           AA_VERSION_NONE
         )
       ).to.be.revertedWith("This method require system call flag");
@@ -308,6 +359,26 @@ describe("ContractDeployer tests", function () {
     });
 
     it("not known bytecode hash failed", async () => {
+      const expectedAddress = utils.create2Address(
+        contractDeployerSystemCall.address,
+        "0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
+        "0x1234567891234567891234512222122167891123456789123456787654323456",
+        "0x"
+      );
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("NonceHolder", "getRawNonce", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult(
+        "KnownCodesStorage",
+        "getMarker",
+        ["0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"],
+        { failure: false, returnData: ethers.constants.HashZero }
+      );
       await expect(
         contractDeployerSystemCall.create2Account(
           "0x1234567891234567891234512222122167891123456789123456787654323456",
@@ -319,14 +390,8 @@ describe("ContractDeployer tests", function () {
     });
 
     it("successfully deployed", async () => {
-      const expectedAddress = utils.create2Address(
-        wallet.address,
-        utils.hashBytecode(deployableArtifact.bytecode),
-        "0x1234567891234567891234512222122167891123456789123456787654323456",
-        "0xdeadbeef"
-      );
       await expect(
-        contractDeployer.create2Account(
+        contractDeployerSystemCall.create2Account(
           "0x1234567891234567891234512222122167891123456789123456787654323456",
           utils.hashBytecode(deployableArtifact.bytecode),
           "0xdeadbeef",
@@ -334,7 +399,7 @@ describe("ContractDeployer tests", function () {
         )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
         .withArgs(0, "0xdeadbeef");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
@@ -343,36 +408,38 @@ describe("ContractDeployer tests", function () {
     });
 
     it("already deployed failed", async () => {
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: utils.hashBytecode(deployableArtifact.bytecode),
+      });
       await expect(
-        contractDeployer.create2Account(
+        contractDeployerSystemCall.create2Account(
           "0x1234567891234567891234512222122167891123456789123456787654323456",
           utils.hashBytecode(deployableArtifact.bytecode),
           "0xdeadbeef",
           AA_VERSION_NONE
         )
       ).to.be.revertedWith("Code hash is non-zero");
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
     });
 
     it("non-zero value deployed", async () => {
-      const expectedAddress = utils.create2Address(
-        wallet.address,
-        utils.hashBytecode(deployableArtifact.bytecode),
-        ethers.constants.HashZero,
-        "0x"
-      );
       await expect(
-        contractDeployer.create2Account(
-          ethers.constants.HashZero,
+        contractDeployerSystemCall.create2Account(
+          "0x1234567891234567891234512222122167891123456789123456787654323456",
           utils.hashBytecode(deployableArtifact.bytecode),
-          "0x",
+          "0xdeadbeef",
           AA_VERSION_NONE,
           { value: 5555 }
         )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
-        .withArgs(5555, "0x");
+        .withArgs(5555, "0xdeadbeef");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
       expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
       expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
@@ -380,24 +447,49 @@ describe("ContractDeployer tests", function () {
   });
 
   describe("create", function () {
+    let expectedAddress;
+
+    before(async () => {
+      await setResult("NonceHolder", "incrementDeploymentNonce", [contractDeployerSystemCall.address], {
+        failure: false,
+        returnData: "0x00000000000000000000000000000000000000000000000000000000deadbee2",
+      });
+
+      expectedAddress = utils.createAddress(contractDeployerSystemCall.address, "0xdeadbee2");
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("NonceHolder", "getRawNonce", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+
+      // We still need to set in the real account code storage to make VM decommitment work.
+      await publishBytecode(deployableArtifact.bytecode);
+      await setConstructingCodeHash(expectedAddress, deployableArtifact.bytecode);
+    });
+
     it("non system call failed", async () => {
       await expect(
-        contractDeployerNotSystemCall.create(
-          ethers.constants.HashZero,
-          utils.hashBytecode(deployableArtifact.bytecode),
-          "0x"
-        )
+        contractDeployer.create(ethers.constants.HashZero, utils.hashBytecode(deployableArtifact.bytecode), "0x")
       ).to.be.revertedWith("This method require system call flag");
     });
 
     it("successfully deployed", async () => {
-      const nonce = await nonceHolder.getDeploymentNonce(wallet.address);
-      const expectedAddress = utils.createAddress(wallet.address, nonce);
       await expect(
-        contractDeployer.create(ethers.constants.HashZero, utils.hashBytecode(deployableArtifact.bytecode), "0x12")
+        contractDeployerSystemCall.create(
+          ethers.constants.HashZero,
+          utils.hashBytecode(deployableArtifact.bytecode),
+          "0x12"
+        )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
         .withArgs(0, "0x12");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
@@ -405,36 +497,58 @@ describe("ContractDeployer tests", function () {
       expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
     });
   });
-
+  //
   describe("create2", function () {
+    let expectedAddress: string;
+
+    before(async () => {
+      await setResult("NonceHolder", "incrementDeploymentNonce", [contractDeployerSystemCall.address], {
+        failure: false,
+        returnData: "0x00000000000000000000000000000000000000000000000000000000deadbee3",
+      });
+
+      expectedAddress = utils.create2Address(
+        contractDeployerSystemCall.address,
+        utils.hashBytecode(deployableArtifact.bytecode),
+        ethers.constants.HashZero,
+        "0xabcd"
+      );
+      await setResult("AccountCodeStorage", "getCodeHash", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("NonceHolder", "getRawNonce", [expectedAddress], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+
+      // We still need to set in the real account code storage to make VM decommitment work.
+      await publishBytecode(deployableArtifact.bytecode);
+      await setConstructingCodeHash(expectedAddress, deployableArtifact.bytecode);
+    });
+
     it("non system call failed", async () => {
       await expect(
-        contractDeployerNotSystemCall.create2(
-          ethers.constants.HashZero,
-          utils.hashBytecode(deployableArtifact.bytecode),
-          "0x"
-        )
+        contractDeployer.create2(ethers.constants.HashZero, utils.hashBytecode(deployableArtifact.bytecode), "0xabcd")
       ).to.be.revertedWith("This method require system call flag");
     });
 
     it("successfully deployed", async () => {
-      const expectedAddress = utils.create2Address(
-        wallet.address,
-        utils.hashBytecode(deployableArtifact.bytecode),
-        "0x1234567891234567891234512222122167891123456789123456787654323456",
-        "0xab"
-      );
       await expect(
-        contractDeployer.create2(
-          "0x1234567891234567891234512222122167891123456789123456787654323456",
+        contractDeployerSystemCall.create2(
+          ethers.constants.HashZero,
           utils.hashBytecode(deployableArtifact.bytecode),
-          "0xab"
+          "0xabcd"
         )
       )
         .to.emit(contractDeployer, "ContractDeployed")
-        .withArgs(wallet.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
+        .withArgs(contractDeployerSystemCall.address, utils.hashBytecode(deployableArtifact.bytecode), expectedAddress)
         .to.emit(DeployableFactory.connect(expectedAddress, wallet), "Deployed")
-        .withArgs(0, "0xab");
+        .withArgs(0, "0xabcd");
       const accountInfo = await contractDeployer.getAccountInfo(expectedAddress);
       expect(accountInfo.supportedAAVersion).to.be.eq(AA_VERSION_NONE);
       expect(accountInfo.nonceOrdering).to.be.eq(NONCE_ORDERING_SEQUENTIAL);
@@ -456,6 +570,12 @@ describe("ContractDeployer tests", function () {
     });
 
     it("not known bytecode hash failed", async () => {
+      await setResult(
+        "KnownCodesStorage",
+        "getMarker",
+        ["0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"],
+        { failure: false, returnData: ethers.constants.HashZero }
+      );
       const deploymentData = {
         bytecodeHash: "0x0100FFFFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
         newAddress: RANDOM_ADDRESS,
@@ -469,6 +589,10 @@ describe("ContractDeployer tests", function () {
     });
 
     it("successfully deployed", async () => {
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
       const deploymentData = {
         bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),
         newAddress: RANDOM_ADDRESS,
@@ -510,6 +634,16 @@ describe("ContractDeployer tests", function () {
     });
 
     it("successfully deployed", async () => {
+      await setResult("KnownCodesStorage", "getMarker", [utils.hashBytecode(deployableArtifact.bytecode)], {
+        failure: false,
+        returnData: ONE_BYTES32_HEX,
+      });
+
+      // We still need to set in the real account code storage to make VM decommitment work.
+      await publishBytecode(deployableArtifact.bytecode);
+      await setConstructingCodeHash(RANDOM_ADDRESS_2, deployableArtifact.bytecode);
+      await setConstructingCodeHash(RANDOM_ADDRESS_3, deployableArtifact.bytecode);
+
       const deploymentData = [
         {
           bytecodeHash: utils.hashBytecode(deployableArtifact.bytecode),

@@ -12,3 +12,4 @@ l2-contracts/node_modules
 
 # system-contracts
 system-contracts/contracts/openzeppelin
+system-contracts/contracts/Constants.sol

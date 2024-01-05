@@ -1,8 +1,12 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import type { ImmutableSimulator } from "../typechain";
-import { DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
-import { deployContract } from "./shared/utils";
+import { ImmutableSimulatorFactory } from "../typechain";
+import {
+  TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS,
+} from "./shared/constants";
+import { deployContractOnAddress, getWallets } from "./shared/utils";
 
 describe("ImmutableSimulator tests", function () {
   let immutableSimulator: ImmutableSimulator;
@@ -20,7 +24,9 @@ describe("ImmutableSimulator tests", function () {
   ];
 
   before(async () => {
-    immutableSimulator = (await deployContract("ImmutableSimulator")) as ImmutableSimulator;
+    const wallet = getWallets()[0];
+    await deployContractOnAddress(TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS, "ImmutableSimulator");
+    immutableSimulator = ImmutableSimulatorFactory.connect(TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS, wallet);
   });
 
   describe("setImmutables", function () {
@@ -33,16 +39,16 @@ describe("ImmutableSimulator tests", function () {
     it("successfully set", async () => {
       await network.provider.request({
         method: "hardhat_impersonateAccount",
-        params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
+        params: [TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
       });
 
-      const deployer_account = await ethers.getSigner(DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
+      const deployer_account = await ethers.getSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
 
       await immutableSimulator.connect(deployer_account).setImmutables(RANDOM_ADDRESS, IMMUTABLES_DATA);
 
       await network.provider.request({
         method: "hardhat_stopImpersonatingAccount",
-        params: [DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
+        params: [TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
       });
 
       for (const immutable of IMMUTABLES_DATA) {

@@ -18,19 +18,29 @@ type Hashes = {
 
 type SystemContractHashes = ContractDetails & Hashes;
 
-const findDirsEndingWith =
-  (endingWith: string) =>
-  (path: string): string[] => {
-    const absolutePath = makePathAbsolute(path);
-    try {
-      const dirs = fs.readdirSync(absolutePath, { withFileTypes: true }).filter((dirent) => dirent.isDirectory());
-      const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
-      return dirsEndingWithSol.map((dirent) => dirent.name);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      throw new Error(`Failed to read directory: ${absolutePath} Error: ${msg}`);
-    }
-  };
+const findDirsEndingWith = (path: string, endingWith: string): string[] => {
+  const absolutePath = makePathAbsolute(path);
+  try {
+    const dirs = fs.readdirSync(absolutePath, { withFileTypes: true }).filter((dirent) => dirent.isDirectory());
+    const dirsEndingWithSol = dirs.filter((dirent) => dirent.name.endsWith(endingWith));
+    return dirsEndingWithSol.map((dirent) => dirent.name);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    throw new Error(`Failed to read directory: ${absolutePath} Error: ${msg}`);
+  }
+};
+
+const findFilesEndingWith = (path: string, endingWith: string): string[] => {
+  const absolutePath = makePathAbsolute(path);
+  try {
+    const files = fs.readdirSync(absolutePath, { withFileTypes: true }).filter((dirent) => dirent.isFile());
+    const filesEndingWithSol = files.filter((dirent) => dirent.name.endsWith(endingWith));
+    return filesEndingWithSol.map((dirent) => dirent.name);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    throw new Error(`Failed to read directory: ${absolutePath} Error: ${msg}`);
+  }
+};
 
 const SOLIDITY_ARTIFACTS_DIR = "artifacts-zk";
 
@@ -46,7 +56,7 @@ const getSolidityContractDetails = (dir: string, contractName: string): Contract
 
 const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
   const bytecodesDir = join(SOLIDITY_ARTIFACTS_DIR, dir);
-  const dirsEndingWithSol = findDirsEndingWith(".sol")(bytecodesDir);
+  const dirsEndingWithSol = findDirsEndingWith(bytecodesDir, ".sol");
   const contractNames = dirsEndingWithSol.map((d) => d.replace(".sol", ""));
   const solidityContractsDetails = contractNames.map((c) => getSolidityContractDetails(dir, c));
   return solidityContractsDetails;
@@ -55,7 +65,7 @@ const getSolidityContractsDetails = (dir: string): ContractDetails[] => {
 const YUL_ARTIFACTS_DIR = "artifacts";
 
 const getYulContractDetails = (dir: string, contractName: string): ContractDetails => {
-  const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul", contractName + ".yul.zbin");
+  const bytecodePath = join(dir, YUL_ARTIFACTS_DIR, contractName + ".yul.zbin");
   const sourceCodePath = join(dir, contractName + ".yul");
   return {
     contractName,
@@ -65,8 +75,7 @@ const getYulContractDetails = (dir: string, contractName: string): ContractDetai
 };
 
 const getYulContractsDetails = (dir: string): ContractDetails[] => {
-  const bytecodesDir = join(dir, YUL_ARTIFACTS_DIR);
-  const dirsEndingWithYul = findDirsEndingWith(".yul")(bytecodesDir);
+  const dirsEndingWithYul = findFilesEndingWith(dir, ".yul");
   const contractNames = dirsEndingWithYul.map((d) => d.replace(".yul", ""));
   const yulContractsDetails = contractNames.map((c) => getYulContractDetails(dir, c));
   return yulContractsDetails;
@@ -180,8 +189,8 @@ const findDifferences = (newHashes: SystemContractHashes[], oldHashes: SystemCon
   return differencesList;
 };
 
-const SOLIDITY_SOURCE_CODE_PATHS = ["cache-zk/solpp-generated-contracts"];
-const YUL_SOURCE_CODE_PATHS = ["contracts", "contracts/precompiles", "bootloader/build"];
+const SOLIDITY_SOURCE_CODE_PATHS = ["contracts-preprocessed"];
+const YUL_SOURCE_CODE_PATHS = ["contracts-preprocessed", "contracts-preprocessed/precompiles", "bootloader/build"];
 const OUTPUT_FILE_PATH = "SystemContractsHashes.json";
 
 const main = async () => {

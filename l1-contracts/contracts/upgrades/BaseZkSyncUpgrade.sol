@@ -60,9 +60,6 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Notifies about complete upgrade
     event UpgradeComplete(uint256 indexed newProtocolVersion, bytes32 indexed l2UpgradeTxHash, ProposedUpgrade upgrade);
 
-    /// @notice Allow list address changed
-    event NewAllowList(address indexed oldAllowList, address indexed newAllowList);
-
     /// @notice The main function that will be provided by the upgrade proxy
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
@@ -231,17 +228,5 @@ abstract contract BaseZkSyncUpgrade is Base {
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-    }
-
-    /// @notice Change the address of the allow list smart contract
-    /// @param _newAllowList Allow list smart contract address
-    function _setAllowList(IAllowList _newAllowList) internal {
-        if (_newAllowList == IAllowList(address(0))) {
-            return;
-        }
-
-        IAllowList oldAllowList = s.allowList;
-        s.allowList = _newAllowList;
-        emit NewAllowList(address(oldAllowList), address(_newAllowList));
     }
 }

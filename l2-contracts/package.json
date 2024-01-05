@@ -40,7 +40,7 @@
     "deploy-force-deploy-upgrader": "ts-node src/deployForceDeployUpgrader.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
     "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
-    "upgrade-l2-erc20-contract": "ts-node src/upgradeL2BridgeImpl.ts"
+    "upgrade-bridge-contracts": "ts-node src/upgradeBridgeImpl.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

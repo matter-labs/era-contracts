@@ -13,7 +13,6 @@ import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {IAllowList} from "../../common/interfaces/IAllowList.sol";
 import {Base} from "./Base.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -182,7 +181,7 @@ contract MailboxFacet is Base, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override nonReentrant senderCanCallFunction(s.allowList) {
+    ) external override nonReentrant {
         require(!s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({
@@ -228,7 +227,7 @@ contract MailboxFacet is Base, IMailbox {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable nonReentrant senderCanCallFunction(s.allowList) returns (bytes32 canonicalTxHash) {
+    ) external payable nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address sender = msg.sender;
@@ -243,9 +242,6 @@ contract MailboxFacet is Base, IMailbox {
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
-        // The L1 -> L2 transaction may be failed and funds will be sent to the `_refundRecipient`,
-        // so we use `msg.value` instead of `_l2Value` as the bridged amount.
-        _verifyDepositLimit(msg.sender, msg.value);
         canonicalTxHash = _requestL2Transaction(
             sender,
             _contractL2,
@@ -257,14 +253,6 @@ contract MailboxFacet is Base, IMailbox {
             false,
             _refundRecipient
         );
-    }
-
-    function _verifyDepositLimit(address _depositor, uint256 _amount) internal {
-        IAllowList.Deposit memory limitData = IAllowList(s.allowList).getTokenDepositLimitData(address(0)); // address(0) denotes the ETH
-        if (!limitData.depositLimitation) return; // no deposit limitation is placed for ETH
-
-        require(s.totalDepositedAmountPerUser[_depositor] + _amount <= limitData.depositCap, "d2");
-        s.totalDepositedAmountPerUser[_depositor] += _amount;
     }
 
     function _requestL2Transaction(

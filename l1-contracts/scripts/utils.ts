@@ -11,18 +11,6 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
-export interface PermissionToCall {
-  caller: string;
-  target: string;
-  functionName: string;
-  enable: boolean;
-}
-
-export interface AccessMode {
-  target: string;
-  mode: number;
-}
-
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
 }
@@ -78,13 +66,13 @@ export function applyL1ToL2Alias(address: string): string {
 
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
-  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul/proved_batch.yul.zbin`);
+  return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
 }
 
 export function readSystemContractsBytecode(fileName: string) {
   const systemContractsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts");
   const artifact = fs.readFileSync(
-    `${systemContractsPath}/artifacts-zk/cache-zk/solpp-generated-contracts/${fileName}.sol/${fileName}.json`
+    `${systemContractsPath}/artifacts-zk/contracts-preprocessed/${fileName}.sol/${fileName}.json`
   );
   return JSON.parse(artifact.toString()).bytecode;
 }
@@ -146,24 +134,6 @@ export function print(name: string, data: any) {
 
 export function getLowerCaseAddress(address: string) {
   return ethers.utils.getAddress(address).toLowerCase();
-}
-
-export function permissionToCallComparator(first: PermissionToCall, second: PermissionToCall) {
-  if (getLowerCaseAddress(first.caller) < getLowerCaseAddress(second.caller)) {
-    return -1;
-  }
-  if (getLowerCaseAddress(first.caller) > getLowerCaseAddress(second.caller)) {
-    return 1;
-  }
-
-  if (getLowerCaseAddress(first.target) < getLowerCaseAddress(second.target)) {
-    return -1;
-  }
-  if (getLowerCaseAddress(first.target) > getLowerCaseAddress(second.target)) {
-    return 1;
-  }
-
-  return first.functionName.localeCompare(second.functionName);
 }
 
 export type L1Token = {

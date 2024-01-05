@@ -3,67 +3,60 @@ import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-web3";
 import * as zksync from "zksync-web3";
 import { serialize } from "zksync-web3/build/src/utils";
-import type { Callable, DefaultAccount, DelegateCaller, L2EthToken, MockERC20Approve, NonceHolder } from "../typechain";
-import { DefaultAccountFactory, L2EthTokenFactory, NonceHolderFactory } from "../typechain";
-import {
-  BOOTLOADER_FORMAL_ADDRESS,
-  ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS,
-  NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
-} from "./shared/constants";
+import type { DefaultAccount, DelegateCaller, MockContract } from "../typechain";
+import { DefaultAccountFactory } from "../typechain";
+import { TEST_BOOTLOADER_FORMAL_ADDRESS } from "./shared/constants";
+import { getMock } from "./shared/mocks";
 import { signedTxToTransactionData } from "./shared/transactions";
-import { deployContract, getWallets, loadArtifact, setCode } from "./shared/utils";
+import { deployContract, deployContractOnAddress, getWallets, loadArtifact } from "./shared/utils";
 
+// TODO: more test cases can be added.
 describe("DefaultAccount tests", function () {
   let wallet: Wallet;
-  let account: Wallet;
+  let bootloaderAccount: ethers.Signer;
+
   let defaultAccount: DefaultAccount;
-  let bootloader: ethers.Signer;
-  let nonceHolder: NonceHolder;
-  let l2EthToken: L2EthToken;
-  let callable: Callable;
-  let mockERC20Approve: MockERC20Approve;
-  let paymasterFlowInterface: ethers.utils.Interface;
+  let account: Wallet;
+  let callable: MockContract;
   let delegateCaller: DelegateCaller;
+  let mockERC20: MockContract;
+
+  let paymasterFlowIface: ethers.utils.Interface;
+  let ERC20Iface: ethers.utils.Interface;
 
   const RANDOM_ADDRESS = ethers.utils.getAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
 
   before(async () => {
     wallet = getWallets()[0];
     account = getWallets()[2];
-    const defaultAccountArtifact = await loadArtifact("DefaultAccount");
-    await setCode(account.address, defaultAccountArtifact.bytecode);
+
+    await deployContractOnAddress(account.address, "DefaultAccount");
     defaultAccount = DefaultAccountFactory.connect(account.address, wallet);
-    nonceHolder = NonceHolderFactory.connect(NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
-    l2EthToken = L2EthTokenFactory.connect(ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, wallet);
-    callable = (await deployContract("Callable")) as Callable;
+
+    callable = (await deployContract("MockContract")) as MockContract;
     delegateCaller = (await deployContract("DelegateCaller")) as DelegateCaller;
-    mockERC20Approve = (await deployContract("MockERC20Approve")) as MockERC20Approve;
+    mockERC20 = (await deployContract("MockContract")) as MockContract;
 
-    const paymasterFlowInterfaceArtifact = await loadArtifact("IPaymasterFlow");
-    paymasterFlowInterface = new ethers.utils.Interface(paymasterFlowInterfaceArtifact.abi);
+    paymasterFlowIface = new ethers.utils.Interface((await loadArtifact("IPaymasterFlow")).abi);
+    ERC20Iface = new ethers.utils.Interface((await loadArtifact("IERC20")).abi);
 
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [BOOTLOADER_FORMAL_ADDRESS],
-    });
-    bootloader = await ethers.getSigner(BOOTLOADER_FORMAL_ADDRESS);
+    bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
   });
 
   after(async function () {
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
-      params: [BOOTLOADER_FORMAL_ADDRESS],
+      params: [TEST_BOOTLOADER_FORMAL_ADDRESS],
     });
   });
 
   describe("validateTransaction", function () {
     it("non-deployer ignored", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: RANDOM_ADDRESS,
         from: account.address,
-        nonce: nonce,
+        nonce: 1,
         data: "0x",
         value: 0,
         gasLimit: 50000,
@@ -85,13 +78,12 @@ describe("DefaultAccount tests", function () {
       expect(await wallet.provider.call(call)).to.be.eq("0x");
     });
 
-    it("invalid ignature", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
+    it("invalid signature", async () => {
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: RANDOM_ADDRESS,
         from: account.address,
-        nonce: nonce,
+        nonce: 1,
         data: "0x",
         value: 0,
         gasLimit: 50000,
@@ -106,21 +98,20 @@ describe("DefaultAccount tests", function () {
       const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
       const call = {
-        from: BOOTLOADER_FORMAL_ADDRESS,
+        from: TEST_BOOTLOADER_FORMAL_ADDRESS,
         to: defaultAccount.address,
         value: 0,
         data: defaultAccount.interface.encodeFunctionData("validateTransaction", [txHash, signedHash, txData]),
       };
-      expect(await bootloader.provider.call(call)).to.be.eq(ethers.constants.HashZero);
+      expect(await bootloaderAccount.provider.call(call)).to.be.eq(ethers.constants.HashZero);
     });
 
     it("valid tx", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: RANDOM_ADDRESS,
         from: account.address,
-        nonce: nonce,
+        nonce: 5,
         data: "0x",
         value: 0,
         gasLimit: 50000,
@@ -134,12 +125,12 @@ describe("DefaultAccount tests", function () {
       const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
       const call = {
-        from: BOOTLOADER_FORMAL_ADDRESS,
+        from: TEST_BOOTLOADER_FORMAL_ADDRESS,
         to: defaultAccount.address,
         value: 0,
         data: defaultAccount.interface.encodeFunctionData("validateTransaction", [txHash, signedHash, txData]),
       };
-      expect(await bootloader.provider.call(call)).to.be.eq(
+      expect(await bootloaderAccount.provider.call(call)).to.be.eq(
         defaultAccount.interface.getSighash("validateTransaction") + "0".repeat(56)
       );
     });
@@ -147,12 +138,11 @@ describe("DefaultAccount tests", function () {
 
   describe("executeTransaction", function () {
     it("non-deployer ignored", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,
         from: account.address,
-        nonce: nonce,
+        nonce: 111,
         data: "0xdeadbeef",
         value: 5,
         gasLimit: 50000,
@@ -169,13 +159,35 @@ describe("DefaultAccount tests", function () {
     });
 
     it("successfully executed", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,
         from: account.address,
-        nonce: nonce,
+        nonce: 111,
         data: "0xdeadbeef",
+        value: 0,
+        gasLimit: 50000,
+      });
+      const txBytes = await account.signTransaction(legacyTx);
+      const parsedTx = zksync.utils.parseTransaction(txBytes);
+      const txData = signedTxToTransactionData(parsedTx)!;
+
+      const txHash = parsedTx.hash;
+      delete legacyTx.from;
+      const signedHash = ethers.utils.keccak256(serialize(legacyTx));
+
+      await expect(await defaultAccount.connect(bootloaderAccount).executeTransaction(txHash, signedHash, txData))
+        .to.emit(callable, "Called")
+        .withArgs(0, "0xdeadbeef");
+    });
+
+    it("non-zero value", async () => {
+      const legacyTx = await account.populateTransaction({
+        type: 0,
+        to: callable.address,
+        from: account.address,
+        nonce: 111,
+        data: "0x",
         value: 5,
         gasLimit: 50000,
       });
@@ -187,20 +199,19 @@ describe("DefaultAccount tests", function () {
       delete legacyTx.from;
       const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
-      await expect(await defaultAccount.connect(bootloader).executeTransaction(txHash, signedHash, txData))
-        .to.emit(callable, "Called")
-        .withArgs(5, "0xdeadbeef");
+      await expect(await defaultAccount.connect(bootloaderAccount).executeTransaction(txHash, signedHash, txData))
+        .to.emit(getMock("MsgValueSimulator"), "Called")
+        .withArgs(0, "0x");
     });
   });
 
   describe("executeTransactionFromOutside", function () {
     it("nothing", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,
         from: account.address,
-        nonce: nonce,
+        nonce: 111,
         data: "0xdeadbeef",
         value: 5,
         gasLimit: 50000,
@@ -217,12 +228,11 @@ describe("DefaultAccount tests", function () {
 
   describe("payForTransaction", function () {
     it("non-deployer ignored", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,
         from: account.address,
-        nonce: nonce,
+        nonce: 1,
         data: "0xdeadbeef",
         value: 5,
         gasLimit: 50000,
@@ -236,19 +246,18 @@ describe("DefaultAccount tests", function () {
       delete legacyTx.from;
       const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
-      const balanceBefore = await l2EthToken.balanceOf(defaultAccount.address);
-      await defaultAccount.payForTransaction(txHash, signedHash, txData);
-      const balanceAfter = await l2EthToken.balanceOf(defaultAccount.address);
-      expect(balanceAfter).to.be.eq(balanceBefore);
+      await expect(defaultAccount.payForTransaction(txHash, signedHash, txData)).to.not.emit(
+        getMock("Bootloader"),
+        "Called"
+      );
     });
 
     it("successfully payed", async () => {
-      const nonce = await nonceHolder.getMinNonce(account.address);
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,
         from: account.address,
-        nonce: nonce,
+        nonce: 2,
         data: "0xdeadbeef",
         value: 5,
         gasLimit: 50000,
@@ -262,9 +271,9 @@ describe("DefaultAccount tests", function () {
       delete legacyTx.from;
       const signedHash = ethers.utils.keccak256(serialize(legacyTx));
 
-      await expect(await defaultAccount.connect(bootloader).payForTransaction(txHash, signedHash, txData))
-        .to.emit(l2EthToken, "Transfer")
-        .withArgs(account.address, BOOTLOADER_FORMAL_ADDRESS, 50000 * 200);
+      await expect(await defaultAccount.connect(bootloaderAccount).payForTransaction(txHash, signedHash, txData))
+        .to.emit(getMock("Bootloader"), "Called")
+        .withArgs(50000 * 200, "0x");
     });
   });
 
@@ -283,11 +292,7 @@ describe("DefaultAccount tests", function () {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
           paymasterParams: {
             paymaster: RANDOM_ADDRESS,
-            paymasterInput: paymasterFlowInterface.encodeFunctionData("approvalBased", [
-              mockERC20Approve.address,
-              2023,
-              "0x",
-            ]),
+            paymasterInput: paymasterFlowIface.encodeFunctionData("approvalBased", [mockERC20.address, 2023, "0x"]),
           },
         },
       });
@@ -299,12 +304,17 @@ describe("DefaultAccount tests", function () {
       const eip712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
 
       await expect(await defaultAccount.prepareForPaymaster(eip712TxHash, eip712SignedHash, eip712TxData)).to.not.emit(
-        mockERC20Approve,
-        "Approved"
+        mockERC20,
+        "Called"
       );
     });
 
     it("successfully prepared", async () => {
+      await mockERC20.setResult({
+        input: ERC20Iface.encodeFunctionData("allowance", [account.address, RANDOM_ADDRESS]),
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
       const eip712Tx = await account.populateTransaction({
         type: 113,
         to: callable.address,
@@ -318,11 +328,7 @@ describe("DefaultAccount tests", function () {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
           paymasterParams: {
             paymaster: RANDOM_ADDRESS,
-            paymasterInput: paymasterFlowInterface.encodeFunctionData("approvalBased", [
-              mockERC20Approve.address,
-              2023,
-              "0x",
-            ]),
+            paymasterInput: paymasterFlowIface.encodeFunctionData("approvalBased", [mockERC20.address, 2023, "0x"]),
           },
         },
       });
@@ -334,15 +340,17 @@ describe("DefaultAccount tests", function () {
       const eip712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
 
       await expect(
-        await defaultAccount.connect(bootloader).prepareForPaymaster(eip712TxHash, eip712SignedHash, eip712TxData)
+        await defaultAccount
+          .connect(bootloaderAccount)
+          .prepareForPaymaster(eip712TxHash, eip712SignedHash, eip712TxData)
       )
-        .to.emit(mockERC20Approve, "Approved")
-        .withArgs(RANDOM_ADDRESS, 2023);
+        .to.emit(mockERC20, "Called")
+        .withArgs(0, ERC20Iface.encodeFunctionData("approve", [RANDOM_ADDRESS, 2023]));
     });
   });
 
   describe("fallback/receive", function () {
-    it("zero value", async () => {
+    it("zero value by EOA wallet", async () => {
       const call = {
         from: wallet.address,
         to: defaultAccount.address,
@@ -352,124 +360,40 @@ describe("DefaultAccount tests", function () {
       expect(await wallet.provider.call(call)).to.be.eq("0x");
     });
 
-    describe("prepareForPaymaster", function () {
-      it("non-deployer ignored", async () => {
-        const eip712Tx = await account.populateTransaction({
-          type: 113,
-          to: callable.address,
-          from: account.address,
-          data: "0x",
-          value: 0,
-          maxFeePerGas: 12000,
-          maxPriorityFeePerGas: 100,
-          gasLimit: 50000,
-          customData: {
-            gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-            paymasterParams: {
-              paymaster: RANDOM_ADDRESS,
-              paymasterInput: paymasterFlowInterface.encodeFunctionData("approvalBased", [
-                mockERC20Approve.address,
-                2023,
-                "0x",
-              ]),
-            },
-          },
-        });
-        const signedEip712Tx = await account.signTransaction(eip712Tx);
-        const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-
-        const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
-        const eip712TxHash = parsedEIP712tx.hash;
-        const eip712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
-
-        await expect(
-          await defaultAccount.prepareForPaymaster(eip712TxHash, eip712SignedHash, eip712TxData)
-        ).to.not.emit(mockERC20Approve, "Approved");
-      });
-
-      it("successfully prepared", async () => {
-        const eip712Tx = await account.populateTransaction({
-          type: 113,
-          to: callable.address,
-          from: account.address,
-          data: "0x",
-          value: 0,
-          maxFeePerGas: 12000,
-          maxPriorityFeePerGas: 100,
-          gasLimit: 50000,
-          customData: {
-            gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
-            paymasterParams: {
-              paymaster: RANDOM_ADDRESS,
-              paymasterInput: paymasterFlowInterface.encodeFunctionData("approvalBased", [
-                mockERC20Approve.address,
-                2023,
-                "0x",
-              ]),
-            },
-          },
-        });
-        const signedEip712Tx = await account.signTransaction(eip712Tx);
-        const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-
-        const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
-        const eip712TxHash = parsedEIP712tx.hash;
-        const eip712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
-
-        await expect(
-          await defaultAccount.connect(bootloader).prepareForPaymaster(eip712TxHash, eip712SignedHash, eip712TxData)
-        )
-          .to.emit(mockERC20Approve, "Approved")
-          .withArgs(RANDOM_ADDRESS, 2023);
-      });
+    it("non-zero value by EOA wallet", async () => {
+      const call = {
+        from: wallet.address,
+        to: defaultAccount.address,
+        value: 3223,
+        data: "0x87238489489983493904904390431212224343434344433443433434344234234234",
+      };
+      expect(await wallet.provider.call(call)).to.be.eq("0x");
     });
 
-    describe("fallback/receive", function () {
-      it("zero value by EOA wallet", async () => {
-        const call = {
-          from: wallet.address,
-          to: defaultAccount.address,
-          value: 0,
-          data: "0x872384894899834939049043904390390493434343434344433443433434344234234234",
-        };
-        expect(await wallet.provider.call(call)).to.be.eq("0x");
-      });
+    it("zero value by bootloader", async () => {
+      // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
+      // the fallback is behaving correctly
+      const calldata = delegateCaller.interface.encodeFunctionData("delegateCall", [defaultAccount.address]);
+      const call = {
+        from: TEST_BOOTLOADER_FORMAL_ADDRESS,
+        to: delegateCaller.address,
+        value: 0,
+        data: calldata,
+      };
+      expect(await bootloaderAccount.call(call)).to.be.eq("0x");
+    });
 
-      it("non-zero value by EOA wallet", async () => {
-        const call = {
-          from: wallet.address,
-          to: defaultAccount.address,
-          value: 3223,
-          data: "0x87238489489983493904904390431212224343434344433443433434344234234234",
-        };
-        expect(await wallet.provider.call(call)).to.be.eq("0x");
-      });
-
-      it("zero value by bootloader", async () => {
-        // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
-        // the fallback is behaving correctly
-        const calldata = delegateCaller.interface.encodeFunctionData("delegateCall", [defaultAccount.address]);
-        const call = {
-          from: BOOTLOADER_FORMAL_ADDRESS,
-          to: delegateCaller.address,
-          value: 0,
-          data: calldata,
-        };
-        expect(await bootloader.call(call)).to.be.eq("0x");
-      });
-
-      it("non-zero value by bootloader", async () => {
-        // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
-        // the fallback is behaving correctly
-        const calldata = delegateCaller.interface.encodeFunctionData("delegateCall", [defaultAccount.address]);
-        const call = {
-          from: BOOTLOADER_FORMAL_ADDRESS,
-          to: delegateCaller.address,
-          value: 3223,
-          data: calldata,
-        };
-        expect(await bootloader.call(call)).to.be.eq("0x");
-      });
+    it("non-zero value by bootloader", async () => {
+      // Here we need to ensure that during delegatecalls even if `msg.sender` is the bootloader,
+      // the fallback is behaving correctly
+      const calldata = delegateCaller.interface.encodeFunctionData("delegateCall", [defaultAccount.address]);
+      const call = {
+        from: TEST_BOOTLOADER_FORMAL_ADDRESS,
+        to: delegateCaller.address,
+        value: 3223,
+        data: calldata,
+      };
+      expect(await bootloaderAccount.call(call)).to.be.eq("0x");
     });
   });
 });
