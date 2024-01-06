@@ -233,10 +233,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 "Miscalculated deploy transactions fees"
             );
 
-            require(
-                factoryDepsHash == keccak256(abi.encode(_factoryDeps)),
-                "L1WethBridge: Invalid factory deps"
-            );
+            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WethBridge: Invalid factory deps");
         }
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -290,7 +287,11 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
                 new bytes[](0)
             );
-            require((wethBridgeProxyAddress == (ethIsBaseToken ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase) ), "L1WETHBridge: bridge address does not match");
+            require(
+                (wethBridgeProxyAddress ==
+                    (ethIsBaseToken ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase)),
+                "L1WETHBridge: bridge address does not match"
+            );
         }
         bridgeProxyDeployOnL2TxHash[_chainId] = bridgeProxyTxHash;
     }

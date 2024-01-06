@@ -31,23 +31,17 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
   const l1WethAddress = await l1WethBridge.l1WethAddress();
-  const { l2WethImplAddress : l2WethImplAddressEthIsBase, l2WethProxyAddress: l2WethProxyAddressEthIsBase, 
-    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase } = calculateWethAddresses(
-    l2ProxyAdminAddress,
-    l2GovernorAddress,
-    l1WethBridge.address,
-    l1WethAddress,
-    true
-  );
+  const {
+    l2WethImplAddress: l2WethImplAddressEthIsBase,
+    l2WethProxyAddress: l2WethProxyAddressEthIsBase,
+    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase,
+  } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
 
-  const { l2WethImplAddress : l2WethImplAddressEthIsNotBase, l2WethProxyAddress: l2WethProxyAddressEthIsNotBase, 
-    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase } = calculateWethAddresses(
-    l2ProxyAdminAddress,
-    l2GovernorAddress,
-    l1WethBridge.address,
-    l1WethAddress,
-    false
-  );
+  const {
+    l2WethImplAddress: l2WethImplAddressEthIsNotBase,
+    l2WethProxyAddress: l2WethProxyAddressEthIsNotBase,
+    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
+  } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
 
   const tx1 = await l1WethBridge.initialize();
   const tx2 = await l1WethBridge.initializeV2(

@@ -55,14 +55,19 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
     /// @param _l2Bridge Address of the L2 bridge
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
-    function initializeV2(address _l2Bridge, address _l1Address, address _governor, bool _isEthBaseToken) external reinitializer(2) {
+    function initializeV2(
+        address _l2Bridge,
+        address _l1Address,
+        address _governor,
+        bool _isEthBaseToken
+    ) external reinitializer(2) {
         require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
         require(_l1Address != address(0), "L1 WETH token address cannot be zero");
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
         governor = _governor;
         isEthBaseToken = _isEthBaseToken;
-    }   
+    }
 
     modifier onlyBridge() {
         require(msg.sender == l2Bridge, "permission denied"); // Only L2 bridge can call this method
@@ -77,10 +82,7 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
-    function bridgeMint(
-        address _to,
-        uint256 _amount
-    ) external override onlyBridge() {
+    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         if (isEthBaseToken) {
             revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
         } else {
@@ -105,30 +107,30 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     }
 
     /// @notice Deposit Ether to mint WETH.
-    function deposit() external payable override onlyIfEthIsBaseToken() {
+    function deposit() external payable override onlyIfEthIsBaseToken {
         depositTo(msg.sender);
     }
 
     /// @notice Withdraw WETH to get Ether.
-    function withdraw(uint256 _amount) external override onlyIfEthIsBaseToken() {
+    function withdraw(uint256 _amount) external override onlyIfEthIsBaseToken {
         withdrawTo(msg.sender, _amount);
     }
 
     /// @notice Deposit Ether to mint WETH to a given account.
-    function depositTo(address _to) public payable override onlyIfEthIsBaseToken() {
+    function depositTo(address _to) public payable override onlyIfEthIsBaseToken {
         _mint(_to, msg.value);
     }
 
     /// @notice Withdraw WETH to get Ether to a given account.
     /// burns sender's tokens and sends Ether to the given account
-    function withdrawTo(address _to, uint256 _amount) public override onlyIfEthIsBaseToken() {
+    function withdrawTo(address _to, uint256 _amount) public override onlyIfEthIsBaseToken {
         _burn(msg.sender, _amount);
         (bool success, ) = _to.call{value: _amount}("");
         require(success, "Failed withdrawal");
     }
 
     /// @dev Fallback function to allow receiving Ether.
-    receive() external payable onlyIfEthIsBaseToken() {
+    receive() external payable onlyIfEthIsBaseToken {
         depositTo(msg.sender);
     }
 }
