@@ -1,6 +1,5 @@
 .DS_Store
 .idea
-<<<<<<< HEAD
 .vscode
 artifacts-forge/
 artifacts-zk/
@@ -17,8 +16,4 @@ tools/data/Verifier.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*
-=======
-/ethereum/.openzeppelin
-tools/target
-tools/data/Verifier.sol
->>>>>>> origin/kl-factory
+l1-contracts/yarn-error.log*
