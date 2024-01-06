@@ -31,19 +31,31 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
   const l1WethAddress = await l1WethBridge.l1WethAddress();
-  const { l2WethImplAddress, l2WethProxyAddress, l2WethBridgeProxyAddress } = calculateWethAddresses(
+  const { l2WethImplAddress : l2WethImplAddressEthIsBase, l2WethProxyAddress: l2WethProxyAddressEthIsBase, 
+    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase } = calculateWethAddresses(
     l2ProxyAdminAddress,
     l2GovernorAddress,
     l1WethBridge.address,
-    l1WethAddress
+    l1WethAddress,
+    true
+  );
+
+  const { l2WethImplAddress : l2WethImplAddressEthIsNotBase, l2WethProxyAddress: l2WethProxyAddressEthIsNotBase, 
+    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase } = calculateWethAddresses(
+    l2ProxyAdminAddress,
+    l2GovernorAddress,
+    l1WethBridge.address,
+    l1WethAddress,
+    false
   );
 
   const tx1 = await l1WethBridge.initialize();
   const tx2 = await l1WethBridge.initializeV2(
     [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-    ["0x00", "0x00"],
-    l2WethProxyAddress,
-    l2WethBridgeProxyAddress,
+    l2WethProxyAddressEthIsBase,
+    l2WethProxyAddressEthIsNotBase,
+    l2WethBridgeProxyAddressEthIsBase,
+    l2WethBridgeProxyAddressEthIsNotBase,
     l1GovernorAddress,
     0,
     { nonce: nonce + 1, gasPrice }
@@ -58,9 +70,9 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const receipts = await Promise.all(txs.map((tx) => tx.wait(1)));
   if (deployer.verbose) {
     console.log(`WETH bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);
-    console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddress}`);
-    console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddress}`);
-    console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${l2WethBridgeProxyAddress}`);
+    // console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddressEthIsBase}`);
+    // console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddressEthIsBase}`);
+    // console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${l2WethBridgeProxyAddressEthIsBase}`);
   }
 }
 

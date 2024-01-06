@@ -35,6 +35,7 @@ describe("L1ERC20Bridge tests", function () {
   let l1Erc20BridgeContract: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "0";
+  const functionSignature = "0x11a2ccc1";
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
@@ -144,7 +145,6 @@ describe("L1ERC20Bridge tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
-    const functionSignature = "0xc87325f1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
@@ -159,7 +159,6 @@ describe("L1ERC20Bridge tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
-    const functionSignature = "0xc87325f1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,
@@ -174,7 +173,6 @@ describe("L1ERC20Bridge tests", function () {
   });
 
   it("Should revert on finalizing a withdrawal with wrong proof", async () => {
-    const functionSignature = "0xc87325f1";
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
       functionSignature,

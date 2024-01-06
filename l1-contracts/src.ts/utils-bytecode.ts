@@ -49,7 +49,8 @@ export function calculateWethAddresses(
   l2ProxyAdminAddress: string,
   l2GovernorAddress: string,
   l1WethBridgeAddress: string,
-  l1WethAddress: string
+  l1WethAddress: string,
+  ethIsBaseToken: boolean 
 ): { l2WethImplAddress: string; l2WethProxyAddress: string; l2WethBridgeProxyAddress: string } {
   const abiCoder = new ethers.utils.AbiCoder();
 
@@ -65,6 +66,7 @@ export function calculateWethAddresses(
     l1WethAddress,
     l2ProxyAdminAddress,
     l2GovernorAddress,
+    ethIsBaseToken
   ]);
 
   const l2WethBridgeProxyAddress = computeL2Create2Address(

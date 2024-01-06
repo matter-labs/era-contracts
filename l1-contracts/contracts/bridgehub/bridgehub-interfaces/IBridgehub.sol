@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../bridge/interfaces/IL1Bridge.sol";
+import {IL1Bridge} from "../../bridge/interfaces/IL1Bridge.sol";
 import "../../common/Messaging.sol";
 import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../../state-transition/libraries/Diamond.sol";

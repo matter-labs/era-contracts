@@ -25,7 +25,7 @@ const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.js
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
 const testnetTokens = JSON.parse(fs.readFileSync(testnetTokenPath, { encoding: "utf-8" }));
 
-export const CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
+export const CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
 export const DEFAULT_REVERT_REASON = "VM did not revert";
@@ -359,7 +359,7 @@ export async function initialDeployment(
   // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
   // nonce++;
 
-  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (20).toString();
+  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
   process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
   process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
   process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = zeroHash;

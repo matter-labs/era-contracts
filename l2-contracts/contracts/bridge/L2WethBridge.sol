@@ -5,12 +5,13 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import "./interfaces/IL1Bridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IL2Weth.sol";
 import "./interfaces/IL2StandardToken.sol";
 
 import "./L2Weth.sol";
-import {L2_ETH_ADDRESS} from "../L2ContractHelper.sol";
+import {L2_ETH_ADDRESS, L2ContractHelper} from "../L2ContractHelper.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
@@ -36,6 +37,9 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @dev governor address (on L1 and aliased)
     address public governor;
 
+    /// @dev isEthBaseToken
+    bool public isEthBaseToken;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
@@ -51,13 +55,15 @@ contract L2WethBridge is IL2Bridge, Initializable {
         address _l1Bridge,
         address _l1WethAddress,
         address _proxyAdmin,
-        address _governor
+        address _governor,
+        bool _isEthBaseToken
     ) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
         require(_l1WethAddress != address(0), "L1 WETH token address cannot be zero");
 
         l1Bridge = _l1Bridge;
         l1WethAddress = _l1WethAddress;
+        isEthBaseToken = _isEthBaseToken;
 
         address l2WethImplementation = address(new L2Weth{salt: bytes32(0)}());
         bytes memory initData = abi.encodeWithSelector(L2Weth.initialize.selector, "Wrapped Ether", "WETH");
@@ -66,7 +72,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
             _proxyAdmin,
             initData
         );
-        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _governor);
+        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _governor, _isEthBaseToken);
         l2WethAddress = address(l2Weth);
     }
 
@@ -81,13 +87,27 @@ contract L2WethBridge is IL2Bridge, Initializable {
         // Burn WETH on L2, receive ETH.
         IL2StandardToken(l2WethAddress).bridgeBurn(msg.sender, _amount);
 
-        // WETH withdrawal message.
-        bytes memory wethMessage = abi.encodePacked(_l1Receiver);
+        if (isEthBaseToken) {
+            // WETH withdrawal message.
+            bytes memory wethMessage = abi.encodePacked(_l1Receiver);
 
-        // Withdraw ETH to L1 bridge.
-        L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
+            // Withdraw ETH to L1 bridge.
+            L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
+        } else {
+            bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1WethAddress, _amount);
+            L2ContractHelper.sendMessageToL1(message);
+        }
 
         emit WithdrawalInitiated(msg.sender, _l1Receiver, l2WethAddress, _amount);
+    }
+
+    /// @dev Encode the message for l2ToL1log sent with withdraw initialization
+    function _getL1WithdrawMessage(
+        address _to,
+        address _l1Token,
+        uint256 _amount
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(IL1BridgeDeprecated.finalizeWithdrawal.selector, _to, _l1Token, _amount);
     }
 
     /// @notice Finalize the deposit of WETH from L1 to L2 by calling deposit on L2Weth contract
@@ -108,10 +128,15 @@ contract L2WethBridge is IL2Bridge, Initializable {
         );
 
         require(_l1Token == l1WethAddress, "Only WETH can be deposited");
-        require(msg.value == _amount, "Amount mismatch");
 
-        // Deposit WETH to L2 receiver.
-        IL2Weth(l2WethAddress).depositTo{value: msg.value}(_l2Receiver);
+        if (isEthBaseToken) {
+            require(msg.value == _amount, "Amount mismatch");
+            // Deposit WETH to L2 receiver.
+            IL2Weth(l2WethAddress).depositTo{value: msg.value}(_l2Receiver);
+        } else {
+            require(msg.value == 0, "Value should be 0 for ERC20 bridge");
+            IL2StandardToken(l2WethAddress).bridgeMint(_l2Receiver, _amount);
+        }
 
         emit FinalizeDeposit(_l1Sender, _l2Receiver, l2WethAddress, _amount);
     }
@@ -128,6 +153,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
 
     receive() external payable {
         require(msg.sender == l2WethAddress, "pd");
+        require(isEthBaseToken, "Base token can only be deposited if it is ETH");
         emit EthReceived(msg.value);
     }
 }

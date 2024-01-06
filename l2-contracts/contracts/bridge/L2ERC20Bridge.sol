@@ -124,7 +124,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         address _l1Token,
         uint256 _amount
     ) internal pure returns (bytes memory) {
-        return abi.encodePacked(IL1Bridge.finalizeWithdrawal.selector, _to, _l1Token, _amount);
+        return abi.encodePacked(IL1BridgeDeprecated.finalizeWithdrawal.selector, _to, _l1Token, _amount);
     }
 
     /// @return Address of an L2 token counterpart

@@ -21,3 +21,13 @@ interface IL1BridgeLegacy {
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 txHash);
 }
+
+interface IL1BridgeDeprecated {
+    function finalizeWithdrawal(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external;
+}

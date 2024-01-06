@@ -685,7 +685,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
-        } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
+        } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
 
             // Check that the message length is correct.

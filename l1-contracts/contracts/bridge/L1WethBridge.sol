@@ -5,6 +5,7 @@ pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IL1Bridge.sol";
+import "./interfaces/IL1BridgeLegacy.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
@@ -58,16 +59,15 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     address public governor;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
-    address public l2BridgeStandardAddress;
+    address public l2BridgeStandardAddressEthIsBase;
+    address public l2BridgeStandardAddressEthIsNotBase;
 
     /// @dev The address of the WETH on L2
-    address public l2WethStandardAddress;
+    address public l2WethStandardAddressEthIsBase;
+    address public l2WethStandardAddressEthIsNotBase;
 
-    /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge when Eth is the base token
-    bytes32 public baseFactoryDepsHash;
-
-    /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge when Eth is the _NOT_ the base token
-    bytes32 public erc20FactoryDepsHash;
+    /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge
+    bytes32 public factoryDepsHash;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2BridgeAddress;
@@ -143,28 +143,34 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
-    /// @param _baseFactoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
+    /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
     /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
     /// implementation and proxy upon initialization
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
-    /// @param _erc20FactoryDeps same as baseFactoryDeps, just for chains where Eth is not the base asset.
-    /// @param _l2WethStandardAddress Pre-calculated address of L2 WETH token
+    /// @param _l2WethStandardAddressEthIsBase Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
     function initializeV2(
-        bytes[] calldata _baseFactoryDeps,
-        bytes[] calldata _erc20FactoryDeps,
-        address _l2WethStandardAddress,
-        address _l2BridgeStandardAddress,
+        bytes[] calldata _factoryDeps,
+        address _l2WethStandardAddressEthIsBase,
+        address _l2WethStandardAddressEthIsNotBase,
+        address _l2BridgeStandardAddressEthIsBase,
+        address _l2BridgeStandardAddressEthIsNotBase,
         address _governor,
         uint256 _eraIsWithdrawalFinalizedStorageSwitch
     ) external reinitializer(2) {
-        require(_l2WethStandardAddress != address(0), "L2 WETH address cannot be zero");
+        require(_l2WethStandardAddressEthIsBase != address(0), "L2 WETH address cannot be zero");
+        require(_l2WethStandardAddressEthIsNotBase != address(0), "L2 WETH not eth based address cannot be zero");
+        require(_l2BridgeStandardAddressEthIsBase != address(0), "L2 bridge address cannot be zero");
+        require(_l2BridgeStandardAddressEthIsNotBase != address(0), "L2 bridge not eth based address cannot be zero");
         require(_governor != address(0), "Governor address cannot be zero");
-        require(_baseFactoryDeps.length == 2, "Invalid base factory deps length provided");
-        require(_erc20FactoryDeps.length == 2, "Invalid erc20 factory deps length provided");
+        require(_factoryDeps.length == 2, "Invalid base factory deps length provided");
 
-        l2WethStandardAddress = _l2WethStandardAddress;
-        l2BridgeStandardAddress = _l2BridgeStandardAddress;
+        l2WethStandardAddressEthIsBase = _l2WethStandardAddressEthIsBase;
+        l2WethStandardAddressEthIsNotBase = _l2WethStandardAddressEthIsNotBase;
+
+        l2BridgeStandardAddressEthIsBase = _l2BridgeStandardAddressEthIsBase;
+        l2BridgeStandardAddressEthIsNotBase = _l2BridgeStandardAddressEthIsNotBase;
+
         governor = _governor;
         eraIsWithdrawalFinalizedStorageSwitch = _eraIsWithdrawalFinalizedStorageSwitch;
 
@@ -176,8 +182,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         require(size > 0, "L1WETHBridge, governor cannot be EOA");
         // #endif
 
-        baseFactoryDepsHash = keccak256(abi.encode(_baseFactoryDeps));
-        erc20FactoryDepsHash = keccak256(abi.encode(_erc20FactoryDeps));
+        factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
     function initializeChainGovernance(
@@ -228,18 +233,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 "Miscalculated deploy transactions fees"
             );
 
-            // if this is the base token bridge of the chain
-            if (thisIsBaseTokenBridge) {
-                require(
-                    baseFactoryDepsHash == keccak256(abi.encode(_factoryDeps)),
-                    "L1WethBridge: Invalid base factory deps"
-                );
-            } else {
-                require(
-                    erc20FactoryDepsHash == keccak256(abi.encode(_factoryDeps)),
-                    "L1WethBridge: Invalid erc20 factory deps"
-                );
-            }
+            require(
+                factoryDepsHash == keccak256(abi.encode(_factoryDeps)),
+                "L1WethBridge: Invalid factory deps"
+            );
         }
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -267,7 +264,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, l2ProxyAdmin, l2Governor)
+                (address(this), l1WethAddress, l2ProxyAdmin, l2Governor, ethIsBaseToken)
             );
             l2WethBridgeProxyConstructorData = abi.encode(
                 wethBridgeImplementationAddr,
@@ -293,7 +290,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
                 new bytes[](0)
             );
-            require(wethBridgeProxyAddress == l2BridgeStandardAddress, "L1WETHBridge: bridge address does not match");
+            require((wethBridgeProxyAddress == (ethIsBaseToken ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase) ), "L1WETHBridge: bridge address does not match");
         }
         bridgeProxyDeployOnL2TxHash[_chainId] = bridgeProxyTxHash;
     }
@@ -339,8 +336,11 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         );
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
-        l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
-        l2WethAddress[_chainId] = l2WethStandardAddress;
+
+        bool ethIsBase = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
+
+        l2BridgeAddress[_chainId] = ethIsBase ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase;
+        l2WethAddress[_chainId] = ethIsBase ? l2WethStandardAddressEthIsBase : l2WethStandardAddressEthIsNotBase;
     }
 
     /// @notice Initiates a WETH deposit by depositing WETH into the L1 bridge contract, unwrapping it to ETH
@@ -384,7 +384,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
         // if ETH is the base token we have to have enough value
         uint256 mintValue = _mintValue;
-        bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
+        bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
         if (ethIsBaseToken) {
             require(
                 bridgehub.baseTokenBridge(_chainId) == address(this),
@@ -441,7 +441,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         address _refundRecipient
     ) internal returns (bytes32 txHash) {
         if (_ethIsBaseToken) {
-            // note to have a unified interface with ERC20s we transfer all the value and  redeposit it with bridgehubDeposit.
+            // note to have a unified interface with ERC20s we transfer all the value and redeposit it with bridgehubDeposit.
             // we don't increase chainBalance because we will add it in BridgehubDeposit
             // we don't save the depositAmount because base asset is sent to refundrecipient
 
@@ -676,8 +676,17 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 // Parse additional data
                 (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
             }
-        } else if (bytes4(functionSignature) == this.finalizeWithdrawal.selector) {
-            require(false, "We don't support weth as erc20 on other chains with other base tokens yet");
+        } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
+            // this message is a token withdrawal
+
+            // Check that the message length is correct.
+            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
+            // 76 (bytes).
+            require(_message.length == 76, "Incorrect ETH withdrawal message length");
+            (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
+            address l1Token;
+            (l1Token, offset) = UnsafeBytes.readAddress(_message, offset);
+            (ethAmount, offset) = UnsafeBytes.readUint256(_message, offset);
         } else {
             require(false, "Incorrect message function selector");
         }
@@ -685,7 +694,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
     /// @return l2Token Address of an L2 token counterpart.
     function l2TokenAddress(address _l1Token) public view override returns (address l2Token) {
-        l2Token = _l1Token == l1WethAddress ? l2WethStandardAddress : address(0);
+        l2Token = _l1Token == l1WethAddress ? l2WethStandardAddressEthIsBase : address(0);
     }
 
     /// @dev The receive function is called when ETH is sent directly to the contract.
