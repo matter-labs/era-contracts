@@ -137,7 +137,7 @@ describe("WETH Bridge tests", () => {
         )
     );
 
-    expect(revertReason).equal("L1WETH Bridge: Amount cannot be zero");
+    expect(revertReason).equal("L1WETH Bridge: Amount cannot be zero when Eth is base token");
   });
 
   it("Should deposit successfully", async () => {

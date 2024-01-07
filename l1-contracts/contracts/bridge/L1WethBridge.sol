@@ -219,7 +219,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             require(l2BridgeAddress[_chainId] == address(0), "L1WETHBridge: bridge already deployed");
             require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
 
-            bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this));
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             if (ethIsBaseToken) {
                 mintValue = msg.value;
@@ -379,31 +378,32 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable nonReentrant returns (bytes32 txHash) {
-        require(_l1Token == l1WethAddress, "L1WETH Bridge: Invalid L1 token address");
-        require(_amount != 0, "L1WETH Bridge: Amount cannot be zero");
-        require(l2BridgeAddress[_chainId] != address(0), "L1WETH Bridge: Bridge is not deployed");
-
-        // if ETH is the base token we have to have enough value
         uint256 mintValue = _mintValue;
-        bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-        if (ethIsBaseToken) {
-            require(
-                bridgehub.baseTokenBridge(_chainId) == address(this),
-                "L1WETH Bridge: other eth bridge not supported"
-            );
-            mintValue = msg.value + _amount;
-            // we check this in the Mailbox as well
-            require(_mintValue <= mintValue, "L1WETH Bridge: Incorrect amount of ETH sent");
+        uint256 amount = _amount;
+        {
+            require(_l1Token == l1WethAddress, "L1WETH Bridge: Invalid L1 token address");
+            bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
+            require((_amount != 0) || (!ethIsBaseToken), "L1WETH Bridge: Amount cannot be zero when Eth is base token");
+            require(l2BridgeAddress[_chainId] != address(0), "L1WETH Bridge: Bridge is not deployed");
+
+            if (ethIsBaseToken) {
+                mintValue = msg.value + _amount;
+                // we check this in the Mailbox as well
+                require(_mintValue <= mintValue, "L1WETH Bridge: Incorrect amount of ETH sent");
+            } else {
+                amount = msg.value + _amount;
+            }
+
+            if (_amount > 0){
+                // Deposit WETH tokens from the depositor address to the smart contract address
+                IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
+                // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
+                IWETH9(l1WethAddress).withdraw(_amount);
+            }
         }
-
-        // Deposit WETH tokens from the depositor address to the smart contract address
-        IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
-        // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
-        IWETH9(l1WethAddress).withdraw(_amount);
-
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, _amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, amount);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
@@ -415,24 +415,22 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                     : msg.sender;
             }
             txHash = _depositSendTx(
-                ethIsBaseToken,
                 _chainId,
                 mintValue,
-                _amount,
+                amount,
                 l2TxCalldata,
                 _l2TxGasLimit,
                 _l2TxGasPerPubdataByte,
                 refundRecipient
             );
         }
-        emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, amount);
         if (_chainId == eraChainId) {
-            emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+            emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, amount);
         }
     }
 
     function _depositSendTx(
-        bool _ethIsBaseToken,
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _amount,
@@ -441,7 +439,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) internal returns (bytes32 txHash) {
-        if (_ethIsBaseToken) {
+        bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
+        if (ethIsBaseToken) {
             // note to have a unified interface with ERC20s we transfer all the value and redeposit it with bridgehubDeposit.
             // we don't increase chainBalance because we will add it in BridgehubDeposit
             // we don't save the depositAmount because base asset is sent to refundrecipient
@@ -461,9 +460,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
 
             txHash = bridgehub.requestL2Transaction{value: _mintValue}(request);
         } else {
-            depositAmount[_chainId][msg.sender][txHash] = _amount;
-            chainBalance[_chainId] += _amount;
-
             IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
                 chainId: _chainId,
                 payer: msg.sender,
@@ -478,6 +474,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             });
 
             txHash = bridgehub.requestL2Transaction(request);
+            depositAmount[_chainId][msg.sender][txHash] = _amount;
+            chainBalance[_chainId] += _amount;
         }
     }
 
