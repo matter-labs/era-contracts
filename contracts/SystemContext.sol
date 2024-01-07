@@ -41,7 +41,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     address public coinbase = BOOTLOADER_FORMAL_ADDRESS;
 
     /// @notice Formal `block.difficulty` parameter.
-    uint256 public difficulty = 2500000000000000;
+    uint256 public difficulty = 2.5e15;
 
     /// @notice The `block.basefee`.
     /// @dev It is currently a constant.
