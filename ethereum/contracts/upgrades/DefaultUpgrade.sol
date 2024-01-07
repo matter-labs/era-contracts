@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "../zksync/libraries/Diamond.sol";
-import "./BaseZkSyncUpgrade.sol";
+import {Diamond} from "../zksync/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

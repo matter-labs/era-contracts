@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./../zksync/interfaces/IVerifier.sol";
-import "./libraries/PriorityQueue.sol";
+import {IVerifier} from "./../zksync/interfaces/IVerifier.sol";
+import {PriorityQueue} from "./libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
