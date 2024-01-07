@@ -17,7 +17,6 @@ interface IL1Bridge {
 /// @author Matter Labs
 interface IL1BridgeDeprecated {
     function finalizeWithdrawal(
-        uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
