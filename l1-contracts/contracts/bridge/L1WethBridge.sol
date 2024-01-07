@@ -394,7 +394,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
                 amount = msg.value + _amount;
             }
 
-            if (_amount > 0){
+            if (_amount > 0) {
                 // Deposit WETH tokens from the depositor address to the smart contract address
                 IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
                 // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
