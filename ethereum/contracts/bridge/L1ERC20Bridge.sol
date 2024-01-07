@@ -119,7 +119,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
             _deployBridgeProxyFee,
             l2BridgeProxyBytecodeHash,
             l2BridgeProxyConstructorData,
-            // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+            // No factory deps are needed for the L2 bridge proxy, because it is already passed in previous step
             new bytes[](0)
         );
     }

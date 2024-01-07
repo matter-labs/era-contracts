@@ -61,7 +61,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice The main function that will be provided by the upgrade proxy
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
-        // of the L1 block at which the upgrade occured. This means that using timestamp as a signifier of "upgraded"
+        // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");

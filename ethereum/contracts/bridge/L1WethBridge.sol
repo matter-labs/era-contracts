@@ -68,9 +68,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
-    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2
+    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2
     /// bridge implementation
-    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
+    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2 bridge
     /// proxy
     function initialize(
         bytes[] calldata _factoryDeps,
@@ -122,7 +122,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
             l2WethBridgeProxyConstructorData,
-            // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
+            // No factory deps are needed for the L2 bridge proxy, because it is already passed in the previous step
             new bytes[](0)
         );
     }
