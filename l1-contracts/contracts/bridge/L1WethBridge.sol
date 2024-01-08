@@ -687,7 +687,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             (l1Token, offset) = UnsafeBytes.readAddress(_message, offset);
             (ethAmount, offset) = UnsafeBytes.readUint256(_message, offset);
         } else {
-            require(false, "Incorrect message function selector");
+            revert("Incorrect message function selector");
         }
     }
 

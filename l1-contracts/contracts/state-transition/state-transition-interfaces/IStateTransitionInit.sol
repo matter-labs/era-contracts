@@ -22,7 +22,5 @@ struct ZkSyncStateTransitionInitializeData {
 }
 
 interface IZkSyncStateTransitionInit {
-    function getName() external view returns (string memory);
-
     function initialize(ZkSyncStateTransitionInitializeData calldata _initalizeData) external;
 }

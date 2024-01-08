@@ -2,14 +2,15 @@
 
 pragma solidity 0.8.20;
 
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+
 import "./bridgehub-interfaces/IBridgehub.sol";
 import "../bridge/interfaces/IL1Bridge.sol";
 import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
-contract Bridgehub is IBridgehub, ReentrancyGuard {
-    string public constant override getName = "Bridgehub";
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step{
     address public constant ethTokenAddress = address(1);
 
     /// @notice Address which will exercise critical changes
@@ -75,6 +76,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
         stateTransitionIsRegistered[_stateTransition] = true;
     }
 
+    /// @notice State Transition can be any contract with the appropriate interface/functionality
+    /// @notice this stops new Chains from using the STF, old chains are not affected
+    function removeStateTransition(address _stateTransition) external onlyGovernor {
+        require(stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
+        stateTransitionIsRegistered[_stateTransition] = false;
+    }
+
     /// @notice token can be any contract with the appropriate interface/functionality
     function newToken(address _token) external onlyGovernor {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
@@ -118,7 +126,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard {
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
-        require(stateTransition[_chainId] == address(0), "Bridgehub: chainId already not registered");
+        require(stateTransition[_chainId] == address(0), "Bridgehub: chainId already registered");
 
         stateTransition[chainId] = _stateTransition;
         baseToken[chainId] = _baseToken;

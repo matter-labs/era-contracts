@@ -9,8 +9,6 @@ import "../../state-transition/libraries/Diamond.sol";
 
 interface IBridgehub {
     /// Getters
-    function getName() external view returns (string memory);
-
     function governor() external view returns (address);
 
     function stateTransitionIsRegistered(address _stateTransition) external view returns (bool);

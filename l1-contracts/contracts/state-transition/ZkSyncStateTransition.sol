@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
 
@@ -16,13 +18,11 @@ import "../upgrades/IDefaultUpgrade.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import "./l2-deps/ISystemContext.sol";
 
-/// @title StateTransition conract
+/// @title StateTransition contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard {
+contract ZkSyncStateTransition is IZkSyncStateTransition, ReentrancyGuard, Ownable2Step {
     using UncheckedMath for uint256;
-
-    string public constant override getName = "ZkSyncStateTransition";
 
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
