@@ -120,15 +120,13 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
     function _setVerifier(IVerifier _newVerifier) private {
-        if (_newVerifier == IVerifier(address(0))) {
-            return;
-        }
-
         // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier will fail. Ensure all commited batches are finalized before the
         // verifier is upgraded.
-        require(s.totalBatchesCommitted == s.totalBatchesVerified, "All committed batches must be verified first");
+        if (_newVerifier == IVerifier(address(0))) {
+            return;
+        }
 
         IVerifier oldVerifier = s.verifier;
         s.verifier = _newVerifier;
@@ -138,6 +136,10 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Change the verifier parameters
     /// @param _newVerifierParams New parameters for the verifier
     function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
+        // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier verifier are upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier params will fail. Ensure all commited batches are finalized before the
+        // verifier is upgraded.
         if (
             _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) &&
             _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) &&
@@ -145,12 +147,6 @@ abstract contract BaseZkSyncUpgrade is Base {
         ) {
             return;
         }
-
-        // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
-        // during the transition. If verifier verifier are upgraded, it will immediately be used to prove all committed batches.
-        // Batches committed expecting the old verifier params will fail. Ensure all commited batches are finalized before the
-        // verifier is upgraded.
-        require(s.totalBatchesCommitted == s.totalBatchesVerified, "All committed batches must be verified first");
 
         VerifierParams memory oldVerifierParams = s.verifierParams;
         s.verifierParams = _newVerifierParams;
