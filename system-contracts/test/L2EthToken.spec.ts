@@ -165,7 +165,9 @@ describe("L2EthToken tests", () => {
 
   describe("withdraw", () => {
     it("event, balance, totalsupply", async () => {
-      const selector = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi).getSighash("finalizeEthWithdrawal");
+      const selector = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi).getSighash(
+        "finalizeEthWithdrawal"
+      );
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
 
       const message: string = ethers.utils.solidityPack(
@@ -197,7 +199,9 @@ describe("L2EthToken tests", () => {
     });
 
     it("event, balance, totalsupply, withdrawWithMessage", async () => {
-      const selector = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi).getSighash("finalizeEthWithdrawal");
+      const selector = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi).getSighash(
+        "finalizeEthWithdrawal"
+      );
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
       const additionalData: string = ethers.utils.defaultAbiCoder.encode(["string"], ["additional data"]);
       const message: string = ethers.utils.solidityPack(
