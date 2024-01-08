@@ -57,8 +57,7 @@ async function main() {
         if ((await deployWallet.provider.getCode(cmd.baseTokenAddress)) == "0x") {
           throw new Error(`Token ${cmd.baseTokenAddress} is not deployed`);
         }
-      } else if (baseTokenAddress == ADDRESS_ONE) {
-        // base token is eth, we are ok.
+        console.log(`Using base token at ${baseTokenAddress}`);
       } else if (cmd.baseTokenName) {
         const tokens = getTokens(process.env.CHAIN_ETH_NETWORK);
         const token = tokens.find((token: { symbol: string }) => token.symbol == cmd.baseTokenName);
@@ -69,6 +68,9 @@ async function main() {
         }
         baseTokenAddress = token.address;
         console.log(`Using base token ${cmd.baseTokenName} at ${baseTokenAddress}`);
+      }  else if (baseTokenAddress == ADDRESS_ONE) {
+        // base token is eth, we are ok.
+        console.log(`Using ETH as base token at ${baseTokenAddress}`);
       }
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {

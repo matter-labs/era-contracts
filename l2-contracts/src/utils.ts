@@ -1,6 +1,6 @@
 import { artifacts } from "hardhat";
 
-import { deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
+import { ADDRESS_ONE, deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { Interface } from "ethers/lib/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
@@ -9,6 +9,7 @@ import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
 import type { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
+import { IERC20Factory } from "zksync-web3/build/typechain";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -93,6 +94,16 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  
+  const baseTokenAddress = await bridgehub.baseToken(chainId);
+  const baseTokenBridge = await bridgehub.baseTokenBridge(chainId);
+  const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
+  const ethIsBaseToken = ADDRESS_ONE == baseTokenAddress;
+
+  if (!ethIsBaseToken) {
+    const tx = await baseToken.approve(baseTokenBridge, expectedCost);
+    await tx.wait();
+  }
 
   return await bridgehub.requestL2Transaction(
     {
@@ -107,7 +118,7 @@ export async function create2DeployFromL1(
       factoryDeps: [bytecode],
       refundRecipient: wallet.address,
     },
-    { value: expectedCost, gasPrice }
+    { value: ethIsBaseToken ? expectedCost : 0 , gasPrice }
   );
 }
 
