@@ -32,6 +32,10 @@ contract MsgValueSimulator is ISystemContract {
         to = address(uint160(addressAsUint));
     }
 
+    /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
+    /// @dev The contract accepts value, the callee and whether the call should a system one via its ABI params.
+    /// @param _data The calldata to be passed to the callee.
+    /// @return The return data from the callee.
     fallback(bytes calldata _data) external onlySystemCall returns (bytes memory) {
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
