@@ -37,6 +37,10 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         _disableInitializers();
     }
 
+    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
+    /// @param _l1Bridge The address of the L1 Bridge contract.
+    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @param _governor The address of the governor contract.
     function initialize(address _l1Bridge, bytes32 _l2TokenProxyBytecodeHash, address _governor) external initializer {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
