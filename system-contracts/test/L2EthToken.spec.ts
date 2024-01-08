@@ -65,7 +65,7 @@ describe("L2EthToken tests", () => {
         await l2EthToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("100.0"))
       ).wait();
 
-      const senderBalandeBeforeTransfer: BigNumber = await l2EthToken.balanceOf(wallets[0].address);
+      const senderBalanceBeforeTransfer: BigNumber = await l2EthToken.balanceOf(wallets[0].address);
       const recipientBalanceBeforeTransfer: BigNumber = await l2EthToken.balanceOf(wallets[1].address);
 
       const amountToTransfer = ethers.utils.parseEther("10.0");
@@ -78,7 +78,7 @@ describe("L2EthToken tests", () => {
 
       const senderBalanceAfterTransfer: BigNumber = await l2EthToken.balanceOf(wallets[0].address);
       const recipientBalanceAfterTransfer: BigNumber = await l2EthToken.balanceOf(wallets[1].address);
-      expect(senderBalanceAfterTransfer).to.be.eq(senderBalandeBeforeTransfer.sub(amountToTransfer));
+      expect(senderBalanceAfterTransfer).to.be.eq(senderBalanceBeforeTransfer.sub(amountToTransfer));
       expect(recipientBalanceAfterTransfer).to.be.eq(recipientBalanceBeforeTransfer.add(amountToTransfer));
     });
 
