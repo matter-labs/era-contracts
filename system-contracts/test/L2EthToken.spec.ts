@@ -14,14 +14,14 @@ describe("L2EthToken tests", () => {
   let wallets: Array<Wallet>;
   let l2EthToken: L2EthToken;
   let bootloaderAccount: ethers.Signer;
-  let selector: string;
+  let mailboxIface: ethers.utils.Interface;
 
   before(async () => {
     await prepareEnvironment();
     await deployContractOnAddress(TEST_ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2EthToken");
     l2EthToken = L2EthTokenFactory.connect(TEST_ETH_TOKEN_SYSTEM_CONTRACT_ADDRESS, richWallet);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
-    selector = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi).getSighash("finalizeEthWithdrawal");
+    mailboxIface = new ethers.utils.Interface((await loadArtifact("IMailbox")).abi);
   });
 
   beforeEach(async () => {
@@ -170,7 +170,7 @@ describe("L2EthToken tests", () => {
       const amountToWithdraw: BigNumber = ethers.utils.parseEther("1.0");
       const message: string = ethers.utils.solidityPack(
         ["bytes4", "address", "uint256"],
-        [selector, wallets[1].address, amountToWithdraw]
+        [mailboxIface.getSighash("finalizeEthWithdrawal"), wallets[1].address, amountToWithdraw]
       );
 
       await setResult("L1Messenger", "sendToL1", [message], {
@@ -201,7 +201,13 @@ describe("L2EthToken tests", () => {
       const additionalData: string = ethers.utils.defaultAbiCoder.encode(["string"], ["additional data"]);
       const message: string = ethers.utils.solidityPack(
         ["bytes4", "address", "uint256", "address", "bytes"],
-        [selector, wallets[1].address, amountToWithdraw, richWallet.address, additionalData]
+        [
+          mailboxIface.getSighash("finalizeEthWithdrawal"),
+          wallets[1].address,
+          amountToWithdraw,
+          richWallet.address,
+          additionalData,
+        ]
       );
 
       await setResult("L1Messenger", "sendToL1", [message], {
