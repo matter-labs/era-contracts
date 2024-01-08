@@ -2,7 +2,6 @@ import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-web3";
 import type { L2EthToken } from "../typechain";
-import { IMailboxFactory } from "../typechain/IMailboxFactory";
 import { L2EthTokenFactory } from "../typechain";
 import { deployContractOnAddress, getWallets, loadArtifact, provider } from "./shared/utils";
 import type { BigNumber } from "ethers";
