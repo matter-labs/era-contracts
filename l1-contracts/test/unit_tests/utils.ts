@@ -1,6 +1,6 @@
 import type { BigNumberish, BytesLike, Wallet } from "ethers";
 import { BigNumber, ethers } from "ethers";
-import type { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-ethers/build/src/types";
 import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
@@ -14,7 +14,7 @@ import { IBridgehub } from "../../typechain/IBridgehub";
 import { IMailbox } from "../../typechain/IMailbox";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
 import * as fs from "fs";
 import { ADDRESS_ONE } from "../../scripts/utils";

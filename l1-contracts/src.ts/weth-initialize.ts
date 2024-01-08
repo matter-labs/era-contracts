@@ -15,7 +15,7 @@ import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
-import { IERC20Factory } from "zksync-web3/build/typechain";
+import { IERC20Factory } from "zksync-ethers/build/typechain";
 import { TestnetERC20TokenFactory } from "../typechain";
 
 export async function initializeWethBridge(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumberish) {

@@ -87,6 +87,6 @@
     "solhint-plugin-prettier": "^0.0.5"
   },
   "optionalDependencies": {
-    "zksync-web3": "file:../../../zksync2-js"
+    "zksync-web3": "zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub"
   }
 }

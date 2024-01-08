@@ -15,7 +15,7 @@ import * as fs from "fs";
 import { hashL2Bytecode } from "../../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
-import type { Address } from "zksync-web3/build/src/types";
+import type { Address } from "zksync-ethers/build/src/types";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));

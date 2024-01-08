@@ -3,7 +3,7 @@ import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { ethers } from "hardhat";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";

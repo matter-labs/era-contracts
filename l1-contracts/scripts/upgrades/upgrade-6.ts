@@ -2,13 +2,13 @@ import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
 import { ethers } from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
+import { Provider, Wallet } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
 import * as fs from "fs";
 import * as path from "path";
-import { applyL1ToL2Alias, hashBytecode } from "zksync-web3/build/src/utils";
+import { applyL1ToL2Alias, hashBytecode } from "zksync-ethers/build/src/utils";
 
 type ForceDeployment = {
   bytecodeHash: string;

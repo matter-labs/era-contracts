@@ -109,15 +109,15 @@ describe("Custom base token tests", () => {
 
     await owner.sendTransaction(tx);
     // note we can use initialDeployment so we don't go into deployment details here
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [], "DAI");
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [], "BAT");
     chainId = deployer.chainId;
     bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
     const tokens = getTokens("hardhat");
-    l1TokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
+    l1TokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "BAT")!.address;
     l1ERCToken = TestnetERC20TokenFactory.connect(l1TokenAddress, owner);
 
-    let altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "wBTC")!.address;
+    let altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
 
     // prepare the bridge
@@ -135,6 +135,15 @@ describe("Custom base token tests", () => {
     );
 
     await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
+  });
+
+  it("Should have correct base token", async () => {
+    // we should still be able to deploy the erc20 bridge
+    const baseTokenAddressInBridgehub = await bridgehub.baseToken(chainId);
+    const baseTokenBridgeAddress = await bridgehub.baseTokenBridge(chainId);
+    expect(l1TokenAddress).equal(baseTokenAddressInBridgehub);
+    expect(l1ERC20Bridge.address).equal(baseTokenBridgeAddress);
+
   });
 
   it("Check startInitializeChain", async () => {
