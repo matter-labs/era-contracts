@@ -13,6 +13,8 @@ import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/
 import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {IZkSync} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IZkSync.sol";
+import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
+import {IVerifier} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract L1WethBridgeTest is Test {
@@ -43,21 +45,30 @@ contract L1WethBridgeTest is Test {
 
         bytes8 dummyHash = 0x1234567890123456;
         address dummyAddress = makeAddr("dummyAddress");
+
+        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
+            verifier: IVerifier(dummyAddress), // verifier
+            governor: owner,
+            admin: owner,
+            genesisBatchHash: bytes32(0),
+            genesisIndexRepeatedStorageChanges: 0,
+            genesisBatchCommitment: bytes32(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: 0, 
+                recursionLeafLevelVkHash: 0, 
+                recursionCircuitsSetVksHash: 0
+            }),
+            zkPorterIsAvailable: false,
+            l2BootloaderBytecodeHash: dummyHash,
+            l2DefaultAccountBytecodeHash: dummyHash,
+            priorityTxMaxGasLimit: 10000000,
+            initialProtocolVersion: 0,
+            feeParams: defaultFeeParams()
+        });
+
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            dummyAddress,
-            owner,
-            owner,
-            0,
-            0,
-            0,
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
-            false,
-            dummyHash,
-            dummyHash,
-            10000000,
-            0,
-            defaultFeeParams()
+            params
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);

@@ -48,4 +48,10 @@ contract TransactionValidatorSharedTest is Test {
             _priorityTxMaxPubdata
         );
     }
+
+    function getOverheadForTransaction(
+        uint256 _encodingLength
+    ) public pure returns (uint256) {
+        return TransactionValidator.getOverheadForTransaction(_encodingLength);
+    }
 }

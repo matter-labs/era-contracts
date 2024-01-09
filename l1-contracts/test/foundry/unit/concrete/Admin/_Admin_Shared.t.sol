@@ -8,6 +8,7 @@ import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/zksync/Storag
 import {Diamond} from "solpp/zksync/libraries/Diamond.sol";
 import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
 import {Governance} from "solpp/governance/Governance.sol";
+import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
 
 contract AdminTest is Test {
     DiamondProxy internal diamondProxy;
@@ -44,32 +45,34 @@ contract AdminTest is Test {
             recursionCircuitsSetVksHash: 0
         });
 
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1_000_000,
-            maxPubdataPerBatch: 110_000,
-            maxL2GasPerBatch: 80_000_000,
-            priorityTxMaxPubdata: 99_000,
-            minimalL2GasPrice: 250_000_000
+        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
+            verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
+            governor: governor,
+            admin: owner,
+            genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
+            genesisIndexRepeatedStorageChanges: 0,
+            genesisBatchCommitment: bytes32(0),
+            verifierParams: dummyVerifierParams,
+            zkPorterIsAvailable: false,
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+            initialProtocolVersion: 0,
+            feeParams: FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            })
         });
 
         adminFacet = new AdminFacet();
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            0x03752D8252d67f99888E741E3fB642803B29B155,
-            governor,
-            owner,
-            0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            0,
-            0x0000000000000000000000000000000000000000000000000000000000000000,
-            dummyVerifierParams,
-            false,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            500000, // priority tx max L2 gas limit
-            0,
-            feeParams
+            params
         );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);

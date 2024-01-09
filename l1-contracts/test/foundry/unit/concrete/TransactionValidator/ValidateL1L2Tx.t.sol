@@ -61,4 +61,26 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         vm.expectRevert();
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
+
+    function test_ShouldAllowLargeTransactions() public {
+        // If the governance is fine with, the user can send a transaction with a huge gas limit.
+        IMailbox.L2CanonicalTransaction memory testTx = createTestTransaction();
+
+        uint256 largeGasLimit = 2_000_000_000;
+
+        testTx.gasPerPubdataByteLimit = 1;
+        testTx.gasLimit = largeGasLimit;
+
+        // This transaction could publish 2B bytes of pubdata & has 2B gas, which is more than would be typically
+        // allowed in the production system
+        validateL1ToL2Transaction(testTx, largeGasLimit, largeGasLimit);
+    }
+
+    function test_ShouldReturnCorrectOverhead_ShortTx() public {
+        require(getOverheadForTransaction(32) == 10_000, "The overhead for short transaction must be equal to the tx slot overhead");
+    }
+
+    function test_ShouldReturnCorrectOverhead_LongTx() public {
+        require(getOverheadForTransaction(1000000) == 1000000 * 10, "The overhead for long transaction must be equal to the tx slot overhead");
+    }
 }
