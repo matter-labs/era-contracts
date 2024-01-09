@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "../Storage.sol";
-import "../../common/ReentrancyGuard.sol";
+import {AppStorage} from "../Storage.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -19,7 +19,7 @@ contract Base is ReentrancyGuard {
 
     /// @notice Checks that the message sender is an active governor or admin
     modifier onlyGovernorOrAdmin() {
-        require(msg.sender == s.governor || msg.sender == s.admin, "Only by governor or admin");
+        require(msg.sender == s.governor || msg.sender == s.admin, "1k");
         _;
     }
 
