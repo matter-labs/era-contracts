@@ -13,7 +13,7 @@ import {ILegacyGetters} from "../interfaces/ILegacyGetters.sol";
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IBase} from "../interfaces/IBase.sol";
 
-/// @title Getters Contract implements functions for getting contract state from outside the batchchain.
+/// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract GettersFacet is Base, IGetters, ILegacyGetters {
