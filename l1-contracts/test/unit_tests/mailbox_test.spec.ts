@@ -397,7 +397,7 @@ function expectedLegacyL2GasPrice(l1GasPrice: ethers.BigNumberish) {
   // In the previous release the following code was used to calculate the L2 gas price for L1->L2 transactions:
   //
   //  uint256 pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
-  //  uint256 minL2GasPriceETH = (pubdataPriceETH + _gasPricePerPubdata - 1) / _gasPricePerPubdata;
+  //  uint256 minL2GasPriceETH = (pubdataPriceETH + _gasPerPubdata - 1) / _gasPerPubdata;
   //  return Math.max(FAIR_L2_GAS_PRICE, minL2GasPriceETH);
   //
 

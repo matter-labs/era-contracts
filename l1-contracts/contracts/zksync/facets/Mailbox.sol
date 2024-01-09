@@ -160,9 +160,9 @@ contract MailboxFacet is Base, IMailbox {
 
     /// @notice Derives the price for L2 gas in ETH to be paid.
     /// @param _l1GasPrice The gas price on L1.
-    /// @param _gasPricePerPubdata The price for each pubdata byte in L2 gas
+    /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
-    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPricePerPubdata) internal view returns (uint256) {
+    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
 
         uint256 pubdataPriceETH;
@@ -174,7 +174,7 @@ contract MailboxFacet is Base, IMailbox {
         uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / uint256(feeParams.maxPubdataPerBatch);
 
         uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadETH / uint256(feeParams.maxL2GasPerBatch);
-        uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPricePerPubdata - 1) / _gasPricePerPubdata;
+        uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPerPubdata - 1) / _gasPerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceETH);
     }
