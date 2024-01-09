@@ -105,7 +105,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     /// @param _availableGetters The getters that the token has.
     /// @param _newName The new name of the token.
     /// @param _newSymbol The new symbol of the token.
-    /// @param _newDecimals The new decimals of the token.
     /// @param _version The version of the token that will be initialized.
     /// @dev The _version must be exactly the version higher by 1 than the current version. This is needed
     /// to ensure that the governor can not accidentally disable future reinitialization of the token.
@@ -124,7 +123,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         __ERC20Permit_init(_newName);
         availableGetters = _availableGetters;
 
-        emit BridgeInitialize(l1Address, _newName, _newSymbol, _decimals);
+        emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
     }
 
     modifier onlyBridge() {

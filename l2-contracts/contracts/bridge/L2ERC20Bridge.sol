@@ -2,12 +2,13 @@
 
 pragma solidity 0.8.20;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IL2Bridge} from "./interfaces/IL2StandardToken.sol";
+import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
