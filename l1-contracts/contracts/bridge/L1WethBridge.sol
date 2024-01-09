@@ -2,21 +2,25 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./interfaces/IL1Bridge.sol";
-import "./interfaces/IL2WethBridge.sol";
-import "./interfaces/IL2Bridge.sol";
-import "./interfaces/IWETH9.sol";
-import "../zksync/interfaces/IZkSync.sol";
+import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
+import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
+import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IWETH9} from "./interfaces/IWETH9.sol";
+import {IZkSync} from "../zksync/interfaces/IZkSync.sol";
 
-import "./libraries/BridgeInitializationHelper.sol";
+import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
 
-import "../common/libraries/UnsafeBytes.sol";
-import "../common/ReentrancyGuard.sol";
-import "../common/libraries/L2ContractHelper.sol";
+import {IMailbox} from "../zksync/interfaces/IMailbox.sol";
+import {L2Message} from "../zksync/Storage.sol";
+
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

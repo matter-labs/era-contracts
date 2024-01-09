@@ -2,11 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import "../zksync/facets/Base.sol";
-import "../zksync/interfaces/IMailbox.sol";
-import "../zksync/interfaces/IVerifier.sol";
-import "../common/libraries/L2ContractHelper.sol";
-import "../zksync/libraries/TransactionValidator.sol";
+import {Base} from "../zksync/facets/Base.sol";
+import {IMailbox} from "../zksync/interfaces/IMailbox.sol";
+import {VerifierParams} from "../zksync/Storage.sol";
+import {IVerifier} from "../zksync/interfaces/IVerifier.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {TransactionValidator} from "../zksync/libraries/TransactionValidator.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../zksync/Config.sol";
 
 /// @author Matter Labs

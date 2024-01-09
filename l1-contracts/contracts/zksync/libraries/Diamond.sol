@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "../../common/libraries/UncheckedMath.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
