@@ -10,7 +10,7 @@ import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge. Note, that it does not 
+/// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade {
     /// @dev Describes whether there is a specific getter in the token.

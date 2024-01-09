@@ -34,11 +34,13 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
-    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)) public isWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
+        public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount))) internal depositAmount;
+    mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
+        internal depositAmount;
 
     /// @dev The address of deployed L2 bridge counterpart
     address public l2Bridge;
@@ -130,7 +132,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
     /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
     /// @dev Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted.
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the 
+    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
@@ -151,7 +153,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted
-    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the 
+    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited

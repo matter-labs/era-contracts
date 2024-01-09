@@ -28,12 +28,9 @@ contract AuthorizationTest is AdminTest {
         bytes32 correctNewFeeParamsHash = keccak256(abi.encode(newParams));
         bytes32 currentFeeParamsHash = keccak256(abi.encode(proxyAsGettersMock.getFeeParams()));
 
-        require(
-            currentFeeParamsHash == correctNewFeeParamsHash,
-            "Fee params were not changed correctly"
-        );
+        require(currentFeeParamsHash == correctNewFeeParamsHash, "Fee params were not changed correctly");
     }
-    
+
     function test_changeFeeParams_RevertWhen_PriorityTxMaxPubdataHigherThanMaxPubdataPerBatch() public {
         FeeParams memory newParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,

@@ -18,7 +18,8 @@ library Diamond {
         0x33774e659306e47509050e97cb651e731180a42d458212294d30751925c551a2; // keccak256("diamond.zksync.init") - 1
 
     /// @dev Storage position of `DiamondStorage` structure.
-    bytes32 private constant DIAMOND_STORAGE_POSITION = 0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b; // keccak256("diamond.standard.diamond.storage") - 1;
+    bytes32 private constant DIAMOND_STORAGE_POSITION =
+        0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b; // keccak256("diamond.standard.diamond.storage") - 1;
 
     event DiamondCut(FacetCut[] facetCuts, address initAddress, bytes initCalldata);
 
