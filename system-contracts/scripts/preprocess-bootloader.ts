@@ -3,7 +3,7 @@ import * as hre from "hardhat";
 import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { render, renderFile } from "template-file";
-import { utils } from "zksync-web3";
+import { utils } from "zksync-ethers";
 import { SYSTEM_CONTRACTS, getRevertSelector, getTransactionUtils } from "./constants";
 import type { ForceDeployment } from "./utils";
 

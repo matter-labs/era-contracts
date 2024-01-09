@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import type { Wallet } from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
 import type { EmptyContract } from "../typechain";
 import { deployContract, getWallets, provider } from "./shared/utils";
 

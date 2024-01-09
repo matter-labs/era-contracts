@@ -11,7 +11,7 @@ import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 
 import { getL1TxInfo } from "../../l2-contracts/src/utils";
 
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
 
 const provider = web3Provider();

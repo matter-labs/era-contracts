@@ -11347,10 +11347,9 @@ yocto-queue@^1.0.0:
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-1.0.0.tgz#7f816433fb2cbc511ec8bf7d263c3b58a1a3c251"
   integrity sha512-9bnSc/HEW2uRy67wc+T8UwauLuPJVn28jb+GtJY16iiKWyvmYJRXVT4UamsAEGQfPohgr2q4Tq0sQbQlxTfi1g==
 
-zksync-ethers@^5.0.0:
+"zksync-ethers@https://github.com/kelemeno/zksync-ethers#ethers-v5-feat/bridgehub":
   version "5.0.0"
-  resolved "https://registry.yarnpkg.com/zksync-ethers/-/zksync-ethers-5.0.0.tgz#2d0bb9a98ad1198957038f7669a50b10ef96bc3c"
-  integrity sha512-zPowwK/2wG3YqIlKNtRfzpMnHMnWSa5wFsfDrxKFgLjbA3VvuHl4mFCFUxMapsroGyG619+zt71HKM1jyNpSmQ==
+  resolved "https://github.com/kelemeno/zksync-ethers#a2a075e0d0b38abf4765e4d3257dd160de65d9e0"
   dependencies:
     ethers "~5.7.0"
 
@@ -11358,11 +11357,5 @@ zksync-web3@^0.15.4:
   version "0.15.5"
   resolved "https://registry.yarnpkg.com/zksync-web3/-/zksync-web3-0.15.5.tgz#aabe379464963ab573e15948660a709f409b5316"
   integrity sha512-97gB7OKJL4spegl8fGO54g6cvTd/75G6yFWZWEa2J09zhjTrfqabbwE/GwiUJkFQ5BbzoH4JaTlVz1hoYZI+DQ==
-  dependencies:
-    ethers "~5.7.0"
-
-zksync-web3@zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub:
-  version "5.0.0"
-  resolved "https://codeload.github.com/zksync-sdk/zksync-ethers/tar.gz/283ff902b17f7de1b51e767b233a6a23b1b67384"
   dependencies:
     ethers "~5.7.0"

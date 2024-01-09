@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { Wallet } from "ethers";
-import * as zksync from "zksync-web3";
+import * as zksync from "zksync-ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, getNumberFromEnv } from "./utils";
