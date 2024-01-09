@@ -21,7 +21,7 @@ object "Ecrecover" {
 
             /// @dev The gas cost of processing ecrecover circuit precompile.
             function ECRECOVER_GAS_COST() -> ret {
-                ret := 1112
+                ret := 7000
             }
 
             ////////////////////////////////////////////////////////////////

@@ -2,7 +2,7 @@ import type { CompilerPaths } from "./utils";
 import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
 
-const COMPILER_VERSION = "1.3.14";
+const COMPILER_VERSION = "1.3.18";
 const IS_COMPILER_PRE_RELEASE = false;
 
 export async function compileZasm(paths: CompilerPaths, file: string) {

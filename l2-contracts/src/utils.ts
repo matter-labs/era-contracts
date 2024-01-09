@@ -158,9 +158,8 @@ export async function getL1TxInfo(
   );
 
   return {
-    to: zksync.address,
+    target: zksync.address,
     data: l1Calldata,
     value: neededValue.toString(),
-    gasPrice: gasPrice.toString(),
   };
 }

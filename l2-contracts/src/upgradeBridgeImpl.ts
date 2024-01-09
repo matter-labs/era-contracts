@@ -1,6 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
-import { BigNumber, Wallet, ethers } from "ethers";
+import { Wallet, ethers, BigNumber } from "ethers";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import * as path from "path";
@@ -10,22 +10,54 @@ import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-cont
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
 
-export function getContractBytecode(contractName: string) {
+const SupportedL2Contracts = ["L2ERC20Bridge", "L2StandardERC20", "L2WethBridge", "L2Weth"] as const;
+
+// For L1 contracts we can not read bytecodes, but we can still produce the upgrade calldata
+const SupportedL1Contracts = ["L1ERC20Bridge"] as const;
+
+const SupportedContracts = [...SupportedL1Contracts, ...SupportedL2Contracts] as const;
+
+type SupportedL2Contract = (typeof SupportedL2Contracts)[number];
+type SupportedContract = (typeof SupportedContracts)[number];
+
+interface UpgradeInfo {
+  contract: SupportedContract;
+  target: string;
+  l2ProxyAddress?: string;
+}
+
+export function getContractBytecode(contractName: SupportedL2Contract) {
   return hre.artifacts.readArtifactSync(contractName).bytecode;
 }
 
-type SupportedContracts = "L2ERC20Bridge" | "L2StandardERC20" | "L2WethBridge" | "L2Weth";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function checkSupportedContract(contract: any): contract is SupportedContracts {
-  if (!["L2ERC20Bridge", "L2StandardERC20", "L2WethBridge", "L2Weth"].includes(contract)) {
+function checkSupportedL2Contract(contract: any): contract is SupportedL2Contract {
+  if (!SupportedL2Contracts.includes(contract)) {
     throw new Error(`Unsupported contract: ${contract}`);
   }
 
   return true;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function checkSupportedContract(contract: any): contract is SupportedContract {
+  if (!SupportedContracts.includes(contract)) {
+    throw new Error(`Unsupported contract: ${contract}`);
+  }
+
+  return true;
+}
+
+function validateUpgradeInfo(info: UpgradeInfo) {
+  if (!info.target) {
+    throw new Error("L2 target address is not provided");
+  }
+  checkSupportedContract(info.contract);
+}
+
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
+const l1Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 const provider = web3Provider();
@@ -69,7 +101,15 @@ async function getTransparentProxyUpgradeTxInfo(
   gasPrice: BigNumber
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
-  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice);
+  return await getL1TxInfo(
+    deployer,
+    proxyAddress,
+    l2Calldata,
+    refundRecipient,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    provider
+  );
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -84,16 +124,30 @@ async function getTokenBeaconUpgradeTxInfo(
   return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
 }
 
+async function getL1BridgeUpgradeTxInfo(proxyTarget: string) {
+  return {
+    target: l1Erc20BridgeProxyAddress,
+    value: 0,
+    data: await getTransparentProxyUpgradeCalldata(proxyTarget),
+  };
+}
+
 async function getTxInfo(
   deployer: Deployer,
   target: string,
   refundRecipient: string,
   gasPrice: BigNumber,
-  contract: SupportedContracts,
+  contract: SupportedContract,
   l2ProxyAddress?: string
 ) {
   if (contract === "L2ERC20Bridge") {
-    return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
+    return await getTransparentProxyUpgradeTxInfo(
+      deployer,
+      target,
+      l2Erc20BridgeProxyAddress,
+      refundRecipient,
+      gasPrice
+    );
   } else if (contract == "L2Weth") {
     throw new Error(
       "The latest L2Weth implementation requires L2WethBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed."
@@ -105,7 +159,9 @@ async function getTxInfo(
     }
     console.log(`Using beacon address: ${l2ProxyAddress}`);
 
-    return getTokenBeaconUpgradeTxInfo(deployer, target, refundRecipient, gasPrice, l2ProxyAddress);
+    return await getTokenBeaconUpgradeTxInfo(deployer, target, refundRecipient, gasPrice, l2ProxyAddress);
+  } else if (contract == "L1ERC20Bridge") {
+    return await getL1BridgeUpgradeTxInfo(target);
   } else {
     throw new Error(`Unsupported contract: ${contract}`);
   }
@@ -117,7 +173,7 @@ async function main() {
   program.version("0.1.0").name("upgrade-l2-bridge-impl");
 
   program
-    .command("deploy-target")
+    .command("deploy-l2-target")
     .option("--contract <contract>")
     .option("--private-key <private-key>")
     .option("--gas-price <gas-price>")
@@ -136,7 +192,7 @@ async function main() {
         ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
         : (await provider.getGasPrice()).mul(3).div(2);
       const salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.constants.HashZero);
-      checkSupportedContract(cmd.contract);
+      checkSupportedL2Contract(cmd.contract);
 
       console.log(`Using deployer wallet: ${deployWallet.address}`);
       console.log("Gas price: ", ethers.utils.formatUnits(gasPrice, "gwei"));
@@ -202,9 +258,7 @@ async function main() {
 
   program
     .command("prepare-l1-tx-info")
-    .option("--contract <contract>")
-    .option("--target-address <target-address>")
-    .option("--l2-proxy-address <l2-proxy-address>")
+    .option("--upgrades-info <upgrades-info>")
     .option("--gas-price <gas-price>")
     .option("--deployer-private-key <deployer-private-key>")
     .option("--refund-recipient <refund-recipient>")
@@ -219,72 +273,56 @@ async function main() {
             "m/44'/60'/0'/0/1"
           ).connect(provider);
       const deployer = new Deployer({ deployWallet });
-      const target = cmd.targetAddress as string;
-      if (!target) {
-        throw new Error("L2 target address is not provided");
-      }
-      checkSupportedContract(cmd.contract);
-
       const refundRecipient = cmd.refundRecipient ? cmd.refundRecipient : deployWallet.address;
       console.log("Gas price: ", ethers.utils.formatUnits(gasPrice, "gwei"));
-      console.log("Target address: ", target);
-      console.log("Refund recipient: ", refundRecipient);
-      const txInfo = await getTxInfo(deployer, target, refundRecipient, gasPrice, cmd.contract, cmd.l2ProxyAddress);
+      console.log(
+        "IMPORTANT: gasPrice that you provide in the transaction should be <= to the one provided to this tool."
+      );
 
-      console.log(JSON.stringify(txInfo, null, 4));
-      console.log("IMPORTANT: gasPrice that you provide in the transaction should <= to the one provided above.");
-    });
-
-  program
-    .command("instant-upgrade")
-    .option("--contract <contract>")
-    .option("--target-address <target-address>")
-    .option("--l2-proxy-address <l2-proxy-address>")
-    .option("--gas-price <gas-price>")
-    .option("--governor-private-key <governor-private-key>")
-    .option("--refund-recipient <refund-recipient>")
-    .option("--no-l2-double-check")
-    .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice
-        ? ethers.utils.parseUnits(cmd.gasPrice, "gwei")
-        : (await provider.getGasPrice()).mul(3).div(2);
-      const deployWallet = cmd.governorPrivateKey
-        ? new Wallet(cmd.governorPrivateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
-      const deployer = new Deployer({ deployWallet });
-      const target = cmd.targetAddress as string;
-      if (!target) {
-        throw new Error("L2 target address is not provided");
-      }
-      checkSupportedContract(cmd.contract);
-
-      const refundRecipient = cmd.refundRecipient ? cmd.refundRecipient : deployWallet.address;
-      console.log(`Using deployer wallet: ${deployWallet.address}`);
-      console.log("Gas price: ", ethers.utils.formatUnits(gasPrice, "gwei"));
-      console.log("Target address: ", target);
       console.log("Refund recipient: ", refundRecipient);
 
-      const txInfo = await getTxInfo(deployer, target, refundRecipient, gasPrice, cmd.contract, cmd.l2ProxyAddress);
-      const tx = await deployWallet.sendTransaction(txInfo);
-      console.log("L1 tx hash: ", tx.hash);
+      const ugpradesInfo = JSON.parse(cmd.upgradesInfo) as UpgradeInfo[];
+      ugpradesInfo.forEach(validateUpgradeInfo);
 
-      const receipt = await tx.wait();
-      if (receipt.status !== 1) {
-        console.error("L1 tx failed");
-        process.exit(1);
+      const governanceCalls = [];
+      for (const info of ugpradesInfo) {
+        console.log("Generating upgrade transaction for contract: ", info.contract);
+        console.log("Target address: ", info.target);
+        const txInfo = await getTxInfo(
+          deployer,
+          info.target,
+          refundRecipient,
+          gasPrice,
+          info.contract,
+          info.l2ProxyAddress
+        );
+
+        console.log(JSON.stringify(txInfo, null, 4) + "\n");
+
+        governanceCalls.push(txInfo);
       }
 
-      // Double checking that the upgrade has been successful on L2.
-      // Note that it requires working L2 node.
-      if (cmd.l2DoubleCheck !== false) {
-        const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-        await awaitPriorityOps(zksProvider, receipt, deployer.zkSyncContract(deployWallet).interface);
+      const operation = {
+        calls: governanceCalls,
+        predecessor: ethers.constants.HashZero,
+        salt: ethers.constants.HashZero,
+      };
 
-        console.log("The L2 transaction has been successfully committed");
-      }
+      console.log("Combined list of governance calls: ");
+      console.log(JSON.stringify(operation, null, 4) + "\n");
+
+      const governance = deployer.governanceContract(deployWallet);
+      const scheduleTransparentCalldata = governance.interface.encodeFunctionData("scheduleTransparent", [
+        operation,
+        0,
+      ]);
+      const executeCalldata = governance.interface.encodeFunctionData("execute", [operation]);
+
+      console.log("scheduleTransparentCalldata: ");
+      console.log(scheduleTransparentCalldata);
+
+      console.log("executeCalldata: ");
+      console.log(executeCalldata);
     });
 
   program.command("get-l2-erc20-beacon-address").action(async () => {
