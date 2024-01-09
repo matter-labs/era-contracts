@@ -11,6 +11,9 @@ import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {VerifierParams} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 
+// While formally the following import is not used, it is needed to inherit documentation from it
+import {IBase} from "../interfaces/IBase.sol";
+
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,6 +21,7 @@ contract ExecutorFacet is Base, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
+    /// @inheritdoc IBase
     string public constant override getName = "ExecutorFacet";
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
@@ -172,10 +176,7 @@ contract ExecutorFacet is Base, IExecutor {
         }
     }
 
-    /// @notice Commit batch
-    /// @notice 1. Checks timestamp.
-    /// @notice 2. Process L2 logs.
-    /// @notice 3. Store batch commitments.
+    /// @inheritdoc IExecutor
     function commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
@@ -285,9 +286,7 @@ contract ExecutorFacet is Base, IExecutor {
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
     }
 
-    /// @notice Execute batches, complete priority operations and process withdrawals.
-    /// @notice 1. Processes all pending operations (Complete priority requests)
-    /// @notice 2. Finalizes batch on Ethereum
+    /// @inheritdoc IExecutor
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
         uint256 nBatches = _batchesData.length;
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
@@ -306,8 +305,7 @@ contract ExecutorFacet is Base, IExecutor {
         }
     }
 
-    /// @notice Batches commitment verification.
-    /// @notice Only verifies batch commitments without any other processing
+    /// @inheritdoc IExecutor
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
@@ -393,10 +391,7 @@ contract ExecutorFacet is Base, IExecutor {
             ) >> PUBLIC_INPUT_SHIFT;
     }
 
-    /// @notice Reverts unexecuted batches
-    /// @param _newLastBatch batch number after which batches should be reverted
-    /// NOTE: Doesn't delete the stored data about batches, but only decreases
-    /// counters that are responsible for the number of batches
+    /// @inheritdoc IExecutor
     function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidator {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
