@@ -6,6 +6,9 @@ import {PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {VerifierParams, UpgradeState} from "../Storage.sol";
 import "./IBase.sol";
 
+/// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IGetters is IBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS

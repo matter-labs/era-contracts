@@ -5,6 +5,9 @@ pragma solidity 0.8.20;
 import {IBase} from "./IBase.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
+/// @title The interface of the Admin Contract that controls access rights for contract management.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IAdmin is IBase {
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
     /// @notice New governor can accept governor rights by calling `acceptGovernor` function.

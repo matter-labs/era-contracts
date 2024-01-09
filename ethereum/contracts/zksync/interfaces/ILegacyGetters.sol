@@ -7,6 +7,7 @@ import {IBase} from "./IBase.sol";
 /// @author Matter Labs
 /// @dev This interface contains getters for the zkSync contract that should not be used,
 /// but still are kept for backward compatibility.
+/// @custom:security-contact security@matterlabs.dev
 interface ILegacyGetters is IBase {
     /// @return The total number of batches that were committed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
