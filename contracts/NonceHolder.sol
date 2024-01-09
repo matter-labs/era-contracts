@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./interfaces/INonceHolder.sol";
-import "./interfaces/IContractDeployer.sol";
+import {INonceHolder} from "./interfaces/INonceHolder.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
