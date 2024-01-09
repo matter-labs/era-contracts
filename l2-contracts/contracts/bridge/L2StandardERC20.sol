@@ -23,7 +23,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         bool ignoreDecimals;
     }
 
-    ERC20Getters availableGetters;
+    ERC20Getters private availableGetters;
 
     /// @dev The decimals of the token, that are used as a value for `decimals` getter function.
     /// @notice A private variable is used only for decimals, but not for `name` and `symbol`, because standard
