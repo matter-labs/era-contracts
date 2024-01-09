@@ -24,23 +24,6 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
-
-        _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
-        _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
-        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
-
-        bytes32 txHash;
-        txHash = _setL2SystemContractUpgrade(
-            _proposedUpgrade.l2ProtocolUpgradeTx,
-            _proposedUpgrade.factoryDeps,
-            _proposedUpgrade.newProtocolVersion
-        );
-
-        _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
-
-        emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
-
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }
