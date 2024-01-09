@@ -34,6 +34,7 @@ async function main() {
   program.command("compile-precompiles").action(async () => {
     await compileYulFolder("contracts-preprocessed");
     await compileYulFolder("contracts-preprocessed/precompiles");
+    await compileYulFolder("contracts-preprocessed/precompiles/test-contracts");
   });
 
   await program.parseAsync(process.argv);

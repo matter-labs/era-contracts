@@ -7,6 +7,11 @@ import "../libraries/SystemContractsCaller.sol";
 import "../Constants.sol";
 import "../libraries/EfficientCall.sol";
 
+// In this test it is important to actuall change the real Keccak256's contract's bytecode, 
+// which requires changes in the real AccountCodeStorage contract
+address constant REAL_DEPLOYER_SYSTEM_CONTRACT = address(0x8006);
+address constant REAL_FORCE_DEPLOYER_ADDRESS = address(0x8007);
+
 contract KeccakTest {
     bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
@@ -82,9 +87,9 @@ contract KeccakTest {
         // Firstly, we reset keccak256 bytecode to be some random bytecode
         EfficientCall.mimicCall(
             gasleft(),
-            address(DEPLOYER_SYSTEM_CONTRACT),
+            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
             eraseCallData,
-            FORCE_DEPLOYER,
+            REAL_FORCE_DEPLOYER_ADDRESS,
             false,
             false
         );
@@ -93,15 +98,13 @@ contract KeccakTest {
         try this.callKeccak(msg.data[0:0]) returns (bytes32) {
             revert("The keccak should not work anymore");
         } catch {}
-        // bytes32 incorrectHash = this.callKeccak(msg.data[0:0]);
-        // require(incorrectHash == bytes32(0), "The keccak should now return always incorrect values");
 
         // Upgrading it back to the correct version:
         EfficientCall.mimicCall(
             gasleft(),
-            address(DEPLOYER_SYSTEM_CONTRACT),
+            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
             upgradeCalldata,
-            FORCE_DEPLOYER,
+            REAL_FORCE_DEPLOYER_ADDRESS,
             false,
             false
         );
@@ -114,9 +117,9 @@ contract KeccakTest {
     function keccakPerformUpgrade(bytes calldata upgradeCalldata) external {
         EfficientCall.mimicCall(
             gasleft(),
-            address(DEPLOYER_SYSTEM_CONTRACT),
+            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
             upgradeCalldata,
-            FORCE_DEPLOYER,
+            REAL_FORCE_DEPLOYER_ADDRESS,
             false,
             false
         );
@@ -137,9 +140,9 @@ contract KeccakTest {
         // Firstly, we upgrade keccak256 bytecode to the correct version.
         EfficientCall.mimicCall(
             gasleft(),
-            address(DEPLOYER_SYSTEM_CONTRACT),
+            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
             upgradeCalldata,
-            FORCE_DEPLOYER,
+            REAL_FORCE_DEPLOYER_ADDRESS,
             false,
             false
         );
@@ -158,9 +161,9 @@ contract KeccakTest {
         // Upgrading it back to the original version:
         EfficientCall.mimicCall(
             gasleft(),
-            address(DEPLOYER_SYSTEM_CONTRACT),
+            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
             resetCalldata,
-            FORCE_DEPLOYER,
+            REAL_FORCE_DEPLOYER_ADDRESS,
             false,
             false
         );

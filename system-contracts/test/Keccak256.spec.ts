@@ -1,7 +1,7 @@
 import { CONTRACT_DEPLOYER_ADDRESS, hashBytecode } from "zksync-web3/build/src/utils";
-import type { KeccakTest } from "../typechain-types";
-import { KeccakTest__factory } from "../typechain-types";
-import { KECCAK256_CONTRACT_ADDRESS } from "./shared/constants";
+import type { KeccakTest } from "../typechain";
+import { KeccakTestFactory } from "../typechain";
+import { REAL_KECCAK256_CONTRACT_ADDRESS } from "./shared/constants";
 import { getWallets, loadArtifact, publishBytecode, setCode, getCode } from "./shared/utils";
 import { ethers } from "hardhat";
 import { readYulBytecode } from "../scripts/utils";
@@ -9,6 +9,7 @@ import { Language } from "../scripts/constants";
 import type { BytesLike } from "ethers";
 import { expect } from "chai";
 import * as hre from "hardhat";
+import { prepareEnvironment } from "./shared/mocks";
 
 describe("Keccak256 tests", function () {
   let keccakTest: KeccakTest;
@@ -22,9 +23,10 @@ describe("Keccak256 tests", function () {
   const KECCAK_TEST_ADDRESS = "0x0000000000000000000000000000000000009000";
 
   before(async () => {
+    await prepareEnvironment();
     await setCode(KECCAK_TEST_ADDRESS, (await loadArtifact("KeccakTest")).bytecode);
 
-    const keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+    const keccakCode = await getCode(REAL_KECCAK256_CONTRACT_ADDRESS);
     oldKeccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
     const keccakMockCode = readYulBytecode({
@@ -36,7 +38,7 @@ describe("Keccak256 tests", function () {
 
     keccakMockCodeHash = ethers.utils.hexlify(hashBytecode(keccakMockCode));
 
-    keccakTest = KeccakTest__factory.connect(KECCAK_TEST_ADDRESS, getWallets()[0]);
+    keccakTest = KeccakTestFactory.connect(KECCAK_TEST_ADDRESS, getWallets()[0]);
     const correctKeccakCode = readYulBytecode({
       codeName: "Keccak256",
       path: "precompiles",
@@ -44,18 +46,15 @@ describe("Keccak256 tests", function () {
       address: ethers.constants.AddressZero,
     });
 
-    const correctContractDeployerCode = (await loadArtifact("ContractDeployer")).bytecode;
-    await setCode(CONTRACT_DEPLOYER_ADDRESS, correctContractDeployerCode);
-
-    const emptyContractCode = (await loadArtifact("AlwaysRevert")).bytecode;
+    const alwaysRevertCode = (await loadArtifact("AlwaysRevert")).bytecode;
 
     await publishBytecode(keccakCode);
     await publishBytecode(correctKeccakCode);
-    await publishBytecode(emptyContractCode);
+    await publishBytecode(alwaysRevertCode);
     await publishBytecode(keccakMockCode);
 
     correctKeccakCodeHash = ethers.utils.hexlify(hashBytecode(correctKeccakCode));
-    alwaysRevertCodeHash = ethers.utils.hexlify(hashBytecode(emptyContractCode));
+    alwaysRevertCodeHash = ethers.utils.hexlify(hashBytecode(alwaysRevertCode));
   });
 
   it("zero pointer test", async () => {
@@ -115,7 +114,7 @@ describe("Keccak256 tests", function () {
 
     await keccakTest.keccakPerformUpgrade(mockKeccakInput);
 
-    let keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+    let keccakCode = await getCode(REAL_KECCAK256_CONTRACT_ADDRESS);
     let keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
     expect(keccakCodeHash).to.eq(keccakMockCodeHash);
@@ -125,7 +124,7 @@ describe("Keccak256 tests", function () {
     // previous one.
     await hre.network.provider.send("hardhat_mine", ["0x100"]);
 
-    keccakCode = await getCode(KECCAK256_CONTRACT_ADDRESS);
+    keccakCode = await getCode(REAL_KECCAK256_CONTRACT_ADDRESS);
     keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
 
     expect(keccakCodeHash).to.eq(oldKeccakCodeHash);
