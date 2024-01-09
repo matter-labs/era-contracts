@@ -106,14 +106,14 @@ describe("ERC20Bridge", function () {
         },
         "TestTokenNewName",
         "TTN",
-        12,
         2
       )
     ).wait();
 
     expect(await erc20Token.name()).to.equal("TestTokenNewName");
     expect(await erc20Token.symbol()).to.equal("TTN");
-    expect(await erc20Token.decimals()).to.equal(12);
+    // The decimals should stay the same
+    expect(await erc20Token.decimals()).to.equal(18);
   });
 
   it("Governance should not be able to skip initializer versions", async () => {
@@ -128,7 +128,6 @@ describe("ERC20Bridge", function () {
         },
         "TestTokenNewName",
         "TTN",
-        12,
         20,
         { gasLimit: 10000000 }
       )
