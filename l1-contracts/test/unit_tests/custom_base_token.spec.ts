@@ -1,18 +1,18 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
-import type { L1ERC20Bridge, L1WethBridge, WETH9, TestnetERC20Token } from "../../typechain";
-import { L1ERC20BridgeFactory, L1WethBridgeFactory, TestnetERC20TokenFactory, WETH9Factory } from "../../typechain";
+import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
+import type { L1ERC20Bridge, TestnetERC20Token } from "../../typechain";
+import { L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import {
+  CONTRACTS_LATEST_PROTOCOL_VERSION,
+  depositERC20,
+  executeUpgrade,
   getCallRevertReason,
   initialDeployment,
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
-  executeUpgrade,
-  depositERC20,
 } from "./utils";
 
 import { startInitializeChain } from "../../src.ts/erc20-initialize";
@@ -22,8 +22,6 @@ import * as fs from "fs";
 import { hashL2Bytecode } from "../../src.ts/utils";
 
 import { Interface } from "ethers/lib/utils";
-import { IERC20 } from "../../typechain/IERC20";
-import { IERC20Factory } from "../../typechain/IERC20Factory";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 

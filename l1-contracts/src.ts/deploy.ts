@@ -1,35 +1,35 @@
-import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
+import * as hardhat from "hardhat";
 
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
-import { Interface, hexlify } from "ethers/lib/utils";
-import type { FacetCut } from "./diamondCut";
-import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
-import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
-import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
-import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
-import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
-import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
-import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import { hexlify, Interface } from "ethers/lib/utils";
 import {
+  ADDRESS_ONE,
+  deployedAddressesFromEnv,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
-  readSystemContractsBytecode,
-  readBatchBootloaderBytecode,
   getTokens,
-  ADDRESS_ONE,
-  deployedAddressesFromEnv,
+  readBatchBootloaderBytecode,
+  readSystemContractsBytecode,
 } from "../scripts/utils";
+import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
+import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
+import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
+import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
+import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+import type { FacetCut } from "./diamondCut";
+import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { hashL2Bytecode } from "./utils";
 
-import { deployViaCreate2 } from "./deploy-utils";
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { ERC20Factory } from "../typechain";
+import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { deployViaCreate2 } from "./deploy-utils";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -428,7 +428,6 @@ export class Deployer {
   public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    const l1Weth = ERC20Factory.connect(l1WethToken, this.deployWallet);
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
@@ -472,7 +471,7 @@ export class Deployer {
     const receipt2 = await tx2.wait();
 
     const tx3 = await bridgehub.setWethBridge(this.addresses.Bridges.WethBridgeProxy);
-    const receipt3 = await tx3.wait();
+    await tx3.wait();
     if (this.verbose) {
       console.log(
         `WETH bridge was registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
@@ -656,7 +655,7 @@ export class Deployer {
     this.chainId = parseInt(chainId, 16);
   }
 
-  public async registerToken(tokenAddress: string, gasPrice?: BigNumberish) {
+  public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     const tx = await bridgehub.newToken(tokenAddress);

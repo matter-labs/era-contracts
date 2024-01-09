@@ -1,21 +1,20 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Forwarder, MockExecutorFacet, Bridgehub } from "../../typechain";
-import { BridgehubFactory, MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
-import { IBridgehub } from "../../typechain/IBridgehub";
+import type { Bridgehub, Forwarder, MockExecutorFacet } from "../../typechain";
+import { BridgehubFactory, ForwarderFactory, MailboxFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
 import {
+  CONTRACTS_LATEST_PROTOCOL_VERSION,
   DEFAULT_REVERT_REASON,
-  getCallRevertReason,
+  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
+  L2_TO_L1_MESSENGER,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  ethTestConfig,
+  getCallRevertReason,
+  initialDeployment,
   requestExecute,
   requestExecuteDirect,
-  L2_TO_L1_MESSENGER,
-  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
-  ethTestConfig,
-  initialDeployment,
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
 } from "./utils";
 
 import * as ethers from "ethers";

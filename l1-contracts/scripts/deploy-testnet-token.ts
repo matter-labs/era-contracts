@@ -2,10 +2,9 @@ import "@nomiclabs/hardhat-ethers";
 import { ArgumentParser } from "argparse";
 import { Wallet } from "ethers";
 import * as fs from "fs";
-import * as hardhat from "hardhat";
 import * as path from "path";
-import { web3Provider } from "./utils";
 import { deployTestnetTokens } from "../src.ts/deploy-testnet-token";
+import { web3Provider } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);

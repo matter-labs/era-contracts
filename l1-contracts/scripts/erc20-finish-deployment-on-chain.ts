@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import { Wallet } from "ethers";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as zksync from "zksync-ethers";
 import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, getNumberFromEnv } from "./utils";
+import { web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";

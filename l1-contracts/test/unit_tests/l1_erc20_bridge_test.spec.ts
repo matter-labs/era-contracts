@@ -4,20 +4,19 @@ import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
 
 import * as fs from "fs";
-import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { TestnetERC20Token, Bridgehub, L1ERC20Bridge } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory } from "../../typechain";
+import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
+import { startInitializeChain } from "../../src.ts/erc20-initialize";
+import type { Bridgehub, L1ERC20Bridge } from "../../typechain";
+import { BridgehubFactory, L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import {
+  CONTRACTS_LATEST_PROTOCOL_VERSION,
+  depositERC20,
+  executeUpgrade,
   getCallRevertReason,
   initialDeployment,
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
-  executeUpgrade,
-  depositERC20,
 } from "./utils";
-import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import { startInitializeChain } from "../../src.ts/erc20-initialize";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -32,7 +31,7 @@ describe("L1ERC20Bridge tests", function () {
   let l1ERC20BridgeInit: L1ERC20Bridge;
   // let erc20TestToken: TestnetERC20Token;
   let erc20TestToken: ethers.Contract;
-  let l1Erc20BridgeContract: ethers.Contract;
+  // let l1Erc20BridgeContract: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "0";
   const functionSignature = "0x11a2ccc1";

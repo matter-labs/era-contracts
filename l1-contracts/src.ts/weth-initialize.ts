@@ -4,11 +4,11 @@ import type { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
 import {
+  calculateWethAddresses,
   L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE,
   L2_WETH_BRIDGE_PROXY_BYTECODE,
-  L2_WETH_PROXY_BYTECODE,
   L2_WETH_IMPLEMENTATION_BYTECODE,
-  calculateWethAddresses,
+  L2_WETH_PROXY_BYTECODE,
 } from "./utils-bytecode";
 
 import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
@@ -18,7 +18,7 @@ const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLO
 import { TestnetERC20TokenFactory } from "../typechain";
 
 export async function initializeWethBridge(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumberish) {
-  const bridgehub = deployer.bridgehubContract(deployWallet);
+  deployer.bridgehubContract(deployWallet);
   const l1WethBridge = deployer.defaultWethBridge(deployWallet);
   const nonce = await deployWallet.getTransactionCount();
 
@@ -31,13 +31,11 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
 
   const l1WethAddress = await l1WethBridge.l1WethAddress();
   const {
-    l2WethImplAddress: l2WethImplAddressEthIsBase,
     l2WethProxyAddress: l2WethProxyAddressEthIsBase,
     l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase,
   } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
 
   const {
-    l2WethImplAddress: l2WethImplAddressEthIsNotBase,
     l2WethProxyAddress: l2WethProxyAddressEthIsNotBase,
     l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
   } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);

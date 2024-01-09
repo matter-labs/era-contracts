@@ -1,8 +1,20 @@
-import * as hardhat from "hardhat";
 import type { Wallet } from "ethers";
 import * as fs from "fs";
+import * as hardhat from "hardhat";
 
-export async function deployTestnetTokens(tokens: any, wallet: Wallet, outputPath: string, verbose: boolean = false) {
+type Token = {
+  name: string;
+  symbol: string;
+  decimals: number;
+  address: string;
+};
+
+export async function deployTestnetTokens(
+  tokens: Token[],
+  wallet: Wallet,
+  outputPath: string,
+  verbose: boolean = false
+) {
   const result = [];
 
   for (const token of tokens) {

@@ -1,34 +1,34 @@
 import { expect } from "chai";
-import * as hardhat from "hardhat";
+import type { BigNumberish, BytesLike } from "ethers";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as fs from "fs";
+import * as hardhat from "hardhat";
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 import { diamondCut } from "../../src.ts/diamondCut";
-import type { ExecutorFacet, GettersFacet, AdminFacet, ZkSyncStateTransition } from "../../typechain";
+import type { AdminFacet, ExecutorFacet, GettersFacet, ZkSyncStateTransition } from "../../typechain";
 import {
+  AdminFacetFactory,
+  CustomUpgradeTestFactory,
+  DefaultUpgradeFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
-  AdminFacetFactory,
-  DefaultUpgradeFactory,
-  CustomUpgradeTestFactory,
   ZkSyncStateTransitionFactory,
 } from "../../typechain";
-import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
+import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
 import {
-  getCallRevertReason,
   EMPTY_STRING_KECCAK,
-  genesisStoredBatchInfo,
-  L2_SYSTEM_CONTEXT_ADDRESS,
   L2_BOOTLOADER_ADDRESS,
-  createSystemLogs,
+  L2_SYSTEM_CONTEXT_ADDRESS,
   SYSTEM_LOG_KEYS,
   constructL2Log,
-  packBatchTimestampAndBatchTimestamp,
-  initialDeployment,
+  createSystemLogs,
   createSystemLogsWithUpgrade,
+  genesisStoredBatchInfo,
+  getCallRevertReason,
+  initialDeployment,
+  packBatchTimestampAndBatchTimestamp,
 } from "./utils";
-import * as ethers from "ethers";
-import type { BigNumberish, BytesLike } from "ethers";
-import { Wallet } from "ethers";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 
 // process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
@@ -385,7 +385,9 @@ describe("L2 upgrade test", function () {
           name: event.name,
           args: parsedArgs,
         };
-      } catch (_) {}
+      } catch (_) {
+        // lint no-empty
+      }
     });
     l2UpgradeTxHash = upgradeEvents.find((event) => event.name == "UpgradeComplete").args.l2UpgradeTxHash;
 

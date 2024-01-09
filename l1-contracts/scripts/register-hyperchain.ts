@@ -1,10 +1,10 @@
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
-import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Provider, getTokens, ADDRESS_ONE } from "./utils";
+import { Deployer } from "../src.ts/deploy";
+import { ADDRESS_ONE, getTokens, web3Provider } from "./utils";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -74,7 +74,7 @@ async function main() {
       }
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-        await deployer.registerToken(baseTokenAddress, gasPrice);
+        await deployer.registerToken(baseTokenAddress);
       }
 
       await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);

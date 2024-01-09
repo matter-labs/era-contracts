@@ -1,9 +1,9 @@
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
-import { Deployer } from "../src.ts/deploy";
+import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, getNumberFromEnv, deployedAddressesFromEnv } from "./utils";
+import { Deployer } from "../src.ts/deploy";
 import { startInitializeChain } from "../src.ts/weth-initialize";
+import { deployedAddressesFromEnv, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";

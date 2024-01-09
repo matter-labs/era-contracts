@@ -1,13 +1,13 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Forwarder, ZkSyncStateTransition, Bridgehub } from "../../typechain";
+import type { Bridgehub, ZkSyncStateTransition } from "../../typechain";
 import { BridgehubFactory, ZkSyncStateTransitionFactory } from "../../typechain";
 
-import { ethTestConfig, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION } from "./utils";
+import { CONTRACTS_LATEST_PROTOCOL_VERSION, ethTestConfig, initialDeployment } from "./utils";
 
-import type { Deployer } from "../../src.ts/deploy";
 import * as ethers from "ethers";
 import { Wallet } from "ethers";
+import type { Deployer } from "../../src.ts/deploy";
 
 process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
@@ -16,9 +16,9 @@ describe("Initial Deployment", function () {
   let stateTransition: ZkSyncStateTransition;
   let owner: ethers.Signer;
   let deployer: Deployer;
-  const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
-  const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
-  let forwarder: Forwarder;
+  // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
+  // const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
+  // let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {

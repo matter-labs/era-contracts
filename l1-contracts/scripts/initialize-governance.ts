@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import { Wallet } from "ethers";
-import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, deployedAddressesFromEnv } from "./utils";
+import { Deployer } from "../src.ts/deploy";
+import { deployedAddressesFromEnv, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -41,12 +41,11 @@ async function main() {
         verbose: true,
       });
 
-      const governance = deployer.governanceContract(deployWallet);
+      // const governance =
+      deployer.governanceContract(deployWallet);
 
-      const erc20Bridge = deployer.transparentUpgradableProxyContract(
-        deployer.addresses.Bridges.ERC20BridgeProxy,
-        deployWallet
-      );
+      // const erc20Bridge =
+      deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
       // const wethBridge = deployer.transparentUpgradableProxyContract(
       //   deployer.addresses.Bridges.WethBridgeProxy,
       //   deployWallet

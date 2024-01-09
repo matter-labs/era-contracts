@@ -1,10 +1,9 @@
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
+import { Wallet } from "ethers";
+import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { initializeErc20Bridge } from "../src.ts/erc20-initialize";
-import { initializeWethBridge } from "../src.ts/weth-initialize";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, deployedAddressesFromEnv } from "./utils";
+import { deployedAddressesFromEnv, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";

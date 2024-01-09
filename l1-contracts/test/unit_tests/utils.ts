@@ -5,14 +5,14 @@ import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
 import { deployTestnetTokens } from "../../src.ts/deploy-testnet-token";
-import { initializeWethBridge } from "../../src.ts/weth-initialize";
 import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
+import { initializeWethBridge } from "../../src.ts/weth-initialize";
 
 import { GovernanceFactory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { IMailbox } from "../../typechain/IMailbox";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
+import type { IMailbox } from "../../typechain/IMailbox";
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
@@ -84,7 +84,7 @@ export async function getCallRevertReason(promise) {
           revertReason === "cannot estimate gas; transaction may fail or may require manual gas limit" ||
           revertReason === DEFAULT_REVERT_REASON
         ) {
-          revertReason = e.error.toString().match(/revert with reason \"([^']*)\"/)[1] || "PLACEHOLDER_STRING";
+          revertReason = e.error.toString().match(/revert with reason "([^']*)"/)[1] || "PLACEHOLDER_STRING";
         }
       } catch (_) {
         try {
@@ -184,17 +184,19 @@ export async function requestExecuteDirect(
   factoryDeps: BytesLike[],
   refundRecipient: string
 ) {
-  let overrides;
-  overrides ??= {};
-  overrides.gasPrice = await mailbox.provider.getGasPrice();
+  const gasPrice = await mailbox.provider.getGasPrice();
 
   // we call bridgehubChain direcetly to avoid running out of gas.
   const baseCost = await mailbox.l2TransactionBaseCost(
-    overrides.gasPrice,
+    gasPrice,
     ethers.BigNumber.from(100000),
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-  overrides.value = baseCost.add(ethers.BigNumber.from(0));
+
+  const overrides = {
+    gasPrice,
+    value: baseCost.add(ethers.BigNumber.from(0)),
+  };
 
   return await mailbox.requestL2Transaction(
     to,
@@ -381,7 +383,7 @@ export async function initialDeployment(
   await initializeWethBridge(deployer, deployWallet, gasPrice);
 
   if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-    await deployer.registerToken(baseTokenAddress, gasPrice);
+    await deployer.registerToken(baseTokenAddress);
   }
 
   await deployer.registerHyperchain(baseTokenAddress, create2Salt, extraFacets, gasPrice);

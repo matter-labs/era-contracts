@@ -1,19 +1,19 @@
 import type { Wallet } from "ethers";
 import { ethers } from "ethers";
-import type { Deployer } from "../src.ts/deploy";
 import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
+import type { Deployer } from "../src.ts/deploy";
 
 import { applyL1ToL2Alias, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
+import { TestnetERC20TokenFactory } from "../typechain";
 import {
-  L2_ERC20_BRIDGE_PROXY_BYTECODE,
-  L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
-  L2_STANDARD_ERC20_PROXY_BYTECODE,
   calculateERC20Addresses,
+  L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE,
+  L2_ERC20_BRIDGE_PROXY_BYTECODE,
   L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+  L2_STANDARD_ERC20_PROXY_BYTECODE,
   L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
 } from "./utils-bytecode";
-import { TestnetERC20TokenFactory } from "../typechain";
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
@@ -23,7 +23,7 @@ export async function initializeErc20Bridge(
   gasPrice: ethers.BigNumberish,
   cmdErc20Bridge: string
 ) {
-  const bridgehub = deployer.bridgehubContract(deployWallet);
+  deployer.bridgehubContract(deployWallet);
   const nonce = await deployWallet.getTransactionCount();
 
   const erc20Bridge = cmdErc20Bridge
