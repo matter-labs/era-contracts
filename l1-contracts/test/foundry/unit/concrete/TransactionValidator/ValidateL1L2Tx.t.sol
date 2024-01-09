@@ -8,7 +8,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequestL1L2() public pure {
         IMailbox.L2CanonicalTransaction memory testTx = createTestTransaction();
         testTx.gasLimit = 500000;
-        validateL1ToL2Transaction(testTx, 500000);
+        validateL1ToL2Transaction(testTx, 500000, 100000);
     }
 
     function test_RevertWhen_GasLimitDoesntCoverOverhead() public {
@@ -16,7 +16,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // The limit is so low, that it doesn't even cover the overhead
         testTx.gasLimit = 0;
         vm.expectRevert(bytes("my"));
-        validateL1ToL2Transaction(testTx, 500000);
+        validateL1ToL2Transaction(testTx, 500000, 100000);
     }
 
     function test_RevertWhen_GasLimitHigherThanMax() public {
@@ -27,7 +27,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = priorityTxMaxGasLimit + 1000000;
         vm.expectRevert(bytes("ui"));
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
     function test_RevertWhen_TooMuchPubdata() public {
@@ -41,7 +41,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // (hypothetically, assuming all the gas was spent on writing).
         testTx.gasPerPubdataByteLimit = 1;
         vm.expectRevert(bytes("uk"));
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
     function test_RevertWhen_BelowMinimumCost() public {
@@ -49,7 +49,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         uint256 priorityTxMaxGasLimit = 500000;
         testTx.gasLimit = 200000;
         vm.expectRevert(bytes("up"));
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 
     function test_RevertWhen_HugePubdata() public {
@@ -59,6 +59,6 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
         // Setting huge pubdata limit should cause the panic.
         testTx.gasPerPubdataByteLimit = type(uint256).max;
         vm.expectRevert();
-        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit);
+        validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000);
     }
 }
