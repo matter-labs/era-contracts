@@ -42,16 +42,14 @@ contract TransactionValidatorSharedTest is Test {
         uint256 _priorityTxMaxPubdata
     ) public pure {
         TransactionValidator.validateL1ToL2Transaction(
-            _transaction, 
-            abi.encode(_transaction), 
+            _transaction,
+            abi.encode(_transaction),
             _priorityTxMaxGasLimit,
             _priorityTxMaxPubdata
         );
     }
 
-    function getOverheadForTransaction(
-        uint256 _encodingLength
-    ) public pure returns (uint256) {
+    function getOverheadForTransaction(uint256 _encodingLength) public pure returns (uint256) {
         return TransactionValidator.getOverheadForTransaction(_encodingLength);
     }
 }

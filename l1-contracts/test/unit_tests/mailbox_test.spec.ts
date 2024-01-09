@@ -1,8 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTestFactory, MailboxFacetTest } from "../../typechain";
-import { MailboxFacetFactory, MockExecutorFacetFactory, DiamondInitFactory, ForwarderFactory } from "../../typechain";
+import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest } from "../../typechain";
+import {
+  MailboxFacetTestFactory,
+  MailboxFacetFactory,
+  MockExecutorFacetFactory,
+  DiamondInitFactory,
+  ForwarderFactory,
+} from "../../typechain";
 import {
   DEFAULT_REVERT_REASON,
   getCallRevertReason,

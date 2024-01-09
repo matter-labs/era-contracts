@@ -7,7 +7,7 @@
       "l1-contracts",
       "l2-contracts",
       "system-contracts"
-    ], 
+    ],
     "nohoist": [
       "**/@openzeppelin/**"
     ]

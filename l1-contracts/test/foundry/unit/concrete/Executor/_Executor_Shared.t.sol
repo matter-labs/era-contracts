@@ -135,8 +135,8 @@ contract ExecutorTest is Test {
             genesisIndexRepeatedStorageChanges: 0,
             genesisBatchCommitment: bytes32(0),
             verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: 0, 
-                recursionLeafLevelVkHash: 0, 
+                recursionNodeLevelVkHash: 0,
+                recursionLeafLevelVkHash: 0,
                 recursionCircuitsSetVksHash: 0
             }),
             zkPorterIsAvailable: false,
@@ -147,10 +147,7 @@ contract ExecutorTest is Test {
             feeParams: defaultFeeParams()
         });
 
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            params
-        );
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({

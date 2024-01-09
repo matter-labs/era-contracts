@@ -70,10 +70,7 @@ contract AdminTest is Test {
 
         adminFacet = new AdminFacet();
 
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            params
-        );
+        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({

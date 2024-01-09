@@ -92,10 +92,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             })
         });
 
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            params
-        );
+        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

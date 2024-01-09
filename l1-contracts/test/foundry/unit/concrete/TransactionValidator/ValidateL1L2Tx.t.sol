@@ -77,10 +77,16 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     }
 
     function test_ShouldReturnCorrectOverhead_ShortTx() public {
-        require(getOverheadForTransaction(32) == 10_000, "The overhead for short transaction must be equal to the tx slot overhead");
+        require(
+            getOverheadForTransaction(32) == 10_000,
+            "The overhead for short transaction must be equal to the tx slot overhead"
+        );
     }
 
     function test_ShouldReturnCorrectOverhead_LongTx() public {
-        require(getOverheadForTransaction(1000000) == 1000000 * 10, "The overhead for long transaction must be equal to the tx slot overhead");
+        require(
+            getOverheadForTransaction(1000000) == 1000000 * 10,
+            "The overhead for long transaction must be equal to the tx slot overhead"
+        );
     }
 }
