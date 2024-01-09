@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import "../zksync/facets/Base.sol";
+import "../zksync/Storage.sol";
 import "../zksync/interfaces/IMailbox.sol";
 import "../zksync/interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";

@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./IBase.sol";
-
+import {IBase} from "./IBase.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
 interface IAdmin is IBase {

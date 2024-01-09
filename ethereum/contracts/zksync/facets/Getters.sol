@@ -2,12 +2,13 @@
 
 pragma solidity 0.8.20;
 
-import "./Base.sol";
-import "../libraries/Diamond.sol";
-import "../libraries/PriorityQueue.sol";
-import "../../common/libraries/UncheckedMath.sol";
-import "../interfaces/IGetters.sol";
-import "../interfaces/ILegacyGetters.sol";
+import {Base} from "./Base.sol";
+import {VerifierParams} from "../Storage.sol";
+import {Diamond} from "../libraries/Diamond.sol";
+import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
+import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
+import {IGetters} from "../interfaces/IGetters.sol";
+import {ILegacyGetters} from "../interfaces/ILegacyGetters.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IBase} from "../interfaces/IBase.sol";

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./IBase.sol";
+import {IBase} from "./IBase.sol";
 
 /// @author Matter Labs
 /// @dev This interface contains getters for the zkSync contract that should not be used,
