@@ -68,7 +68,7 @@ async function main() {
         }
         baseTokenAddress = token.address;
         console.log(`Using base token ${cmd.baseTokenName} at ${baseTokenAddress}`);
-      }  else if (baseTokenAddress == ADDRESS_ONE) {
+      } else if (baseTokenAddress == ADDRESS_ONE) {
         // base token is eth, we are ok.
         console.log(`Using ETH as base token at ${baseTokenAddress}`);
       }

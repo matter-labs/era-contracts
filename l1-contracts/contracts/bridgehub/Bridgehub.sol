@@ -10,7 +10,7 @@ import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.s
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
 
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step{
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     address public constant ethTokenAddress = address(1);
 
     /// @notice Address which will exercise critical changes

@@ -381,7 +381,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 mintValue = _mintValue;
         uint256 amount = _amount;
         {
-            require(((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS)), "L1WETH Bridge: Invalid L1 token address");
+            require(
+                ((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS)),
+                "L1WETH Bridge: Invalid L1 token address"
+            );
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             require((_amount != 0) || (!ethIsBaseToken), "L1WETH Bridge: Amount cannot be zero when Eth is base token");
             require(l2BridgeAddress[_chainId] != address(0), "L1WETH Bridge: Bridge is not deployed");

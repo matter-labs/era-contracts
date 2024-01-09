@@ -11,7 +11,8 @@
     "fast-glob": "^3.3.2",
     "hardhat": "^2.18.3",
     "preprocess": "^3.2.0",
-    "zksync-ethers": "https://github.com/kelemeno/zksync-ethers#ethers-v5-feat/bridgehub"  },
+    "zksync-ethers": "https://github.com/kelemeno/zksync-ethers#ethers-v5-feat/bridgehub"
+  },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",

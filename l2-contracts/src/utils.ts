@@ -94,7 +94,7 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-  
+
   const baseTokenAddress = await bridgehub.baseToken(chainId);
   const baseTokenBridge = await bridgehub.baseTokenBridge(chainId);
   const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
@@ -118,7 +118,7 @@ export async function create2DeployFromL1(
       factoryDeps: [bytecode],
       refundRecipient: wallet.address,
     },
-    { value: ethIsBaseToken ? expectedCost : 0 , gasPrice }
+    { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
   );
 }
 

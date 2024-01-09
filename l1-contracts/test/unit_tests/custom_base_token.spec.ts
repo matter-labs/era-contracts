@@ -143,7 +143,6 @@ describe("Custom base token tests", () => {
     const baseTokenBridgeAddress = await bridgehub.baseTokenBridge(chainId);
     expect(l1TokenAddress).equal(baseTokenAddressInBridgehub);
     expect(l1ERC20Bridge.address).equal(baseTokenBridgeAddress);
-
   });
 
   it("Check startInitializeChain", async () => {
@@ -168,20 +167,18 @@ describe("Custom base token tests", () => {
     await (
       await l1ERCToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
     ).wait();
-    await bridgehub
-      .connect(randomSigner)
-      .requestL2Transaction({
-        chainId,
-        payer: await randomSigner.getAddress(),
-        l2Contract: await randomSigner.getAddress(),
-        mintValue: ethers.utils.parseUnits("800", 18),
-        l2Value: 1,
-        l2Calldata: "0x",
-        l2GasLimit: 10000000,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        factoryDeps: [],
-        refundRecipient: await randomSigner.getAddress(),
-      });
+    await bridgehub.connect(randomSigner).requestL2Transaction({
+      chainId,
+      payer: await randomSigner.getAddress(),
+      l2Contract: await randomSigner.getAddress(),
+      mintValue: ethers.utils.parseUnits("800", 18),
+      l2Value: 1,
+      l2Calldata: "0x",
+      l2GasLimit: 10000000,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: [],
+      refundRecipient: await randomSigner.getAddress(),
+    });
   });
 
   it("Should deposit some alternative token successfully", async () => {
