@@ -15,23 +15,6 @@ This repository contains both L1 and L2 zkSync smart contracts. For their descri
 It is used as a submodule of a private repo. Compilation and test scripts should work without additional tooling, but
 others may not.
 
-## Testing
-
-The tests of the system contracts utilize the zkSync test node. In order to run the tests, execute the following commands in the root of the repository:
-
-```
-yarn test-node
-```
-
-It will run the test node, and you can see its logs in the output.
-Then run tests in the separate terminal:
-
-```
-yarn test
-```
-
-Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
-
 ## License
 
 zkSync Era contracts are distributed under the terms of the MIT license.

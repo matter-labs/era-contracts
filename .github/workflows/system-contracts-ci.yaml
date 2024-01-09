@@ -121,9 +121,6 @@ jobs:
             system-contracts/contracts-preprocessed
             system-contracts/bootloader/build
 
-      - name: Build contracts
-        run: yarn build
-
       - name: Run tests
         run: yarn sc test
 
