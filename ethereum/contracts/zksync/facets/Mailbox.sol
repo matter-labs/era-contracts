@@ -58,7 +58,7 @@ contract MailboxFacet is Base, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) public view override returns (bool) {
+    ) public view returns (bool) {
         // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
         // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
         //
@@ -158,7 +158,7 @@ contract MailboxFacet is Base, IMailbox {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override nonReentrant {
+    ) external nonReentrant {
         require(!s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "jj");
 
         L2Message memory l2ToL1Message = L2Message({

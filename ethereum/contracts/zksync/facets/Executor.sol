@@ -180,7 +180,7 @@ contract ExecutorFacet is Base, IExecutor {
     function commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) external override nonReentrant onlyValidator {
+    ) external nonReentrant onlyValidator {
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
         require(_newBatchesData.length > 0, "No batches to commit");
