@@ -19,7 +19,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
     /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
     /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-    /// @param verifierParams The new verifier params. If either of its fields is 0, the params will not be updated.
+    /// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
     /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
     /// in each upgrade. Usually empty.
     /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
@@ -137,7 +137,7 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
-    /// @param _verifierParams The new verifier params. If either of the fields is 0, the params will not be updated.
+    /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
     function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
         _setVerifier(IVerifier(_newVerifier));
         _setVerifierParams(_verifierParams);
