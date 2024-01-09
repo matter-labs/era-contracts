@@ -33,12 +33,12 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// RawNonces for accounts are stored in format
     /// minNonce + 2^128 * deploymentNonce, where deploymentNonce
     /// is the nonce used for deploying smart contracts.
-    mapping(uint256 => uint256) internal rawNonces;
+    mapping(uint256 account => uint256 packedMinAndDeploymentNonce) internal rawNonces;
 
     /// Mapping of values under nonces for accounts.
     /// The main key of the mapping is the 256-bit address of the account, while the
     /// inner mapping is a mapping from a nonce to the value stored there.
-    mapping(uint256 => mapping(uint256 => uint256)) internal nonceValues;
+    mapping(uint256 account => mapping(uint256 nonceKey => uint256 value)) internal nonceValues;
 
     /// @notice Returns the current minimal nonce for account.
     /// @param _address The account to return the minimal nonce for

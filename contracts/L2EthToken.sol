@@ -17,7 +17,7 @@ import {IMailbox} from "./interfaces/IMailbox.sol";
  */
 contract L2EthToken is IEthToken, ISystemContract {
     /// @notice The balances of the users.
-    mapping(address => uint256) internal balance;
+    mapping(address account => uint256 balance) internal balance;
 
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
