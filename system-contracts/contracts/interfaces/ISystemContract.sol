@@ -5,8 +5,6 @@ pragma solidity 0.8.20;
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 
-
-
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

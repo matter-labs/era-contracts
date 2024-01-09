@@ -12,8 +12,8 @@ uint8 constant MAX_ENUMERATION_INDEX_SIZE = 8;
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The interface for the Compressor contract, responsible for verifying the correctness of 
- * the compression of the state diffs and bytecodes. 
+ * @notice The interface for the Compressor contract, responsible for verifying the correctness of
+ * the compression of the state diffs and bytecodes.
  */
 interface ICompressor {
     function publishCompressedBytecode(
