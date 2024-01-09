@@ -47,8 +47,8 @@ library Diamond {
     /// @param facets The array of all unique facet addresses that belong to the diamond proxy
     /// @param isFrozen Denotes whether the diamond proxy is frozen and all freezable facets are not accessible
     struct DiamondStorage {
-        mapping(bytes4 => SelectorToFacet) selectorToFacet;
-        mapping(address => FacetToSelectors) facetToSelectors;
+        mapping(bytes4 selector => SelectorToFacet selectorInfo) selectorToFacet;
+        mapping(address facetAddress => FacetToSelectors facetInfo) facetToSelectors;
         address[] facets;
         bool isFrozen;
     }

@@ -30,7 +30,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(address => address) public override l1TokenAddress;
+    mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.

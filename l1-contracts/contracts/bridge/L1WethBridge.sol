@@ -52,7 +52,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)) public isWithdrawalFinalized;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.

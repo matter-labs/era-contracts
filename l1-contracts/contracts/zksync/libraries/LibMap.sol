@@ -7,7 +7,7 @@ pragma solidity 0.8.20;
 library LibMap {
     /// @dev A uint32 map in storage.
     struct Uint32Map {
-        mapping(uint256 => uint256) map;
+        mapping(uint256 packedIndex => uint256 eightPackedValues) map;
     }
 
     /// @dev Retrieves the uint32 value at a specific index from the Uint32Map.
