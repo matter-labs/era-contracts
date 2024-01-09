@@ -9,11 +9,11 @@ object "Bootloader" {
             //                      Function Declarations
             ////////////////////////////////////////////////////////////////////////////
 
-            // While we definitely cannot control the gas price on L1,
+            // While we definitely cannot control the pubdata price on L1,
             // we need to check the operator does not provide any absurd numbers there
             function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
-                // 100k gwei
-                ret := 100000000000000
+                // 1M gwei
+                ret := 1000000000000000
             }
 
             function MAX_ALLOWED_FAIR_L2_GAS_PRICE() -> ret {
@@ -1898,12 +1898,6 @@ object "Bootloader" {
                 if lt(gas(), safeAdd(gasToProvide, CHECK_ENOUGH_GAS_OVERHEAD(), "cjq")) {
                     revertWithReason(NOT_ENOUGH_GAS_PROVIDED_ERR_CODE(), 0)
                 }
-            }
-
-            /// Returns the batch overhead to be paid, assuming a certain value of gasPerPubdata
-            function getBatchOverheadEth(l1GasPrice) -> ret {
-                let l1GasOverhead := BATCH_OVERHEAD_L1_GAS()
-                ret := safeMul(l1GasOverhead, l1GasPrice, "aa")
             }
 
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
