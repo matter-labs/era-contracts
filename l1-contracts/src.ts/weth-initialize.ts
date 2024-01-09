@@ -1,5 +1,6 @@
-import { ethers, Wallet } from "ethers";
-import { Deployer } from "../src.ts/deploy";
+import type { Wallet } from "ethers";
+import { ethers } from "ethers";
+import type { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
 import {
@@ -14,8 +15,6 @@ import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
 
-import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
-import { IERC20Factory } from "zksync-ethers/build/typechain";
 import { TestnetERC20TokenFactory } from "../typechain";
 
 export async function initializeWethBridge(deployer: Deployer, deployWallet: Wallet, gasPrice: ethers.BigNumberish) {

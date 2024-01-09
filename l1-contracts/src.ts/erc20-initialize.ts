@@ -1,5 +1,6 @@
-import { ethers, Wallet } from "ethers";
-import { Deployer } from "../src.ts/deploy";
+import type { Wallet } from "ethers";
+import { ethers } from "ethers";
+import type { Deployer } from "../src.ts/deploy";
 import { ADDRESS_ONE, getNumberFromEnv } from "../scripts/utils";
 
 import { applyL1ToL2Alias, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";

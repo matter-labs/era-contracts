@@ -2,14 +2,8 @@ import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
-import type { L1ERC20Bridge, L1WethBridge, WETH9 } from "../../typechain";
-import {
-  L1ERC20BridgeFactory,
-  L1WethBridgeFactory,
-  TestnetERC20TokenFactory,
-  TestnetERC20Token,
-  WETH9Factory,
-} from "../../typechain";
+import type { L1ERC20Bridge, L1WethBridge, WETH9, TestnetERC20Token } from "../../typechain";
+import { L1ERC20BridgeFactory, L1WethBridgeFactory, TestnetERC20TokenFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
@@ -117,7 +111,7 @@ describe("Custom base token tests", () => {
     l1TokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "BAT")!.address;
     l1ERCToken = TestnetERC20TokenFactory.connect(l1TokenAddress, owner);
 
-    let altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
+    const altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
 
     // prepare the bridge

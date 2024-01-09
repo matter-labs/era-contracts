@@ -2,7 +2,7 @@ import * as chalk from "chalk";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
-import { DeployedAddresses } from "../src.ts/deploy";
+import type { DeployedAddresses } from "../src.ts/deploy";
 
 const warning = chalk.bold.yellow;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";

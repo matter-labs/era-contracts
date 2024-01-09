@@ -5,8 +5,8 @@ import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { TestnetERC20Token, Bridgehub } from "../../typechain";
-import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory, L1ERC20Bridge } from "../../typechain";
+import type { TestnetERC20Token, Bridgehub, L1ERC20Bridge } from "../../typechain";
+import { TestnetERC20TokenFactory, BridgehubFactory, L1ERC20BridgeFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import {

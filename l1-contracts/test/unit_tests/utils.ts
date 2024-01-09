@@ -10,8 +10,8 @@ import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
 
 import { GovernanceFactory } from "../../typechain";
 
-import { IBridgehub } from "../../typechain/IBridgehub";
-import { IMailbox } from "../../typechain/IMailbox";
+import type { IBridgehub } from "../../typechain/IBridgehub";
+import type { IMailbox } from "../../typechain/IMailbox";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";

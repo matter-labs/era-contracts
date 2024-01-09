@@ -1,5 +1,5 @@
 import * as hardhat from "hardhat";
-import { Wallet } from "ethers";
+import type { Wallet } from "ethers";
 import * as fs from "fs";
 
 export async function deployTestnetTokens(tokens: any, wallet: Wallet, outputPath: string, verbose: boolean = false) {
@@ -23,7 +23,7 @@ export async function deployTestnetTokens(tokens: any, wallet: Wallet, outputPat
       result.push(testnetToken);
     } else {
       if (verbose) {
-        console.log(`Deploying testnet WETH`);
+        console.log("Deploying testnet WETH");
       }
       const tokenFactory = await hardhat.ethers.getContractFactory("WETH9", wallet);
       const weth = await tokenFactory.deploy({ gasLimit: 800000 });

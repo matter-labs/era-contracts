@@ -1,15 +1,9 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Forwarder, MockExecutorFacet } from "../../typechain";
-import {
-  BridgehubFactory,
-  Bridgehub,
-  MailboxFacetFactory,
-  ForwarderFactory,
-  MockExecutorFacetFactory,
-} from "../../typechain";
+import type { Forwarder, MockExecutorFacet, Bridgehub } from "../../typechain";
+import { BridgehubFactory, MailboxFacetFactory, ForwarderFactory, MockExecutorFacetFactory } from "../../typechain";
 import { IBridgehub } from "../../typechain/IBridgehub";
-import { IMailbox } from "../../typechain/IMailbox";
+import type { IMailbox } from "../../typechain/IMailbox";
 
 import {
   DEFAULT_REVERT_REASON,
