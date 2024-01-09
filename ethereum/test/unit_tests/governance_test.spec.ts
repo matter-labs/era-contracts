@@ -38,7 +38,7 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
     );
-    expect(revertReason).equal("Only by governor or admin");
+    expect(revertReason).equal("1k");
   });
 
   it("governor successfully set porter availability", async () => {
