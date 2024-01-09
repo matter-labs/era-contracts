@@ -7,7 +7,7 @@ pragma solidity 0.8.20;
  * @custom:security-contact security@matterlabs.dev
  * @notice Smart contract for sending arbitrary length messages to L1
  * @dev by default ZkSync can send fixed-length messages on L1.
- * A fixed length message has 4 parameters `senderAddress` `isService`, `key`, `value`,
+ * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
  * the first one is taken from the context, the other three are chosen by the sender.
  * @dev To send a variable-length message we use this trick:
  * - This system contract accepts an arbitrary length message and sends a fixed length message with
@@ -113,7 +113,7 @@ library L2ContractHelper {
     }
 }
 
-/// @notice Structure used to represent zkSync transaction.
+/// @notice Structure used to represent a zkSync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;

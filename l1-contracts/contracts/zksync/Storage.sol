@@ -70,7 +70,7 @@ struct VerifierParams {
     bytes32 recursionCircuitsSetVksHash;
 }
 
-/// @notice The struct that describes for the users will be charged for pubdata for L1->L2 transactions.
+/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
 /// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
 /// @param Validium The pubdata is considered free with regard to the L1 gas price.
 enum PubdataPricingMode {
