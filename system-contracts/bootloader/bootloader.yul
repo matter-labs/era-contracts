@@ -118,7 +118,7 @@ object "Bootloader" {
             }
 
             /// @dev The slot from which the scratch space starts.
-            /// Scatch space is used for various temporary values
+            /// Scratch space is used for various temporary values
             function SCRATCH_SPACE_BEGIN_SLOT() -> ret {
                 ret := 8
             }
@@ -353,7 +353,7 @@ object "Bootloader" {
 
             /// @dev Slots needed to store L1 Messenger pubdata.
             /// @dev Note that are many more these than the maximal pubdata in batch, since 
-            /// it needs to also accomodate uncompressed state diffs that are required for the state diff
+            /// it needs to also accommodate uncompressed state diffs that are required for the state diff
             /// compression verification.
             function OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS() -> ret {
                 ret := {{OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS}}
@@ -1689,7 +1689,6 @@ object "Bootloader" {
                 if gt(operatorOverheadForTransaction, txTotalGasLimit) {
                     assertionError("Overhead higher than gasLimit")
                 }
-                let txGasLimit := min(safeSub(txTotalGasLimit, operatorOverheadForTransaction, "www"), MAX_GAS_PER_TRANSACTION())
 
                 let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
 
@@ -2716,7 +2715,7 @@ object "Bootloader" {
                         )
                     }
                     default {
-                        // For L2 transactions, we use near call panic, it will triger the validation 
+                        // For L2 transactions, we use near call panic, it will trigger the validation 
                         // step of the transaction to fail, returning a consistent error message. 
                         nearCallPanic()
                     }
@@ -3696,14 +3695,16 @@ object "Bootloader" {
 
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
+
+
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                 let baseFee := 0
 
                 baseFee, GAS_PRICE_PER_PUBDATA := getFeeParams(
                     FAIR_PUBDATA_PRICE,
                     FAIR_L2_GAS_PRICE
                 )
-
-                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
 
                 // Only for the proved batch we enforce that the baseFee proposed 
                 // by the operator is equal to the expected one. For the playground batch, we allow
@@ -3833,7 +3834,7 @@ object "Bootloader" {
             setTxOrigin(0)
             setGasPrice(0)
 
-            // Transfering all the ETH received in the block to the operator
+            // Transferring all the ETH received in the block to the operator
             directETHTransfer(
                 selfbalance(),
                 OPERATOR_ADDRESS
@@ -3846,7 +3847,7 @@ object "Bootloader" {
             // So we need to have this method to reflect it in the system contracts too.
             //
             // The reason is that as of now our node requires that each storage write (event, etc) belongs to a particular
-            // L2 block. In case a batch is sealed by timeout (i.e. the resources of the batch have not been exhaused, but we need
+            // L2 block. In case a batch is sealed by timeout (i.e. the resources of the batch have not been exhausted, but we need
             // to seal it to assure timely finality), we need to process sending funds to the operator *after* the last
             // non-empty L2 block has been already sealed. We can not override old L2 blocks, so we need to create a new empty "fictive" block for it.
             //
