@@ -254,4 +254,16 @@ abstract contract BaseZkSyncUpgrade is Base {
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
+
+    /// @notice Placeholder function for custom logic for upgrading L1 contract.
+    /// Typically this function will never be used.
+    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
+    /// upgrade.
+    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
+
+    /// @notice placeholder function for custom logic for post-upgrade logic.
+    /// Typically this function will never be used.
+    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
+    /// upgrade.
+    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
 }

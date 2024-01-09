@@ -8,18 +8,6 @@ import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract DefaultUpgrade is BaseZkSyncUpgrade {
-    /// @notice Placeholder function for custom logic for upgrading L1 contract.
-    /// Typically this function will never be used.
-    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
-    /// upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
-
-    /// @notice placeholder function for custom logic for post-upgrade logic.
-    /// Typically this function will never be used.
-    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
-    /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
-
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
