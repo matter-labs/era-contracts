@@ -2,7 +2,8 @@
 pragma solidity 0.8.20;
 
 /// @notice Library for storage of packed unsigned integers.
-/// @author Solady (https://github.com/vectorized/solady/blob/main/src/utils/LibMap.sol)
+/// @author Matter Labs
+/// @dev This library is an adaptation of the corresponding Solady library (https://github.com/vectorized/solady/blob/main/src/utils/LibMap.sol)
 library LibMap {
     /// @dev A uint32 map in storage.
     struct Uint32Map {
