@@ -76,19 +76,38 @@ interface IExecutor is IBase {
         uint256[] serializedProof;
     }
 
+    /// @notice Function called by the operator to commit new batches. It is responsible for:
+    /// - Verifying the correctness of their timestamps.
+    /// - Processing their L2->L1 logs.
+    /// - Storing batch commitments.
+    /// @param _lastCommittedBatchData Stored data of the last committed batch.
+    /// @param _newBatchesData Data of the new batches to be committed.
     function commitBatches(
         StoredBatchInfo calldata _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external;
 
+    /// @notice Batches commitment verification.
+    /// @dev Only verifies batch commitments without any other processing.
+    /// @param _prevBatch Stored data of the last committed batch.
+    /// @param _committedBatches Stored data of the committed batches.
+    /// @param _proof The zero knowledge proof.
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
     ) external;
 
+    /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
+    /// - Processing all pending operations (commpleting priority requests).
+    /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
+    /// @param _batchesData Data of the batches to be executed.
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
 
+    /// @notice Reverts unexecuted batches
+    /// @param _newLastBatch batch number after which batches should be reverted
+    /// NOTE: Doesn't delete the stored data about batches, but only decreases
+    /// counters that are responsible for the number of batches
     function revertBatches(uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
