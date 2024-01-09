@@ -32,8 +32,10 @@ interface IGetters is IBase {
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 
-    /// @notice Returns zero if and only if no operations were processed from the queue
-    /// @notice Reverts if there are no unprocessed priority transactions
+    /// @notice The function that returns the first unprocessed priority transaction.
+    /// @dev Returns zero if and only if no operations were processed from the queue.
+    /// @dev If all the transactions were processed, it will return the last processed index, so
+    /// in case exactly *unprocessed* transactions are needed, one should check that getPriorityQueueSize() is greater than 0.
     /// @return Index of the oldest priority operation that wasn't processed yet
     function getFirstUnprocessedPriorityTx() external view returns (uint256);
 
