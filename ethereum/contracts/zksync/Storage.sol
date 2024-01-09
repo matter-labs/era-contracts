@@ -108,7 +108,7 @@ struct AppStorage {
     /// @notice Address that the governor proposed as one that will replace it
     address pendingGovernor;
     /// @notice List of permitted validators
-    mapping(address => bool) validators;
+    mapping(address validatorAddress => bool isValidator) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
     IVerifier verifier;
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
@@ -120,9 +120,9 @@ struct AppStorage {
     /// batch
     uint256 totalBatchesCommitted;
     /// @dev Stored hashed StoredBatch for batch number
-    mapping(uint256 => bytes32) storedBatchHashes;
+    mapping(uint256 batchNumber => bytes32 batchHash) storedBatchHashes;
     /// @dev Stored root hashes of L2 -> L1 logs
-    mapping(uint256 => bytes32) l2LogsRootHashes;
+    mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
     PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
@@ -148,7 +148,7 @@ struct AppStorage {
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
     /// @dev Used to indicate that eth withdrawal was already processed
-    mapping(uint256 => mapping(uint256 => bool)) isEthWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)) isEthWithdrawalFinalized;
     /// @dev The most recent withdrawal time and amount reset
     uint256 __DEPRECATED_lastWithdrawalLimitReset;
     /// @dev The accumulated withdrawn amount during the withdrawal limit window
