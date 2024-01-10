@@ -21,7 +21,7 @@ import {
   readBatchBootloaderBytecode,
   getTokens,
   deployedAddressesFromEnv,
-  SYSTEM_CONFIG
+  SYSTEM_CONFIG,
 } from "../scripts/utils";
 import { deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";

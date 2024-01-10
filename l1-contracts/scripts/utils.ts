@@ -10,11 +10,11 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 
 interface SystemConfig {
   requiredL2GasPricePerPubdata: number;
-  priorityTxMinimalGasPrice: number,
-  priorityTxMaxGasPerBatch: number,
-  priorityTxPubdataPerBatch: number,
-  priorityTxBatchOverheadL1Gas: number
-  priorityTxMaxPubdata: number
+  priorityTxMinimalGasPrice: number;
+  priorityTxMaxGasPerBatch: number;
+  priorityTxPubdataPerBatch: number;
+  priorityTxBatchOverheadL1Gas: number;
+  priorityTxMaxPubdata: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -26,8 +26,8 @@ export const SYSTEM_CONFIG: SystemConfig = {
   priorityTxMaxGasPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_GAS_PER_BATCH,
   priorityTxPubdataPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_PUBDATA_PER_BATCH,
   priorityTxBatchOverheadL1Gas: SYSTEM_CONFIG_JSON.PRIORITY_TX_BATCH_OVERHEAD_L1_GAS,
-  priorityTxMaxPubdata: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_PUBDATA
-}
+  priorityTxMaxPubdata: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_PUBDATA,
+};
 
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
@@ -220,5 +220,5 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
 
 export enum PubdataPricingMode {
   Rollup = 0,
-  Porter = 1
+  Porter = 1,
 }
