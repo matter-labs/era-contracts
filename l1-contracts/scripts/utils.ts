@@ -8,8 +8,26 @@ const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
+interface SystemConfig {
+  requiredL2GasPricePerPubdata: number;
+  priorityTxMinimalGasPrice: number,
+  priorityTxMaxGasPerBatch: number,
+  priorityTxPubdataPerBatch: number,
+  priorityTxBatchOverheadL1Gas: number
+  priorityTxMaxPubdata: number
+}
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+const SYSTEM_CONFIG_JSON = require("../../SystemConfig.json");
+
+export const SYSTEM_CONFIG: SystemConfig = {
+  requiredL2GasPricePerPubdata: SYSTEM_CONFIG_JSON.REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMinimalGasPrice: SYSTEM_CONFIG_JSON.PRIORITY_TX_MINIMAL_GAS_PRICE,
+  priorityTxMaxGasPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_GAS_PER_BATCH,
+  priorityTxPubdataPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_PUBDATA_PER_BATCH,
+  priorityTxBatchOverheadL1Gas: SYSTEM_CONFIG_JSON.PRIORITY_TX_BATCH_OVERHEAD_L1_GAS,
+  priorityTxMaxPubdata: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_PUBDATA
+}
 
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
@@ -198,4 +216,9 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
   };
+}
+
+export enum PubdataPricingMode {
+  Rollup = 0,
+  Porter = 1
 }

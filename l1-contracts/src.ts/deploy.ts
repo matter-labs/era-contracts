@@ -21,9 +21,11 @@ import {
   readBatchBootloaderBytecode,
   getTokens,
   deployedAddressesFromEnv,
+  SYSTEM_CONFIG
 } from "../scripts/utils";
 import { deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { PubdataPricingMode } from "../test/unit_tests/utils";
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
@@ -76,14 +78,13 @@ export class Deployer {
     const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    // TODO: use config variables
     const feeParams = {
-      pubdataPricingMode: 0,
-      batchOverheadL1Gas: 1_000_000,
-      maxPubdataPerBatch: 110_000,
-      priorityTxMaxPubdata: 99_000,
-      maxL2GasPerBatch: 80_000_000,
-      minimalL2GasPrice: 250_000_000, // 0.25 gwei
+      pubdataPricingMode: PubdataPricingMode.Rollup,
+      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
+      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
+      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
+      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
+      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
     };
 
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
