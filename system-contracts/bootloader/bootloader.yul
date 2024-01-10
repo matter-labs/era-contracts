@@ -399,7 +399,7 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 2^19 VM words.
+            /// @dev The memory page consists of 24000000 / 32 VM words.
             /// Each execution result is a single boolean, but 
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 
@@ -682,6 +682,13 @@ object "Bootloader" {
                 }
             }
 
+            /// @notice Returns "raw" code hash of the address. "Raw" means that it returns exactly the value
+            /// that is stored in the AccountCodeStorage system contract for that address, without applying any
+            /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
+            /// @param addr The address of the account to get the code hash of.
+            /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failer is user providing not
+            /// enough gas.
             function getRawCodeHash(addr, assertSuccess) -> ret {
                 mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
                 mstore(4, addr)
@@ -3708,7 +3715,7 @@ object "Bootloader" {
 
                 // Only for the proved batch we enforce that the baseFee proposed 
                 // by the operator is equal to the expected one. For the playground batch, we allow
-                // the operator to provide any baseFee the operator wants.s
+                // the operator to provide any baseFee the operator wants.
                 if iszero(eq(baseFee, EXPECTED_BASE_FEE)) {
                     debugLog("baseFee", baseFee)
                     debugLog("EXPECTED_BASE_FEE", EXPECTED_BASE_FEE)
