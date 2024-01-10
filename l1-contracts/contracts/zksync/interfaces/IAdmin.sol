@@ -78,7 +78,7 @@ interface IAdmin is IBase {
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
-    /// @notice Fee params for L1->L2 transactions changed
+    /// @notice Estimation fee params for L1->L2 transactions changed
     event NewEstimationFeeParams(FeeParams oldEstimationFeeParams, FeeParams newEstimationFeeParams);
 
     /// @notice Emitted when an upgrade is executed.
