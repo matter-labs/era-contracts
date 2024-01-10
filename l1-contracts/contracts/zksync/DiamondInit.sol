@@ -83,7 +83,7 @@ contract DiamondInit is Base {
         s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
         s.protocolVersion = _initalizeData.initialProtocolVersion;
         s.feeParams = _initalizeData.feeParams;
-        s.estimaetionFeeParams = _initalizeData.feeParams;
+        s.estimationFeeParams = _initalizeData.feeParams;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

@@ -104,8 +104,8 @@ contract AdminFacet is Base, IAdmin {
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n7");
 
-        FeeParams memory oldFeeParams = s.estimaetionFeeParams;
-        s.estimaetionFeeParams = _newFeeParams;
+        FeeParams memory oldFeeParams = s.estimationFeeParams;
+        s.estimationFeeParams = _newFeeParams;
 
         emit NewEstimationFeeParams(oldFeeParams, _newFeeParams);
     }
