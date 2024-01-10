@@ -170,4 +170,7 @@ struct AppStorage {
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
+    /// @dev Fee params used to derive gasPrice for estimation of the pricing for L1->L2 transactions.
+    /// It is needed for smooth transition between the pricing modes & fee params.
+    FeeParams estimationFeeParams;
 }

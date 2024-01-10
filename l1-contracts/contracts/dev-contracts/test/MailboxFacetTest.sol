@@ -12,6 +12,7 @@ contract MailboxFacetTest is MailboxFacet {
 
     function setFeeParams(FeeParams memory _feeParams) external {
         s.feeParams = _feeParams;
+        s.estimaetionFeeParams = _feeParams;
     }
 
     function getL2GasPrice(uint256 _l1GasPrice) external view returns (uint256) {

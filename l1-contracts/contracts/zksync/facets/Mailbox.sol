@@ -136,7 +136,7 @@ contract MailboxFacet is Base, IMailbox {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) public view returns (uint256) {
-        uint256 l2GasPrice = _deriveL2GasPrice(_gasPrice, _l2GasPerPubdataByteLimit);
+        uint256 l2GasPrice = _deriveL2GasPrice(s.estimationFeeParams, _gasPrice, _l2GasPerPubdataByteLimit);
         return l2GasPrice * _l2GasLimit;
     }
 
@@ -144,18 +144,20 @@ contract MailboxFacet is Base, IMailbox {
     /// @param _l1GasPrice The gas price on L1.
     /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
-    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
-        FeeParams memory feeParams = s.feeParams;
-
+    function _deriveL2GasPrice(
+        FeeParams memory _feeParams,
+        uint256 _l1GasPrice,
+        uint256 _gasPerPubdata
+    ) internal view returns (uint256) {
         uint256 pubdataPriceETH;
-        if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+        if (_feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
         }
 
-        uint256 batchOverheadETH = uint256(feeParams.batchOverheadL1Gas) * _l1GasPrice;
-        uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / uint256(feeParams.maxPubdataPerBatch);
+        uint256 batchOverheadETH = uint256(_feeParams.batchOverheadL1Gas) * _l1GasPrice;
+        uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / uint256(_feeParams.maxPubdataPerBatch);
 
-        uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadETH / uint256(feeParams.maxL2GasPerBatch);
+        uint256 l2GasPrice = _feeParams.minimalL2GasPrice + batchOverheadETH / uint256(_feeParams.maxL2GasPerBatch);
         uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPerPubdata - 1) / _gasPerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceETH);
@@ -246,7 +248,7 @@ contract MailboxFacet is Base, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
         {
-            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _l2GasPerPubdataByteLimit);
+            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(s.feeParams, tx.gasprice, _l2GasPerPubdataByteLimit);
             uint256 baseCost = params.l2GasPrice * _l2GasLimit;
             require(msg.value >= baseCost + _l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
         }

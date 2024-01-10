@@ -97,6 +97,19 @@ contract AdminFacet is Base, IAdmin {
         emit NewFeeParams(oldFeeParams, _newFeeParams);
     }
 
+    /// @notice Change the fee params for estimation L1->L2 transactions costs
+    /// @param _newFeeParams The new fee params
+    function changeEstimationFeeParams(FeeParams calldata _newFeeParams) external onlyGovernor {
+        // Double checking that the new fee params are valid, i.e.
+        // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
+        require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n7");
+
+        FeeParams memory oldFeeParams = s.estimaetionFeeParams;
+        s.estimaetionFeeParams = _newFeeParams;
+
+        emit NewEstimationFeeParams(oldFeeParams, _newFeeParams);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
