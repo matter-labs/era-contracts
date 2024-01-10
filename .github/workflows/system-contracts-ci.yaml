@@ -2,10 +2,6 @@ name: System contracts CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - dev
-      - main
 
 jobs:
   build:
