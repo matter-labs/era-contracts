@@ -41,18 +41,18 @@ interface IOldDiamondCut {
 }
 
 /// @author Matter Labs
-contract DiamondUpgradeInit3 is StateTransitionChainBase {
+contract DiamondUpgradeInit3 is ZkSyncStateTransitionBase {
     function upgrade(
         uint256 _priorityTxMaxGasLimit,
         address _allowList,
         IVerifier _verifier
     ) external payable returns (bytes32) {
         // Zero out the deprecated storage slots
-        delete chainStorage.__DEPRECATED_diamondCutStorage;
+        delete s.__DEPRECATED_diamondCutStorage;
 
-        chainStorage.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
-        chainStorage.__DEPRECATED_allowList = _allowList;
-        chainStorage.verifier = _verifier;
+        s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
+        s.__DEPRECATED_allowList = _allowList;
+        s.verifier = _verifier;
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

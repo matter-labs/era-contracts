@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IStateTransitionChainBase} from "./IBase.sol";
+import {IZkSyncStateTransitionBase} from "./IBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -25,7 +25,7 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
-interface IExecutor is IStateTransitionChainBase {
+interface IExecutor is IZkSyncStateTransitionBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
     /// @param batchHash Hash of L2 batch

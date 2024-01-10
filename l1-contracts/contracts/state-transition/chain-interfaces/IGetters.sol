@@ -3,10 +3,10 @@
 pragma solidity 0.8.20;
 
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
-import {VerifierParams, UpgradeState} from "../chain-deps/StateTransitionChainStorage.sol";
+import {VerifierParams, UpgradeState} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 import "./IBase.sol";
 
-interface IGetters is IStateTransitionChainBase {
+interface IGetters is IZkSyncStateTransitionBase {
     /*//////////////////////////////////////////////////////////////
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/

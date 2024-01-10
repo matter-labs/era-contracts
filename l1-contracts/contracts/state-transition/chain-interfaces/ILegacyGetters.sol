@@ -7,7 +7,7 @@ import "./IBase.sol";
 /// @author Matter Labs
 /// @dev This interface contains getters for the zkSync contract that should not be used,
 /// but still are keot for backward compatibility.
-interface ILegacyGetters is IStateTransitionChainBase {
+interface ILegacyGetters is IZkSyncStateTransitionBase {
     function getTotalBlocksCommitted() external view returns (uint256);
 
     function getTotalBlocksVerified() external view returns (uint256);

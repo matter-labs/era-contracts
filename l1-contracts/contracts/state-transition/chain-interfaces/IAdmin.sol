@@ -3,12 +3,12 @@
 pragma solidity 0.8.20;
 
 import "../Verifier.sol";
-import "../chain-deps/StateTransitionChainStorage.sol";
+import "../chain-deps/ZkSyncStateTransitionStorage.sol";
 import "./IBase.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 
-interface IAdmin is IStateTransitionChainBase {
+interface IAdmin is IZkSyncStateTransitionBase {
     function setPendingGovernor(address _newPendingGovernor) external;
 
     function acceptGovernor() external;

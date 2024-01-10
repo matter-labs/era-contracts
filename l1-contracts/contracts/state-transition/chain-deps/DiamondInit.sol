@@ -14,7 +14,7 @@ import "../l2-deps/ISystemContext.sol";
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
-contract DiamondInit is StateTransitionChainBase, IDiamondInit {
+contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
@@ -27,22 +27,22 @@ contract DiamondInit is StateTransitionChainBase, IDiamondInit {
         require(_initializeData.admin != address(0), "hc");
         require(_initializeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
 
-        chainStorage.chainId = _initializeData.chainId;
-        chainStorage.bridgehub = _initializeData.bridgehub;
-        chainStorage.stateTransition = _initializeData.stateTransition;
-        chainStorage.baseToken = _initializeData.baseToken;
-        chainStorage.baseTokenBridge = _initializeData.baseTokenBridge;
-        chainStorage.protocolVersion = _initializeData.protocolVersion;
+        s.chainId = _initializeData.chainId;
+        s.bridgehub = _initializeData.bridgehub;
+        s.stateTransition = _initializeData.stateTransition;
+        s.baseToken = _initializeData.baseToken;
+        s.baseTokenBridge = _initializeData.baseTokenBridge;
+        s.protocolVersion = _initializeData.protocolVersion;
 
-        chainStorage.verifier = _initializeData.verifier;
-        chainStorage.governor = _initializeData.governor;
-        chainStorage.admin = _initializeData.admin;
+        s.verifier = _initializeData.verifier;
+        s.governor = _initializeData.governor;
+        s.admin = _initializeData.admin;
 
-        chainStorage.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        chainStorage.verifierParams = _initializeData.verifierParams;
-        chainStorage.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
-        chainStorage.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
-        chainStorage.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
+        s.storedBatchHashes[0] = _initializeData.storedBatchZero;
+        s.verifierParams = _initializeData.verifierParams;
+        s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
+        s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
+        s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

@@ -13,17 +13,17 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
-import {StateTransitionChainBase} from "./Base.sol";
+import {ZkSyncStateTransitionBase} from "./Base.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
-import {IBridgehub} from "../../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IL1Bridge} from "../../../bridge/interfaces/IL1Bridge.sol";
 
 /// @title zkSync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is StateTransitionChainBase, IMailbox {
+contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
@@ -135,7 +135,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        require(_batchNumber <= chainStorage.totalBatchesExecuted, "xx");
+        require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
@@ -149,7 +149,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
         bytes32 calculatedRootHash = Merkle.calculateRoot(_proof, _index, hashedLog);
-        bytes32 actualRootHash = chainStorage.l2LogsRootHashes[_batchNumber];
+        bytes32 actualRootHash = s.l2LogsRootHashes[_batchNumber];
 
         return actualRootHash == calculatedRootHash;
     }
@@ -207,11 +207,11 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external override {
         require(
-            chainStorage.baseToken == ETH_TOKEN_ADDRESS,
+            s.baseToken == ETH_TOKEN_ADDRESS,
             " finalizeEthWithdrawal only available for Eth chains on mailbox"
         );
-        IL1Bridge(chainStorage.baseTokenBridge).finalizeWithdrawal(
-            chainStorage.chainId,
+        IL1Bridge(s.baseTokenBridge).finalizeWithdrawal(
+            s.chainId,
             _l2BatchNumber,
             _l2MessageIndex,
             _l2TxNumberInBatch,
@@ -230,7 +230,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(chainStorage.baseToken == ETH_TOKEN_ADDRESS, "legacy interface only available for eth base token");
+        require(s.baseToken == ETH_TOKEN_ADDRESS, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
             msg.sender,
             _contractL2,
@@ -242,8 +242,8 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
             _factoryDeps,
             _refundRecipient
         );
-        IL1Bridge(chainStorage.baseTokenBridge).bridgehubDeposit{value: msg.value}(
-            chainStorage.chainId,
+        IL1Bridge(s.baseTokenBridge).bridgehubDeposit{value: msg.value}(
+            s.chainId,
             address(0),
             msg.value,
             msg.sender
@@ -314,7 +314,7 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         bool _isFree
     ) internal returns (bytes32 canonicalTxHash) {
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
-        _params.txId = chainStorage.priorityQueue.getTotalPriorityTxs();
+        _params.txId = s.priorityQueue.getTotalPriorityTxs();
 
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
@@ -377,12 +377,12 @@ contract MailboxFacet is StateTransitionChainBase, IMailbox {
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
-            chainStorage.priorityTxMaxGasLimit
+            s.priorityTxMaxGasLimit
         );
 
         canonicalTxHash = keccak256(transactionEncoding);
 
-        chainStorage.priorityQueue.pushBack(
+        s.priorityQueue.pushBack(
             PriorityOperation({
                 canonicalTxHash: canonicalTxHash,
                 expirationTimestamp: _priorityOpParams.expirationTimestamp,

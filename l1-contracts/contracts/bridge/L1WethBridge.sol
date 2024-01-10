@@ -9,7 +9,7 @@ import "./interfaces/IL1BridgeLegacy.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
-import "../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import "../bridgehub/IBridgehub.sol";
 import "../state-transition/chain-interfaces/IMailbox.sol";
 import "../state-transition/chain-interfaces/IGetters.sol";
 

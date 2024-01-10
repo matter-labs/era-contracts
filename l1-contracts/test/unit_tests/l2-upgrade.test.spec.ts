@@ -6,14 +6,14 @@ import * as fs from "fs";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 import { diamondCut } from "../../src.ts/diamondCut";
-import type { AdminFacet, ExecutorFacet, GettersFacet, ZkSyncStateTransition } from "../../typechain";
+import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {
   AdminFacetFactory,
   CustomUpgradeTestFactory,
   DefaultUpgradeFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
-  ZkSyncStateTransitionFactory,
+  StateTransitionManagerFactory,
 } from "../../typechain";
 import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
 import {
@@ -45,7 +45,7 @@ describe("L2 upgrade test", function () {
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
 
-  let stateTransition: ZkSyncStateTransition;
+  let stateTransition: StateTransitionManager;
 
   let owner: ethers.Signer;
 
@@ -90,7 +90,7 @@ describe("L2 upgrade test", function () {
     proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
-    stateTransition = ZkSyncStateTransitionFactory.connect(
+    stateTransition = StateTransitionManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
@@ -914,7 +914,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
 async function executeUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  stateTransition: ZkSyncStateTransition,
+  stateTransition: StateTransitionManager,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {
@@ -946,7 +946,7 @@ async function executeUpgrade(
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
 async function rollBackToVersion(
   protocolVersion: string,
-  stateTransition: ZkSyncStateTransition,
+  stateTransition: StateTransitionManager,
   partialUpgrade: Partial<ProposedUpgrade>
 ) {
   partialUpgrade.newProtocolVersion = protocolVersion;
@@ -975,7 +975,7 @@ async function rollBackToVersion(
 async function executeCustomUpgrade(
   chainId: BigNumberish,
   proxyGetters: GettersFacet,
-  stateTransition: ZkSyncStateTransition,
+  stateTransition: StateTransitionManager,
   partialUpgrade: Partial<ProposedUpgrade>,
   contractFactory?: ethers.ethers.ContractFactory
 ) {

@@ -10,7 +10,7 @@ import "./IMailbox.sol";
 // kl to do remove this, needed for the server for now
 import "../libraries/Diamond.sol";
 
-interface IStateTransitionChain is IAdmin, IExecutor, IGetters, IMailbox {
+interface IZkSyncStateTransition is IAdmin, IExecutor, IGetters, IMailbox {
     function initialize(
         uint256 _chainId,
         address _bridgehubChainContract,

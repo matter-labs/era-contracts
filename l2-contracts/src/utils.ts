@@ -162,7 +162,7 @@ export async function getL1TxInfo(
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
 ) {
-  const zksync = deployer.stateTransitionChainContract(ethers.Wallet.createRandom().connect(provider));
+  const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
     to,
     0,

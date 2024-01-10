@@ -39,7 +39,7 @@ struct UpgradeStorage {
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
 /// Their presence is maintained for compatibility and to prevent storage collision.
-struct StateTransitionChainStorage {
+struct ZkSyncStateTransitionStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
     /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)

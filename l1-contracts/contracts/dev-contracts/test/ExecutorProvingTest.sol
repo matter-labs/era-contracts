@@ -1,7 +1,7 @@
 pragma solidity 0.8.20;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {VerifierParams} from "../../state-transition/chain-deps/StateTransitionChainStorage.sol";
+import {VerifierParams} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
@@ -39,8 +39,8 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.
     function setHashes(bytes32 l2DefaultAccountBytecodeHash, bytes32 l2BootloaderBytecodeHash) external {
-        chainStorage.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
-        chainStorage.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
-        chainStorage.zkPorterIsAvailable = false;
+        s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
+        s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
+        s.zkPorterIsAvailable = false;
     }
 }

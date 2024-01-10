@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import "./IBase.sol";
 import "../../common/Messaging.sol";
 
-interface IMailbox is IStateTransitionChainBase {
+interface IMailbox is IZkSyncStateTransitionBase {
     function proveL2MessageInclusion(
         uint256 _batchNumber,
         uint256 _index,

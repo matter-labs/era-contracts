@@ -2,18 +2,16 @@
 
 pragma solidity 0.8.20;
 
-import {IL1Bridge} from "../../bridge/interfaces/IL1Bridge.sol";
-import "../../common/Messaging.sol";
-import "../../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
-import "../../state-transition/libraries/Diamond.sol";
+import {IL1Bridge} from "../bridge/interfaces/IL1Bridge.sol";
+import "../common/Messaging.sol";
+import "../state-transition/IStateTransitionManager.sol";
+import "../state-transition/libraries/Diamond.sol";
 
 interface IBridgehub {
     /// Getters
-    function governor() external view returns (address);
+    function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
 
-    function stateTransitionIsRegistered(address _stateTransition) external view returns (bool);
-
-    function stateTransition(uint256 _chainId) external view returns (address);
+    function stateTransitionManager(uint256 _chainId) external view returns (address);
 
     function tokenIsRegistered(address _baseToken) external view returns (bool);
 
@@ -93,7 +91,7 @@ interface IBridgehub {
 
     function newChain(
         uint256 _chainId,
-        address _stateTransition,
+        address _stateTransitionManager,
         address _baseToken,
         address _baseTokenBridge,
         uint256 _salt,
@@ -101,7 +99,7 @@ interface IBridgehub {
         bytes calldata _initData
     ) external returns (uint256 chainId);
 
-    function newStateTransition(address _stateTransition) external;
+    function newstateTransitionManager(address _stateTransitionManager) external;
 
     function newToken(address _token) external;
 
@@ -109,5 +107,5 @@ interface IBridgehub {
 
     function setWethBridge(address _wethBridge) external;
 
-    event NewChain(uint64 indexed chainId, address stateTransition, address indexed chainGovernance);
+    event NewChain(uint64 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 }

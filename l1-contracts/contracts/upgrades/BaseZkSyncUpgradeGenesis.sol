@@ -18,7 +18,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
     function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override {
-        uint256 previousProtocolVersion = chainStorage.protocolVersion;
+        uint256 previousProtocolVersion = s.protocolVersion;
         require(
             // Note this is the only thing change > to >=
             _newProtocolVersion >= previousProtocolVersion,
@@ -30,13 +30,13 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-        require(chainStorage.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
+        require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            chainStorage.l2SystemContractsUpgradeBatchNumber == 0,
+            s.l2SystemContractsUpgradeBatchNumber == 0,
             "The batch number of the previous upgrade has not been cleaned"
         );
 
-        chainStorage.protocolVersion = _newProtocolVersion;
+        s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
 }

@@ -6,7 +6,7 @@ pragma solidity ^0.8.17;
 
 import {BridgehubTest} from "../_Bridgehub_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
+import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/IStateTransitionManager.sol";
 
 /* solhint-enable max-line-length */
 
@@ -27,7 +27,7 @@ contract BridgehubMailboxTest is BridgehubTest {
         //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
         //     ""
         // );
-        vm.mockCall(chainStateTransition, abi.encodeWithSelector(IZkSyncStateTransition.newChain.selector), "");
+        vm.mockCall(chainStateTransition, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
         bridgehub.newStateTransition(chainStateTransition);

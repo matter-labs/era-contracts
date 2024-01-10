@@ -6,26 +6,26 @@ import "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
     constructor() {
-        chainStorage.governor = msg.sender;
+        s.governor = msg.sender;
     }
 
     function getPorterAvailability() external view returns (bool) {
-        return chainStorage.zkPorterIsAvailable;
+        return s.zkPorterIsAvailable;
     }
 
     function isValidator(address _address) external view returns (bool) {
-        return chainStorage.validators[_address];
+        return s.validators[_address];
     }
 
     function getPriorityTxMaxGasLimit() external view returns (uint256) {
-        return chainStorage.priorityTxMaxGasLimit;
+        return s.priorityTxMaxGasLimit;
     }
 
     function getGovernor() external view returns (address) {
-        return chainStorage.governor;
+        return s.governor;
     }
 
     function getPendingGovernor() external view returns (address) {
-        return chainStorage.pendingGovernor;
+        return s.pendingGovernor;
     }
 }

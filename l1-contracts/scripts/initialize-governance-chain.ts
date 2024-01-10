@@ -41,7 +41,7 @@ async function main() {
       });
 
       const governance = deployer.governanceContract(deployWallet);
-      const zkSync = deployer.stateTransitionChainContract(deployWallet);
+      const zkSync = deployer.stateTransitionContract(deployWallet);
 
       await (await zkSync.setPendingGovernor(governance.address)).wait();
 

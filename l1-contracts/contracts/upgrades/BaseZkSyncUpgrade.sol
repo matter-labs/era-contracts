@@ -40,7 +40,7 @@ struct ProposedUpgrade {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
+abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -78,10 +78,10 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousDefaultAccountBytecodeHash = chainStorage.l2DefaultAccountBytecodeHash;
+        bytes32 previousDefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
 
         // Change the default account bytecode hash
-        chainStorage.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
+        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
     }
 
@@ -95,10 +95,10 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousBootloaderBytecodeHash = chainStorage.l2BootloaderBytecodeHash;
+        bytes32 previousBootloaderBytecodeHash = s.l2BootloaderBytecodeHash;
 
         // Change the bootloader bytecode hash
-        chainStorage.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
+        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
         emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 
@@ -113,8 +113,8 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
             return;
         }
 
-        IVerifier oldVerifier = chainStorage.verifier;
-        chainStorage.verifier = _newVerifier;
+        IVerifier oldVerifier = s.verifier;
+        s.verifier = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
 
@@ -129,8 +129,8 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
             return;
         }
 
-        VerifierParams memory oldVerifierParams = chainStorage.verifierParams;
-        chainStorage.verifierParams = _newVerifierParams;
+        VerifierParams memory oldVerifierParams = s.verifierParams;
+        s.verifierParams = _newVerifierParams;
         emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
     }
 
@@ -171,7 +171,7 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
             encodedTransaction,
-            chainStorage.priorityTxMaxGasLimit
+            s.priorityTxMaxGasLimit
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);
@@ -187,7 +187,7 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
 
-        chainStorage.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
+        s.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
 
         return l2ProtocolUpgradeTxHash;
     }
@@ -210,7 +210,7 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
     function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
-        uint256 previousProtocolVersion = chainStorage.protocolVersion;
+        uint256 previousProtocolVersion = s.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
             "New protocol version is not greater than the current one"
@@ -221,13 +221,13 @@ abstract contract BaseZkSyncUpgrade is StateTransitionChainBase {
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
-        require(chainStorage.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
+        require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
-            chainStorage.l2SystemContractsUpgradeBatchNumber == 0,
+            s.l2SystemContractsUpgradeBatchNumber == 0,
             "The batch number of the previous upgrade has not been cleaned"
         );
 
-        chainStorage.protocolVersion = _newProtocolVersion;
+        s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
 }

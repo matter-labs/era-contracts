@@ -116,7 +116,7 @@ async function main() {
         ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
-      const zkSyncContract = deployer.stateTransitionChainContract(deployWallet);
+      const zkSyncContract = deployer.stateTransitionContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

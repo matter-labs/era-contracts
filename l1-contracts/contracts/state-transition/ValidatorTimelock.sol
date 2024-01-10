@@ -30,7 +30,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     event NewValidator(address _oldValidator, address _newValidator);
 
     /// @dev The main zkSync smart contract.
-    address public immutable stateTransitionChain;
+    address public immutable stateTransition;
 
     /// @dev The mapping of L2 batch number => timestamp when it was committed.
     LibMap.Uint32Map internal committedBatchTimestamp;
@@ -41,9 +41,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor(address _initialOwner, address _stateTransitionChain, uint32 _executionDelay, address _validator) {
+    constructor(address _initialOwner, address _stateTransition, uint32 _executionDelay, address _validator) {
         _transferOwnership(_initialOwner);
-        stateTransitionChain = _stateTransitionChain;
+        stateTransition = _stateTransition;
         executionDelay = _executionDelay;
         validator = _validator;
     }
@@ -87,14 +87,14 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             }
         }
 
-        _propagateToStateTransitionChain();
+        _propagateToZkSyncStateTransition();
     }
 
     /// @dev Make a call to the zkSync contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator {
-        _propagateToStateTransitionChain();
+        _propagateToZkSyncStateTransition();
     }
 
     /// @dev Make a call to the zkSync contract with the same calldata.
@@ -105,7 +105,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator {
-        _propagateToStateTransitionChain();
+        _propagateToZkSyncStateTransition();
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -124,13 +124,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToStateTransitionChain();
+        _propagateToZkSyncStateTransition();
     }
 
     /// @dev Call the zkSync contract with the same calldata as this contract was called.
     /// Note: it is called the zkSync contract, not delegatecalled!
-    function _propagateToStateTransitionChain() internal {
-        address contractAddress = stateTransitionChain;
+    function _propagateToZkSyncStateTransition() internal {
+        address contractAddress = stateTransition;
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())

@@ -8,11 +8,11 @@ import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contr
 // import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Getters.sol";
 // import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Mailbox.sol";
 // import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/DiamondInit.sol";
-// import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/StateTransitionChainStorage.sol";
+// import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 // import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
 // import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
 // import {Utils} from "../../Utils/Utils.sol";
-import {IStateTransitionChain} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IStateTransitionChain.sol";
+import {IZkSyncStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract L1WethBridgeTest is Test {
@@ -75,7 +75,7 @@ contract L1WethBridgeTest is Test {
 
         // address[] addresses = Utils.initial_deployment();
 
-        IStateTransitionChain zkSync = IStateTransitionChain(address(diamondProxy));
+        IZkSyncStateTransition zkSync = IZkSyncStateTransition(address(diamondProxy));
 
         L1WethBridge bridge = new L1WethBridge(payable(address(l1Weth)), zkSync);
 

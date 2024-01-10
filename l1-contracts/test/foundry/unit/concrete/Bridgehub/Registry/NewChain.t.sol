@@ -7,10 +7,10 @@ pragma solidity ^0.8.17;
 import {RegistryTest} from "./_Registry_Shared.t.sol";
 import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {AllowList} from "../../../../../../cache/solpp-generated-contracts/common/AllowList.sol";
-import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
+import {IStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/IStateTransitionManager.sol";
 // import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Vm} from "forge-std/Test.sol";
-import {IRegistry} from "../../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-interfaces/IRegistry.sol";
+import {IRegistry} from "../../../../../../cache/solpp-generated-contracts/bridgehub/IRegistry.sol";
 
 /* solhint-enable max-line-length */
 
@@ -78,7 +78,7 @@ contract NewChainTest is RegistryTest {
         //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
         //     ""
         // );
-        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IZkSyncStateTransition.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
         bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
@@ -97,7 +97,7 @@ contract NewChainTest is RegistryTest {
         //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
         //     ""
         // );
-        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IZkSyncStateTransition.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         // === Internal call checks ===
         // vm.expectCall(
@@ -115,7 +115,7 @@ contract NewChainTest is RegistryTest {
         vm.expectCall(
             stateTransitionAddress,
             abi.encodeWithSelector(
-                IZkSyncStateTransition.newChain.selector,
+                IStateTransitionManager.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,
@@ -185,7 +185,7 @@ contract NewChainTest is RegistryTest {
         //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
         //     ""
         // );
-        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IZkSyncStateTransition.newChain.selector), "");
+        vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         // === Internal call checks ===
         // vm.expectCall(
@@ -203,7 +203,7 @@ contract NewChainTest is RegistryTest {
         vm.expectCall(
             stateTransitionAddress,
             abi.encodeWithSelector(
-                IZkSyncStateTransition.newChain.selector,
+                IStateTransitionManager.newChain.selector,
                 chainId,
                 chainContractAddress,
                 governorAddress,

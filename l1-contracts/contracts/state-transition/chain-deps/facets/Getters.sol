@@ -12,7 +12,7 @@ import "../../chain-interfaces/ILegacyGetters.sol";
 /// @title Getters Contract implements functions for getting contract state from outside the batchchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
+contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
@@ -24,106 +24,106 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
 
     /// @return The address of the current governor
     function getGovernor() external view returns (address) {
-        return chainStorage.governor;
+        return s.governor;
     }
 
     /// @return The address of the pending governor
     function getPendingGovernor() external view returns (address) {
-        return chainStorage.pendingGovernor;
+        return s.pendingGovernor;
     }
 
     /// @return The address of the bridgehub
     function getBridgehub() external view returns (address) {
-        return address(chainStorage.bridgehub);
+        return address(s.bridgehub);
     }
 
     /// @return The address of the state transition
     function getStateTransition() external view returns (address) {
-        return address(chainStorage.stateTransition);
+        return address(s.stateTransition);
     }
 
     /// @return The address of the base token
     function getBaseToken() external view returns (address) {
-        return address(chainStorage.baseToken);
+        return address(s.baseToken);
     }
 
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address) {
-        return address(chainStorage.baseTokenBridge);
+        return address(s.baseTokenBridge);
     }
 
     /// @return The address of the verifier smart contract
     function getVerifier() external view returns (address) {
-        return address(chainStorage.verifier);
+        return address(s.verifier);
     }
 
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256) {
-        return chainStorage.totalBatchesCommitted;
+        return s.totalBatchesCommitted;
     }
 
     /// @return The total number of batches that were committed & verified
     function getTotalBatchesVerified() external view returns (uint256) {
-        return chainStorage.totalBatchesVerified;
+        return s.totalBatchesVerified;
     }
 
     /// @return The total number of batches that were committed & verified & executed
     function getTotalBatchesExecuted() external view returns (uint256) {
-        return chainStorage.totalBatchesExecuted;
+        return s.totalBatchesExecuted;
     }
 
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256) {
-        return chainStorage.priorityQueue.getTotalPriorityTxs();
+        return s.priorityQueue.getTotalPriorityTxs();
     }
 
     /// @notice Returns zero if and only if no operations were processed from the queue
     /// @notice Reverts if there are no unprocessed priority transactions
     /// @return Index of the oldest priority operation that wasn't processed yet
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {
-        return chainStorage.priorityQueue.getFirstUnprocessedPriorityTx();
+        return s.priorityQueue.getFirstUnprocessedPriorityTx();
     }
 
     /// @return The number of priority operations currently in the queue
     function getPriorityQueueSize() external view returns (uint256) {
-        return chainStorage.priorityQueue.getSize();
+        return s.priorityQueue.getSize();
     }
 
     /// @return The first unprocessed priority operation from the queue
     function priorityQueueFrontOperation() external view returns (PriorityOperation memory) {
-        return chainStorage.priorityQueue.front();
+        return s.priorityQueue.front();
     }
 
     /// @return Whether the address has a validator access
     function isValidator(address _address) external view returns (bool) {
-        return chainStorage.validators[_address];
+        return s.validators[_address];
     }
 
     /// @return Merkle root of the tree with L2 logs for the selected batch
     function l2LogsRootHash(uint256 _batchNumber) external view returns (bytes32) {
-        return chainStorage.l2LogsRootHashes[_batchNumber];
+        return s.l2LogsRootHashes[_batchNumber];
     }
 
     /// @notice For unfinalized (non executed) batches may change
     /// @dev returns zero for non-committed batches
     /// @return The hash of committed L2 batch.
     function storedBatchHash(uint256 _batchNumber) external view returns (bytes32) {
-        return chainStorage.storedBatchHashes[_batchNumber];
+        return s.storedBatchHashes[_batchNumber];
     }
 
     /// @return Bytecode hash of bootloader program.
     function getL2BootloaderBytecodeHash() external view returns (bytes32) {
-        return chainStorage.l2BootloaderBytecodeHash;
+        return s.l2BootloaderBytecodeHash;
     }
 
     /// @return Bytecode hash of default account (bytecode for EOA).
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
-        return chainStorage.l2DefaultAccountBytecodeHash;
+        return s.l2DefaultAccountBytecodeHash;
     }
 
     /// @return Verifier parameters.
     function getVerifierParams() external view returns (VerifierParams memory) {
-        return chainStorage.verifierParams;
+        return s.verifierParams;
     }
 
     /// @return Whether the diamond is frozen or not
@@ -134,12 +134,12 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
 
     /// @return The current protocol version
     function getProtocolVersion() external view returns (uint256) {
-        return chainStorage.protocolVersion;
+        return s.protocolVersion;
     }
 
     /// @return The upgrade system contract transaction hash, 0 if the upgrade is not initialized
     function getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
-        return chainStorage.l2SystemContractsUpgradeTxHash;
+        return s.l2SystemContractsUpgradeTxHash;
     }
 
     /// @return The L2 batch number in which the upgrade transaction was processed.
@@ -148,7 +148,7 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// - The upgrade transaction has been processed and the batch with such transaction has been
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
-        return chainStorage.l2SystemContractsUpgradeBatchNumber;
+        return s.l2SystemContractsUpgradeBatchNumber;
     }
 
     /// @return isFreezable Whether the facet can be frozen by the governor or always accessible
@@ -166,7 +166,7 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
 
     /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function getPriorityTxMaxGasLimit() external view returns (uint256) {
-        return chainStorage.priorityTxMaxGasLimit;
+        return s.priorityTxMaxGasLimit;
     }
 
     /// @return Whether the selector can be frozen by the governor or always accessible
@@ -180,7 +180,7 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
-        return chainStorage.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
+        return s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -227,19 +227,19 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// @return The total number of batches that were committed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
     function getTotalBlocksCommitted() external view returns (uint256) {
-        return chainStorage.totalBatchesCommitted;
+        return s.totalBatchesCommitted;
     }
 
     /// @return The total number of batches that were committed & verified
     /// @dev It is a *deprecated* method, please use `getTotalBatchesVerified` instead.
     function getTotalBlocksVerified() external view returns (uint256) {
-        return chainStorage.totalBatchesVerified;
+        return s.totalBatchesVerified;
     }
 
     /// @return The total number of batches that were committed & verified & executed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesExecuted` instead.
     function getTotalBlocksExecuted() external view returns (uint256) {
-        return chainStorage.totalBatchesExecuted;
+        return s.totalBatchesExecuted;
     }
 
     /// @notice For unfinalized (non executed) batches may change
@@ -247,7 +247,7 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// @dev returns zero for non-committed batches
     /// @return The hash of committed L2 batch.
     function storedBlockHash(uint256 _batchNumber) external view returns (bytes32) {
-        return chainStorage.storedBatchHashes[_batchNumber];
+        return s.storedBatchHashes[_batchNumber];
     }
 
     /// @return The L2 batch number in which the upgrade transaction was processed.
@@ -257,6 +257,6 @@ contract GettersFacet is StateTransitionChainBase, IGetters, ILegacyGetters {
     /// - The upgrade transaction has been processed and the batch with such transaction has been
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
-        return chainStorage.l2SystemContractsUpgradeBatchNumber;
+        return s.l2SystemContractsUpgradeBatchNumber;
     }
 }

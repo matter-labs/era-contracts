@@ -11,7 +11,7 @@ import "./Base.sol";
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is StateTransitionChainBase, IAdmin {
+contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     string public constant override getName = "AdminFacet";
 
     /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
@@ -19,20 +19,20 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @param _newPendingGovernor Address of the new governor
     function setPendingGovernor(address _newPendingGovernor) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
-        address oldPendingGovernor = chainStorage.pendingGovernor;
+        address oldPendingGovernor = s.pendingGovernor;
         // Change pending governor
-        chainStorage.pendingGovernor = _newPendingGovernor;
+        s.pendingGovernor = _newPendingGovernor;
         emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
     }
 
     /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
     function acceptGovernor() external {
-        address pendingGovernor = chainStorage.pendingGovernor;
+        address pendingGovernor = s.pendingGovernor;
         require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
 
-        address previousGovernor = chainStorage.governor;
-        chainStorage.governor = pendingGovernor;
-        delete chainStorage.pendingGovernor;
+        address previousGovernor = s.governor;
+        s.governor = pendingGovernor;
+        delete s.pendingGovernor;
 
         emit NewPendingGovernor(pendingGovernor, address(0));
         emit NewGovernor(previousGovernor, pendingGovernor);
@@ -43,20 +43,20 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
-        address oldPendingAdmin = chainStorage.pendingAdmin;
+        address oldPendingAdmin = s.pendingAdmin;
         // Change pending admin
-        chainStorage.pendingAdmin = _newPendingAdmin;
+        s.pendingAdmin = _newPendingAdmin;
         emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
-        address pendingAdmin = chainStorage.pendingAdmin;
+        address pendingAdmin = s.pendingAdmin;
         require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
 
-        address previousAdmin = chainStorage.admin;
-        chainStorage.admin = pendingAdmin;
-        delete chainStorage.pendingAdmin;
+        address previousAdmin = s.admin;
+        s.admin = pendingAdmin;
+        delete s.pendingAdmin;
 
         emit NewPendingAdmin(pendingAdmin, address(0));
         emit NewAdmin(previousAdmin, pendingAdmin);
@@ -66,7 +66,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @param _validator Validator address
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external onlyGovernorOrAdmin {
-        chainStorage.validators[_validator] = _active;
+        s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
 
@@ -74,7 +74,7 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     /// @param _zkPorterIsAvailable The availability of zk porter shard
     function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransition {
         // Change the porter availability
-        chainStorage.zkPorterIsAvailable = _zkPorterIsAvailable;
+        s.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
@@ -83,8 +83,8 @@ contract AdminFacet is StateTransitionChainBase, IAdmin {
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
         require(_newPriorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "n5");
 
-        uint256 oldPriorityTxMaxGasLimit = chainStorage.priorityTxMaxGasLimit;
-        chainStorage.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
+        uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
+        s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 

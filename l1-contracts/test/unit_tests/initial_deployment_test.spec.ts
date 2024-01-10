@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Bridgehub, ZkSyncStateTransition } from "../../typechain";
-import { BridgehubFactory, ZkSyncStateTransitionFactory } from "../../typechain";
+import type { Bridgehub, StateTransitionManager } from "../../typechain";
+import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
 import { CONTRACTS_LATEST_PROTOCOL_VERSION, ethTestConfig, initialDeployment } from "./utils";
 
@@ -13,7 +13,7 @@ process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSIO
 
 describe("Initial Deployment", function () {
   let bridgehub: Bridgehub;
-  let stateTransition: ZkSyncStateTransition;
+  let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
   let deployer: Deployer;
   // const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
@@ -45,7 +45,7 @@ describe("Initial Deployment", function () {
     chainId = deployer.chainId;
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    stateTransition = ZkSyncStateTransitionFactory.connect(
+    stateTransition = StateTransitionManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
@@ -56,11 +56,11 @@ describe("Initial Deployment", function () {
     const stateTransitionAddress2 = await bridgehub.stateTransition(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
 
-    const stateTransitionChainAddress1 = deployer.addresses.StateTransition.DiamondProxy;
-    const stateTransitionChainAddress2 = await stateTransition.stateTransitionChain(chainId);
-    expect(stateTransitionChainAddress1.toLowerCase()).equal(stateTransitionChainAddress2.toLowerCase());
+    const stateTransitionAddress1 = deployer.addresses.StateTransition.DiamondProxy;
+    const stateTransitionAddress2 = await stateTransition.stateTransition(chainId);
+    expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
 
-    const stateTransitionChainAddress3 = await bridgehub.getStateTransitionChain(chainId);
-    expect(stateTransitionChainAddress1.toLowerCase()).equal(stateTransitionChainAddress3.toLowerCase());
+    const stateTransitionAddress3 = await bridgehub.getZkSyncStateTransition(chainId);
+    expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress3.toLowerCase());
   });
 });

@@ -4,27 +4,25 @@ pragma solidity 0.8.20;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import "./bridgehub-interfaces/IBridgehub.sol";
+import "./IBridgehub.sol";
 import "../bridge/interfaces/IL1Bridge.sol";
-import "../state-transition/state-transition-interfaces/IZkSyncStateTransition.sol";
+import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
-import "../state-transition/chain-interfaces/IStateTransitionChain.sol";
+import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
-    address public constant ethTokenAddress = address(1);
+    address public constant ETH_TOKEN_ADDRESS = address(1);
 
-    /// @notice Address which will exercise critical changes
-    address public governor;
     /// new fields
-    /// @notice we store registered stateTransitions
-    mapping(address => bool) public stateTransitionIsRegistered;
+    /// @notice we store registered stateTransitionManagers
+    mapping(address => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
     mapping(address => bool) public tokenIsRegistered;
     /// @notice we store registered bridges
     mapping(address => bool) public tokenBridgeIsRegistered;
 
-    /// @notice chainID => stateTransition contract address
-    mapping(uint256 => address) public stateTransition;
+    /// @notice chainID => stateTransitionManager contract address
+    mapping(uint256 => address) public stateTransitionManager;
     /// @notice chainID => base token address
     mapping(uint256 => address) public baseToken;
     /// @notice chainID => bridge holding the base token
@@ -33,20 +31,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
     IL1Bridge public wethBridge;
 
-    /// @notice Checks that the message sender is an active governor
-    modifier onlyGovernor() {
-        require(msg.sender == governor, "Bridgehub: not governor");
+    modifier onlystateTransitionManager(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager[_chainId], "Bridgehub: not state transition");
         _;
     }
 
-    modifier onlyStateTransition(uint256 _chainId) {
-        require(msg.sender == stateTransition[_chainId], "Bridgehub: not state transition");
-        _;
-    }
-
-    modifier onlyStateTransitionChain(uint256 _chainId) {
+    modifier onlystateTransitionManagerChain(uint256 _chainId) {
         require(
-            msg.sender == IZkSyncStateTransition(stateTransition[_chainId]).stateTransitionChain(_chainId),
+            msg.sender == IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId),
             "Bridgehub: not state transition chain"
         );
         _;
@@ -57,64 +49,62 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         _;
     }
 
-    function initialize(address _governor) external reentrancyGuardInitializer returns (bytes32) {
-        require(governor == address(0), "Bridgehub: governor zero");
-        governor = _governor;
+    function initialize() external reentrancyGuardInitializer returns (bytes32) {
     }
 
     ///// Getters
 
-    function getStateTransitionChain(uint256 _chainId) public view returns (address) {
-        return IZkSyncStateTransition(stateTransition[_chainId]).stateTransitionChain(_chainId);
+    function getZkSyncStateTransition(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId);
     }
 
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
-    function newStateTransition(address _stateTransition) external onlyGovernor {
-        require(!stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
-        stateTransitionIsRegistered[_stateTransition] = true;
+    function newstateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        require(!stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition already registered");
+        stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
-    function removeStateTransition(address _stateTransition) external onlyGovernor {
-        require(stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition already registered");
-        stateTransitionIsRegistered[_stateTransition] = false;
+    function removestateTransitionManager(address _stateTransitionManager) external onlyOwner {
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition already registered");
+        stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
-    function newToken(address _token) external onlyGovernor {
+    function newToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
     }
 
     /// @notice Bridge can be any contract with the appropriate interface/functionality
-    function newTokenBridge(address _tokenBridge) external onlyGovernor {
+    function newTokenBridge(address _tokenBridge) external onlyOwner {
         require(!tokenBridgeIsRegistered[_tokenBridge], "Bridgehub: token bridge already registered");
         tokenBridgeIsRegistered[_tokenBridge] = true;
     }
 
-    function setWethBridge(address _wethBridge) external onlyGovernor {
+    function setWethBridge(address _wethBridge) external onlyOwner {
         wethBridge = IL1Bridge(_wethBridge);
     }
 
     /// @notice for Eth the baseToken address is 0.
     function newChain(
         uint256 _chainId,
-        address _stateTransition,
+        address _stateTransitionManager,
         address _baseToken,
         address _baseTokenBridge,
         uint256 _salt,
         address _l2Governor,
         bytes calldata _initData
-    ) external onlyGovernor returns (uint256 chainId) {
+    ) external onlyOwner returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
         if (_chainId == 0) {
             chainId = uint48(
                 uint256(
                     keccak256(
-                        abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransition, msg.sender, _salt)
+                        abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransitionManager, msg.sender, _salt)
                     )
                 )
             );
@@ -122,17 +112,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             chainId = _chainId;
         }
 
-        require(stateTransitionIsRegistered[_stateTransition], "Bridgehub: state transition not registered");
+        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition not registered");
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
-        require(stateTransition[_chainId] == address(0), "Bridgehub: chainId already registered");
+        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
 
-        stateTransition[chainId] = _stateTransition;
+        stateTransitionManager[chainId] = _stateTransitionManager;
         baseToken[chainId] = _baseToken;
         baseTokenBridge[chainId] = _baseTokenBridge;
 
-        IZkSyncStateTransition(_stateTransition).newChain(
+        IStateTransitionManager(_stateTransitionManager).newChain(
             chainId,
             _baseToken,
             _baseTokenBridge,
@@ -140,7 +130,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             _initData
         );
 
-        emit NewChain(uint48(chainId), _stateTransition, msg.sender);
+        emit NewChain(uint48(chainId), _stateTransitionManager, msg.sender);
     }
 
     //// Mailbox forwarder
@@ -152,9 +142,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
+        address stateTransition = getZkSyncStateTransition(_chainId);
         return
-            IStateTransitionChain(stateTransitionChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+            IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(
@@ -164,8 +154,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
-        return IStateTransitionChain(stateTransitionChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+        address stateTransition = getZkSyncStateTransition(_chainId);
+        return IZkSyncStateTransition(stateTransition).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
     function proveL1ToL2TransactionStatus(
@@ -177,9 +167,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
+        address stateTransition = getZkSyncStateTransition(_chainId);
         return
-            IStateTransitionChain(stateTransitionChain).proveL1ToL2TransactionStatus(
+            IZkSyncStateTransition(stateTransition).proveL1ToL2TransactionStatus(
                 _l2TxHash,
                 _l2BatchNumber,
                 _l2MessageIndex,
@@ -195,9 +185,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256) {
-        address stateTransitionChain = getStateTransitionChain(_chainId);
+        address stateTransition = getZkSyncStateTransition(_chainId);
         return
-            IStateTransitionChain(stateTransitionChain).l2TransactionBaseCost(
+            IZkSyncStateTransition(stateTransition).l2TransactionBaseCost(
                 _gasPrice,
                 _l2GasLimit,
                 _l2GasPerPubdataByteLimit
@@ -211,7 +201,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             address token = baseToken[_request.chainId];
             // address tokenBridge = baseTokenBridge[_request.chainId];
 
-            if (token == ethTokenAddress) {
+            if (token == ETH_TOKEN_ADDRESS) {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
                 IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDeposit{value: msg.value}(
                     _request.chainId,
@@ -237,14 +227,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             address token = baseToken[_request.chainId];
             // address tokenBridge = baseTokenBridge[_request.chainId];
 
-            if (token == ethTokenAddress) {
+            if (token == ETH_TOKEN_ADDRESS) {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
                 mintValue = msg.value;
             }
         }
 
-        address stateTransitionChain = getStateTransitionChain(_request.chainId);
-        canonicalTxHash = IStateTransitionChain(stateTransitionChain).bridgehubRequestL2Transaction(
+        address stateTransition = getZkSyncStateTransition(_request.chainId);
+        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             msg.sender,
             _request.l2Contract,
             mintValue,

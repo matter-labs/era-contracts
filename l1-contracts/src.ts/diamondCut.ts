@@ -3,8 +3,8 @@ import type { Interface } from "ethers/lib/utils";
 import "@nomiclabs/hardhat-ethers";
 import type { Wallet, BigNumberish } from "ethers";
 import { ethers } from "ethers";
-import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
-import { IStateTransitionChainBaseFactory } from "../typechain/IStateTransitionChainBaseFactory";
+import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { IZkSyncStateTransitionBaseFactory } from "../typechain/IZkSyncStateTransitionBaseFactory";
 
 // Some of the facets are to be removed with the upcoming upgrade.
 const UNCONDITIONALLY_REMOVED_FACETS = ["DiamondCutFacet", "GovernanceFacet"];
@@ -102,12 +102,12 @@ export async function getCurrentFacetCutsForAdd(
 }
 
 export async function getDeployedFacetCutsForRemove(wallet: Wallet, zkSyncAddress: string, updatedFaceNames: string[]) {
-  const mainContract = IStateTransitionChainFactory.connect(zkSyncAddress, wallet);
+  const mainContract = IZkSyncStateTransitionFactory.connect(zkSyncAddress, wallet);
   const diamondCutFacets = await mainContract.facets();
   // We don't care about freezing, because we are removing the facets.
   const result = [];
   for (const { addr, selectors } of diamondCutFacets) {
-    const facet = IStateTransitionChainBaseFactory.connect(addr, wallet);
+    const facet = IZkSyncStateTransitionBaseFactory.connect(addr, wallet);
     const facetName = await facet.getName();
     if (updatedFaceNames.includes(facetName)) {
       result.push({

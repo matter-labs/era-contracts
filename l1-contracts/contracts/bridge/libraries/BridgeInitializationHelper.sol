@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../bridgehub/bridgehub-interfaces/IBridgehub.sol";
+import "../../bridgehub/IBridgehub.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";

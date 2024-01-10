@@ -15,8 +15,8 @@ import {
   readSystemContractsBytecode,
 } from "../scripts/utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
-import { IStateTransitionChainFactory } from "../typechain/IStateTransitionChainFactory";
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -98,7 +98,7 @@ export class Deployer {
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
   }
 
-  public async initialStateTransitionChainDiamondCut(extraFacets?: FacetCut[]) {
+  public async initialZkSyncStateTransitionDiamondCut(extraFacets?: FacetCut[]) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
@@ -259,7 +259,7 @@ export class Deployer {
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
-      "ZkSyncStateTransition",
+      "StateTransitionManager",
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       ethTxOptions
@@ -281,10 +281,10 @@ export class Deployer {
     const genesisBatchHash = getHashFromEnv("CONTRACTS_GENESIS_ROOT"); // TODO: confusing name
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-    const diamondCut = await this.initialStateTransitionChainDiamondCut(extraFacets);
+    const diamondCut = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
 
-    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("ZkSyncStateTransition").abi);
+    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
     const initCalldata = stateTransition.encodeFunctionData("initialize", [
       {
@@ -595,7 +595,7 @@ export class Deployer {
     // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const inputChainId = 0;
     const governor = this.ownerAddress;
-    const diamondCutData = await this.initialStateTransitionChainDiamondCut(extraFacets);
+    const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode(
       [
         "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)",
@@ -722,11 +722,11 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
+    return IStateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
-  public stateTransitionChainContract(signerOrProvider: Signer | providers.Provider) {
-    return IStateTransitionChainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+  public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
+    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
   }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {
