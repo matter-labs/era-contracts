@@ -42,6 +42,8 @@ jobs:
         with:
           tag_name: ${{ steps.init.outputs.release_tag }}
           fail_on_unmatched_files: true
+          draft: true
+          body: ""
           files: |
             l1-contracts.tar.gz
             l2-contracts.tar.gz
