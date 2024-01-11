@@ -12,7 +12,6 @@ import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
-
     /// new fields
     /// @notice we store registered stateTransitionManagers
     mapping(address => bool) public stateTransitionManagerIsRegistered;
@@ -63,14 +62,20 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     function newStateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(!stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition already registered");
+        require(
+            !stateTransitionManagerIsRegistered[_stateTransitionManager],
+            "Bridgehub: state transition already registered"
+        );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
     }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
     function removestateTransitionManager(address _stateTransitionManager) external onlyOwner {
-        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition already registered");
+        require(
+            stateTransitionManagerIsRegistered[_stateTransitionManager],
+            "Bridgehub: state transition already registered"
+        );
         stateTransitionManagerIsRegistered[_stateTransitionManager] = false;
     }
 
@@ -105,7 +110,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             chainId = uint48(
                 uint256(
                     keccak256(
-                        abi.encodePacked("CHAIN_ID", block.chainid, address(this), _stateTransitionManager, msg.sender, _salt)
+                        abi.encodePacked(
+                            "CHAIN_ID",
+                            block.chainid,
+                            address(this),
+                            _stateTransitionManager,
+                            msg.sender,
+                            _salt
+                        )
                     )
                 )
             );
@@ -113,7 +125,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             chainId = _chainId;
         }
 
-        require(stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition not registered");
+        require(
+            stateTransitionManagerIsRegistered[_stateTransitionManager],
+            "Bridgehub: state transition not registered"
+        );
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
@@ -144,8 +159,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         bytes32[] calldata _proof
     ) external view override returns (bool) {
         address stateTransition = getZkSyncStateTransition(_chainId);
-        return
-            IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+        return IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
     function proveL2LogInclusion(

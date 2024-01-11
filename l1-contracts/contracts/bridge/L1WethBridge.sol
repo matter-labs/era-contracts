@@ -23,7 +23,7 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY} from "../common/Config.sol";
 import "../vendor/AddressAliasHelper.sol";
 
-import {Initializable} from  "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @author Matter Labs
@@ -112,10 +112,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        address payable _l1WethAddress,
-        IBridgehub _bridgehub
-    ) reentrancyGuardInitializer {
+    constructor(address payable _l1WethAddress, IBridgehub _bridgehub) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
     }
@@ -136,7 +133,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         address _l2BridgeStandardAddressEthIsNotBase,
         address _owner,
         uint256 _eraIsWithdrawalFinalizedStorageSwitch
-    ) external reentrancyGuardInitializer() {
+    ) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
         require(_l2WethStandardAddressEthIsBase != address(0), "L2 WETH address cannot be zero");
         require(_l2WethStandardAddressEthIsNotBase != address(0), "L2 WETH not eth based address cannot be zero");
@@ -541,13 +538,19 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        require(
+            !isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex],
+            "Withdrawal is already finalized"
+        );
 
         if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitch))) {
             // in this case we have to check we don't double withdraw ether
             // we are not fully finalized if eth has not been withdrawn
             // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
-            bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
+            bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(
+                _l2BatchNumber,
+                _l2MessageIndex
+            );
             require(!alreadyFinalized, "Withdrawal is already finalized");
         }
 

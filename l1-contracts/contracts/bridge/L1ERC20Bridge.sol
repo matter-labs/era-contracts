@@ -32,7 +32,13 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
-contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, InitializableRandomStorage, Ownable2StepRandomStorage {
+contract L1ERC20Bridge is
+    IL1Bridge,
+    IL1BridgeLegacy,
+    ReentrancyGuard,
+    InitializableRandomStorage,
+    Ownable2StepRandomStorage
+{
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
@@ -86,7 +92,8 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, Initializ
 
     /// @dev A mapping chainId => account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256)))) internal depositAmountShared;
+    mapping(uint256 => mapping(address => mapping(address => mapping(bytes32 => uint256))))
+        internal depositAmountShared;
 
     /// @dev used for extra security until hyperbridging happens.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
@@ -112,7 +119,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, Initializ
     }
 
     // used for calling reentracyGuardInitializer in testing and independent deployments
-    function initialize() external reentrancyGuardInitializer  {}
+    function initialize() external reentrancyGuardInitializer {}
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it

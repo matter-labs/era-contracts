@@ -194,11 +194,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             "Executor facet: wrong protocol version"
         );
         // Check that we commit batches after last committed batch
-        require(
-            s.storedBatchHashes[s.totalBatchesCommitted] ==
-                _hashStoredBatchInfo(_lastCommittedBatchData),
-            "i"
-        ); // incorrect previous batch data
+        require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
         require(_newBatchesData.length > 0, "No batches to commit");
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -262,9 +258,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0), false);
 
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(
-                _lastCommittedBatchData
-            );
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -310,9 +304,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
                 _outdatedProtocolVersion
             );
 
-            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(
-                _lastCommittedBatchData
-            );
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -395,8 +387,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             require(
-                _hashStoredBatchInfo(_committedBatches[i]) ==
-                    s.storedBatchHashes[currentTotalBatchesVerified],
+                _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
                 "o1"
             );
 
@@ -478,11 +469,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             delete s.l2SystemContractsUpgradeBatchNumber;
         }
 
-        emit BlocksRevert(
-            s.totalBatchesCommitted,
-            s.totalBatchesVerified,
-            s.totalBatchesExecuted
-        );
+        emit BlocksRevert(s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
     }
 
     /// @notice Returns larger of two values
@@ -513,12 +500,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        return
-            abi.encodePacked(
-                s.zkPorterIsAvailable,
-                s.l2BootloaderBytecodeHash,
-                s.l2DefaultAccountBytecodeHash
-            );
+        return abi.encodePacked(s.zkPorterIsAvailable, s.l2BootloaderBytecodeHash, s.l2DefaultAccountBytecodeHash);
     }
 
     function _batchAuxiliaryOutput(

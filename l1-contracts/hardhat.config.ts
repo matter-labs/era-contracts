@@ -77,7 +77,7 @@ const contractDefs = {
   goerli: testnetConfig,
   mainnet: prodConfig,
   hardhat: hardhatConfig,
-  localhost: localConfig
+  localhost: localConfig,
 };
 
 export default {

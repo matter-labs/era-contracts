@@ -202,10 +202,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        require(
-            s.baseToken == ETH_TOKEN_ADDRESS,
-            " finalizeEthWithdrawal only available for Eth chains on mailbox"
-        );
+        require(s.baseToken == ETH_TOKEN_ADDRESS, " finalizeEthWithdrawal only available for Eth chains on mailbox");
         IL1Bridge(s.baseTokenBridge).finalizeWithdrawal(
             s.chainId,
             _l2BatchNumber,
@@ -370,11 +367,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
         bytes memory transactionEncoding = abi.encode(transaction);
 
-        TransactionValidator.validateL1ToL2Transaction(
-            transaction,
-            transactionEncoding,
-            s.priorityTxMaxGasLimit
-        );
+        TransactionValidator.validateL1ToL2Transaction(transaction, transactionEncoding, s.priorityTxMaxGasLimit);
 
         canonicalTxHash = keccak256(transactionEncoding);
 

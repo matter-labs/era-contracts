@@ -21,7 +21,7 @@ struct StateTransitionManagerInitializeData {
     uint256 protocolVersion;
 }
 
-interface IStateTransitionManager{
+interface IStateTransitionManager {
     // when a new Chain is added
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
@@ -43,7 +43,7 @@ interface IStateTransitionManager{
 
     function initialize(StateTransitionManagerInitializeData calldata _initalizeData) external;
 
-        /// @notice
+    /// @notice
     function newChain(
         uint256 _chainId,
         address _baseToken,

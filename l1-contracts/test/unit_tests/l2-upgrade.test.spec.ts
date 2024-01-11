@@ -158,7 +158,7 @@ describe("L2 upgrade test", function () {
     await makeExecutedEqualCommitted(proxyExecutor, storedBatch1InfoChainIdUpgrade, [storedBatch2Info], []);
   });
 
-    it("Timestamp should behave correctly", async () => {
+  it("Timestamp should behave correctly", async () => {
     // Upgrade was scheduled for now should work fine
     const timeNow = (await hardhat.ethers.provider.getBlock("latest")).timestamp;
     await executeUpgrade(chainId, proxyGetters, stateTransitionManager, {
@@ -454,7 +454,9 @@ describe("L2 upgrade test", function () {
       factoryDeps: [myFactoryDep],
       newProtocolVersion: 5 + 1 + initialProtocolVersion,
     };
-    const revertReason = await getCallRevertReason(executeUpgrade(chainId, proxyGetters, stateTransitionManager, upgrade));
+    const revertReason = await getCallRevertReason(
+      executeUpgrade(chainId, proxyGetters, stateTransitionManager, upgrade)
+    );
     await rollBackToVersion((4 + 1 + initialProtocolVersion).toString(), stateTransitionManager, upgrade);
     expect(revertReason).to.equal("Previous upgrade has not been finalized");
   });
@@ -938,7 +940,11 @@ async function executeUpgrade(
   const oldProtocolVersion = await proxyGetters.getProtocolVersion();
   // This promise will be handled in the tests
   (
-    await stateTransitionManager.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+    await stateTransitionManager.setNewVersionUpgrade(
+      diamondCutData,
+      oldProtocolVersion,
+      partialUpgrade.newProtocolVersion
+    )
   ).wait();
   return stateTransitionManager.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
 }

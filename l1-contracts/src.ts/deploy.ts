@@ -721,7 +721,10 @@ export class Deployer {
   }
 
   public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
-    return IStateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
+    return IStateTransitionManagerFactory.connect(
+      this.addresses.StateTransition.StateTransitionProxy,
+      signerOrProvider
+    );
   }
 
   // public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
