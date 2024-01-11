@@ -19,8 +19,11 @@ import "../common/Messaging.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import "../common/ReentrancyGuard.sol";
-import "../common/VersionTracker.sol";
+import "../common/InitializableRandomStorage.sol";
+import "../common/Ownable2StepRandomStorage.sol";
 import "../vendor/AddressAliasHelper.sol";
+
+import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
@@ -29,16 +32,11 @@ import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.s
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
-contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTracker {
+contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, InitializableRandomStorage, Ownable2StepRandomStorage {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub public immutable bridgehub;
-
-    /// @dev Era's chainID
-    uint256 public immutable eraChainId;
-
-    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -68,9 +66,6 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
     mapping(address => mapping(address => uint256)) public __DEPRECATED_totalDepositedAmountPerUser;
 
-    /// @dev Governor's address
-    address public governor;
-
     bytes32 public factoryDepsHash;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
@@ -96,20 +91,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @dev used for extra security until hyperbridging happens.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
 
-    address public eraTokenBeaconAddress;
-
     function l2Bridge() external view returns (address) {
-        return l2BridgeAddress[eraChainId];
+        return l2BridgeAddress[ERA_CHAIN_ID];
     }
 
     function l2TokenBeacon() external view returns (address) {
-        return eraTokenBeaconAddress;
-    }
-
-    /// @notice Checks that the message sender is the governor
-    modifier onlyGovernor() {
-        require(msg.sender == governor, "L1ERC20Bridge: not governor");
-        _;
+        return ERA_TOKEN_BEACON_ADDRESS;
     }
 
     /// @notice Checks that the message sender is the governor
@@ -120,13 +107,12 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, uint256 _eraChainId) reentrancyGuardInitializer {
+    constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
         bridgehub = _bridgehub;
-        eraChainId = _eraChainId;
     }
 
     // used for calling reentracyGuardInitializer in testing and independent deployments
-    function initialize() external reentrancyGuardInitializer {}
+    function initialize() external reentrancyGuardInitializer  {}
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it
@@ -138,32 +124,31 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
     /// @notice At the time of the function call, it is not yet deployed in L2, but knowledge of its address
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _l2BridgeStandardAddress Pre-calculated address of the L2 token upgradeable beacon
-    /// @param _governor Address which can change L2 token implementation and upgrade the bridge
+    /// @param _owner Address which can change L2 token implementation and upgrade the bridge
     /// implementation
     function initializeV2(
         bytes[] calldata _factoryDeps,
         address _l2TokenBeaconStandardAddress,
         address _l2BridgeStandardAddress,
-        address _governor,
-        address _eraTokenBeaconAddress
+        address _owner
     ) external payable reinitializer(2) {
-        require(_l2TokenBeacon != address(0), "nf");
-        require(_governor != address(0), "nh");
+        _transferOwnership(_owner);
+        require(_l2TokenBeaconStandardAddress != address(0), "Token Beacon address 0");
+        require(_l2BridgeStandardAddress != address(0), "Bridge address 0");
+        require(_owner != address(0), "nh");
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
         require(_factoryDeps.length == 3, "mk");
         // The caller miscalculated deploy transactions fees
         l2TokenProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[2]);
         l2TokenBeaconStandardAddress = _l2TokenBeaconStandardAddress;
         l2BridgeStandardAddress = _l2BridgeStandardAddress;
-        governor = _governor;
-        eraTokenBeaconAddress = _eraTokenBeaconAddress;
 
         // #if !EOA_GOVERNOR
         uint32 size;
         assembly {
-            size := extcodesize(_governor)
+            size := extcodesize(_owner)
         }
-        require(size > 0, "L1ERC20Bridge, governor cannot be EOA");
+        require(size > 0, "L1ERC20Bridge, owner cannot be EOA");
         // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
@@ -173,7 +158,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         uint256 _chainId,
         address _l2BridgeAddress,
         address _l2TokenBeaconAddress
-    ) external onlyGovernor {
+    ) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
         l2TokenBeaconAddress[_chainId] = _l2TokenBeaconAddress;
     }
@@ -232,7 +217,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
             {
                 address proxyAdmin = readProxyAdmin();
                 address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
-                address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
+                address l2Governor = AddressAliasHelper.applyL1ToL2Alias(owner());
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(
                     IL2ERC20Bridge.initialize,
@@ -329,7 +314,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
         l2TxHash = deposit(
-            eraChainId,
+            ERA_CHAIN_ID,
             _l2Receiver,
             _l1Token,
             0, // this is overriden by msg.value for era
@@ -361,7 +346,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         address _refundRecipient
     ) external payable returns (bytes32 l2TxHash) {
         l2TxHash = deposit(
-            eraChainId,
+            ERA_CHAIN_ID,
             _l2Receiver,
             _l1Token,
             0, // this is overriden by msg.value for era
@@ -443,14 +428,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         );
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         } else {
             depositAmountShared[_chainId][msg.sender][_l1Token][l2TxHash] = _amount;
         }
 
         emit DepositInitiatedSharedBridge(_chainId, l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
         }
     }
@@ -560,14 +545,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(proofValid, "yn");
 
         uint256 amount = 0;
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
         } else {
             amount = depositAmountShared[_chainId][_depositSender][_l1Token][_l2TxHash];
         }
         require(amount > 0, "y1");
 
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             delete depositAmount[_depositSender][_l1Token][_l2TxHash];
         } else {
             delete depositAmountShared[_chainId][_depositSender][_l1Token][_l2TxHash];
@@ -580,7 +565,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         IERC20(_l1Token).safeTransfer(_depositSender, amount);
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, amount);
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
         }
     }
@@ -599,7 +584,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
         } else {
             require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
@@ -618,13 +603,13 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard, VersionTr
         require(chainBalance[_chainId][l1Token] >= amount, "L1ERC20Bridge: chain does not have enough funds");
         chainBalance[_chainId][l1Token] -= amount;
 
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             emit WithdrawalFinalized(l1Receiver, l1Token, amount);
         }
 
         {
             // Preventing the stack too deep error
-            if (_chainId == eraChainId) {
+            if (_chainId == ERA_CHAIN_ID) {
                 isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
             } else {
                 isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;

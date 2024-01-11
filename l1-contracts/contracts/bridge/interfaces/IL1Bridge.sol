@@ -40,7 +40,7 @@ interface IL1Bridge {
     // legacy before bridgehub, only used for Era
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
-    function isWithdrawalFinalized(
+    function isWithdrawalFinalizedShared(
         uint256 chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex

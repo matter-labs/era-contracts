@@ -14,7 +14,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncStateTransitionBase} from "./Base.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, FAIR_L2_GAS_PRICE, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -28,10 +28,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     using PriorityQueue for PriorityQueue.Queue;
 
     string public constant override getName = "MailboxFacet";
-    address public constant ETH_TOKEN_ADDRESS = address(1);
-
-    /// @dev Era's chainID
-    uint256 public constant eraChainId = $(ERA_CHAIN_ID);
 
     // this is implemented in the bridghead, does not go through the router.
     function bridgehubRequestL2Transaction(
@@ -244,7 +240,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
         IL1Bridge(s.baseTokenBridge).bridgehubDeposit{value: msg.value}(
             s.chainId,
-            address(0),
+            ETH_TOKEN_ADDRESS,
             msg.value,
             msg.sender
         );

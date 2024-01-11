@@ -9,9 +9,9 @@ import "../bridge/interfaces/IL1Bridge.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
-    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// new fields
     /// @notice we store registered stateTransitionManagers
@@ -49,7 +49,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         _;
     }
 
-    function initialize() external reentrancyGuardInitializer returns (bytes32) {
+    function initialize(address _owner) external reentrancyGuardInitializer {
+        _transferOwnership(_owner);
     }
 
     ///// Getters
@@ -61,7 +62,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
-    function newstateTransitionManager(address _stateTransitionManager) external onlyOwner {
+    function newStateTransitionManager(address _stateTransitionManager) external onlyOwner {
         require(!stateTransitionManagerIsRegistered[_stateTransitionManager], "Bridgehub: state transition already registered");
         stateTransitionManagerIsRegistered[_stateTransitionManager] = true;
     }

@@ -125,3 +125,13 @@ uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
+
+/// @dev Era's chainID
+uint256 constant ERA_CHAIN_ID = $(ERA_CHAIN_ID);
+
+address constant ERA_TOKEN_BEACON_ADDRESS = $(ERA_TOKEN_BEACON_ADDRESS);
+
+address constant ETH_TOKEN_ADDRESS = address(1);
+
+/// @dev address of era's diamond proxy
+address constant ERA_DIAMOND_PROXY = $(ERA_DIAMOND_PROXY);

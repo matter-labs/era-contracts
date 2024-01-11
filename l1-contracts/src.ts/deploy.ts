@@ -15,7 +15,6 @@ import {
   readSystemContractsBytecode,
 } from "../scripts/utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
-import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
@@ -376,7 +375,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId],
+      [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       ethTxOptions
     );
@@ -431,7 +430,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1WethBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, EraLegacyChainId, EraLegacyDiamondProxyAddress],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       ethTxOptions
     );
@@ -570,7 +569,7 @@ export class Deployer {
   public async registerStateTransition() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.newStateTransition(this.addresses.StateTransition.StateTransitionProxy);
+    const tx = await bridgehub.newStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
     const receipt = await tx.wait();
     if (this.verbose) {
@@ -590,7 +589,7 @@ export class Deployer {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const stateTransition = this.stateTransitionContract(this.deployWallet);
+    const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const inputChainId = 0;
@@ -628,7 +627,7 @@ export class Deployer {
     const diamondProxyAddress =
       "0x" +
       receipt.logs
-        .find((log) => log.topics[0] == stateTransition.interface.getEventTopic("StateTransitionNewChain"))
+        .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
         .topics[2].slice(26);
 
     this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
@@ -721,13 +720,13 @@ export class Deployer {
     return IBridgehubFactory.connect(this.addresses.Bridgehub.BridgehubProxy, signerOrProvider);
   }
 
-  public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
+  public stateTransitionManagerContract(signerOrProvider: Signer | providers.Provider) {
     return IStateTransitionManagerFactory.connect(this.addresses.StateTransition.StateTransitionProxy, signerOrProvider);
   }
 
-  public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
-  }
+  // public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
+  //   return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+  // }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {
     return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);

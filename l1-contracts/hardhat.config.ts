@@ -44,7 +44,7 @@ const testnetConfig = {
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 300,
 };
-const testConfig = {
+const hardhatConfig = {
   UPGRADE_NOTICE_PERIOD: 0,
   PRIORITY_EXPIRATION: 101,
   SECURITY_COUNCIL_APPROVALS_FOR_EMERGENCY_UPGRADE: 2,
@@ -53,6 +53,8 @@ const testConfig = {
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 9,
+  ERA_TOKEN_BEACON_ADDRESS: "address(0)",
+  ERA_DIAMOND_PROXY: "address(0)",
 };
 const localConfig = {
   ...prodConfig,
@@ -60,12 +62,13 @@ const localConfig = {
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 9,
 };
-const hardhatConfig = {
-  ...prodConfig,
-  DUMMY_VERIFIER: true,
-  EOA_GOVERNOR: true,
-  ERA_CHAIN_ID: 9,
-};
+// const hardhatConfig = {
+//   ...prodConfig,
+//   DUMMY_VERIFIER: true,
+//   EOA_GOVERNOR: true,
+//   ERA_CHAIN_ID: 9,
+//   ERA_TOKEN_BEACON_ADDRESS: 0,
+// };
 
 const contractDefs = {
   sepolia: testnetConfig,
@@ -73,9 +76,8 @@ const contractDefs = {
   ropsten: testnetConfig,
   goerli: testnetConfig,
   mainnet: prodConfig,
-  test: testConfig,
-  localhost: localConfig,
   hardhat: hardhatConfig,
+  localhost: localConfig
 };
 
 export default {
@@ -103,7 +105,7 @@ export default {
   },
   solpp: {
     defs: (() => {
-      const defs = process.env.CONTRACT_TESTS ? contractDefs.test : contractDefs[process.env.CHAIN_ETH_NETWORK];
+      const defs = contractDefs[process.env.CHAIN_ETH_NETWORK];
 
       return {
         ...systemParams,

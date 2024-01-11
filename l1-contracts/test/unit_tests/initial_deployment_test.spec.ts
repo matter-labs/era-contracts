@@ -52,9 +52,9 @@ describe("Initial Deployment", function () {
   });
 
   it("Check addresses", async () => {
-    const stateTransitionAddress1 = deployer.addresses.StateTransition.StateTransitionProxy;
-    const stateTransitionAddress2 = await bridgehub.stateTransition(chainId);
-    expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
+    const stateTransitionManagerAddress1 = deployer.addresses.StateTransition.StateTransitionProxy;
+    const stateTransitionManagerAddress2 = await bridgehub.stateTransitionManager(chainId);
+    expect(stateTransitionManagerAddress1.toLowerCase()).equal(stateTransitionManagerAddress2.toLowerCase());
 
     const stateTransitionAddress1 = deployer.addresses.StateTransition.DiamondProxy;
     const stateTransitionAddress2 = await stateTransition.stateTransition(chainId);

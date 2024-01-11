@@ -3,6 +3,7 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
 import type { L1WethBridge, WETH9 } from "../../typechain";
+import type { Deployer } from "../../src.ts/deploy";
 import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
@@ -69,12 +70,14 @@ describe("WETH Bridge tests", () => {
   let bridgeProxy: L1WethBridge;
   let l1Weth: WETH9;
   const functionSignature = "0x6c0960f9";
+  let deployWallet: Wallet;
+  let deployer: Deployer;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
-    const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(owner.provider);
+    deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
 
     const gasPrice = await owner.provider.getGasPrice();
@@ -91,7 +94,7 @@ describe("WETH Bridge tests", () => {
     await owner.sendTransaction(tx);
 
     // note we can use initialDeployment so we don't go into deployment details here
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
 
@@ -101,10 +104,20 @@ describe("WETH Bridge tests", () => {
     // prepare the bridge
 
     bridgeProxy = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
+  });
+
+  it("Check startInitializeChain", async () => {
     const nonce = await deployWallet.getTransactionCount();
+    const gasPrice = await owner.provider.getGasPrice();
 
     await startInitializeChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
+    const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
+
+    expect(txHash).not.equal(ethers.constants.HashZero);
+  });
+
+  it("Check should initialize through governance", async () => {
     const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
     const upgradeCall = l1WethBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [
       chainId,
@@ -112,11 +125,7 @@ describe("WETH Bridge tests", () => {
       ADDRESS_ONE,
     ]);
 
-    await executeUpgrade(deployer, deployWallet, bridgeProxy.address, 0, upgradeCall);
-  });
-
-  it("Check startInitializeChain", async () => {
-    const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
+    const txHash = await executeUpgrade(deployer, deployWallet, bridgeProxy.address, 0, upgradeCall);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
   });

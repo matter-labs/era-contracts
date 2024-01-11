@@ -18,10 +18,13 @@ import "./libraries/BridgeInitializationHelper.sol";
 import "../common/Messaging.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
-import "../common/VersionTracker.sol";
 import "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
+import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY} from "../common/Config.sol";
 import "../vendor/AddressAliasHelper.sol";
+
+import {Initializable} from  "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -38,10 +41,8 @@ import "../vendor/AddressAliasHelper.sol";
 /// WETH, and sends the WETH to the L1 recipient.
 /// @dev The `L1WethBridge` contract works in conjunction with its L2 counterpart, `L2WethBridge`.
 /// @dev Note VersionTracker stores at random addresses, so we can add it to the inheritance tree.
-contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
+contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step {
     using SafeERC20 for IERC20;
-
-    address public constant ETH_TOKEN_ADDRESS = address(1);
 
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
@@ -52,11 +53,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub public immutable bridgehub;
 
-    /// @dev Era's chainID
-    uint256 public immutable eraChainId;
-
-    /// @dev Governor's address
-    address public governor;
+    /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
+    /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
+    uint256 public eraIsWithdrawalFinalizedStorageSwitch;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
     address public l2BridgeStandardAddressEthIsBase;
@@ -86,16 +85,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev only used when it is not the base token, as then it is sent to refund recipient
     mapping(uint256 => mapping(address => mapping(bytes32 => uint256))) internal depositAmount;
 
-    /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
-    /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
-    uint256 eraIsWithdrawalFinalizedStorageSwitch;
-
-    /// @dev address of EraDiamondProxy
-    address eraDiamondProxy;
-
     /// @dev A mapping L2 chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
-    mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalizedShared;
 
     /// @dev A mapping chainId => amount. Used before we activate hyperbridging.
     mapping(uint256 => uint256) public chainBalance;
@@ -106,16 +98,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     event EthWithdrawalFinalized(uint256 chainId, address indexed to, uint256 amount);
 
     function l2Bridge() external view returns (address) {
-        return l2BridgeAddress[eraChainId];
+        return l2BridgeAddress[ERA_CHAIN_ID];
     }
 
-    /// @notice Checks that the message sender is the governor
-    modifier onlyGovernor() {
-        require(msg.sender == governor, "L1WETHBridge: not governor");
-        _;
-    }
-
-    /// @notice Checks that the message sender is the governor
+    /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
     modifier onlyBridgehubOrEthChain(uint256 _chainId) {
         require(
             (msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS),
@@ -128,18 +114,11 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         address payable _l1WethAddress,
-        IBridgehub _bridgehub,
-        uint256 _eraChainId,
-        address _eraDiamondProxy
+        IBridgehub _bridgehub
     ) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
-        eraChainId = _eraChainId;
-        eraDiamondProxy = _eraDiamondProxy;
     }
-
-    // used for calling reentracyGuardInitializer in testing and independent deployments
-    function initialize() external reentrancyGuardInitializer {}
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
@@ -148,21 +127,22 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
     /// implementation and proxy upon initialization
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethStandardAddressEthIsBase Pre-calculated address of L2 WETH token
-    /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
-    function initializeV2(
+    /// @param _owner Address which can change L2 WETH token implementation and upgrade the bridge
+    function initialize(
         bytes[] calldata _factoryDeps,
         address _l2WethStandardAddressEthIsBase,
         address _l2WethStandardAddressEthIsNotBase,
         address _l2BridgeStandardAddressEthIsBase,
         address _l2BridgeStandardAddressEthIsNotBase,
-        address _governor,
+        address _owner,
         uint256 _eraIsWithdrawalFinalizedStorageSwitch
-    ) external reinitializer(2) {
+    ) external reentrancyGuardInitializer() {
+        _transferOwnership(_owner);
         require(_l2WethStandardAddressEthIsBase != address(0), "L2 WETH address cannot be zero");
         require(_l2WethStandardAddressEthIsNotBase != address(0), "L2 WETH not eth based address cannot be zero");
         require(_l2BridgeStandardAddressEthIsBase != address(0), "L2 bridge address cannot be zero");
         require(_l2BridgeStandardAddressEthIsNotBase != address(0), "L2 bridge not eth based address cannot be zero");
-        require(_governor != address(0), "Governor address cannot be zero");
+        require(_owner != address(0), "Governor address cannot be zero");
         require(_factoryDeps.length == 2, "Invalid base factory deps length provided");
 
         l2WethStandardAddressEthIsBase = _l2WethStandardAddressEthIsBase;
@@ -171,15 +151,14 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         l2BridgeStandardAddressEthIsBase = _l2BridgeStandardAddressEthIsBase;
         l2BridgeStandardAddressEthIsNotBase = _l2BridgeStandardAddressEthIsNotBase;
 
-        governor = _governor;
         eraIsWithdrawalFinalizedStorageSwitch = _eraIsWithdrawalFinalizedStorageSwitch;
 
         // #if !EOA_GOVERNOR
         uint32 size;
         assembly {
-            size := extcodesize(_governor)
+            size := extcodesize(_owner)
         }
-        require(size > 0, "L1WETHBridge, governor cannot be EOA");
+        require(size > 0, "L1WETHBridge, owner cannot be EOA");
         // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
@@ -189,7 +168,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         uint256 _chainId,
         address _l2BridgeAddress,
         address _l2WethAddress
-    ) external onlyGovernor {
+    ) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
         l2WethAddress[_chainId] = _l2WethAddress;
     }
@@ -256,7 +235,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         {
             address proxyAdmin = readProxyAdmin();
             address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
-            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(governor);
+            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(owner());
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
@@ -428,7 +407,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             );
         }
         emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, amount);
-        if (_chainId == eraChainId) {
+        if (_chainId == ERA_CHAIN_ID) {
             emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, amount);
         }
     }
@@ -562,13 +541,13 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
 
-        if ((_chainId == eraChainId) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitch))) {
+        if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitch))) {
             // in this case we have to check we don't double withdraw ether
             // we are not fully finalized if eth has not been withdrawn
             // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
-            bool alreadyFinalized = IGetters(eraDiamondProxy).isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
+            bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
             require(!alreadyFinalized, "Withdrawal is already finalized");
         }
 
@@ -589,7 +568,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             IERC20(l1WethAddress).safeTransfer(l1WithdrawReceiver, amount);
 
             emit WithdrawalFinalizedSharedBridge(_chainId, l1WithdrawReceiver, l1WethAddress, amount);
-            if (_chainId == eraChainId) {
+            if (_chainId == ERA_CHAIN_ID) {
                 emit WithdrawalFinalized(l1WithdrawReceiver, l1WethAddress, amount);
             }
         } else {
@@ -602,7 +581,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, VersionTracker {
             emit EthWithdrawalFinalized(_chainId, l1WithdrawReceiver, amount);
         }
 
-        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
     }
 
     /// @dev check that the withdrawal is valid

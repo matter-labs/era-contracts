@@ -40,8 +40,7 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
     l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
   } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
 
-  const tx1 = await l1WethBridge.initialize();
-  const tx2 = await l1WethBridge.initializeV2(
+  const tx1 = await l1WethBridge.initialize(
     [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
     l2WethProxyAddressEthIsBase,
     l2WethProxyAddressEthIsNotBase,
@@ -49,10 +48,10 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
     l2WethBridgeProxyAddressEthIsNotBase,
     l1GovernorAddress,
     0,
-    { nonce: nonce + 1, gasPrice }
+    { nonce: nonce , gasPrice }
   );
 
-  const txs = [tx1, tx2];
+  const txs = [tx1];
   if (deployer.verbose) {
     for (const tx of txs) {
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
@@ -60,7 +59,7 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   }
   const receipts = await Promise.all(txs.map((tx) => tx.wait(1)));
   if (deployer.verbose) {
-    console.log(`WETH bridge initialized, gasUsed: ${receipts[1].gasUsed.toString()}`);
+    console.log(`WETH bridge initialized, gasUsed: ${receipts[0].gasUsed.toString()}`);
     // console.log(`CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR=${l2WethImplAddressEthIsBase}`);
     // console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddressEthIsBase}`);
     // console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${l2WethBridgeProxyAddressEthIsBase}`);

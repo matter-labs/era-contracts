@@ -23,6 +23,8 @@ interface IBridgehub {
 
     function baseTokenBridge(uint256 _chainId) external view returns (address);
 
+    function getZkSyncStateTransition(uint256 _chainId) external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -99,7 +101,7 @@ interface IBridgehub {
         bytes calldata _initData
     ) external returns (uint256 chainId);
 
-    function newstateTransitionManager(address _stateTransitionManager) external;
+    function newStateTransitionManager(address _stateTransitionManager) external;
 
     function newToken(address _token) external;
 

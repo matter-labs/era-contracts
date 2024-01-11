@@ -56,7 +56,7 @@ pragma solidity ^0.8.2;
  * ```
  * ====
  */
-abstract contract VersionTracker {
+abstract contract InitializableRandomStorage {
     /// @dev Indicates that the contract has been initialized.
     /// @custom:oz-retyped-from bool
     /// @dev Address of initialized variable.
