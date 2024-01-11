@@ -52,7 +52,6 @@ describe("L1Messenger tests", () => {
   });
 
   describe("sendL2ToL1Log", async () => {
-    
     it("should revert when not called by the system contract", async () => {
       const isService = true;
       const key = ethers.utils.hexlify(randomBytes(32));
@@ -66,11 +65,11 @@ describe("L1Messenger tests", () => {
       const isService = true;
       const key = ethers.utils.hexlify(randomBytes(32));
       const value = ethers.utils.hexlify(randomBytes(32));
-      
+
       const txNumberInBlock = 1;
       const callResult = {
         failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
       };
       await setResult("SystemContext", "txNumberInBlock", [], callResult);
 
@@ -87,7 +86,7 @@ describe("L1Messenger tests", () => {
       const txNumberInBlock = 1;
       const callResult = {
         failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
       };
 
       await setResult("SystemContext", "txNumberInBlock", [], callResult);
@@ -125,33 +124,33 @@ describe("L1Messenger tests", () => {
       const expectedKey = ethers.utils
         .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
         .toLowerCase();
-  
-      const txNumberInBlock = 1; 
+
+      const txNumberInBlock = 1;
       const callResult = {
         failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
       };
       await setResult("SystemContext", "txNumberInBlock", [], callResult);
-  
+
       await expect(l1Messenger.connect(l1MessengerAccount).sendToL1(message))
         .to.emit(l1Messenger, "L1MessageSent")
         .withArgs(l1MessengerAccount.address, expectedHash, message)
         .and.to.emit(l1Messenger, "L2ToL1LogSent")
         .withArgs([0, true, txNumberInBlock, l1Messenger.address, expectedKey, expectedHash]);
     });
-  
+
     it("should emit L1MessageSent & L2ToL1LogSent events when called with default account", async () => {
       const message = ethers.utils.hexlify(randomBytes(64));
       const expectedHash = ethers.utils.keccak256(message);
       const expectedKey = ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(wallet.address), 32).toLowerCase();
-  
+
       const txNumberInBlock = 1;
       const callResult = {
         failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock])
+        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
       };
       await setResult("SystemContext", "txNumberInBlock", [], callResult);
-  
+
       await expect(l1Messenger.sendToL1(message))
         .to.emit(l1Messenger, "L1MessageSent")
         .withArgs(wallet.address, expectedHash, message)
@@ -181,8 +180,11 @@ describe("L1Messenger tests", () => {
     it("shoud emit event, called by known code system contract", async () => {
       const bytecode = await getCode(l1Messenger.address);
       const bytecodeHash = await ethers.utils.hexlify(utils.hashBytecode(bytecode));
-      await expect(l1Messenger.connect(knownCodeStorageAccount).requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 }))
-      .to.emit(l1Messenger, "BytecodeL1PublicationRequested").withArgs(bytecodeHash);
+      await expect(
+        l1Messenger.connect(knownCodeStorageAccount).requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 })
+      )
+        .to.emit(l1Messenger, "BytecodeL1PublicationRequested")
+        .withArgs(bytecodeHash);
     });
   });
 
@@ -212,7 +214,7 @@ describe("L1Messenger tests", () => {
         value,
       ]);
       numberOfLogs++;
-      
+
       // ====================================================================================================
       // sendToL1()
       const message = Buffer.alloc(32, 3);
@@ -240,7 +242,7 @@ describe("L1Messenger tests", () => {
       const currentMessageLength = 32;
       numberOfMessages++;
       numberOfLogs++;
-      
+
       // ====================================================================================================
       // requestBytecodeL1Publication()
       const bytecode = await getCode(l1Messenger.address);
@@ -326,7 +328,7 @@ describe("L1Messenger tests", () => {
       );
       const enumerationIndexSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(enumerationIndexSize), 1);
       const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
-    
+
       // ====================================================================================================
       // Prepare totalL2ToL1PubdataAndStateDiffs
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
@@ -411,7 +413,7 @@ describe("L1Messenger tests", () => {
       const currentMessageLength = 32;
       numberOfMessages++;
       numberOfLogs++;
-      
+
       // ====================================================================================================
       // requestBytecodeL1Publication()
       const bytecode = await getCode(l1Messenger.address);
@@ -431,7 +433,7 @@ describe("L1Messenger tests", () => {
       const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
-     
+
       // ====================================================================================================
       // Prepare state diffs - taken from Compressor.spec.ts
       const stateDiffs = [
@@ -488,7 +490,7 @@ describe("L1Messenger tests", () => {
 
       // ====================================================================================================
       // Prepare state diffs data for publishPubdataAndClearState()
-      const version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);     
+      const version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);
       const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
       const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
       const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
@@ -497,7 +499,7 @@ describe("L1Messenger tests", () => {
       );
       const enumerationIndexSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(enumerationIndexSize), 1);
       const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
-    
+
       // ====================================================================================================
       // Prepare totalL2ToL1PubdataAndStateDiffs
       // set numberOfLogsBytes to 0x900 to trigger the revert (max value is 0x800)
@@ -522,9 +524,10 @@ describe("L1Messenger tests", () => {
 
       // ====================================================================================================
       // publishPubdataAndClearState()
-      
-      await expect(l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs))
-      .to.be.rejectedWith("Too many L2->L1 logs");
+
+      await expect(
+        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs)
+      ).to.be.rejectedWith("Too many L2->L1 logs");
 
       numberOfLogs = 0;
       numberOfMessages = 0;
