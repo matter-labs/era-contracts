@@ -36,12 +36,20 @@ contract ExecutorFacet is Base, IExecutor {
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataSource(pubdataSource));
+        LogProcessingOutput memory logOutput = _processL2Logs(
+            _newBatch,
+            _expectedSystemContractUpgradeTxHash,
+            PubdataSource(pubdataSource)
+        );
 
         // ToDo: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments;
         if (pubdataSource == uint8(PubdataSource.Blob)) {
-            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blob1Hash, logOutput.blob2Hash);
+            blobCommitments = _verifyBlobInformation(
+                _newBatch.pubdataCommitments[1:],
+                logOutput.blob1Hash,
+                logOutput.blob2Hash
+            );
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
         }
@@ -106,11 +114,7 @@ contract ExecutorFacet is Base, IExecutor {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
         PubdataSource _pubdataSource
-    )
-        internal
-        pure
-        returns (LogProcessingOutput memory logOutput)
-    {
+    ) internal pure returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
 
@@ -156,7 +160,7 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.BLOB_ONE_HASH_KEY)) {
-                if (_pubdataSource == PubdataSource.Blob){
+                if (_pubdataSource == PubdataSource.Blob) {
                     require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
                     logOutput.blob1Hash = logValue;
                 }
@@ -501,7 +505,11 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Calls the point evaluation precompile and verifies the output
     // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
     // Also verify that the provided commitment matches the provided versioned_hash.
-    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal view {
+    function _pointEvaluationPrecompile(
+        bytes32 _versionedHash,
+        bytes32 _inputPoint,
+        bytes calldata _valueCommitmentProof
+    ) internal view {
         bytes memory precompileInput = abi.encodePacked(_versionedHash, _inputPoint, _valueCommitmentProof);
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
@@ -517,15 +525,19 @@ contract ExecutorFacet is Base, IExecutor {
     /// the pubdata will contain the last 3 values, the versioned hash is pulled from the BLOBHASH opcode, and the opening point
     /// is calculated as the hash(versioned hash || blob commitment) where the blob commitment comes from system logs.
     function _verifyBlobInformation(
-        bytes calldata _pubdataCommitments, 
-        bytes32 _blob1Hash, 
+        bytes calldata _pubdataCommitments,
+        bytes32 _blob1Hash,
         bytes32 _blob2Hash
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
         // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
         require(_pubdataCommitments.length > 0, "pl");
-        require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * 2 && _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
+        require(
+            _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * 2 &&
+                _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0,
+            "bs"
+        );
         blobCommitments = new bytes32[](2);
         bytes32 versionedHash;
 
@@ -539,17 +551,17 @@ contract ExecutorFacet is Base, IExecutor {
             } else {
                 evalutationPoint = keccak256(abi.encode(versionedHash, _blob2Hash));
             }
-            
+
             require(versionedHash != bytes32(0), "vh");
-            
-            _pointEvaluationPrecompile(versionedHash, evalutationPoint, _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]);
-            
+
+            _pointEvaluationPrecompile(
+                versionedHash,
+                evalutationPoint,
+                _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]
+            );
+
             blobCommitments[versionedHashIndex] = keccak256(
-                abi.encodePacked(
-                    versionedHash,
-                    evalutationPoint,
-                    _pubdataCommitments[i:i+32]
-                )
+                abi.encodePacked(versionedHash, evalutationPoint, _pubdataCommitments[i:i + 32])
             );
             versionedHashIndex += 1;
         }

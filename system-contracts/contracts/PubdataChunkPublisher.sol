@@ -18,11 +18,9 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @param _pubdata The total l2 to l1 pubdata that will be sent via L1 blobs.
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
     /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
-    function chunkAndPublishPubdata(
-        bytes calldata _pubdata
-    ) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
+    function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
-        // ToDo: Update for dynamic number of hashes: 
+        // ToDo: Update for dynamic number of hashes:
         //       blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
         bytes32[] memory blobHashes = new bytes32[](2);
         for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {

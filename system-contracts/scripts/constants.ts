@@ -147,7 +147,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000008011",
     codeName: "PubdataChunkPublisher",
     lang: Language.Solidity,
-  }
+  },
 } as const;
 
 export const EIP712_TX_ID = 113;

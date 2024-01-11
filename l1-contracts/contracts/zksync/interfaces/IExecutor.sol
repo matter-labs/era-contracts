@@ -53,7 +53,7 @@ uint256 constant BLS_MODULUS = 5243587517512619047944774050818596583769055250052
 /// @dev Format: list of: opening point (32 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
 uint256 constant POINT_EVALUATION_INPUT_SIZE = 160;
 
-/// @dev Packed pubdata commitments. 
+/// @dev Packed pubdata commitments.
 /// @dev Format: list of: claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
 uint256 constant PUBDATA_COMMITMENT_SIZE = 128;
 
@@ -88,7 +88,7 @@ interface IExecutor is IBase {
     /// @param bootloaderHeapInitialContentsHash Hash of the initial contents of the bootloader heap. In practice it serves as the commitment to the transactions in the batch.
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
-    /// @param pubdataCommitments Packed pubdata commitments/data. 
+    /// @param pubdataCommitments Packed pubdata commitments/data.
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
     ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
