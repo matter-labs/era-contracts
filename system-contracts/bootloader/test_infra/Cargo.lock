@@ -558,7 +558,7 @@ dependencies = [
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "const_format",
  "convert_case",
- "crossbeam 0.7.3",
+ "crossbeam 0.8.2",
  "crypto-bigint 0.5.5",
  "cs_derive 0.1.0 (git+https://github.com/matter-labs/era-boojum.git?branch=main)",
  "derivative",
@@ -775,7 +775,7 @@ dependencies = [
 [[package]]
 name = "circuit_definitions"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1#e2a406c308d7aee4b3b2cd27497640e5ffc17912"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1#6db7c01717d157945f0f2939119dbd8a170de6bc"
 dependencies = [
  "crossbeam 0.8.2",
  "derivative",
@@ -2874,7 +2874,7 @@ checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 [[package]]
 name = "multivm"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "hex",
@@ -6033,7 +6033,7 @@ dependencies = [
 [[package]]
 name = "vlog"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "chrono",
  "sentry",
@@ -6613,7 +6613,7 @@ dependencies = [
 [[package]]
 name = "zkevm_circuits"
 version = "1.4.1"
-source = "git+https://github.com/matter-labs/zkevm_circuits.git?branch=v1.4.1#f7c610e2ba15e6e426a6f474b722f095c5921dbe"
+source = "git+https://github.com/matter-labs/era-zkevm_circuits.git?branch=v1.4.1#5076a9a8cd775c8f7a84507a02af1e2350e3679d"
 dependencies = [
  "arrayvec 0.7.4",
  "bincode",
@@ -6707,7 +6707,7 @@ dependencies = [
  "codegen 0.2.0",
  "crossbeam 0.8.2",
  "derivative",
- "env_logger 0.9.3",
+ "env_logger 0.10.1",
  "hex",
  "rand 0.4.6",
  "rayon",
@@ -6723,7 +6723,7 @@ dependencies = [
 [[package]]
 name = "zkevm_test_harness"
 version = "1.4.0"
-source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1#e2a406c308d7aee4b3b2cd27497640e5ffc17912"
+source = "git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1#6db7c01717d157945f0f2939119dbd8a170de6bc"
 dependencies = [
  "bincode",
  "circuit_definitions 0.1.0 (git+https://github.com/matter-labs/era-zkevm_test_harness.git?branch=v1.4.1)",
@@ -6731,7 +6731,7 @@ dependencies = [
  "crossbeam 0.8.2",
  "curl",
  "derivative",
- "env_logger 0.9.3",
+ "env_logger 0.10.1",
  "hex",
  "lazy_static",
  "rand 0.4.6",
@@ -6752,7 +6752,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "serde",
  "serde_json",
@@ -6780,7 +6780,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "serde",
@@ -6854,7 +6854,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "envy",
  "ethabi",
@@ -6868,7 +6868,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "base64 0.13.1",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6883,7 +6883,7 @@ dependencies = [
 [[package]]
 name = "zksync_dal"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -6917,7 +6917,7 @@ dependencies = [
 [[package]]
 name = "zksync_health_check"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "async-trait",
  "futures",
@@ -6930,7 +6930,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -6974,7 +6974,7 @@ dependencies = [
 [[package]]
 name = "zksync_state"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "itertools 0.10.5",
@@ -6991,7 +6991,7 @@ dependencies = [
 [[package]]
 name = "zksync_storage"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "num_cpus",
  "once_cell",
@@ -7003,7 +7003,7 @@ dependencies = [
 [[package]]
 name = "zksync_system_constants"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -7021,7 +7021,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -7058,7 +7058,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#b7ff6ad474b6480e15e3351c56bc5b85107636ec"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
 dependencies = [
  "anyhow",
  "bigdecimal",
