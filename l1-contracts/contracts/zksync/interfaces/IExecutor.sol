@@ -88,7 +88,7 @@ interface IExecutor is IBase {
     /// @param eventsQueueStateHash Hash of the events queue state. In practice it serves as the commitment to the events in the batch.
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
     /// @param pubdataCommitments Packed pubdata commitments/data. 
-    /// @dev pubdataCommitments format: 1 byte pubdata location
+    /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 128 bytes
     ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
     /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
