@@ -100,7 +100,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
         emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
     }
 
-    /// @notice Method which is to be used by the goveranor if a token needs to change its name, symbol or decimals.
+    /// @notice Method which is to be used by the governor if a token needs to change its name, symbol or decimals.
     /// @param _availableGetters The set of getters that the token has.
     /// @param _newName The new name of the token.
     /// @param _newSymbol The new symbol of the token.
