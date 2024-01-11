@@ -472,8 +472,10 @@ contract ExecutorFacet is Base, IExecutor {
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
+                // 2 Linear hashes of blob commitments: keccak(versioned hash || opening point || evaluation value)
                 _blobCommitments[0],
                 _blobCommitments[1],
+                // 2 4844 output commitment hashes
                 bytes32(0),
                 bytes32(0)
             );
@@ -508,6 +510,10 @@ contract ExecutorFacet is Base, IExecutor {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
+    /// Verifies that the blobs contain the correct data by calling the point evaluation precompile. For the precompile we need:
+    /// versioned hash || opening point || opening value || commitment || proof
+    /// the pubdata will contain the last 3 values, the versioned hash is pulled from the BLOBHASH opcode, and the opening point
+    /// is calculated as the hash(versioned hash || blob commitment) where the blob commitment comes from system logs.
     function _verifyBlobInformation(
         bytes calldata _pubdataCommitments, 
         bytes32 _blob1Hash, 
@@ -516,7 +522,8 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 versionedHashIndex = 0;
 
         // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
-        require(_pubdataCommitments.length == PUBDATA_COMMITMENT_SIZE * 2, "bs");
+        require(_pubdataCommitments.length > 0, "pl");
+        require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * 2 && _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
         blobCommitments = new bytes32[](2);
         bytes32 versionedHash;
 
@@ -546,10 +553,14 @@ contract ExecutorFacet is Base, IExecutor {
         }
 
         // This check is required because we want to ensure that there arent any extra blobs trying to be published.
+        // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
     }
 
+    /// Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
+    /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
+    /// new opcode.
     function _getBlobVersionedHash(uint256 _index) internal view returns (bytes32 versionedHash) {
         (bool success, bytes memory data) = BLOB_VERSIONED_HASH_GETTER_ADDR.staticcall(abi.encode(_index));
         require(success, "vc");
