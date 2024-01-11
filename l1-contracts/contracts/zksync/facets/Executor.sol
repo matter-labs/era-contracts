@@ -504,7 +504,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         // ToDo: Check output against spec, should have field elements prepended but other clients dont use it.
         require(success, "failed to call point evaluation precompile");
-        uint256 result = abi.decode(data, (uint256));
+        (, uint256 result) = abi.decode(data, (uint256, uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
