@@ -9,7 +9,7 @@ import {Base} from "./facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
 import {VerifierParams, FeeParams} from "./Storage.sol";
 /* solhint-disable max-line-length */
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, MAX_GAS_PER_TRANSACTION} from "./Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -57,7 +57,7 @@ contract DiamondInit is Base {
         require(address(_initalizeData.verifier) != address(0), "vt");
         require(_initalizeData.governor != address(0), "vy");
         require(_initalizeData.admin != address(0), "hc");
-        require(_initalizeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
+        require(_initalizeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
 
         s.verifier = _initalizeData.verifier;
         s.governor = _initalizeData.governor;

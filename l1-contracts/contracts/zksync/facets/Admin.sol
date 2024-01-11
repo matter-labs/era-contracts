@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {IAdmin} from "../interfaces/IAdmin.sol";
 import {Diamond} from "../libraries/Diamond.sol";
-import {L2_TX_MAX_GAS_LIMIT} from "../Config.sol";
+import {MAX_GAS_PER_TRANSACTION} from "../Config.sol";
 import {FeeParams} from "../Storage.sol";
 import {Base} from "./Base.sol";
 
@@ -77,7 +77,7 @@ contract AdminFacet is Base, IAdmin {
 
     /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
-        require(_newPriorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "n5");
+        require(_newPriorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "n5");
 
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
         s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;

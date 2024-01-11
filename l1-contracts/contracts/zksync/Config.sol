@@ -47,7 +47,7 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
-uint256 constant L2_TX_MAX_GAS_LIMIT = $(L2_TX_MAX_GAS_LIMIT);
+uint256 constant MAX_GAS_PER_TRANSACTION = $(MAX_GAS_PER_TRANSACTION);
 
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased
 /// value.
