@@ -499,7 +499,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Calls the point evaluation precompile and verifies the output
     // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
     // Also verify that the provided commitment matches the provided versioned_hash.
-    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal returns (bytes32) {
+    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal {
         bytes memory precompileInput = abi.encodePacked(_versionedHash, _inputPoint, _valueCommitmentProof);
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.call(precompileInput);
