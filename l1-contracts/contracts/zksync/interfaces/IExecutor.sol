@@ -28,6 +28,7 @@ struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
     bytes32 chainedPriorityTxsHash;
     bytes32 previousBatchHash;
+    bytes32 pubdataHash;
     bytes32 stateDiffHash;
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;

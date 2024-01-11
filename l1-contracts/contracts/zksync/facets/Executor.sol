@@ -28,7 +28,7 @@ contract ExecutorFacet is Base, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal returns (StoredBatchInfo memory) {
+    ) internal view returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
@@ -42,6 +42,8 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32[] memory blobCommitments;
         if (pubdataSource == uint8(PubdataSource.Blob)) {
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blob1Hash, logOutput.blob2Hash);
+        } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
+            require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
         }
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");
@@ -136,7 +138,7 @@ contract ExecutorFacet is Base, IExecutor {
                 // might also need to add it back it to the batch commitment
                 if (_pubdataSource == PubdataSource.Calldata) {
                     require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                    require(logValue == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
+                    logOutput.pubdataHash = logValue;
                 }
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
@@ -499,10 +501,10 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Calls the point evaluation precompile and verifies the output
     // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
     // Also verify that the provided commitment matches the provided versioned_hash.
-    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal {
+    function _pointEvaluationPrecompile(bytes32 _versionedHash, bytes32 _inputPoint, bytes calldata _valueCommitmentProof) internal view {
         bytes memory precompileInput = abi.encodePacked(_versionedHash, _inputPoint, _valueCommitmentProof);
 
-        (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.call(precompileInput);
+        (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
         // ToDo: Check output against spec, should have field elements prepended but other clients dont use it.
         require(success, "failed to call point evaluation precompile");
@@ -518,7 +520,7 @@ contract ExecutorFacet is Base, IExecutor {
         bytes calldata _pubdataCommitments, 
         bytes32 _blob1Hash, 
         bytes32 _blob2Hash
-    ) internal returns (bytes32[] memory blobCommitments) {
+    ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
         // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
