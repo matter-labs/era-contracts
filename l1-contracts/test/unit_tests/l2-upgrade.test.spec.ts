@@ -1,10 +1,9 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { AllowList, ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain";
+import type { ExecutorFacet, GettersFacet, AdminFacet } from "../../typechain";
 import {
   DiamondInitFactory,
-  AllowListFactory,
   ExecutorFacetFactory,
   GettersFacetFactory,
   AdminFacetFactory,
@@ -14,7 +13,6 @@ import {
 import type { StoredBatchInfo, CommitBatchInfo } from "./utils";
 import {
   getCallRevertReason,
-  AccessMode,
   EMPTY_STRING_KECCAK,
   genesisStoredBatchInfo,
   L2_SYSTEM_CONTEXT_ADDRESS,
@@ -35,7 +33,6 @@ describe("L2 upgrade test", function () {
   let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
 
-  let allowList: AllowList;
   let diamondProxyContract: ethers.Contract;
   let owner: ethers.Signer;
 
@@ -61,10 +58,6 @@ describe("L2 upgrade test", function () {
     const adminFacetContract = await adminFacetFactory.deploy();
     const adminFacet = AdminFacetFactory.connect(adminFacetContract.address, adminFacetContract.signer);
 
-    const allowListFactory = await hardhat.ethers.getContractFactory("AllowList");
-    const allowListContract = await allowListFactory.deploy(await allowListFactory.signer.getAddress());
-    allowList = AllowListFactory.connect(allowListContract.address, allowListContract.signer);
-
     // Note, that while this testsuit is focused on testing MailboxFaucet only,
     // we still need to initialize its storage via DiamondProxy
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
@@ -87,7 +80,6 @@ describe("L2 upgrade test", function () {
         genesisBatchHash: ethers.constants.HashZero,
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.constants.HashZero,
-        allowList: allowList.address,
         verifierParams,
         zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: dummyHash,
@@ -111,8 +103,6 @@ describe("L2 upgrade test", function () {
     const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
     const chainId = hardhat.network.config.chainId;
     diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
-
-    await (await allowList.setAccessMode(diamondProxyContract.address, AccessMode.Public)).wait();
 
     proxyExecutor = ExecutorFacetFactory.connect(diamondProxyContract.address, owner);
     proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, owner);

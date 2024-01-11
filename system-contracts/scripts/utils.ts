@@ -5,8 +5,12 @@ import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import type { YulContractDescrption } from "./constants";
+import type { YulContractDescrption, ZasmContractDescrption } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
+import { getCompilersDir } from "hardhat/internal/util/global-dir";
+import { getZksolcUrl, saltFromUrl } from "@matterlabs/hardhat-zksync-solc";
+import path from "path";
+import { spawn as _spawn } from "child_process";
 
 export interface Dependency {
   name: string;
@@ -22,7 +26,13 @@ export interface DeployedDependency {
 
 export function readYulBytecode(description: YulContractDescrption) {
   const contractName = description.codeName;
-  const path = `contracts/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul.zbin`;
+  return ethers.utils.hexlify(fs.readFileSync(path));
+}
+
+export function readZasmBytecode(description: ZasmContractDescrption) {
+  const contractName = description.codeName;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm.zbin`;
   return ethers.utils.hexlify(fs.readFileSync(path));
 }
 
@@ -116,9 +126,10 @@ export async function publishFactoryDeps(
   nonce: number,
   gasPrice: BigNumber
 ) {
-  if (dependencies.length == 0) {
-    return [];
+  if (dependencies.length === 0) {
+    throw new Error("The dependencies must be non-empty");
   }
+
   const bytecodes = getBytecodes(dependencies);
   const combinedLength = totalBytesLength(bytecodes);
 
@@ -142,15 +153,14 @@ export async function publishFactoryDeps(
       gasLimit: 3000000,
     },
   });
+
   console.log(`Transaction hash: ${txHandle.hash}`);
 
-  // Waiting for the transaction to be processed by the server
-  await txHandle.wait();
+  console.log("Waiting for transaction commit on L1");
 
-  console.log("Transaction complete! Checking markers on L2...");
+  await txHandle.waitL1Commit(2);
 
-  // Double checking that indeed the dependencies have been marked as known
-  await checkMarkers(bytecodes, deployer);
+  return txHandle;
 }
 
 // Returns an array of bytecodes that should be published along with their total length in bytes
@@ -180,4 +190,50 @@ export async function filterPublishedFactoryDeps(
   console.log(`Combined length to deploy: ${currentLength}`);
 
   return [bytecodesToDeploy, currentLength];
+}
+
+export async function compilerLocation(compilerVersion: string, isCompilerPreRelease: boolean): Promise<string> {
+  const compilersCache = await getCompilersDir();
+
+  let salt = "";
+
+  if (isCompilerPreRelease) {
+    const url = getZksolcUrl("https://github.com/matter-labs/zksolc-prerelease", hre.config.zksolc.version);
+    salt = saltFromUrl(url);
+  }
+
+  return path.join(compilersCache, "zksolc", `zksolc-v${compilerVersion}${salt ? "-" : ""}${salt}`);
+}
+
+// executes a command in a new shell
+// but pipes data to parent's stdout/stderr
+export function spawn(command: string) {
+  command = command.replace(/\n/g, " ");
+  const child = _spawn(command, { stdio: "inherit", shell: true });
+  return new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("close", (code) => {
+      code == 0 ? resolve(code) : reject(`Child process exited with code ${code}`);
+    });
+  });
+}
+
+export class CompilerPaths {
+  public absolutePathSources: string;
+  public absolutePathArtifacts: string;
+  constructor(absolutePathSources: string, absolutePathArtifacts: string) {
+    this.absolutePathSources = absolutePathSources;
+    this.absolutePathArtifacts = absolutePathArtifacts;
+  }
+}
+
+export function prepareCompilerPaths(path: string): CompilerPaths {
+  const currentWorkingDirectory = process.cwd();
+  console.log(`Yarn project directory: ${currentWorkingDirectory}`);
+
+  // This script is located in `system-contracts/scripts`, so we get one directory back.
+  const absolutePathSources = `${__dirname}/../${path}`;
+  const absolutePathArtifacts = `${__dirname}/../${path}/artifacts`;
+
+  return new CompilerPaths(absolutePathSources, absolutePathArtifacts);
 }

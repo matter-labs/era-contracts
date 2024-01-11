@@ -3,7 +3,6 @@
 pragma solidity 0.8.20;
 
 import "./../zksync/interfaces/IVerifier.sol";
-import "../common/interfaces/IAllowList.sol";
 import "./libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
@@ -102,7 +101,7 @@ struct AppStorage {
     /// @dev Container that stores transactions requested from L1
     PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
-    IAllowList allowList;
+    address __DEPRECATED_allowList;
     /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
     VerifierParams verifierParams;
     /// @notice Bytecode hash of bootloader program.

@@ -6,14 +6,16 @@
   "dependencies": {
     "@matterlabs/hardhat-zksync-deploy": "^0.6.5",
     "@nomiclabs/hardhat-solpp": "^2.0.1",
-    "commander": "^8.3.0",
+    "commander": "^9.4.1",
     "ethers": "^5.7.0",
+    "fast-glob": "^3.3.2",
     "hardhat": "^2.18.3",
     "preprocess": "^3.2.0",
     "zksync-web3": "^0.14.3"
   },
   "devDependencies": {
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
+    "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
     "@matterlabs/hardhat-zksync-solc": "^0.4.2",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
@@ -30,7 +32,8 @@
     "ts-generator": "^0.1.1",
     "ts-node": "^10.1.0",
     "typechain": "^4.0.0",
-    "typescript": "^4.6.4"
+    "typescript": "^4.6.4",
+    "zksync-ethers": "^5.0.0"
   },
   "mocha": {
     "timeout": 240000,
@@ -42,18 +45,22 @@
     ]
   },
   "scripts": {
-    "build": "yarn build:sol && yarn build:yul",
-    "build:sol": "hardhat compile",
-    "build:yul": "yarn preprocess:yul && yarn compile-yul",
+    "build": "yarn build:system-contracts && yarn build:bootloader",
+    "build:bootloader": "yarn preprocess:bootloader && yarn compile-yul compile-bootloader",
+    "build:system-contracts": "yarn preprocess:system-contracts && hardhat compile && yarn compile-yul compile-precompiles",
+    "build:test-system-contracts": "yarn preprocess:system-contracts --test-mode && hardhat compile && yarn compile-yul compile-precompiles && yarn compile-zasm",
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
-    "clean": "yarn clean:sol && yarn clean:yul",
-    "clean:sol": "hardhat clean",
-    "clean:yul": "rm -rf ./bootloader/build ./bootloader/tests/artifacts ./contracts/artifacts ./contracts/precompiles/artifacts",
+    "clean": "yarn clean:bootloader && yarn clean:system-contracts",
+    "clean:bootloader": "rm -rf ./bootloader/build ./bootloader/tests/artifacts",
+    "clean:system-contracts": "rm -rf ./contracts-preprocessed && hardhat clean",
     "compile-yul": "ts-node scripts/compile-yul.ts",
+    "compile-zasm": "ts-node scripts/compile-zasm.ts",
     "deploy-preimages": "ts-node scripts/deploy-preimages.ts",
-    "preprocess:yul": "rm -rf ./bootloader/build && yarn ts-node scripts/process.ts",
-    "test": "hardhat test --network zkSyncTestNode",
+    "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
+    "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
+    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
+    "test-node": "hardhat node-zksync --tag v0.0.1-alpha.boojum",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
   }
 }

@@ -13,7 +13,7 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 
 export default {
   zksolc: {
-    version: "1.3.14",
+    version: "1.3.18",
     compilerSource: "binary",
     settings: {
       isSystem: true,
@@ -36,6 +36,13 @@ export default {
       zksync: true,
       // contract verification endpoint
       verifyURL: "https://zksync2-testnet-explorer.zksync.dev/contract_verification",
+    },
+    zkSyncTestnetSepolia: {
+      url: "https://sepolia.era.zksync.dev",
+      ethNetwork: "sepolia",
+      zksync: true,
+      // contract verification endpoint
+      verifyURL: "https://explorer.sepolia.era.zksync.dev/contract_verification",
     },
     zksyncMainnet: {
       url: "https://mainnet.era.zksync.io",

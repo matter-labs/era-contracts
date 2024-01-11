@@ -9,11 +9,9 @@ import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
 import "../zksync/interfaces/IZkSync.sol";
-import "../common/interfaces/IAllowList.sol";
 
 import "./libraries/BridgeInitializationHelper.sol";
 
-import "../common/AllowListed.sol";
 import "../common/libraries/UnsafeBytes.sol";
 import "../common/ReentrancyGuard.sol";
 import "../common/libraries/L2ContractHelper.sol";
@@ -34,7 +32,7 @@ import "../vendor/AddressAliasHelper.sol";
 /// @dev For withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into
 /// WETH, and sends the WETH to the L1 recipient.
 /// @dev The `L1WethBridge` contract works in conjunction with its L2 counterpart, `L2WethBridge`.
-contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
+contract L1WethBridge is IL1Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Event emitted when ETH is received by the contract.
@@ -42,9 +40,6 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
     /// @dev The address of the WETH token on L1
     address payable public immutable l1WethAddress;
-
-    /// @dev The smart contract that manages the list with permission to call contract functions
-    IAllowList public immutable allowList;
 
     /// @dev zkSync smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IZkSync public immutable zkSync;
@@ -61,10 +56,9 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address payable _l1WethAddress, IZkSync _zkSync, IAllowList _allowList) reentrancyGuardInitializer {
+    constructor(address payable _l1WethAddress, IZkSync _zkSync) reentrancyGuardInitializer {
         l1WethAddress = _l1WethAddress;
         zkSync = _zkSync;
-        allowList = _allowList;
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
@@ -163,7 +157,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable nonReentrant senderCanCallFunction(allowList) returns (bytes32 txHash) {
+    ) external payable nonReentrant returns (bytes32 txHash) {
         require(_l1Token == l1WethAddress, "Invalid L1 token address");
         require(_amount != 0, "Amount cannot be zero");
 
@@ -236,7 +230,7 @@ contract L1WethBridge is IL1Bridge, AllowListed, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external nonReentrant senderCanCallFunction(allowList) {
+    ) external nonReentrant {
         require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
 
         (address l1WethWithdrawReceiver, uint256 amount) = _parseL2EthWithdrawalMessage(_message);

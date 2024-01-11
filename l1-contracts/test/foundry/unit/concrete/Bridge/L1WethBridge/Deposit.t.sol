@@ -3,19 +3,9 @@
 pragma solidity 0.8.20;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
-import {IAllowList} from "../../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 
 contract DepositTest is L1WethBridgeTest {
-    function test_RevertWhen_UnWhitelistedAddressDeposits() public {
-        vm.prank(owner);
-        allowList.setAccessMode(address(bridgeProxy), IAllowList.AccessMode.Closed);
-
-        vm.prank(randomSigner);
-        vm.expectRevert(bytes.concat("nr"));
-        bridgeProxy.deposit(randomSigner, address(0), 0, 0, 0, address(0));
-    }
-
     function test_RevertWhen_ReceivedL1TokenIsNotL1WethAddress() public {
         vm.expectRevert("Invalid L1 token address");
         bridgeProxy.deposit(randomSigner, makeAddr("invalidL1TokenAddress"), 0, 0, 0, address(0));

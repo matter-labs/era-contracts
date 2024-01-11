@@ -77,7 +77,6 @@ describe("Diamond proxy tests", function () {
         genesisBatchHash: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
         genesisIndexRepeatedStorageChanges: 0,
         genesisBatchCommitment: ethers.constants.HashZero,
-        allowList: "0x70a0F165d6f8054d0d0CF8dFd4DD2005f0AF6B55",
         verifierParams: dummyVerifierParams,
         zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",

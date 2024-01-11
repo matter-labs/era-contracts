@@ -53,8 +53,6 @@ interface IGetters is IBase {
 
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
-    function getAllowList() external view returns (address);
-
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     /*//////////////////////////////////////////////////////////////
