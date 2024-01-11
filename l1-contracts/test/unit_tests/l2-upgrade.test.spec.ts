@@ -891,6 +891,7 @@ interface ProposedUpgrade {
   postUpgradeCalldata: BytesLike;
   upgradeTimestamp: ethers.BigNumber;
   newProtocolVersion: BigNumberish;
+  newAllowList: string;
 }
 
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
@@ -909,6 +910,7 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     upgradeTimestamp: ethers.constants.Zero,
     factoryDeps: [],
     newProtocolVersion,
+    newAllowList: ethers.constants.AddressZero,
     ...proposedUpgrade,
   };
 }

@@ -5,3 +5,4 @@ eth-gas-reporter/=node_modules/eth-gas-reporter/
 forge-std/=lib/forge-std/src/
 hardhat/=node_modules/hardhat/
 solpp/=cache/solpp-generated-contracts/
+murky/=lib/murky/src/
