@@ -20,31 +20,21 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
-        // TODO: Update for dynamic number of hashes:
-        //       blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
-        bytes32[] memory blobHashes = new bytes32[](2);
-        for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {
-            uint256 end = BLOB_SIZE_BYTES > _pubdata.length - i ? _pubdata.length : i + BLOB_SIZE_BYTES;
+        // TODO: Update for dynamic number of blobs
+        bytes32 blob1Hash;
+        bytes32 blob2Hash;
 
-            bytes32 blobHash;
+        assembly {
+            // The pointer to the free memory slot
+            let ptr := mload(0x40)
+            calldatacopy(ptr, _pubdata.offset, _pubdata.length)
 
-            if (BLOB_SIZE_BYTES > _pubdata.length - i) {
-                assembly {
-                    // The pointer to the next BLOB_SIZE_BYTES after the free memory slot
-                    let ptr := add(mload(0x40), BLOB_SIZE_BYTES)
-                    calldatacopy(ptr, add(_pubdata.offset, i), sub(_pubdata.length, i))
-                    blobHash := keccak256(ptr, BLOB_SIZE_BYTES)
-                }
-            } else {
-                bytes calldata blob = _pubdata[i:end];
-                blobHash = EfficientCall.keccak(blob);
-            }
-
-            blobHashes[i / BLOB_SIZE_BYTES] = blobHash;
+            blob1Hash := keccak256(ptr, BLOB_SIZE_BYTES)
+            blob2Hash := keccak256(add(ptr, BLOB_SIZE_BYTES), BLOB_SIZE_BYTES)
         }
 
-        bytes32 blob1Hash = blobHashes[0] == bytes32(0) ? EMPTY_BLOB_HASH : blobHashes[0];
-        bytes32 blob2Hash = blobHashes[1] == bytes32(0) ? EMPTY_BLOB_HASH : blobHashes[1];
+        blob1Hash = blob1Hash == bytes32(0) ? EMPTY_BLOB_HASH : blob1Hash;
+        blob2Hash = blob2Hash == bytes32(0) ? EMPTY_BLOB_HASH : blob2Hash;
 
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blob1Hash);
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blob2Hash);
