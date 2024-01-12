@@ -510,7 +510,6 @@ contract ExecutorFacet is Base, IExecutor {
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
-        // TODO: Check output against spec, should have field elements prepended but other clients dont use it.
         require(success, "failed to call point evaluation precompile");
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
