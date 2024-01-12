@@ -80,15 +80,15 @@
     "contractName": "MsgValueSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/MsgValueSimulator.sol/MsgValueSimulator.json",
     "sourceCodePath": "contracts-preprocessed/MsgValueSimulator.sol",
-    "bytecodeHash": "0x010000630cca93a07a1117580fe1752fe5fa861cde12feb75f2cf254d3f64499",
-    "sourceCodeHash": "0x4d06c0dee6b0d03922ec76f3bdb96f9dbdd089801a14332b40a3e6a605115c32"
+    "bytecodeHash": "0x01000063cb83b923ab1e67bb7944c6493286ba7c1c5614c0cb17155c5eef82d9",
+    "sourceCodeHash": "0xf6363e8d73fa8579ff74b6e6880e6ed62b6ff80ba984826dc2b0bf0f71fdef2d"
   },
   {
     "contractName": "NonceHolder",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/NonceHolder.sol/NonceHolder.json",
     "sourceCodePath": "contracts-preprocessed/NonceHolder.sol",
-    "bytecodeHash": "0x010000e586890450c5f7c72723d3449c7b2c9028da68a3afab492ab89883cd7a",
-    "sourceCodeHash": "0xd037719e4fb0c42db51e3463586610800667d5d3effa13956502062aa953a0a7"
+    "bytecodeHash": "0x010000e5eef000fb93f3b7f746149d0f467fe99e0f628aa76520b18321eeb7b3",
+    "sourceCodeHash": "0x0de1daab6b7aa57a6bf396631dcf28d281ca4e79e71c699e4e887747b1b2f005"
   },
   {
     "contractName": "SystemContext",
