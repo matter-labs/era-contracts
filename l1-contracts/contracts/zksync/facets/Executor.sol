@@ -23,7 +23,6 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
-    /// @custom:todo ADD BACK VIEW ONCE WE HAVE THE BLOB VERSIONED HASHES
     function _commitOneBatch(
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
@@ -42,7 +41,7 @@ contract ExecutorFacet is Base, IExecutor {
             PubdataSource(pubdataSource)
         );
 
-        // ToDo: Adapt to handle dynamic number of blobs
+        // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments;
         if (pubdataSource == uint8(PubdataSource.Blob)) {
             blobCommitments = _verifyBlobInformation(
@@ -177,7 +176,7 @@ contract ExecutorFacet is Base, IExecutor {
             }
         }
 
-        // ToDo: Update to only require a blob log when a blob is published.
+        // TODO: Update to only require a blob log when a blob is published.
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         // With the protocol upgrade we expect 8 logs: 2^10 - 1 = 1023
@@ -503,8 +502,8 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     /// @notice Calls the point evaluation precompile and verifies the output
-    // Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
-    // Also verify that the provided commitment matches the provided versioned_hash.
+    /// Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
+    /// Also verify that the provided commitment matches the provided versioned_hash.
     function _pointEvaluationPrecompile(
         bytes32 _versionedHash,
         bytes32 _inputPoint,
@@ -514,7 +513,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
-        // ToDo: Check output against spec, should have field elements prepended but other clients dont use it.
+        // TODO: Check output against spec, should have field elements prepended but other clients dont use it.
         require(success, "failed to call point evaluation precompile");
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
@@ -531,7 +530,7 @@ contract ExecutorFacet is Base, IExecutor {
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
-        // ToDo: This should be dynamic instead of being hardcoded to 2 blobs
+        // TODO: This should be dynamic instead of being hardcoded to 2 blobs
         require(_pubdataCommitments.length > 0, "pl");
         require(
             _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * 2 &&
@@ -544,7 +543,7 @@ contract ExecutorFacet is Base, IExecutor {
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
             versionedHash = _getBlobVersionedHash(versionedHashIndex);
 
-            // ToDo: this can be made to be dynamic where evalutationPoint = keccak256(abi.encode(versionedHash, hashes[i / PUBDATA_COMMITMENT_SIZE]));
+            // TODO: this can be made to be dynamic where evalutationPoint = keccak256(abi.encode(versionedHash, hashes[i / PUBDATA_COMMITMENT_SIZE]));
             bytes32 evalutationPoint;
             if (i < PUBDATA_COMMITMENT_SIZE) {
                 evalutationPoint = keccak256(abi.encode(versionedHash, _blob1Hash));
