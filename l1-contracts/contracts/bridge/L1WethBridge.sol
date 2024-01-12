@@ -105,19 +105,19 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     }
 
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
-    modifier onlyBridgehubOrEthChain(uint256 _chainId) {
+    modifier onlyBridgehub() {
         require(
-            (msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS),
-            "L1WETHBridge: not bridgehub or eth chain"
+            (msg.sender == address(bridgehub)),
+            "L1WETHBridge: not bridgehub"
         );
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
-    modifier onlyBridgehub() {
+    modifier onlyBridgehubOrEthChain(uint256 _chainId) {
         require(
-            (msg.sender == address(bridgehub)),
-            "L1WETHBridge: not bridgehub"
+            (msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS),
+            "L1WETHBridge: not bridgehub or eth chain"
         );
         _;
     }

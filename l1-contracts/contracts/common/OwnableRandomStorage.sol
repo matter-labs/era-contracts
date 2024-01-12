@@ -45,7 +45,6 @@ abstract contract OwnableRandomStorage is Context {
         assembly {
             _owner := sload(OWNER_ADDRESS)
         }
-        return _owner;
     }
 
     function _setOwner(address _owner) private {

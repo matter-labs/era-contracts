@@ -26,7 +26,6 @@ abstract contract Ownable2StepRandomStorage is OwnableRandomStorage {
         assembly {
             _pendingOwner := sload(PENDING_OWNER_ADDRESS)
         }
-        return _pendingOwner;
     }
 
     function _setPendingOwner(address _pendingOwner) private {

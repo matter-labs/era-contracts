@@ -21,7 +21,6 @@ import "./l2-deps/ISystemContext.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2Step {
-    using UncheckedMath for uint256;
 
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
