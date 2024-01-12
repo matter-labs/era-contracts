@@ -530,6 +530,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// Verifies that the blobs contain the correct data by calling the point evaluation precompile. For the precompile we need:
     /// versioned hash || opening point || opening value || commitment || proof
     /// the _pubdataCommitments will contain the last 4 values, the versioned hash is pulled from the BLOBHASH opcode
+    /// pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     function _verifyBlobInformation(
         bytes calldata _pubdataCommitments
     ) internal view returns (bytes32[] memory blobCommitments) {
@@ -551,7 +552,7 @@ contract ExecutorFacet is Base, IExecutor {
             require(versionedHash != bytes32(0), "vh");
 
             // First 16 bytes is the opening value. While we get the value as 16 bytes, the point evaluation precompile
-            // requires it to be 32 bytes.
+            // requires it to be 32 bytes. The blob commitment must use the opening value as 16 bytes though.
             bytes32 openingValue = bytes32(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]);
 
             _pointEvaluationPrecompile(
