@@ -26,7 +26,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) external pure returns (LogProcessingOutput memory logOutput) {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataSource.Calldata);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.

@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, EMPTY_BLOB_HASH} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -37,15 +37,15 @@ contract ExecutorFacet is Base, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(
             _newBatch,
-            _expectedSystemContractUpgradeTxHash,
-            PubdataSource(pubdataSource)
+            _expectedSystemContractUpgradeTxHash
         );
 
         // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments = new bytes32[](2);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
+            bytes32[2] memory blobHashes = [logOutput.blob1Hash, logOutput.blob2Hash];
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
-            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:]);
+            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
             require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
@@ -60,13 +60,18 @@ contract ExecutorFacet is Base, IExecutor {
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
+        // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
+        // Otherwise we should be using bytes32(0)
+        bytes32 blob1Hash = pubdataSource == uint8(PubdataSource.Blob) ? logOutput.blob1Hash : bytes32(0);
+        bytes32 blob2Hash = pubdataSource == uint8(PubdataSource.Blob) ? logOutput.blob2Hash : bytes32(0);
+
         // Create batch commitment for the proof verification
         bytes32 commitment = _createBatchCommitment(
             _newBatch, 
             logOutput.stateDiffHash, 
             blobCommitments,
-            logOutput.blob1Hash,
-            logOutput.blob2Hash
+            blob1Hash,
+            blob2Hash
         );
 
         return
@@ -115,8 +120,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        PubdataSource _pubdataSource
+        bytes32 _expectedSystemContractUpgradeTxHash
     ) internal pure returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
@@ -141,10 +145,8 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                if (_pubdataSource == PubdataSource.Calldata) {
-                    require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                    logOutput.pubdataHash = logValue;
-                }
+                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
+                logOutput.pubdataHash = logValue;
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 logOutput.stateDiffHash = logValue;
@@ -161,15 +163,11 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.BLOB_ONE_HASH_KEY)) {
-                if (_pubdataSource == PubdataSource.Blob) {
-                    require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
-                    logOutput.blob1Hash = logValue;
-                }
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
+                logOutput.blob1Hash = logValue;
             } else if (logKey == uint256(SystemLogKey.BLOB_TWO_HASH_KEY)) {
-                if (_pubdataSource == PubdataSource.Blob) {
-                    require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                    logOutput.blob2Hash = logValue;
-                }
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                logOutput.blob2Hash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
@@ -486,6 +484,7 @@ contract ExecutorFacet is Base, IExecutor {
                 // for each blob we have: 
                 // linear hash (hash of preimage from system logs) and 
                 // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+                // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
                 _blob1Hash,
                 _blobCommitments[0],
                 _blob2Hash,
@@ -532,7 +531,8 @@ contract ExecutorFacet is Base, IExecutor {
     /// the _pubdataCommitments will contain the last 4 values, the versioned hash is pulled from the BLOBHASH opcode
     /// pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     function _verifyBlobInformation(
-        bytes calldata _pubdataCommitments
+        bytes calldata _pubdataCommitments,
+        bytes32[2] memory _blobHashes
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
@@ -575,6 +575,14 @@ contract ExecutorFacet is Base, IExecutor {
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
+
+        // We do this check to verify that either the second blob was empty/not used
+        // or that we have both a linear hash and commitment for it.
+        require(
+            (_blobHashes[1] == EMPTY_BLOB_HASH && blobCommitments[1] == bytes32(0)) ||
+            (_blobHashes[1] != EMPTY_BLOB_HASH && blobCommitments[1] != bytes32(0)),
+            "bh"
+        );
     }
 
     /// Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
