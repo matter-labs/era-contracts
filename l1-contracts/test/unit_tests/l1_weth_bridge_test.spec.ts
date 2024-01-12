@@ -50,7 +50,6 @@ export async function create2DeployFromL1(
   await bridgehub.requestL2Transaction(
     {
       chainId,
-      payer: walletAddress,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
       mintValue: expectedCost,
       l2Value: 0,
@@ -146,24 +145,26 @@ describe("WETH Bridge tests", () => {
         )
     );
 
-    expect(revertReason).equal("L1WETH Bridge: Amount cannot be zero when Eth is base token");
+    expect(revertReason).equal("L1WETH Bridge: Amount is zero with direct deposit, call bridgehub directly instead");
   });
 
   it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
     await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
+    let value = ethers.constants.WeiPerEther;
+    let amount = 100;
     await bridgeProxy
       .connect(randomSigner)
       .deposit(
         chainId,
         await randomSigner.getAddress(),
         l1Weth.address,
-        100,
-        100,
+        value.add(amount),
+        amount,
         1000000,
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         await randomSigner.getAddress(),
-        { value: ethers.constants.WeiPerEther }
+        { value: value }
       );
   });
 

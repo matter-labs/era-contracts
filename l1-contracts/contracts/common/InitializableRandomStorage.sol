@@ -61,7 +61,8 @@ abstract contract InitializableRandomStorage {
     /// @custom:oz-retyped-from bool
     /// @dev Address of initialized variable.
     /// @dev Flag is placed at random memory location to not interfere with Storage contract.
-    uint256 private constant INITIALIZED_ADDRESS = uint256(keccak256("initialized")) - 1;
+    // uint256(keccak256("initialized")) - 1;
+    uint256 private constant INITIALIZED_ADDRESS = 0x93c0ba99f1a18bcdc81fcbcb6b4f15a9a6725f937075aed6fac107ffcb147067;
 
     /// @dev Indicates that the contract is in the process of being initialized.
     /// @dev Address of initializing variable.

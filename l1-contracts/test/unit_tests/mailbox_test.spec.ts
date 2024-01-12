@@ -230,7 +230,6 @@ describe("Mailbox tests", function () {
       bridgehub.interface.encodeFunctionData("requestL2Transaction", [
         {
           chainId,
-          payer: ethers.constants.AddressZero,
           l2Contract: ethers.constants.AddressZero,
           mintValue: 0,
           l2Value: 0,

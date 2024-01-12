@@ -57,7 +57,6 @@ export async function create2DeployFromL1(
   await bridgehub.requestL2Transaction(
     {
       chainId,
-      payer: walletAddress,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
       mintValue: expectedCost,
       l2Value: 0,
@@ -161,7 +160,6 @@ describe("Custom base token tests", () => {
     ).wait();
     await bridgehub.connect(randomSigner).requestL2Transaction({
       chainId,
-      payer: await randomSigner.getAddress(),
       l2Contract: await randomSigner.getAddress(),
       mintValue: ethers.utils.parseUnits("800", 18),
       l2Value: 1,

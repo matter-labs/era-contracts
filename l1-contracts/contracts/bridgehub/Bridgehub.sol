@@ -214,9 +214,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
-    /// @notice this assumes that either ether is the base token or 
-    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge. 
-    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance. 
+    /// @notice this assumes that either ether is the base token or
+    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge.
+    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
     function requestL2TransactionBaseTokenBridge(
         L2TransactionRequestDirect calldata _request
     ) public override onlyBaseTokenBridge(_request.chainId) returns (bytes32 canonicalTxHash) {
@@ -235,9 +235,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
-    /// @notice this assumes that either ether is the base token or 
-    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge. 
-    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance. 
+    /// @notice this assumes that either ether is the base token or
+    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge.
+    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
     function requestL2Transaction(
         L2TransactionRequestDirect calldata _request
     ) public payable override returns (bytes32 canonicalTxHash) {
@@ -281,10 +281,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice After depositing funds to the baseTokenBridge, the secondBridge is called
-    /// @notice to return the actual L2 message which is sent to the Mailbox. 
-    /// @notice this assumes that either ether is the base token or 
-    /// @notice the msg.sender has approved the baseTokenBridge with the mintValue, 
-    /// @notice and also the necessary approvals are given for the second bridge. 
+    /// @notice to return the actual L2 message which is sent to the Mailbox.
+    /// @notice this assumes that either ether is the base token or
+    /// @notice the msg.sender has approved the baseTokenBridge with the mintValue,
+    /// @notice and also the necessary approvals are given for the second bridge.
     /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
@@ -316,14 +316,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address stateTransition = getZkSyncStateTransition(_request.chainId);
         (bool success, bytes memory data) = _request.secondBridgeAddress.call{value: _request.secondBridgeValue}(
-            abi.encodeWithSelector(
-                _request.secondBridgeSelector,
-                _request.chainId, 
-                _request.secondBridgeCalldata
-            )
+            abi.encodeWithSelector(_request.secondBridgeSelector, _request.chainId, _request.secondBridgeCalldata)
         );
         require(success, "Bridgehub: second bridge call failed");
-        L2TransactionRequestTwoBridgesInner memory outputRequest = abi.decode(data, (L2TransactionRequestTwoBridgesInner));
+        L2TransactionRequestTwoBridgesInner memory outputRequest = abi.decode(
+            data,
+            (L2TransactionRequestTwoBridgesInner)
+        );
 
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             msg.sender,

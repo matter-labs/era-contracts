@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IL1Bridge.sol";
 import "./interfaces/IL1BridgeLegacy.sol";
+import "./interfaces/IL1BridgeDeprecated.sol";
 import "./interfaces/IL2WethBridge.sol";
 import "./interfaces/IL2Bridge.sol";
 import "./interfaces/IWETH9.sol";
@@ -106,10 +107,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
     modifier onlyBridgehub() {
-        require(
-            (msg.sender == address(bridgehub)),
-            "L1WETHBridge: not bridgehub"
-        );
+        require((msg.sender == address(bridgehub)), "L1WETHBridge: not bridgehub");
         _;
     }
 
@@ -331,6 +329,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @notice Initiates a WETH deposit by depositing WETH into the L1 bridge contract, unwrapping it to ETH
     /// and sending it to the L2 bridge contract where ETH will be wrapped again to WETH and sent to the L2 recipient.
+    /// only used for eth based chains.
     /// @param _l2Receiver The account address that should receive WETH on L2
     /// @param _l1Token The L1 token address which is deposited (needs to be WETH address)
     /// @param _mintValue The total amount of base tokens to be minted. Covers both gas and msg.Value.
@@ -364,34 +363,31 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable nonReentrant returns (bytes32 txHash) {
-        uint256 mintValue = _mintValue;
-        uint256 amount = _amount;
         {
-            require(
-                (_l1Token == l1WethAddress),
-                "L1WETH Bridge: Invalid L1 token address"
-            );
+            require((_l1Token == l1WethAddress), "L1WETH Bridge: Invalid L1 token address");
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            require(ethIsBaseToken, "L1WETH Bridge: Direct deposit via requestL2Transaction only available for Eth based chains");
+            require(
+                ethIsBaseToken,
+                "L1WETH Bridge: Direct deposit via requestL2Transaction only available for Eth based chains"
+            );
             require(l2BridgeAddress[_chainId] != address(0), "L1WETH Bridge: Bridge is not deployed");
 
             require(msg.value + _amount == _mintValue, "L1WETH Bridge: Incorrect amount of ETH sent");
             require(_amount > 0, "L1WETH Bridge: Amount is zero with direct deposit, call bridgehub directly instead");
-            
+
             // Deposit WETH tokens from the depositor address to the smart contract address
             IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
             // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
             IWETH9(l1WethAddress).withdraw(_amount);
-            
         }
         {
-            if (!hyperbridgingEnabled[_chainId]){
+            if (!hyperbridgingEnabled[_chainId]) {
                 chainBalance[_chainId] += _mintValue;
             }
         }
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, _amount);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
@@ -412,10 +408,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 refundRecipient
             );
         }
-        emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, amount);
-        if (_chainId == ERA_CHAIN_ID) {
-            emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, amount);
-        }
+        // kl todo
+        // bytes64 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
+        // emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        // if (_chainId == ERA_CHAIN_ID) {
+        //     emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        // }
     }
 
     function _depositSendTx(
@@ -451,8 +449,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         address //_prevMsgSender
     ) external payable override onlyBridgehubOrEthChain(_chainId) {
         require(_token == ETH_TOKEN_ADDRESS, "L1WETHBridge: Invalid token");
-        require(msg.value == _amount);
-        if (!hyperbridgingEnabled[_chainId]){
+        require(msg.value == _amount, "L1WETHBridge: msg.value not equal to amount");
+        if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId] += _amount;
         }
     }
@@ -464,16 +462,19 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         address _prevMsgSender,
         address _l2Receiver
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+        require(l2BridgeAddress[_chainId] != address(0), "L1WethBridge: bridge not deployed");
         require(msg.value == 0, "L1WETHBridge: msg.value not 0 for WETH");
-        if (!hyperbridgingEnabled[_chainId]){
-            chainBalance[_chainId] += _amount;
-        }
-        if (_amount > 0){
+
+        if (_amount > 0) {
             // Deposit WETH tokens from the depositor address to the smart contract address
             IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
             // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
             IWETH9(l1WethAddress).withdraw(_amount);
         }
+        if (!hyperbridgingEnabled[_chainId]) {
+            chainBalance[_chainId] += _amount;
+        }
+
         uint256 amount = _amount + msg.value;
         {
             // Request the finalization of the deposit on the L2 side
@@ -482,7 +483,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
             // If the recipient is a contract on L1, the address alias will be applied.
-            if (!hyperbridgingEnabled[_chainId]){
+            if (!hyperbridgingEnabled[_chainId]) {
                 chainBalance[_chainId] += amount;
             }
             bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
@@ -493,6 +494,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 txDataHash: txDataHash
             });
         }
+        // kl todo
         // emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
         // if (_chainId == ERA_CHAIN_ID) {
         //     emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
@@ -548,7 +550,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
         bool depositHappened = deposited[_chainId][keccak256(abi.encode(_depositSender, _amount))][_l2TxHash];
         require(((_amount > 0) && (depositHappened)), "L1WethBridge: _amount is zero or deposit did not happen");
-        if (!hyperbridgingEnabled[_chainId]){
+        if (!hyperbridgingEnabled[_chainId]) {
             require(chainBalance[_chainId] >= _amount, "L1WethBridge: chainBalance is too low");
             chainBalance[_chainId] -= _amount;
         }
@@ -602,7 +604,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             _message,
             _merkleProof
         );
-        if (!hyperbridgingEnabled[_chainId]){
+        if (!hyperbridgingEnabled[_chainId]) {
             require(chainBalance[_chainId] >= amount, "L1WethBridge: chainBalance is too low");
             chainBalance[_chainId] -= amount;
         }

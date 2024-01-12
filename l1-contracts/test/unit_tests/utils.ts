@@ -160,7 +160,6 @@ export async function requestExecute(
   return await bridgehub.requestL2Transaction(
     {
       chainId,
-      payer: await bridgehub.signer.getAddress(),
       l2Contract: to,
       mintValue: await overrides.value,
       l2Value,
@@ -338,7 +337,7 @@ export async function initialDeployment(
   const deployer = new Deployer({
     deployWallet,
     ownerAddress,
-    verbose: false,
+    verbose: true,
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,

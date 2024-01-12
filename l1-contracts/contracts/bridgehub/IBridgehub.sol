@@ -97,8 +97,6 @@ interface IBridgehub {
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
-
-
     function l2TransactionBaseCost(
         uint256 _chainId,
         uint256 _gasPrice,
