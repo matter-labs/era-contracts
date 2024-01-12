@@ -180,7 +180,6 @@ contract ExecutorFacet is Base, IExecutor {
             }
         }
 
-        // TODO: Update to only require a blob log when a blob is published.
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         // With the protocol upgrade we expect 8 logs: 2^10 - 1 = 1023
