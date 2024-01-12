@@ -35,7 +35,7 @@ object "Bootloader" {
             }
 
             /// @dev The overhead for a transaction slot in L2 gas. 
-            /// It is roughly equal to 80kk/MAX_TRANSACTIONS_PER_BATCH, i.e. how many gas would an L1->L2 transaction
+            /// It is roughly equal to 80kk/MAX_TRANSACTIONS_IN_BATCH, i.e. how many gas would an L1->L2 transaction
             /// need to pay to compensate for the batch being closed.
             /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is 
             /// compensated enough in case the batch might be prematurely sealed because of the transaction slots being filled up.

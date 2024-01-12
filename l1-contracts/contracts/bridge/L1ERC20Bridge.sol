@@ -51,14 +51,14 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
     /// @dev The bytecode hash of the L2 token contract
     bytes32 public l2TokenProxyBytecodeHash;
 
-    mapping(address => uint256) public __DEPRECATED_lastWithdrawalLimitReset;
+    mapping(address => uint256) private __DEPRECATED_lastWithdrawalLimitReset;
 
     /// @dev A mapping L1 token address => the accumulated withdrawn amount during the withdrawal limit window
-    mapping(address => uint256) public __DEPRECATED_withdrawnAmountInWindow;
+    mapping(address => uint256) private __DEPRECATED_withdrawnAmountInWindow;
 
     /// @dev The accumulated deposited amount per user.
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
-    mapping(address => mapping(address => uint256)) public __DEPRECATED_totalDepositedAmountPerUser;
+    mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
