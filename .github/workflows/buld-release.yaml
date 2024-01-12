@@ -3,7 +3,7 @@ name: Build and release
 on:
   push:
     branches:
-      - '*'
+      - "*"
 
 jobs:
   build-contracts:
