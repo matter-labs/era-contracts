@@ -1,6 +1,7 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
-import { BigNumber, type BytesLike } from "ethers";
+import { BigNumber } from "ethers";
+import type { BytesLike } from "ethers";
 import * as hre from "hardhat";
 import { ethers } from "hardhat";
 import type { Contract } from "zksync-web3";
@@ -9,7 +10,11 @@ import { Provider, utils, Wallet } from "zksync-web3";
 import { Language } from "../../scripts/constants";
 import { readYulBytecode, readZasmBytecode } from "../../scripts/utils";
 import { AccountCodeStorageFactory, ContractDeployerFactory } from "../../typechain";
-import { REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS, REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, TWO_IN_256 } from "./constants";
+import {
+  REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+  REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  TWO_IN_256,
+} from "./constants";
 
 const RICH_WALLETS = [
   {
