@@ -134,5 +134,6 @@ uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;
 /// @dev The offset of the final value in a storage diff.
 uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 32 bytes per field element/
-uint256 constant BLOB_SIZE_BYTES = 131_072;
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev 4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+uint256 constant BLOB_SIZE_BYTES = 126_976;
