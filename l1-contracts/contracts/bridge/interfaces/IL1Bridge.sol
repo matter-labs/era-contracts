@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+
 /// @author Matter Labs
 interface IL1Bridge {
     event DepositInitiatedSharedBridge(
@@ -61,6 +63,7 @@ interface IL1Bridge {
         uint256 _chainId,
         address _depositSender,
         address _l1Token,
+        uint256 _amount,
         bytes32 _l2TxHash,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -79,10 +82,20 @@ interface IL1Bridge {
 
     function bridgehubDeposit(
         uint256 _chainId,
+        uint256 _amount,
+        address _l1Token,
+        address _prevMsgSender,
+        address _l2Receiver
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
+
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
         address _l1Token,
         uint256 _amoun,
         address _prevMsgSender
     ) external payable;
+
+    function bridgehubConfirmL2Transaction(uint256 chainId, bytes32 txDataHash, bytes32 txHash) external;
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 

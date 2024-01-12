@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import "../../bridgehub/IBridgehub.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {L2TransactionRequestDirect, IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -12,6 +14,8 @@ import "../../common/interfaces/IL2ContractDeployer.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev A helper library for initializing L2 bridges in zkSync L2 network.
 library BridgeInitializationHelper {
+    using SafeERC20 for IERC20;
+
     /// @dev The L2 gas limit for requesting L1 -> L2 transaction of deploying L2 bridge instance.
     /// @dev It is big enough to deploy any contract, so we can use the same value for all bridges.
     /// NOTE: this constant will be accurately calculated in the future.
@@ -41,9 +45,8 @@ library BridgeInitializationHelper {
             (bytes32(0), _bytecodeHash, _constructorData)
         );
 
-        IBridgehub.L2TransactionRequest memory request = IBridgehub.L2TransactionRequest({
+        L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
-            payer: msg.sender,
             l2Contract: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             mintValue: _deployTransactionFee, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the other bridge for gas
             l2Value: 0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
@@ -57,6 +60,11 @@ library BridgeInitializationHelper {
         if (ethIsBaseToken) {
             txHash = _bridgehub.requestL2Transaction{value: _deployTransactionFee}(request);
         } else {
+            /// note: here we do the less safe and worse UX way. But this is a special tx, and we only risk the gasFee.
+            address baseToken = _bridgehub.baseToken(_chainId);
+            address baseTokenBridge = _bridgehub.baseTokenBridge(_chainId);
+            IERC20(baseToken).safeTransferFrom(msg.sender, address(this), _deployTransactionFee);
+            IERC20(baseToken).safeApprove(baseTokenBridge, _deployTransactionFee);
             txHash = _bridgehub.requestL2Transaction(request);
         }
 

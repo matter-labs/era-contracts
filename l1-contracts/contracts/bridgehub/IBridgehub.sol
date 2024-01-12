@@ -7,6 +7,38 @@ import "../common/Messaging.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../state-transition/libraries/Diamond.sol";
 
+struct L2TransactionRequestDirect {
+    uint256 chainId;
+    uint256 mintValue;
+    address l2Contract;
+    uint256 l2Value;
+    bytes l2Calldata;
+    uint256 l2GasLimit;
+    uint256 l2GasPerPubdataByteLimit;
+    bytes[] factoryDeps;
+    address refundRecipient;
+}
+
+struct L2TransactionRequestTwoBridgesOuter {
+    uint256 chainId;
+    uint256 mintValue;
+    uint256 l2Value;
+    uint256 l2GasLimit;
+    uint256 l2GasPerPubdataByteLimit;
+    address refundRecipient;
+    address secondBridgeAddress;
+    bytes4 secondBridgeSelector;
+    uint256 secondBridgeValue;
+    bytes secondBridgeCalldata;
+}
+
+struct L2TransactionRequestTwoBridgesInner {
+    address l2Contract;
+    bytes l2Calldata;
+    bytes[] factoryDeps;
+    bytes32 txDataHash;
+}
+
 interface IBridgehub {
     /// Getters
     function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
@@ -53,34 +85,19 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
-    struct L2TransactionRequest {
-        uint256 chainId;
-        address payer;
-        address l2Contract;
-        uint256 mintValue;
-        uint256 l2Value;
-        bytes l2Calldata;
-        uint256 l2GasLimit;
-        uint256 l2GasPerPubdataByteLimit;
-        bytes[] factoryDeps;
-        address refundRecipient;
-    }
+    function requestL2TransactionBaseTokenBridge(
+        L2TransactionRequestDirect calldata _request
+    ) external returns (bytes32 canonicalTxHash);
 
     function requestL2Transaction(
-        L2TransactionRequest memory _request
+        L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
-    // function requestL2TransactionSkipDeposit(
-    //     uint256 _chainId,
-    //     address _contractL2,
-    //     uint256 _mintValue,
-    //     uint256 _l2Value,
-    //     bytes calldata _calldata,
-    //     uint256 _l2GasLimit,
-    //     uint256 _l2GasPerPubdataByteLimit,
-    //     bytes[] calldata _factoryDeps,
-    //     address _refundRecipient
-    // ) external returns (bytes32 canonicalTxHash);
+    function requestL2TransactionTwoBridges(
+        L2TransactionRequestTwoBridgesOuter calldata _request
+    ) external payable returns (bytes32 canonicalTxHash);
+
+
 
     function l2TransactionBaseCost(
         uint256 _chainId,
@@ -102,6 +119,8 @@ interface IBridgehub {
     ) external returns (uint256 chainId);
 
     function newStateTransitionManager(address _stateTransitionManager) external;
+
+    function removeStateTransitionManager(address _stateTransitionManager) external;
 
     function newToken(address _token) external;
 

@@ -71,7 +71,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     /// @notice this stops new Chains from using the STF, old chains are not affected
-    function removestateTransitionManager(address _stateTransitionManager) external onlyOwner {
+    function removeStateTransitionManager(address _stateTransitionManager) external onlyOwner {
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
             "Bridgehub: state transition already registered"
@@ -130,6 +130,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             "Bridgehub: state transition not registered"
         );
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
+        if (_baseToken == ETH_TOKEN_ADDRESS) {
+            require(address(wethBridge) == _baseTokenBridge, "Bridgehub: baseTokenBridge has to be weth bridge");
+            require(address(wethBridge) != address(0), "Bridgehub: weth bridge not set");
+        }
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
         require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
@@ -209,42 +213,56 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             );
     }
 
+    /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
+    /// @notice this assumes that either ether is the base token or 
+    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge. 
+    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance. 
+    function requestL2TransactionBaseTokenBridge(
+        L2TransactionRequestDirect calldata _request
+    ) public override onlyBaseTokenBridge(_request.chainId) returns (bytes32 canonicalTxHash) {
+        address stateTransition = getZkSyncStateTransition(_request.chainId);
+        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
+            msg.sender,
+            _request.l2Contract,
+            _request.mintValue,
+            _request.l2Value,
+            _request.l2Calldata,
+            _request.l2GasLimit,
+            _request.l2GasPerPubdataByteLimit,
+            _request.factoryDeps,
+            _request.refundRecipient
+        );
+    }
+
+    /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
+    /// @notice this assumes that either ether is the base token or 
+    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge. 
+    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance. 
     function requestL2Transaction(
-        L2TransactionRequest memory _request
+        L2TransactionRequestDirect calldata _request
     ) public payable override returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             // address tokenBridge = baseTokenBridge[_request.chainId];
 
             if (token == ETH_TOKEN_ADDRESS) {
+                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDeposit{value: msg.value}(
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
                     token,
-                    msg.value,
-                    _request.payer
+                    _request.mintValue,
+                    msg.sender
                 );
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDeposit(
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
                     _request.chainId,
                     token,
                     _request.mintValue,
-                    _request.payer
+                    msg.sender
                 );
-            }
-        }
-
-        // to avoid stack too deep error we check the same condition twice for different varialbes
-        uint256 mintValue = _request.mintValue;
-        {
-            address token = baseToken[_request.chainId];
-            // address tokenBridge = baseTokenBridge[_request.chainId];
-
-            if (token == ETH_TOKEN_ADDRESS) {
-                // kl todo it would be nice here to be able to deposit weth instead of eth
-                mintValue = msg.value;
             }
         }
 
@@ -252,13 +270,77 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             msg.sender,
             _request.l2Contract,
-            mintValue,
+            _request.mintValue,
             _request.l2Value,
             _request.l2Calldata,
             _request.l2GasLimit,
             _request.l2GasPerPubdataByteLimit,
             _request.factoryDeps,
             _request.refundRecipient
+        );
+    }
+
+    /// @notice After depositing funds to the baseTokenBridge, the secondBridge is called
+    /// @notice to return the actual L2 message which is sent to the Mailbox. 
+    /// @notice this assumes that either ether is the base token or 
+    /// @notice the msg.sender has approved the baseTokenBridge with the mintValue, 
+    /// @notice and also the necessary approvals are given for the second bridge. 
+    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
+    function requestL2TransactionTwoBridges(
+        L2TransactionRequestTwoBridgesOuter calldata _request
+    ) public payable override returns (bytes32 canonicalTxHash) {
+        {
+            address token = baseToken[_request.chainId];
+            // address tokenBridge = baseTokenBridge[_request.chainId];
+
+            if (token == ETH_TOKEN_ADDRESS) {
+                require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
+                // kl todo it would be nice here to be able to deposit weth instead of eth
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
+                    _request.chainId,
+                    token,
+                    _request.mintValue,
+                    msg.sender
+                );
+            } else {
+                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
+                // note we have to pass token, as a bridge might have multiple tokens.
+                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
+                    _request.chainId,
+                    token,
+                    _request.mintValue,
+                    msg.sender
+                );
+            }
+        }
+
+        address stateTransition = getZkSyncStateTransition(_request.chainId);
+        (bool success, bytes memory data) = _request.secondBridgeAddress.call{value: _request.secondBridgeValue}(
+            abi.encodeWithSelector(
+                _request.secondBridgeSelector,
+                _request.chainId, 
+                _request.secondBridgeCalldata
+            )
+        );
+        require(success, "Bridgehub: second bridge call failed");
+        L2TransactionRequestTwoBridgesInner memory outputRequest = abi.decode(data, (L2TransactionRequestTwoBridgesInner));
+
+        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
+            msg.sender,
+            outputRequest.l2Contract,
+            _request.mintValue,
+            _request.l2Value,
+            outputRequest.l2Calldata,
+            _request.l2GasLimit,
+            _request.l2GasPerPubdataByteLimit,
+            outputRequest.factoryDeps,
+            _request.refundRecipient
+        );
+
+        IL1Bridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+            _request.chainId,
+            outputRequest.txDataHash,
+            canonicalTxHash
         );
     }
 }
