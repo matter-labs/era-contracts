@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.20;
 
+/// @title L1 Bridge contract interface
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL1Bridge {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,

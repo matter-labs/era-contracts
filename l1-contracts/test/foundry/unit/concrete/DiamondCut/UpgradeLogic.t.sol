@@ -7,9 +7,10 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 
@@ -68,21 +69,30 @@ contract UpgradeLogicTest is DiamondCutTest {
             recursionCircuitsSetVksHash: 0
         });
 
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            0x03752D8252d67f99888E741E3fB642803B29B155,
-            governor,
-            governor,
-            0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            0,
-            0x0000000000000000000000000000000000000000000000000000000000000000,
-            dummyVerifierParams,
-            false,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            500000, // priority tx max L2 gas limit
-            0
-        );
+        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
+            verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
+            governor: governor,
+            admin: governor,
+            genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
+            genesisIndexRepeatedStorageChanges: 0,
+            genesisBatchCommitment: bytes32(0),
+            verifierParams: dummyVerifierParams,
+            zkPorterIsAvailable: false,
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+            initialProtocolVersion: 0,
+            feeParams: FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            })
+        });
+
+        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

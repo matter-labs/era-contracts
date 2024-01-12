@@ -9,7 +9,7 @@ pragma solidity 0.8.20;
  */
 library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
-    bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");
+    bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
     /// @notice Validate the bytecode format and calculate its hash.
     /// @param _bytecode The bytecode to hash.

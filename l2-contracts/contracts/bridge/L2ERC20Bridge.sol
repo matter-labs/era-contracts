@@ -2,21 +2,23 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import "./interfaces/IL1Bridge.sol";
-import "./interfaces/IL2Bridge.sol";
-import "./interfaces/IL2StandardToken.sol";
+import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
+import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
-import "./L2StandardERC20.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {L2StandardERC20} from "./L2StandardERC20.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The "default" bridge implementation for the ERC20 tokens.
+/// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
+/// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
@@ -29,7 +31,7 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     bytes32 internal l2TokenProxyBytecodeHash;
 
     /// @dev A mapping l2 token address => l1 token address
-    mapping(address => address) public override l1TokenAddress;
+    mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -37,6 +39,10 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         _disableInitializers();
     }
 
+    /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
+    /// @param _l1Bridge The address of the L1 Bridge contract.
+    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @param _governor The address of the governor contract.
     function initialize(address _l1Bridge, bytes32 _l2TokenProxyBytecodeHash, address _governor) external initializer {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");

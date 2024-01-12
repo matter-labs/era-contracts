@@ -25,11 +25,11 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev It is supposed to be multisig contract.
     address public securityCouncil;
 
-    /// @notice A mapping to store timestamps where each operation will be ready for execution.
+    /// @notice A mapping to store timestamps when each operation will be ready for execution.
     /// @dev - 0 means the operation is not created.
     /// @dev - 1 (EXECUTED_PROPOSAL_TIMESTAMP) means the operation is already executed.
     /// @dev - any other value means timestamp in seconds when the operation will be ready for execution.
-    mapping(bytes32 => uint256) public timestamps;
+    mapping(bytes32 operationId => uint256 executionTimestamp) public timestamps;
 
     /// @notice The minimum delay in seconds for operations to be ready for execution.
     uint256 public minDelay;
@@ -56,13 +56,13 @@ contract Governance is IGovernance, Ownable2Step {
 
     /// @notice Checks that the message sender is contract itself.
     modifier onlySelf() {
-        require(msg.sender == address(this), "Only governance contract itself allowed to call this function");
+        require(msg.sender == address(this), "Only governance contract itself is allowed to call this function");
         _;
     }
 
     /// @notice Checks that the message sender is an active security council.
     modifier onlySecurityCouncil() {
-        require(msg.sender == securityCouncil, "Only security council allowed to call this function");
+        require(msg.sender == securityCouncil, "Only security council is allowed to call this function");
         _;
     }
 
@@ -149,7 +149,7 @@ contract Governance is IGovernance, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Cancel the scheduled operation.
-    /// @dev Both the owner and security council may cancel an operation.
+    /// @dev Only owner can call this function.
     /// @param _id Proposal id value (see `hashOperation`)
     function cancel(bytes32 _id) external onlyOwner {
         require(isOperationPending(_id), "Operation must be pending");
@@ -225,7 +225,7 @@ contract Governance is IGovernance, Ownable2Step {
         for (uint256 i = 0; i < _calls.length; ++i) {
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (!success) {
-                // Propage an error if the call fails.
+                // Propagate an error if the call fails.
                 assembly {
                     revert(add(returnData, 0x20), mload(returnData))
                 }

@@ -14,7 +14,7 @@ import {
 } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import { getCallRevertReason } from "./utils";
+import { defaultFeeParams, getCallRevertReason } from "./utils";
 
 describe("L1ERC20Bridge tests", function () {
   let owner: ethers.Signer;
@@ -61,6 +61,7 @@ describe("L1ERC20Bridge tests", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
+        feeParams: defaultFeeParams(),
       },
     ]);
 

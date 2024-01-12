@@ -136,8 +136,8 @@
     "contractName": "Keccak256",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/Keccak256.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/Keccak256.yul",
-    "bytecodeHash": "0x01000021e3954694ddb9479f31cabe797467b4ea3b92ab64fd81e9b5e53f1300",
-    "sourceCodeHash": "0x6415e127a4e07907fb87d0cbdf480fff8c70326c4f2f670af0cf3248862e4df4"
+    "bytecodeHash": "0x0100000fb004b644efe76e9ef3ba89dfa3eaac946e3fa19f8a046ed27465eeef",
+    "sourceCodeHash": "0x3e6b02b36eb6d8cebe19ae258c2aed531f9be6c261ae02d301ba31b2cd388776"
   },
   {
     "contractName": "SHA256",
@@ -159,20 +159,6 @@
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
     "bytecodeHash": "0x0100084d55ffd8efbd8de0090a0ef9319f2d4f342d5a3d635359eb7ba0cfc2c8",
     "sourceCodeHash": "0xca5283404a6cec4783a22d3f4e10603a6bac565d2b8711ed3fe597f214771854"
-  },
-  {
-    "contractName": "gas_test",
-    "bytecodePath": "bootloader/build/artifacts/gas_test.yul.zbin",
-    "sourceCodePath": "bootloader/build/gas_test.yul",
-    "bytecodeHash": "0x0100081d026f0e582660cfbe6dc48d130ebfb1fe472138faec1d3b329a4fbb41",
-    "sourceCodeHash": "0xed9aecbcd499bdf72ead564faf7c89fe9f8543defdb59c8c43f83273fce57059"
-  },
-  {
-    "contractName": "playground_batch",
-    "bytecodePath": "bootloader/build/artifacts/playground_batch.yul.zbin",
-    "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x010008534df7acda8db1c4789b7d031a292e11fc247d57e22c7304aa320add2e",
-    "sourceCodeHash": "0x9e9d3356645dd69b887089fc27ebb05c6d874a873caef75e848bb3c6cf781bbd"
   },
   {
     "contractName": "proved_batch",
