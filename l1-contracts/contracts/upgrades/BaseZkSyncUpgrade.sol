@@ -77,8 +77,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
-        bytes32 txHash;
-        txHash = _setL2SystemContractUpgrade(
+        bytes32 txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
             _proposedUpgrade.newProtocolVersion
