@@ -136,7 +136,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         }
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
-        require(stateTransitionManager[_chainId] == address(0), "Bridgehub: chainId already registered");
+        require(stateTransitionManager[chainId] == address(0), "Bridgehub: chainId already registered");
 
         stateTransitionManager[chainId] = _stateTransitionManager;
         baseToken[chainId] = _baseToken;
