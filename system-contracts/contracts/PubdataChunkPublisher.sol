@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES} from "./Constants.sol";
+import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, EMPTY_BLOB_HASH} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemLogKey} from "./Constants.sol";
@@ -24,15 +24,29 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         //       blobHashes = new bytes32[]((_pubdata.length / BLOB_SIZE_BYTES) + 1);
         bytes32[] memory blobHashes = new bytes32[](2);
         for (uint256 i = 0; i < _pubdata.length; i += BLOB_SIZE_BYTES) {
-            uint256 end = i + BLOB_SIZE_BYTES > _pubdata.length ? _pubdata.length : i + BLOB_SIZE_BYTES;
+            uint256 end = BLOB_SIZE_BYTES > _pubdata.length - i ? _pubdata.length : i + BLOB_SIZE_BYTES;
 
-            bytes calldata blob = _pubdata[i:end];
-            bytes32 blobHash = EfficientCall.keccak(blob);
+            bytes32 blobHash;
+
+            if (BLOB_SIZE_BYTES > _pubdata.length - i) {
+                assembly {
+                    // The pointer to the next BLOB_SIZE_BYTES after the free memory slot
+                    let ptr := add(mload(0x40), BLOB_SIZE_BYTES)
+                    calldatacopy(ptr, add(_pubdata.offset, i), sub(_pubdata.length, i))
+                    blobHash := keccak256(ptr, BLOB_SIZE_BYTES)
+                }
+            } else {
+                bytes calldata blob = _pubdata[i:end];
+                blobHash = EfficientCall.keccak(blob);
+            }
 
             blobHashes[i / BLOB_SIZE_BYTES] = blobHash;
         }
 
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blobHashes[0]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blobHashes[1]);
+        bytes32 blob1Hash = blobHashes[0] == bytes32(0) ? EMPTY_BLOB_HASH : blobHashes[0];
+        bytes32 blob2Hash = blobHashes[1] == bytes32(0) ? EMPTY_BLOB_HASH : blobHashes[1];
+
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blob1Hash);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blob2Hash);
     }
 }
