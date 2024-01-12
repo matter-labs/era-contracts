@@ -92,7 +92,7 @@ interface IExecutor is IBase {
     /// @param systemLogs concatenation of all L2 -> L1 system logs in the batch
     /// @param pubdataCommitments Packed pubdata commitments/data.
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
-    ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
+    ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
     ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
     /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
     struct CommitBatchInfo {
