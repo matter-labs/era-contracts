@@ -94,7 +94,7 @@ interface IExecutor is IBase {
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
     ///                             calldata: pubdataCommitments.length - 1 bytes of pubdata
-    /// @dev With a target of 3 blobs and a maximum of 6 blobs our pubdata size would be 386 bytes and 772 bytes respectively.
+    /// @dev For 2 blobs we will be sending 288 bytes of calldata instead of the full amount for pubdata.
     struct CommitBatchInfo {
         uint64 batchNumber;
         uint64 timestamp;
