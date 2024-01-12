@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput, PUBDATA_COMMITMENT_OPENING_POINT_OFFSET, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -42,13 +42,9 @@ contract ExecutorFacet is Base, IExecutor {
         );
 
         // TODO: Adapt to handle dynamic number of blobs
-        bytes32[] memory blobCommitments;
+        bytes32[] memory blobCommitments = new bytes32[](2);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
-            blobCommitments = _verifyBlobInformation(
-                _newBatch.pubdataCommitments[1:],
-                logOutput.blob1Hash,
-                logOutput.blob2Hash
-            );
+            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:]);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
         }
@@ -137,8 +133,6 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                // might be okay to remove this branch (TOTAL_L2_TO_L1_PUBDATA_KEY)
-                // might also need to add it back it to the batch commitment
                 if (_pubdataSource == PubdataSource.Calldata) {
                     require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                     logOutput.pubdataHash = logValue;
@@ -504,12 +498,12 @@ contract ExecutorFacet is Base, IExecutor {
     /// @notice Calls the point evaluation precompile and verifies the output
     /// Verify p(z) = y given commitment that corresponds to the polynomial p(x) and a KZG proof.
     /// Also verify that the provided commitment matches the provided versioned_hash.
+    /// 
     function _pointEvaluationPrecompile(
         bytes32 _versionedHash,
-        bytes32 _inputPoint,
-        bytes calldata _valueCommitmentProof
+        bytes calldata _openingPointValueCommitmentProof
     ) internal view {
-        bytes memory precompileInput = abi.encodePacked(_versionedHash, _inputPoint, _valueCommitmentProof);
+        bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPointValueCommitmentProof);
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
@@ -521,12 +515,9 @@ contract ExecutorFacet is Base, IExecutor {
 
     /// Verifies that the blobs contain the correct data by calling the point evaluation precompile. For the precompile we need:
     /// versioned hash || opening point || opening value || commitment || proof
-    /// the pubdata will contain the last 3 values, the versioned hash is pulled from the BLOBHASH opcode, and the opening point
-    /// is calculated as the hash(versioned hash || blob commitment) where the blob commitment comes from system logs.
+    /// the _pubdataCommitments will contain the last 4 values, the versioned hash is pulled from the BLOBHASH opcode
     function _verifyBlobInformation(
-        bytes calldata _pubdataCommitments,
-        bytes32 _blob1Hash,
-        bytes32 _blob2Hash
+        bytes calldata _pubdataCommitments
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
@@ -543,24 +534,20 @@ contract ExecutorFacet is Base, IExecutor {
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
             versionedHash = _getBlobVersionedHash(versionedHashIndex);
 
-            // TODO: this can be made to be dynamic where evalutationPoint = keccak256(abi.encode(versionedHash, hashes[i / PUBDATA_COMMITMENT_SIZE]));
-            bytes32 evalutationPoint;
-            if (i < PUBDATA_COMMITMENT_SIZE) {
-                evalutationPoint = keccak256(abi.encode(versionedHash, _blob1Hash));
-            } else {
-                evalutationPoint = keccak256(abi.encode(versionedHash, _blob2Hash));
-            }
-
             require(versionedHash != bytes32(0), "vh");
 
             _pointEvaluationPrecompile(
                 versionedHash,
-                evalutationPoint,
                 _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]
             );
 
+            // Take the hash of the versioned hash || opening point || claimed value
             blobCommitments[versionedHashIndex] = keccak256(
-                abi.encodePacked(versionedHash, evalutationPoint, _pubdataCommitments[i:i + 32])
+                abi.encodePacked(
+                    versionedHash, 
+                    _pubdataCommitments[i:i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET],
+                    _pubdataCommitments[i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET:i + PUBDATA_COMMITMENT_COMMITMENT_OFFSET]
+                )
             );
             versionedHashIndex += 1;
         }
