@@ -142,7 +142,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param _newVerifierParams New parameters for the verifier
     function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
         // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
-        // during the transition. If verifier verifier are upgraded, it will immediately be used to prove all committed batches.
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier params will fail. Ensure all commited batches are finalized before the
         // verifier is upgraded.
         if (

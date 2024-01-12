@@ -149,7 +149,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
 
     /// @notice A method that checks whether the nonce has been used before.
     /// @param _address The address the nonce of which is being checked.
-    /// @param _nonce The nonce value which is check.
+    /// @param _nonce The nonce value which is checked.
     /// @return `true` if the nonce has been used, `false` otherwise.
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
