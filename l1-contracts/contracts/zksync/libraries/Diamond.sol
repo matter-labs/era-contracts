@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import "../../common/libraries/UncheckedMath.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,11 +14,12 @@ library Diamond {
 
     /// @dev Magic value that should be returned by diamond cut initialize contracts.
     /// @dev Used to distinguish calls to contracts that were supposed to be used as diamond initializer from other contracts.
-    bytes32 constant DIAMOND_INIT_SUCCESS_RETURN_VALUE =
+    bytes32 internal constant DIAMOND_INIT_SUCCESS_RETURN_VALUE =
         0x33774e659306e47509050e97cb651e731180a42d458212294d30751925c551a2; // keccak256("diamond.zksync.init") - 1
 
     /// @dev Storage position of `DiamondStorage` structure.
-    bytes32 constant DIAMOND_STORAGE_POSITION = 0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b; // keccak256("diamond.standard.diamond.storage") - 1;
+    bytes32 private constant DIAMOND_STORAGE_POSITION =
+        0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b; // keccak256("diamond.standard.diamond.storage") - 1;
 
     event DiamondCut(FacetCut[] facetCuts, address initAddress, bytes initCalldata);
 
@@ -47,8 +48,8 @@ library Diamond {
     /// @param facets The array of all unique facet addresses that belong to the diamond proxy
     /// @param isFrozen Denotes whether the diamond proxy is frozen and all freezable facets are not accessible
     struct DiamondStorage {
-        mapping(bytes4 => SelectorToFacet) selectorToFacet;
-        mapping(address => FacetToSelectors) facetToSelectors;
+        mapping(bytes4 selector => SelectorToFacet selectorInfo) selectorToFacet;
+        mapping(address facetAddress => FacetToSelectors facetInfo) facetToSelectors;
         address[] facets;
         bool isFrozen;
     }

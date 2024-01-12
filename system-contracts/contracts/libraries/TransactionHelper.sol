@@ -21,7 +21,7 @@ uint8 constant EIP_2930_TX_TYPE = 0x01;
 /// @dev The type id of EIP1559 transactions.
 uint8 constant EIP_1559_TX_TYPE = 0x02;
 
-/// @notice Structure used to represent zkSync transaction.
+/// @notice Structure used to represent a zkSync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;

@@ -41,7 +41,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     address public coinbase = BOOTLOADER_FORMAL_ADDRESS;
 
     /// @notice Formal `block.difficulty` parameter.
-    uint256 public difficulty = 2500000000000000;
+    uint256 public difficulty = 2.5e15;
 
     /// @notice The `block.basefee`.
     /// @dev It is currently a constant.
@@ -52,7 +52,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
     /// @notice The hashes of batches.
     /// @dev It stores batch hashes for all previous batches.
-    mapping(uint256 => bytes32) internal batchHash;
+    mapping(uint256 batchNumber => bytes32 batchHash) internal batchHashes;
 
     /// @notice The number and the timestamp of the current L2 block.
     BlockInfo internal currentL2BlockInfo;
@@ -117,7 +117,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         } else if (_block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch) {
             // Note, that we will get into this branch only for a brief moment of time, right after the upgrade
             // for virtual blocks before 256 virtual blocks are produced.
-            hash = batchHash[_block];
+            hash = batchHashes[_block];
         } else if (
             _block >= currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block &&
             currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block > 0
@@ -135,7 +135,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _batchNumber The number of the batch.
     /// @return hash The hash of the batch.
     function getBatchHash(uint256 _batchNumber) external view returns (bytes32 hash) {
-        hash = batchHash[_batchNumber];
+        hash = batchHashes[_batchNumber];
     }
 
     /// @notice Returns the current batch's number and timestamp.
@@ -424,7 +424,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 
-        batchHash[previousBatchNumber] = _prevBatchHash;
+        batchHashes[previousBatchNumber] = _prevBatchHash;
 
         // Setting new block number and timestamp
         BlockInfo memory newBlockInfo = BlockInfo({number: previousBatchNumber + 1, timestamp: _newTimestamp});
@@ -478,6 +478,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Returns the hash of the given batch.
     /// @dev Deprecated in favor of getBatchHash.
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
-        hash = batchHash[_blockNumber];
+        hash = batchHashes[_blockNumber];
     }
 }

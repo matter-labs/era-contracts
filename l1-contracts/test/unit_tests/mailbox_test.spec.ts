@@ -1,9 +1,22 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { MailboxFacet, MockExecutorFacet, Forwarder } from "../../typechain";
-import { MailboxFacetFactory, MockExecutorFacetFactory, DiamondInitFactory, ForwarderFactory } from "../../typechain";
-import { DEFAULT_REVERT_REASON, getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, requestExecute } from "./utils";
+import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest } from "../../typechain";
+import {
+  MailboxFacetTestFactory,
+  MailboxFacetFactory,
+  MockExecutorFacetFactory,
+  DiamondInitFactory,
+  ForwarderFactory,
+} from "../../typechain";
+import {
+  DEFAULT_REVERT_REASON,
+  getCallRevertReason,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  requestExecute,
+  defaultFeeParams,
+  PubdataPricingMode,
+} from "./utils";
 import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
@@ -56,6 +69,7 @@ describe("Mailbox tests", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
+        feeParams: defaultFeeParams(),
       },
     ]);
 
@@ -198,6 +212,73 @@ describe("Mailbox tests", function () {
     });
   });
 
+  describe("L2 gas price", async () => {
+    let testContract: MailboxFacetTest;
+    const TEST_GAS_PRICES = [];
+
+    async function testOnAllGasPrices(
+      testFunc: (price: ethers.BigNumber) => ethers.utils.Deferrable<ethers.BigNumber>
+    ) {
+      for (const gasPrice of TEST_GAS_PRICES) {
+        expect(await testContract.getL2GasPrice(gasPrice)).to.eq(testFunc(gasPrice));
+      }
+    }
+
+    before(async () => {
+      const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
+      const mailboxTestContract = await mailboxTestContractFactory.deploy();
+      testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
+
+      // Generating 10 more gas prices for test suit
+      let priceGwei = 0.001;
+      while (priceGwei < 10000) {
+        priceGwei *= 2;
+        const priceWei = ethers.utils.parseUnits(priceGwei.toString(), "gwei");
+        TEST_GAS_PRICES.push(priceWei);
+      }
+    });
+
+    it("Should allow simulating old behaviour", async () => {
+      // Simulating old L2 gas price calculations might be helpful for migration between the systems
+      await (
+        await testContract.setFeeParams({
+          ...defaultFeeParams(),
+          pubdataPricingMode: PubdataPricingMode.Rollup,
+          batchOverheadL1Gas: 0,
+          minimalL2GasPrice: 500_000_000,
+        })
+      ).wait();
+
+      // Testing the logic under low / medium / high L1 gas price
+      testOnAllGasPrices(expectedLegacyL2GasPrice);
+    });
+
+    it("Should allow free pubdata", async () => {
+      await (
+        await testContract.setFeeParams({
+          ...defaultFeeParams(),
+          pubdataPricingMode: PubdataPricingMode.Validium,
+          batchOverheadL1Gas: 0,
+        })
+      ).wait();
+
+      // The gas price per pubdata is still constant, however, the L2 gas price is always equal to the minimalL2GasPrice
+      testOnAllGasPrices(() => {
+        return ethers.BigNumber.from(defaultFeeParams().minimalL2GasPrice);
+      });
+    });
+
+    it("Should work fine in general case", async () => {
+      await (
+        await testContract.setFeeParams({
+          ...defaultFeeParams(),
+        })
+      ).wait();
+
+      testOnAllGasPrices(calculateL2GasPrice);
+    });
+  });
+
   let callDirectly, callViaForwarder, callViaConstructorForwarder;
 
   before(async () => {
@@ -287,4 +368,45 @@ function aliasAddress(address) {
   return ethers.BigNumber.from(address)
     .add("0x1111000000000000000000000000000000001111")
     .mask(20 * 8);
+}
+
+// Returns the expected L2 gas price to be used for an L1->L2 transaction
+function calculateL2GasPrice(l1GasPrice: ethers.BigNumber) {
+  const feeParams = defaultFeeParams();
+  const gasPricePerPubdata = ethers.BigNumber.from(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+
+  let pubdataPriceETH = ethers.BigNumber.from(0);
+  if (feeParams.pubdataPricingMode === PubdataPricingMode.Rollup) {
+    pubdataPriceETH = l1GasPrice.mul(17);
+  }
+
+  const batchOverheadETH = l1GasPrice.mul(feeParams.batchOverheadL1Gas);
+  const fullPubdataPriceETH = pubdataPriceETH.add(batchOverheadETH.div(feeParams.maxPubdataPerBatch));
+
+  const l2GasPrice = batchOverheadETH.div(feeParams.maxL2GasPerBatch).add(feeParams.minimalL2GasPrice);
+  const minL2GasPriceETH = fullPubdataPriceETH.add(gasPricePerPubdata).sub(1).div(gasPricePerPubdata);
+
+  if (l2GasPrice.gt(minL2GasPriceETH)) {
+    return l2GasPrice;
+  }
+
+  return minL2GasPriceETH;
+}
+
+function expectedLegacyL2GasPrice(l1GasPrice: ethers.BigNumberish) {
+  // In the previous release the following code was used to calculate the L2 gas price for L1->L2 transactions:
+  //
+  //  uint256 pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
+  //  uint256 minL2GasPriceETH = (pubdataPriceETH + _gasPerPubdata - 1) / _gasPerPubdata;
+  //  return Math.max(FAIR_L2_GAS_PRICE, minL2GasPriceETH);
+  //
+
+  const pubdataPriceETH = ethers.BigNumber.from(l1GasPrice).mul(17);
+  const gasPricePerPubdata = ethers.BigNumber.from(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+  const FAIR_L2_GAS_PRICE = 500_000_000; // 0.5 gwei
+  const minL2GasPirceETH = ethers.BigNumber.from(pubdataPriceETH.add(gasPricePerPubdata).sub(1)).div(
+    gasPricePerPubdata
+  );
+
+  return ethers.BigNumber.from(Math.max(FAIR_L2_GAS_PRICE, minL2GasPirceETH.toNumber()));
 }

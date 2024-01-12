@@ -7,9 +7,9 @@ import {IExecutor} from "./interfaces/IExecutor.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {Base} from "./facets/Base.sol";
 import {Verifier} from "./Verifier.sol";
-import {VerifierParams} from "./Storage.sol";
+import {VerifierParams, FeeParams} from "./Storage.sol";
 /* solhint-disable max-line-length */
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_TX_MAX_GAS_LIMIT} from "./Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_ROOT_HASH, MAX_GAS_PER_TRANSACTION} from "./Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,17 +18,19 @@ import {L2_TO_L1_LOG_SERIALIZE_SIZE, EMPTY_STRING_KECCAK, DEFAULT_L2_LOGS_TREE_R
 contract DiamondInit is Base {
     /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
     /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
-    /// @param _verifier address of Verifier contract
-    /// @param _governor address who can manage critical updates in the contract
-    /// @param _admin address who can manage non-critical updates in the contract
-    /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
-    /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
-    /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
-    /// @param _verifierParams Verifier config parameters that describes the circuit to be verified
-    /// @param _zkPorterIsAvailable The availability of zk porter shard
-    /// @param _l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-    /// @param _l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-    /// @param _priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+    /// @param verifier address of Verifier contract
+    /// @param governor address who can manage critical updates in the contract
+    /// @param admin address who can manage non-critical updates in the contract
+    /// @param genesisBatchHash Batch hash of the genesis (initial) batch
+    /// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
+    /// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
+    /// @param verifierParams Verifier config parameters that describes the circuit to be verified
+    /// @param zkPorterIsAvailable The availability of zk porter shard
+    /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
+    /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+    /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+    /// @param initialProtocolVersion initial protocol version
+    /// @param feeParams Fee parameters to be used for L1->L2 transactions
     struct InitializeData {
         IVerifier verifier;
         address governor;
@@ -42,6 +44,7 @@ contract DiamondInit is Base {
         bytes32 l2DefaultAccountBytecodeHash;
         uint256 priorityTxMaxGasLimit;
         uint256 initialProtocolVersion;
+        FeeParams feeParams;
     }
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
@@ -54,7 +57,7 @@ contract DiamondInit is Base {
         require(address(_initalizeData.verifier) != address(0), "vt");
         require(_initalizeData.governor != address(0), "vy");
         require(_initalizeData.admin != address(0), "hc");
-        require(_initalizeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
+        require(_initalizeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
 
         s.verifier = _initalizeData.verifier;
         s.governor = _initalizeData.governor;
@@ -79,6 +82,7 @@ contract DiamondInit is Base {
         s.l2DefaultAccountBytecodeHash = _initalizeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
         s.protocolVersion = _initalizeData.initialProtocolVersion;
+        s.feeParams = _initalizeData.feeParams;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
