@@ -19,7 +19,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments);
+        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, bytes32(0), bytes32(0));
     }
 
     function processL2Logs(

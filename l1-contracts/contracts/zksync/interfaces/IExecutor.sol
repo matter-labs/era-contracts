@@ -50,17 +50,14 @@ uint256 constant L2_LOG_VALUE_OFFSET = 56;
 uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
 
 /// @dev Packed pubdata commitments.
-/// @dev Format: list of: opening point (32 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 160 bytes
-uint256 constant PUBDATA_COMMITMENT_SIZE = 160;
-
-/// @dev Offset in pubdata commitment of blobs for opening point
-uint256 constant PUBDATA_COMMITMENT_OPENING_POINT_OFFSET = 0;
+/// @dev Format: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
+uint256 constant PUBDATA_COMMITMENT_SIZE = 144;
 
 /// @dev Offset in pubdata commitment of blobs for claimed value
-uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 32;
+uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 
 /// @dev Offset in pubdata commitment of blobs for kzg commitment
-uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 64;
+uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 
 interface IExecutor is IBase {
     /// @notice Rollup batch stored data

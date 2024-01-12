@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput, PUBDATA_COMMITMENT_OPENING_POINT_OFFSET, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PubdataSource, LogProcessingOutput, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -44,8 +44,10 @@ contract ExecutorFacet is Base, IExecutor {
         // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments = new bytes32[](2);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
+            // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:]);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
+            // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
             require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
         }
 
@@ -59,7 +61,13 @@ contract ExecutorFacet is Base, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitments);
+        bytes32 commitment = _createBatchCommitment(
+            _newBatch, 
+            logOutput.stateDiffHash, 
+            blobCommitments,
+            logOutput.blob1Hash,
+            logOutput.blob2Hash
+        );
 
         return
             StoredBatchInfo(
@@ -433,11 +441,13 @@ contract ExecutorFacet is Base, IExecutor {
     function _createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments
+        bytes32[] memory _blobCommitments,
+        bytes32 _blob1Hash,
+        bytes32 _blob2Hash
     ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments));
+        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blob1Hash, _blob2Hash));
 
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
@@ -459,7 +469,9 @@ contract ExecutorFacet is Base, IExecutor {
     function _batchAuxiliaryOutput(
         CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments
+        bytes32[] memory _blobCommitments,
+        bytes32 _blob1Hash,
+        bytes32 _blob2Hash
     ) internal pure returns (bytes memory) {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
@@ -471,12 +483,13 @@ contract ExecutorFacet is Base, IExecutor {
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
-                // 2 Linear hashes of blob commitments: keccak(versioned hash || opening point || evaluation value)
+                // for each blob we have: 
+                // linear hash (hash of preimage from system logs) and 
+                // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+                _blob1Hash,
                 _blobCommitments[0],
-                _blobCommitments[1],
-                // 2 4844 output commitment hashes
-                bytes32(0),
-                bytes32(0)
+                _blob2Hash,
+                _blobCommitments[1]
             );
     }
 
@@ -501,9 +514,10 @@ contract ExecutorFacet is Base, IExecutor {
     /// 
     function _pointEvaluationPrecompile(
         bytes32 _versionedHash,
-        bytes calldata _openingPointValueCommitmentProof
+        bytes32 _openingPoint,
+        bytes calldata _openingValueCommitmentProof
     ) internal view {
-        bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPointValueCommitmentProof);
+        bytes memory precompileInput = abi.encodePacked(_versionedHash, _openingPoint, _openingValueCommitmentProof);
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
@@ -536,17 +550,21 @@ contract ExecutorFacet is Base, IExecutor {
 
             require(versionedHash != bytes32(0), "vh");
 
+            // First 16 bytes is the opening value. While we get the value as 16 bytes, the point evaluation precompile
+            // requires it to be 32 bytes.
+            bytes32 openingValue = bytes32(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]);
+
             _pointEvaluationPrecompile(
                 versionedHash,
-                _pubdataCommitments[i:i + PUBDATA_COMMITMENT_SIZE]
+                openingValue,
+                _pubdataCommitments[i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET:i + PUBDATA_COMMITMENT_SIZE]
             );
 
             // Take the hash of the versioned hash || opening point || claimed value
             blobCommitments[versionedHashIndex] = keccak256(
                 abi.encodePacked(
                     versionedHash, 
-                    _pubdataCommitments[i:i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET],
-                    _pubdataCommitments[i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET:i + PUBDATA_COMMITMENT_COMMITMENT_OFFSET]
+                    _pubdataCommitments[i:i + PUBDATA_COMMITMENT_COMMITMENT_OFFSET]
                 )
             );
             versionedHashIndex += 1;
