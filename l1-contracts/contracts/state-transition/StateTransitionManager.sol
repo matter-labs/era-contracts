@@ -25,7 +25,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// total number of chains registered in the contract
+    /// @notice total number of chains registered in the contract
     uint256 public totalChains;
 
     /// @notice chainId => chainContract

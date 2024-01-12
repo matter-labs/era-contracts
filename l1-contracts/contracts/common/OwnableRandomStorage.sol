@@ -38,8 +38,7 @@ abstract contract Context {
 abstract contract OwnableRandomStorage is Context {
     /// @dev Address of owner variable.
     /// @dev Flag is placed at random memory location to not interfere with Storage contract.
-    // keccak256("owner") - 1;
-    uint256 private constant OWNER_ADDRESS = 0x02016836a56b71f0d02689e69e326f4f4c1b9057164ef592671cf0d37c8040bf;
+    uint256 private constant OWNER_ADDRESS = uint256(keccak256("owner")) - 1;
 
     function _getOwner() internal view returns (address _owner) {
         assembly {
