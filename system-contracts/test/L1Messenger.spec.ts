@@ -24,6 +24,26 @@ describe("L1Messenger tests", () => {
   let numberOfLogs: number = 0;
   let numberOfMessages: number = 0;
   let numberOfBytecodes: number = 0;
+  let stateDiffs;
+  let encodedStateDiffs;
+  let compressedStateDiffs;
+  let numberOfStateDiffs;
+  let enumerationIndexSize;
+  let isService;
+  let key;
+  let value;
+  let message;
+  let messageHash;
+  let txNumberInBlock;
+  let callResult;
+  let firstLog;
+  let secondLog;
+  let currentMessageLength;
+  let senderAddress;
+  let bytecode;
+  let lengthOfBytecode;
+  let bytecodeHash;
+  let currentMessageLengthBytes;
 
   before(async () => {
     await prepareEnvironment();
@@ -33,46 +53,7 @@ describe("L1Messenger tests", () => {
     l1MessengerAccount = await ethers.getImpersonatedSigner(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
     knownCodeStorageAccount = await ethers.getImpersonatedSigner(TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
-  });
-
-  // this part is necessary to clean the state of L1Messenger contract
-  after(async () => {
-    const isService = true;
-    const key = Buffer.alloc(32, 1);
-    const value = Buffer.alloc(32, 2);
-    const txNumberInBlock = 1;
-    const firstLog = ethers.utils.concat([
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexlify([isService ? 1 : 0]),
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-      ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-      key,
-      value,
-    ]);
-
-    const message = Buffer.alloc(32, 3);
-    const senderAddress = ethers.utils
-      .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-      .toLowerCase();
-    const messageHash = ethers.utils.keccak256(message);
-    const secondLog = ethers.utils.concat([
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexlify([isService ? 1 : 0]),
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-      ethers.utils.hexZeroPad(l1Messenger.address, 20),
-      senderAddress,
-      messageHash,
-    ]);
-
-    const currentMessageLength = 32;
-
-    const bytecode = await getCode(l1Messenger.address);
-    const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
-
-    const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
-    const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
-
-    const stateDiffs = [
+    stateDiffs = [
       {
         key: "0x1234567890123456789012345678901234567890123456789012345678901230",
         index: 0,
@@ -104,10 +85,59 @@ describe("L1Messenger tests", () => {
         finalValue: BigNumber.from(1),
       },
     ];
-    const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-    const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-    const numberOfStateDiffs = stateDiffs.length;
-    const enumerationIndexSize = 4;
+    encodedStateDiffs = encodeStateDiffs(stateDiffs);
+    compressedStateDiffs = compressStateDiffs(4, stateDiffs);
+    numberOfStateDiffs = stateDiffs.length;
+    enumerationIndexSize = 4;
+    isService = true;
+    key = Buffer.alloc(32, 1);
+    value = Buffer.alloc(32, 2);
+    message = Buffer.alloc(32, 3);
+    messageHash = ethers.utils.keccak256(message);
+    senderAddress = ethers.utils
+        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
+        .toLowerCase();
+    currentMessageLength = 32;
+    txNumberInBlock = 1;
+    callResult = {
+      failure: false,
+      returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
+    };
+    
+    firstLog = ethers.utils.concat([
+      ethers.utils.hexlify([0]),
+      ethers.utils.hexlify([isService ? 1 : 0]),
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
+      ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
+      key,
+      value,
+    ]);
+    secondLog = ethers.utils.concat([
+      ethers.utils.hexlify([0]),
+      ethers.utils.hexlify([isService ? 1 : 0]),
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
+      ethers.utils.hexZeroPad(l1Messenger.address, 20),
+      senderAddress,
+      messageHash,
+    ]);
+    bytecode = await getCode(l1Messenger.address);
+    lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+    bytecodeHash = await ethers.utils.hexlify(utils.hashBytecode(bytecode));
+    await setResult("SystemContext", "txNumberInBlock", [], callResult);
+    currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+
+
+
+  });
+
+  // this part is necessary to clean the state of L1Messenger contract
+  after(async () => {
+    
+    
+
+   
+    const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
+
 
     // ====================================================================================================
     // mocking compressor
@@ -133,14 +163,7 @@ describe("L1Messenger tests", () => {
 
     // third log from test case: "sendL2ToL1Log" ->
     // "should emit L2ToL1LogSent event when called by the system contract"
-    const thirdLog = ethers.utils.concat([
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexlify([isService ? 1 : 0]),
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-      ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-      key,
-      value,
-    ]);
+    // same as firstLog
     numberOfLogs++;
 
     // fourth log from test case: "sendL2ToL1Log" ->
@@ -157,14 +180,7 @@ describe("L1Messenger tests", () => {
 
     // fifth log from test case: "sendToL1" ->
     // "should emit L1MessageSent & L2ToL1LogSent events"
-    const fifthLog = ethers.utils.concat([
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexlify([isService ? 1 : 0]),
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-      ethers.utils.hexZeroPad(l1Messenger.address, 20),
-      senderAddress,
-      messageHash,
-    ]);
+    // same as secondLog
     numberOfLogs++;
     numberOfMessages++;
 
@@ -178,9 +194,9 @@ describe("L1Messenger tests", () => {
       numberOfLogsBytes,
       firstLog,
       secondLog,
-      thirdLog,
+      firstLog,
       fourthLog,
-      fifthLog,
+      secondLog,
       numberOfMessagesBytes,
       currentMessageLengthBytes,
       message,
@@ -216,114 +232,30 @@ describe("L1Messenger tests", () => {
 
   describe("publishPubdataAndClearState", async () => {
     it("publishPubdataAndClearState passes correctly", async () => {
-      // ====================================================================================================
-      const isService = true;
-      const key = Buffer.alloc(32, 1);
-      const value = Buffer.alloc(32, 2);
-
-      const txNumberInBlock = 1;
-      const callResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult);
       await (await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value)).wait();
-
-      const firstLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-        key,
-        value,
-      ]);
       numberOfLogs++;
 
-      // ====================================================================================================
-      const message = Buffer.alloc(32, 3);
-      const txNumberInBlock2 = 1;
-      const callResult2 = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock2]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult2);
+      
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(message)).wait();
-
-      const senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
-      const messageHash = ethers.utils.keccak256(message);
-
-      const secondLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1Messenger.address, 20),
-        senderAddress,
-        messageHash,
-      ]);
-      const currentMessageLength = 32;
       numberOfMessages++;
       numberOfLogs++;
-
-      // ====================================================================================================
-
-      const bytecode = await getCode(l1Messenger.address);
-      const bytecodeHash = await ethers.utils.hexlify(utils.hashBytecode(bytecode));
+      
       await (
         await l1Messenger
           .connect(knownCodeStorageAccount)
           .requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 })
       ).wait();
       numberOfBytecodes++;
-      const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+      
 
       // ====================================================================================================
       // Prepare data for publishPubdataAndClearState()
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
-      const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+     
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
 
-      // ====================================================================================================
-      // Prepare state diffs
-      const stateDiffs = [
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901230",
-          index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901232",
-          index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901234",
-          index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901236",
-          index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901238",
-          index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
-        },
-      ];
-      const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-      const numberOfStateDiffs = stateDiffs.length;
-      const enumerationIndexSize = 4;
 
       // ====================================================================================================
       // mocking compressor
@@ -387,112 +319,49 @@ describe("L1Messenger tests", () => {
 
     it("should revert Too many L2->L1 logs", async () => {
       // ====================================================================================================
-      const isService = true;
-      const key = Buffer.alloc(32, 1);
-      const value = Buffer.alloc(32, 2);
+      
 
-      const txNumberInBlock = 1;
-      const callResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+      
+      
       await (await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value)).wait();
 
-      const firstLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-        key,
-        value,
-      ]);
+      
       numberOfLogs++;
 
       // ====================================================================================================
-      const message = Buffer.alloc(32, 3);
-      const txNumberInBlock2 = 1;
-      const callResult2 = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock2]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult2);
+      
+      
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(message)).wait();
 
-      const senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
-      const messageHash = ethers.utils.keccak256(message);
-      const secondLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1Messenger.address, 20),
-        senderAddress,
-        messageHash,
-      ]);
-      const currentMessageLength = 32;
+      
+      
+      
+      
       numberOfMessages++;
       numberOfLogs++;
 
       // ====================================================================================================
 
-      const bytecode = await getCode(l1Messenger.address);
-      const bytecodeHash = await ethers.utils.hexlify(utils.hashBytecode(bytecode));
+      
       await (
         await l1Messenger
           .connect(knownCodeStorageAccount)
           .requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 })
       ).wait();
       numberOfBytecodes++;
-      const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+      
 
       // ====================================================================================================
       // Prepare data for publishPubdataAndClearState()
       let numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
-      const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+     
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
 
       // ====================================================================================================
       // Prepare state diffs
-      const stateDiffs = [
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901230",
-          index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901232",
-          index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901234",
-          index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901236",
-          index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901238",
-          index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
-        },
-      ];
-      const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-      const numberOfStateDiffs = stateDiffs.length;
-      const enumerationIndexSize = 4;
+      
 
       // ====================================================================================================
       // mocking compressor
@@ -553,24 +422,13 @@ describe("L1Messenger tests", () => {
 
     it("should revert logshashes mismatch", async () => {
       // ====================================================================================================
-      const isService = true;
-      const key = Buffer.alloc(32, 1);
-      const value = Buffer.alloc(32, 2);
-      const txNumberInBlock = 1;
-      const firstLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-        key,
-        value,
-      ]);
+      
+      
+      
 
       // ==================================================================================================== -- wrong messageHash, incorrect logshahs
-      const message = Buffer.alloc(32, 3);
-      const senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
+      
+      
       const secondLog = ethers.utils.concat([
         ethers.utils.hexlify([0]),
         ethers.utils.hexlify([isService ? 1 : 0]),
@@ -579,58 +437,23 @@ describe("L1Messenger tests", () => {
         senderAddress,
         ethers.utils.hexlify(randomBytes(32)),
       ]);
-      const currentMessageLength = 32;
+      
       // ====================================================================================================
 
-      const bytecode = await getCode(l1Messenger.address);
-      const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+      
+      
 
       // ====================================================================================================
       // Prepare data for publishPubdataAndClearState()
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
-      const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+     
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
 
       // ====================================================================================================
       // Prepare state diffs
-      const stateDiffs = [
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901230",
-          index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901232",
-          index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901234",
-          index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901236",
-          index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901238",
-          index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
-        },
-      ];
-      const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-      const numberOfStateDiffs = stateDiffs.length;
-      const enumerationIndexSize = 4;
+      
 
       // ====================================================================================================
       // mocking compressor
@@ -690,86 +513,33 @@ describe("L1Messenger tests", () => {
 
     it("should revert chainedMessageHash mismatch", async () => {
       // ====================================================================================================
-      const isService = true;
-      const key = Buffer.alloc(32, 1);
-      const value = Buffer.alloc(32, 2);
-      const txNumberInBlock = 1;
-      const firstLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-        key,
-        value,
-      ]);
+      
+      
+      
 
       // ====================================================================================================
-      const message = Buffer.alloc(32, 3);
-      const senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
-      const messageHash = ethers.utils.keccak256(message);
-      const secondLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1Messenger.address, 20),
-        senderAddress,
-        messageHash,
-      ]);
-      const currentMessageLength = 32;
+      
+      
+      
+      
+      
 
       // ====================================================================================================
 
-      const bytecode = await getCode(l1Messenger.address);
-      const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+      
+      
 
       // ====================================================================================================
       // Prepare data for publishPubdataAndClearState()
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
-      const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+     
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
 
       // ====================================================================================================
       // Prepare state diffs
-      const stateDiffs = [
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901230",
-          index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901232",
-          index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901234",
-          index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901236",
-          index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901238",
-          index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
-        },
-      ];
-      const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-      const numberOfStateDiffs = stateDiffs.length;
-      const enumerationIndexSize = 4;
+      
 
       // ====================================================================================================
       // mocking compressor
@@ -828,87 +598,34 @@ describe("L1Messenger tests", () => {
 
     it("should revert state diff compression version mismatch", async () => {
       // ====================================================================================================
-      const isService = true;
-      const key = Buffer.alloc(32, 1);
-      const value = Buffer.alloc(32, 2);
-      const txNumberInBlock = 1;
-      const firstLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-        key,
-        value,
-      ]);
+      
+      
+      
 
       // ====================================================================================================
-      const message = Buffer.alloc(32, 3);
+      
 
-      const senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
-      const messageHash = ethers.utils.keccak256(message);
-      const secondLog = ethers.utils.concat([
-        ethers.utils.hexlify([0]),
-        ethers.utils.hexlify([isService ? 1 : 0]),
-        ethers.utils.hexZeroPad(ethers.utils.hexlify(txNumberInBlock), 2),
-        ethers.utils.hexZeroPad(l1Messenger.address, 20),
-        senderAddress,
-        messageHash,
-      ]);
-      const currentMessageLength = 32;
+      
+      
+      
+      
 
       // ====================================================================================================
 
-      const bytecode = await getCode(l1Messenger.address);
-      const lengthOfBytecode = ethers.utils.arrayify(bytecode).length;
+      
+      
 
       // ====================================================================================================
       // Prepare data for publishPubdataAndClearState()
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
-      const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
+     
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
 
       // ====================================================================================================
       // Prepare state diffs
-      const stateDiffs = [
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901230",
-          index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901232",
-          index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901234",
-          index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901236",
-          index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
-        },
-        {
-          key: "0x1234567890123456789012345678901234567890123456789012345678901238",
-          index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
-        },
-      ];
-      const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      const compressedStateDiffs = compressStateDiffs(4, stateDiffs);
-      const numberOfStateDiffs = stateDiffs.length;
-      const enumerationIndexSize = 4;
+      
 
       // ====================================================================================================
       // mocking compressor
@@ -964,6 +681,94 @@ describe("L1Messenger tests", () => {
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs)
       ).to.be.rejectedWith("state diff compression version mismatch");
     });
+
+    it("should revert extra data", async () => {
+      // ====================================================================================================
+      
+      
+      
+
+      // ====================================================================================================
+      
+
+      
+      
+      
+      
+
+      // ====================================================================================================
+
+      
+      
+
+      // ====================================================================================================
+      // Prepare data for publishPubdataAndClearState()
+      const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
+      const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
+     
+      const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
+      const lengthOfBytecodeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(lengthOfBytecode), 4);
+
+      // ====================================================================================================
+      // Prepare state diffs
+      
+
+      // ====================================================================================================
+      // mocking compressor
+      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
+      const verifyCompressedStateDiffsResult = {
+        failure: false,
+        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
+      };
+
+      await setResult(
+        "Compressor",
+        "verifyCompressedStateDiffs",
+        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
+        verifyCompressedStateDiffsResult
+      );
+
+      // ====================================================================================================
+      // Prepare state diffs data for publishPubdataAndClearState()
+      // modify version to trigger the revert
+      const version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);
+      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
+      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
+      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
+        ethers.utils.hexlify(compressedStateDiffsLength),
+        3
+      );
+      const enumerationIndexSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(enumerationIndexSize), 1);
+      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
+
+      // ====================================================================================================
+      // Prepare totalL2ToL1PubdataAndStateDiffs
+      // add extra data to trigger the revert
+      const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
+        numberOfLogsBytes,
+        firstLog,
+        secondLog,
+        numberOfMessagesBytes,
+        currentMessageLengthBytes,
+        message,
+        numberOfBytecodesBytes,
+        lengthOfBytecodeBytes,
+        bytecode,
+        version,
+        compressedStateDiffsSizeBytes,
+        enumerationIndexSizeBytes,
+        compressedStateDiffs,
+        numberOfStateDiffsBytes,
+        encodedStateDiffs,
+        Buffer.alloc(1, 64)
+      ]);
+
+      // ====================================================================================================
+      // publishPubdataAndClearState()
+      await expect(
+        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs)
+      ).to.be.rejectedWith("Extra data in the totalL2ToL1Pubdata array");
+    });
   });
 
   describe("sendL2ToL1Log", async () => {
@@ -981,12 +786,8 @@ describe("L1Messenger tests", () => {
       const key = ethers.utils.hexlify(Buffer.alloc(32, 1));
       const value = ethers.utils.hexlify(Buffer.alloc(32, 2));
 
-      const txNumberInBlock = 1;
-      const callResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+      
+      
 
       await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value))
         .to.emit(l1Messenger, "L2ToL1LogSent")
@@ -998,13 +799,13 @@ describe("L1Messenger tests", () => {
       const key = ethers.utils.hexlify(Buffer.alloc(32, 1));
       const value = ethers.utils.hexlify(Buffer.alloc(32, 2));
 
-      const txNumberInBlock = 1;
+      
       const callResult = {
         failure: false,
         returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
       };
 
-      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+      
       await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(isService, key, value))
         .to.emit(l1Messenger, "L2ToL1LogSent")
         .withArgs([0, isService, txNumberInBlock, l1MessengerAccount.address, key, value]);
@@ -1040,12 +841,8 @@ describe("L1Messenger tests", () => {
         .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
         .toLowerCase();
 
-      const txNumberInBlock = 1;
-      const callResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [txNumberInBlock]),
-      };
-      await setResult("SystemContext", "txNumberInBlock", [], callResult);
+      
+      
 
       await expect(l1Messenger.connect(l1MessengerAccount).sendToL1(message))
         .to.emit(l1Messenger, "L1MessageSent")
@@ -1074,8 +871,7 @@ describe("L1Messenger tests", () => {
     });
 
     it("shoud emit event, called by known code system contract", async () => {
-      const bytecode = await getCode(l1Messenger.address);
-      const bytecodeHash = await ethers.utils.hexlify(utils.hashBytecode(bytecode));
+      
       await expect(
         l1Messenger.connect(knownCodeStorageAccount).requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 })
       )

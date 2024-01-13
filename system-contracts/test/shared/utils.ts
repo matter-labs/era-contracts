@@ -173,7 +173,7 @@ export async function setConstructingCodeHash(address: string, bytecode: string)
   await accountCodeStorage.storeAccountConstructingCodeHash(address, bytecodeHash);
 }
 
-interface StateDiff {
+export interface StateDiff {
   key: BytesLike;
   index: number;
   initValue: BigNumber;
