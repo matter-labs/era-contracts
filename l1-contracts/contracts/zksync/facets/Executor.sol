@@ -46,8 +46,14 @@ contract ExecutorFacet is Base, IExecutor {
 
         // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments = new bytes32[](2);
+        bytes32 blob1Hash;
+        bytes32 blob2Hash;
         if (pubdataSource == uint8(PubdataSource.Blob)) {
-            bytes32[2] memory blobHashes = [logOutput.blob1Hash, logOutput.blob2Hash];
+            // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
+            // Otherwise we should be using bytes32(0)
+            blob1Hash = logOutput.blob1Hash;
+            blob2Hash = logOutput.blob2Hash;
+            bytes32[2] memory blobHashes = [blob1Hash, blob2Hash];
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
@@ -63,11 +69,6 @@ contract ExecutorFacet is Base, IExecutor {
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
-
-        // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
-        // Otherwise we should be using bytes32(0)
-        bytes32 blob1Hash = pubdataSource == uint8(PubdataSource.Blob) ? logOutput.blob1Hash : bytes32(0);
-        bytes32 blob2Hash = pubdataSource == uint8(PubdataSource.Blob) ? logOutput.blob2Hash : bytes32(0);
 
         // Create batch commitment for the proof verification
         bytes32 commitment = _createBatchCommitment(
