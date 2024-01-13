@@ -2,7 +2,8 @@ import { ethers, network } from "hardhat";
 import type { L1Messenger } from "../typechain";
 import { L1MessengerFactory } from "../typechain";
 import { prepareEnvironment, setResult } from "./shared/mocks";
-import { StateDiff, compressStateDiffs, deployContractOnAddress, encodeStateDiffs, getCode, getWallets } from "./shared/utils";
+import type { StateDiff } from "./shared/utils";
+import { compressStateDiffs, deployContractOnAddress, encodeStateDiffs, getCode, getWallets } from "./shared/utils";
 import { utils } from "zksync-web3";
 import type { Wallet } from "zksync-web3";
 import {
@@ -35,7 +36,7 @@ describe("L1Messenger tests", () => {
   let message: Buffer;
   let messageHash: string;
   let txNumberInBlock: number;
-  let callResult;
+  let callResult: unknown;
   let firstLog: string;
   let secondLog: string;
   let currentMessageLength: number;
@@ -47,6 +48,12 @@ describe("L1Messenger tests", () => {
   let currentMessageLengthBytes: string;
   let version: string;
   let enumerationIndexSizeBytes: string;
+  let stateDiffHash: string;
+  let verifyCompressedStateDiffsResult: unknown;
+  let numberOfStateDiffsBytes: string;
+  let compressedStateDiffsBuffer: Uint8Array;
+  let compressedStateDiffsLength: number;
+  let compressedStateDiffsSizeBytes: string;
 
   before(async () => {
     await prepareEnvironment();
@@ -98,9 +105,7 @@ describe("L1Messenger tests", () => {
     value = Buffer.alloc(32, 2);
     message = Buffer.alloc(32, 3);
     messageHash = ethers.utils.keccak256(message);
-    senderAddress = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
+    senderAddress = ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase();
     currentMessageLength = 32;
     txNumberInBlock = 1;
     callResult = {
@@ -131,41 +136,29 @@ describe("L1Messenger tests", () => {
     currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(currentMessageLength), 4);
     version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);
     enumerationIndexSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(enumerationIndexSize), 1);
-
-
-
-  });
-
-  // this part is necessary to clean the state of L1Messenger contract
-  after(async () => {
-    
-    // ====================================================================================================
-    // mocking compressor
-    const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-    const verifyCompressedStateDiffsResult = {
+    stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
+    verifyCompressedStateDiffsResult = {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
     };
-
     await setResult(
       "Compressor",
       "verifyCompressedStateDiffs",
       [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
       verifyCompressedStateDiffsResult
     );
+    numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
+    compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
+    compressedStateDiffsLength = compressedStateDiffsBuffer.length;
+    compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(compressedStateDiffsLength), 3);
+  });
 
-    
-    const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-    const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-    const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(compressedStateDiffsLength), 3);
-    
-    const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
-
+  // this part is necessary to clean the state of L1Messenger contract
+  after(async () => {
     // third log from test case: "sendL2ToL1Log" ->
     // "should emit L2ToL1LogSent event when called by the system contract"
     // same as firstLog
     numberOfLogs++;
-
     // fourth log from test case: "sendL2ToL1Log" ->
     // "-||- with isService false"
     const fourthLog = ethers.utils.concat([
@@ -177,16 +170,13 @@ describe("L1Messenger tests", () => {
       value,
     ]);
     numberOfLogs++;
-
     // fifth log from test case: "sendToL1" ->
     // "should emit L1MessageSent & L2ToL1LogSent events"
     // same as secondLog
     numberOfLogs++;
     numberOfMessages++;
-
     // 1 more bytecde from test case: "requestBytecodeL1Publication"
     numberOfBytecodes++;
-
     const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
     const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
     const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
@@ -243,36 +233,10 @@ describe("L1Messenger tests", () => {
           .requestBytecodeL1Publication(bytecodeHash, { gasLimit: 130000000 })
       ).wait();
       numberOfBytecodes++;
-      
       // Prepare data for publishPubdataAndClearState()
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
-      const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);     
-      const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);      
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-
-      // Prepare state diffs data for publishPubdataAndClearState()
-      
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
-
+      const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
+      const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
         numberOfLogsBytes,
@@ -291,14 +255,12 @@ describe("L1Messenger tests", () => {
         numberOfStateDiffsBytes,
         encodedStateDiffs,
       ]);
-
       // publishPubdataAndClearState()
       await (
         await l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs, { gasLimit: 10000000 })
       ).wait();
-
       numberOfLogs = 0;
       numberOfMessages = 0;
       numberOfBytecodes = 0;
@@ -319,26 +281,6 @@ describe("L1Messenger tests", () => {
       // Prepare data for publishPubdataAndClearState()
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-      // Prepare state diffs data for publishPubdataAndClearState()
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
       // set numberOfLogsBytes to 0x900 to trigger the revert (max value is 0x800)
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
@@ -369,26 +311,6 @@ describe("L1Messenger tests", () => {
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-      // Prepare state diffs data for publishPubdataAndClearState()
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
       // set secondlog hash to random data to trigger the revert (max value is 0x800)
       const secondLogModified = ethers.utils.concat([
@@ -427,26 +349,6 @@ describe("L1Messenger tests", () => {
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-      // Prepare state diffs data for publishPubdataAndClearState()
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
       // messageHash = Buffer.alloc(32, 6), to trigger the revert
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
@@ -477,28 +379,8 @@ describe("L1Messenger tests", () => {
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-      // Prepare state diffs data for publishPubdataAndClearState()
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
-      // modify version to trigger the revert 
+      // modify version to trigger the revert
       const versionModified = ethers.utils.hexZeroPad(ethers.utils.hexlify(111), 1);
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
         numberOfLogsBytes,
@@ -528,27 +410,6 @@ describe("L1Messenger tests", () => {
       const numberOfLogsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4);
       const numberOfMessagesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4);
       const numberOfBytecodesBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4);
-      // mocking compressor
-      const stateDiffHash = ethers.utils.keccak256(encodedStateDiffs);
-      const verifyCompressedStateDiffsResult = {
-        failure: false,
-        returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [stateDiffHash]),
-      };
-      await setResult(
-        "Compressor",
-        "verifyCompressedStateDiffs",
-        [numberOfStateDiffs, enumerationIndexSize, encodedStateDiffs, compressedStateDiffs],
-        verifyCompressedStateDiffsResult
-      );
-      // Prepare state diffs data for publishPubdataAndClearState()
-      // modify version to trigger the revert
-      const compressedStateDiffsBuffer = ethers.utils.arrayify(compressedStateDiffs);
-      const compressedStateDiffsLength = compressedStateDiffsBuffer.length;
-      const compressedStateDiffsSizeBytes = ethers.utils.hexZeroPad(
-        ethers.utils.hexlify(compressedStateDiffsLength),
-        3
-      );
-      const numberOfStateDiffsBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfStateDiffs), 4);
       // Prepare totalL2ToL1PubdataAndStateDiffs
       // add extra data to trigger the revert
       const totalL2ToL1PubdataAndStateDiffs = ethers.utils.concat([
@@ -567,9 +428,8 @@ describe("L1Messenger tests", () => {
         compressedStateDiffs,
         numberOfStateDiffsBytes,
         encodedStateDiffs,
-        Buffer.alloc(1, 64)
+        Buffer.alloc(1, 64),
       ]);
-
       // publishPubdataAndClearState()
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(totalL2ToL1PubdataAndStateDiffs)
