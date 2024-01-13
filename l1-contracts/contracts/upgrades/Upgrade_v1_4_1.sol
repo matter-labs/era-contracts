@@ -3,19 +3,17 @@
 pragma solidity 0.8.20;
 
 import {Diamond} from "../zksync/libraries/Diamond.sol";
-import {IAdmin} from "../zksync/interfaces/IAdmin.sol";
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {PubdataPricingMode, FeeParams} from "../zksync/Storage.sol";
-
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
-    /// This event is an exact copy of the "IAdmin.NewFeeParams" event. Since they have the same name and parameters, 
+    /// This event is an exact copy of the "IAdmin.NewFeeParams" event. Since they have the same name and parameters,
     /// these will be tracked by indexers in the same manner.
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
-    /// This function is a copy of the "Admin.changeFeeParams" function. 
+    /// This function is a copy of the "Admin.changeFeeParams" function.
     /// It is to be used once to set the new fee params for the first time as they needed for the correct functioning of the upgrade.
     function changeFeeParams(FeeParams memory _newFeeParams) private {
         // Double checking that the new fee params are valid, i.e.
@@ -40,7 +38,7 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
                 maxL2GasPerBatch: $(PRIORITY_TX_MAX_GAS_PER_BATCH),
                 priorityTxMaxPubdata: $(PRIORITY_TX_PUBDATA_PER_BATCH),
                 minimalL2GasPrice: $(PRIORITY_TX_MINIMAL_GAS_PRICE)
-            })            
+            })
         );
 
         super.upgrade(_proposedUpgrade);
