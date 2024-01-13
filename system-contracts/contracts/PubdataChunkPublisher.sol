@@ -29,12 +29,11 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             let ptr := mload(0x40)
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
 
+            // We take the hash both up to BLOB_SIZE_BYTES even if _pubdata.length is less than 2 * BLOB_SIZE_BYTES
+            // since we need the data to be right padded with 0s up to BLOB_SIZE_BYTES size
             blob1Hash := keccak256(ptr, BLOB_SIZE_BYTES)
             blob2Hash := keccak256(add(ptr, BLOB_SIZE_BYTES), BLOB_SIZE_BYTES)
         }
-
-        blob1Hash = blob1Hash == bytes32(0) ? EMPTY_BLOB_HASH : blob1Hash;
-        blob2Hash = blob2Hash == bytes32(0) ? EMPTY_BLOB_HASH : blob2Hash;
 
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blob1Hash);
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blob2Hash);
