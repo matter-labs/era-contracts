@@ -541,7 +541,7 @@ contract ExecutorFacet is Base, IExecutor {
 
             // First 16 bytes is the opening value. While we get the value as 16 bytes, the point evaluation precompile
             // requires it to be 32 bytes. The blob commitment must use the opening value as 16 bytes though.
-            bytes32 openingValue = bytes32(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]);
+            bytes32 openingValue = bytes32(uint256(uint128(bytes16(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]))));
 
             _pointEvaluationPrecompile(
                 versionedHash,
