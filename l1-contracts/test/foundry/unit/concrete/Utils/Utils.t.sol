@@ -5,7 +5,8 @@ pragma solidity 0.8.20;
 // solhint-disable max-line-length
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS} from "./Utils.sol";
+import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";
+import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
 
@@ -26,7 +27,7 @@ contract UtilsTest is Test {
         bytes memory l2Log = Utils.constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(Utils.SystemLogKeys.PREV_BATCH_HASH_KEY),
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32(uint256(0x2222))
         );
 
@@ -36,7 +37,7 @@ contract UtilsTest is Test {
                 bytes2(0x0001), // servicePrefix
                 bytes2(0x0000), // 0x0000
                 L2_TO_L1_MESSENGER, // sender
-                uint256(Utils.SystemLogKeys.PREV_BATCH_HASH_KEY), // key
+                uint256(SystemLogKey.PREV_BATCH_HASH_KEY), // key
                 bytes32(uint256(0x2222)) // value
             )
         );
@@ -45,14 +46,14 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs();
 
-        assertEq(logs.length, 7, "logs length should be correct");
+        assertEq(logs.length, 9, "logs length should be correct");
 
         assertEq(
             logs[0],
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
-                uint256(Utils.SystemLogKeys.L2_TO_L1_LOGS_TREE_ROOT_KEY),
+                uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
                 bytes32("")
             ),
             "log[0] should be correct"
@@ -63,7 +64,7 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
-                uint256(Utils.SystemLogKeys.TOTAL_L2_TO_L1_PUBDATA_KEY),
+                uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
                 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
             ),
             "log[1] should be correct"
@@ -74,7 +75,7 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
-                uint256(Utils.SystemLogKeys.STATE_DIFF_HASH_KEY),
+                uint256(SystemLogKey.STATE_DIFF_HASH_KEY),
                 bytes32("")
             ),
             "log[2] should be correct"
@@ -85,7 +86,7 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 bytes32("")
             ),
             "log[3] should be correct"
@@ -96,7 +97,7 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PREV_BATCH_HASH_KEY),
+                uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
                 bytes32("")
             ),
             "log[4] should be correct"
@@ -107,7 +108,7 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+                uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
                 keccak256("")
             ),
             "log[5] should be correct"
@@ -118,10 +119,54 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
-                uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
                 bytes32("")
             ),
             "log[6] should be correct"
+        );
+
+        assertEq(
+            logs[5],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
+                keccak256("")
+            ),
+            "log[5] should be correct"
+        );
+
+        assertEq(
+            logs[6],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
+                bytes32("")
+            ),
+            "log[6] should be correct"
+        );
+
+        assertEq(
+            logs[7],
+            Utils.constructL2Log(
+                true,
+                PUBDATA_PUBLISHER_ADDRESS,
+                uint256(SystemLogKey.BLOB_ONE_HASH_KEY),
+                bytes32(0)
+            ),
+            "log[7] should be correct"
+        );
+
+        assertEq(
+            logs[8],
+            Utils.constructL2Log(
+                true,
+                PUBDATA_PUBLISHER_ADDRESS,
+                uint256(SystemLogKey.BLOB_TWO_HASH_KEY),
+                bytes32(0)
+            ),
+            "log[8] should be correct"
         );
     }
 }

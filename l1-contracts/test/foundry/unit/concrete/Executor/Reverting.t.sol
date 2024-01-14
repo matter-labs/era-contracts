@@ -5,7 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
 contract RevertingTest is ExecutorTest {
     function setUp() public {
@@ -13,11 +13,11 @@ contract RevertingTest is ExecutorTest {
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
             .constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
             );
 

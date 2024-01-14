@@ -5,6 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 
 contract CommittingTest is ExecutorTest {
     function test_RevertWhen_ComittingWithWrongLastCommittedBatchData() public {
@@ -37,11 +38,11 @@ contract CommittingTest is ExecutorTest {
         bytes32 wrongNewBatchTimestamp = Utils.randomBytes32("wrongNewBatchTimestamp");
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
 
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
             .constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 wrongNewBatchTimestamp
             );
 
@@ -60,11 +61,11 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
         uint256 wrongNewBatchTimestamp = 1;
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
             .constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 Utils.packBatchTimestampAndBlockTimestamp(1, 1)
             );
 
@@ -84,11 +85,11 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
         uint64 wrongNewBatchTimestamp = 0xffffffff;
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
             .constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 Utils.packBatchTimestampAndBlockTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
             );
 
@@ -108,10 +109,10 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
         bytes32 wrongPreviousBatchHash = Utils.randomBytes32("wrongPreviousBatchHash");
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
+        wrongL2Logs[uint256(uint256(SystemLogKey.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(Utils.SystemLogKeys.PREV_BATCH_HASH_KEY),
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             wrongPreviousBatchHash
         );
 
@@ -129,7 +130,7 @@ contract CommittingTest is ExecutorTest {
 
     function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        delete wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))];
+        delete wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))];
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
@@ -151,7 +152,7 @@ contract CommittingTest is ExecutorTest {
             Utils.constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 bytes32("")
             )
         );
@@ -171,11 +172,11 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
         address unexpectedAddress = address(0);
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
             .constructL2Log(
                 true,
                 unexpectedAddress,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
                 bytes32("")
             );
 
@@ -194,10 +195,10 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
         bytes32 wrongChainedPriorityHash = Utils.randomBytes32("canonicalTxHash");
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY))] = Utils.constructL2Log(
+        wrongL2Logs[uint256(uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY))] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             wrongChainedPriorityHash
         );
 
@@ -215,10 +216,10 @@ contract CommittingTest is ExecutorTest {
 
     function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY))] = Utils.constructL2Log(
+        wrongL2Logs[uint256(uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY))] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32(bytes1(0x01))
         );
 
@@ -313,10 +314,10 @@ contract CommittingTest is ExecutorTest {
 
     function test_SuccessfullyCommitBatch() public {
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
