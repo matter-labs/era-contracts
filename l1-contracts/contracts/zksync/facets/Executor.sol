@@ -193,6 +193,8 @@ contract ExecutorFacet is Base, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
+        // With the new changes for 4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        require(_newBatchesData.length == 1, "e4");
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
         require(_newBatchesData.length > 0, "No batches to commit");
