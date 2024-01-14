@@ -94,7 +94,7 @@ async function main() {
       // Step 1. Transfer ownership of all the contracts to the new governor.
 
       // Below we are preparing the calldata for the L1 transactions
-      const zkSync = deployer.zkSyncContract(deployWallet);
+      const zkSync = deployer.stateTransitionContract(deployWallet);
       const validatorTimelock = deployer.validatorTimelock(deployWallet);
 
       const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(

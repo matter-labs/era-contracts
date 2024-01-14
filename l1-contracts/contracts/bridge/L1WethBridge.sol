@@ -192,7 +192,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// bridge implementation
     /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
     /// proxy
-    function startInitializeChain(
+    function startWethBridgeInitOnChain(
         uint256 _chainId,
         uint256 _mintValue,
         bytes[] calldata _factoryDeps,
@@ -444,9 +444,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     // we have to keep track of bridgehub deposits to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        address ,//_prevMsgSender,
         address _token,
-        uint256 _amount,
-        address //_prevMsgSender
+        uint256 _amount
     ) external payable override onlyBridgehubOrEthChain(_chainId) {
         require(_token == ETH_TOKEN_ADDRESS, "L1WETHBridge: Invalid token");
         require(msg.value == _amount, "L1WETHBridge: msg.value not equal to amount");
@@ -457,17 +457,16 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     function bridgehubDeposit(
         uint256 _chainId,
-        uint256 _amount,
-        address _l1Token,
         address _prevMsgSender,
-        address _l2Receiver
+        bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+        (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
         require(l2BridgeAddress[_chainId] != address(0), "L1WethBridge: bridge not deployed");
         require(msg.value == 0, "L1WETHBridge: msg.value not 0 for WETH");
 
         if (_amount > 0) {
             // Deposit WETH tokens from the depositor address to the smart contract address
-            IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
+            IERC20(l1WethAddress).safeTransferFrom(_prevMsgSender, address(this), _amount);
             // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
             IWETH9(l1WethAddress).withdraw(_amount);
         }

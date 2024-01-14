@@ -16,6 +16,7 @@ import {
 } from "../scripts/utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -727,9 +728,9 @@ export class Deployer {
     );
   }
 
-  // public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-  //   return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
-  // }
+  public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
+    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+  }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {
     return IGovernanceFactory.connect(this.addresses.Governance, signerOrProvider);

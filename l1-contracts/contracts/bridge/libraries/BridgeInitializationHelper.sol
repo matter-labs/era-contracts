@@ -64,7 +64,7 @@ library BridgeInitializationHelper {
             address baseToken = _bridgehub.baseToken(_chainId);
             address baseTokenBridge = _bridgehub.baseTokenBridge(_chainId);
             IERC20(baseToken).safeTransferFrom(msg.sender, address(this), _deployTransactionFee);
-            IERC20(baseToken).safeApprove(baseTokenBridge, _deployTransactionFee);
+            IERC20(baseToken).safeIncreaseAllowance(baseTokenBridge, _deployTransactionFee);
             txHash = _bridgehub.requestL2Transaction(request);
         }
 

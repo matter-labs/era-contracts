@@ -108,7 +108,6 @@ export async function create2DeployFromL1(
   return await bridgehub.requestL2Transaction(
     {
       chainId,
-      payer: wallet.address,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
       mintValue: expectedCost,
       l2Value: 0,

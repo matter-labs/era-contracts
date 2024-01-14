@@ -3,10 +3,11 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias, getAddressFromEnv } from "./utils";
+import { getAddressFromEnv } from "./utils";
+import { applyL1ToL2Alias } from "../src.ts/utils";
 import * as fs from "fs";
 
-import { UpgradeableBeaconFactory } from "../../zksync/typechain/UpgradeableBeaconFactory";
+import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
 import { Provider } from "zksync-web3";
 
 const L2ERC20BridgeABI = JSON.parse(
@@ -54,7 +55,7 @@ async function main() {
 
     // Firstly, we deploy the info about the L1 contracts
 
-    const zkSync = deployer.zkSyncContract(deployWallet);
+    const zkSync = deployer.stateTransitionContract(deployWallet);
 
     console.log("zkSync governor: ", await zkSync.getGovernor());
     console.log("zkSync pendingGovernor: ", await zkSync.getPendingGovernor());

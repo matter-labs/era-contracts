@@ -82,17 +82,19 @@ interface IL1Bridge {
 
     function bridgehubDeposit(
         uint256 _chainId,
-        uint256 _amount,
-        address _l1Token,
         address _prevMsgSender,
-        address _l2Receiver
+        bytes calldata _data
+            // which is abi encoded :
+            // address _l1Token,
+            // uint256 _amount,
+            // address _l2Receiver
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,
+        address _prevMsgSender,
         address _l1Token,
-        uint256 _amoun,
-        address _prevMsgSender
+        uint256 _amount
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 chainId, bytes32 txDataHash, bytes32 txHash) external;

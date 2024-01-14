@@ -182,7 +182,7 @@ contract L1ERC20Bridge is
     /// @param _deployBridgeImplementationFee How much of the sent value should be allocated to deploying the L2 bridge
     /// implementation
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
-    function startInitializeChain(
+    function startErc20BridgeInitOnChain(
         uint256 _chainId,
         uint256 _mintValue,
         bytes[] calldata _factoryDeps,
@@ -198,14 +198,13 @@ contract L1ERC20Bridge is
         // The caller miscalculated deploy transactions fees
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
-            uint256 mintValue = _mintValue;
             if (ethIsBaseToken) {
-                mintValue = msg.value;
+                _mintValue = msg.value;
             } else {
                 require(msg.value == 0, "L1EB: msg.value > 0, base token");
             }
 
-            require(mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: invalid fee");
+            require(_mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: invalid fee");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
@@ -473,14 +472,16 @@ contract L1ERC20Bridge is
     /// used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
     function bridgehubDepositBaseToken(
         uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging
+        address _prevMsgSender,
         address _l1Token,
-        uint256 _amount,
-        address _prevMsgSender
+        uint256 _amount
     ) public payable onlyBridgehub {
         require(msg.value == 0, "L1EB: msg.value > 0 base deposit");
         require(_amount != 0, "4T"); // empty deposit amount
-        uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
+        if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract
+            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
+            require(amount == _amount, "3T"); // The token has non-standard transfer logic
+        }
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
@@ -499,11 +500,10 @@ contract L1ERC20Bridge is
 
     function bridgehubDeposit(
         uint256 _chainId,
-        uint256 _amount,
-        address _l1Token,
         address _prevMsgSender,
-        address _l2Receiver
+        bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+        (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
         require(msg.value == 0, "L1EB: msg.value > 0 for bhub deposit");
         require(l2BridgeAddress[_chainId] != address(0), "L1EB: bridge not deployed");
         require(bridgehub.baseToken(_chainId) != _l1Token, "L1EB: base deposit not supported");

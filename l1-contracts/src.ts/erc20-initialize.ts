@@ -64,7 +64,7 @@ export async function initializeErc20Bridge(
   }
 }
 
-export async function startInitializeChain(
+export async function startErc20BridgeInitOnChain(
   deployer: Deployer,
   deployWallet: Wallet,
   chainId: string,
@@ -94,7 +94,7 @@ export async function startInitializeChain(
     priorityTxMaxGasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-
+  
   if (!ethIsBaseToken) {
     const erc20 = deployer.baseTokenContract(deployWallet);
     const testErc20 = TestnetERC20TokenFactory.connect(deployer.addresses.BaseToken, deployWallet);
@@ -104,18 +104,28 @@ export async function startInitializeChain(
     );
     await mintTx.wait(1);
 
-    const approveTx = await erc20.approve(
+    const approveTx1 = await erc20.increaseAllowance(
       deployer.addresses.Bridges.BaseTokenBridge,
-      requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2))
+      requiredValueToPublishBytecodes
     );
-    await approveTx.wait(1);
+    await approveTx1.wait(1);
+    if (deployer.verbose) {
+      console.log("Approve tx for baseTokenBridge sent for erc20 bridge deployment", approveTx1.hash);
+    }
+
+    const approveTx2 = await erc20.increaseAllowance(
+      deployer.addresses.Bridges.ERC20BridgeProxy,
+      requiredValueToInitializeBridge.mul(2)
+    );
+    await approveTx2.wait(1);
+    if (deployer.verbose) {
+      console.log("Approve tx for erc20Bridge sent for erc20 bridge deployment", approveTx2.hash);
+    }
   }
   nonce = await deployWallet.getTransactionCount();
-
   const tx1 = await bridgehub.requestL2Transaction(
     {
       chainId,
-      payer: deployWallet.address,
       l2Contract: ethers.constants.AddressZero,
       mintValue: requiredValueToPublishBytecodes,
       l2Value: 0,
@@ -127,7 +137,7 @@ export async function startInitializeChain(
     },
     { gasPrice, nonce, value: ethIsBaseToken ? requiredValueToPublishBytecodes : 0 }
   );
-  const tx2 = await erc20Bridge.startInitializeChain(
+  const tx2 = await erc20Bridge.startErc20BridgeInitOnChain(
     chainId,
     requiredValueToInitializeBridge.mul(2),
     [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],

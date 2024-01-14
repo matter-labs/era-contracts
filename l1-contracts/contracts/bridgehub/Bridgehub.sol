@@ -250,18 +250,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
                 IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
+                    msg.sender,
                     token,
-                    _request.mintValue,
-                    msg.sender
+                    _request.mintValue
                 );
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
                 IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
                     _request.chainId,
+                    msg.sender,
                     token,
-                    _request.mintValue,
-                    msg.sender
+                    _request.mintValue
                 );
             }
         }
@@ -298,25 +298,25 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 // kl todo it would be nice here to be able to deposit weth instead of eth
                 IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
+                    msg.sender,
                     token,
-                    _request.mintValue,
-                    msg.sender
+                    _request.mintValue
                 );
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
                 // note we have to pass token, as a bridge might have multiple tokens.
                 IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
                     _request.chainId,
+                    msg.sender,
                     token,
-                    _request.mintValue,
-                    msg.sender
+                    _request.mintValue
                 );
             }
         }
 
         address stateTransition = getZkSyncStateTransition(_request.chainId);
         (bool success, bytes memory data) = _request.secondBridgeAddress.call{value: _request.secondBridgeValue}(
-            abi.encodeWithSelector(_request.secondBridgeSelector, _request.chainId, _request.secondBridgeCalldata)
+            abi.encodeWithSelector(_request.secondBridgeSelector, _request.chainId, msg.sender, _request.secondBridgeCalldata)
         );
         require(success, "Bridgehub: second bridge call failed");
         L2TransactionRequestTwoBridgesInner memory outputRequest = abi.decode(

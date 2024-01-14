@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { startInitializeChain } from "../src.ts/weth-initialize";
+import { startWethBridgeInitOnChain } from "../src.ts/weth-initialize";
 import { deployedAddressesFromEnv, web3Provider } from "./utils";
 
 import * as fs from "fs";
@@ -44,7 +44,7 @@ async function main() {
         verbose: true,
       });
 
-      await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
+      await startWethBridgeInitOnChain(deployer, deployWallet, chainId, nonce, gasPrice);
     });
 
   await program.parseAsync(process.argv);

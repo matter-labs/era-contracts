@@ -48,7 +48,6 @@ async function main() {
       const publishL2ERC20BridgeTx = await bridgehub.requestL2Transaction(
         {
           chainId,
-          payer: wallet.address,
           l2Contract: ethers.constants.AddressZero,
           mintValue: 0,
           l2Value: 0,

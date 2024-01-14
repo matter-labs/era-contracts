@@ -9,7 +9,7 @@ import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
 
-import { startInitializeChain } from "../../src.ts/weth-initialize";
+import { startWethBridgeInitOnChain } from "../../src.ts/weth-initialize";
 
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
@@ -105,11 +105,11 @@ describe("WETH Bridge tests", () => {
     bridgeProxy = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
   });
 
-  it("Check startInitializeChain", async () => {
+  it("Check startWethBridgeInitOnChain", async () => {
     const nonce = await deployWallet.getTransactionCount();
     const gasPrice = await owner.provider.getGasPrice();
 
-    await startInitializeChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
+    await startWethBridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
     const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
 

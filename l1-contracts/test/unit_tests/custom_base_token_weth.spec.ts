@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import type { L1ERC20Bridge, TestnetERC20Token } from "../../typechain";
-import { L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
+import { L1WethBridge, TestnetERC20Token, WETH9 } from "../../typechain";
+import { L1WethBridgeFactory, TestnetERC20TokenFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
@@ -15,7 +15,7 @@ import {
   initialDeployment,
 } from "./utils";
 
-import { startErc20BridgeInitOnChain } from "../../src.ts/erc20-initialize";
+import { startWethBridgeInitOnChain } from "../../src.ts/weth-initialize";
 
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
@@ -70,16 +70,17 @@ export async function create2DeployFromL1(
   );
 }
 
-describe("Custom base token tests", () => {
+describe("Custom base token weth tests", () => {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
   let l1ERC20Bridge: IL1Bridge;
   let bridgehub: IBridgehub;
-  let l1ERC20BridgeInit: L1ERC20Bridge;
+  let l1WethBridge: IL1Bridge;
+  let l1WethBridgeInit: L1WethBridge;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
-  let altTokenAddress: string;
-  let altToken: TestnetERC20Token;
+  let wethTokenAddress: string;
+  let wethToken: WETH9;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID ? parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID) : 270;
 
   before(async () => {
@@ -109,24 +110,25 @@ describe("Custom base token tests", () => {
     baseTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "BAT")!.address;
     baseToken = TestnetERC20TokenFactory.connect(baseTokenAddress, owner);
 
-    altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
-    altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
+    wethTokenAddress = await deployer.defaultWethBridge(deployWallet).l1WethAddress();
+    wethToken = WETH9Factory.connect(wethTokenAddress, owner);
 
     // prepare the bridge
 
     l1ERC20Bridge = IL1BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
-    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
+    l1WethBridge = IL1BridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
+    l1WethBridgeInit = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
     const nonce = await deployWallet.getTransactionCount();
 
-    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
+    await startWethBridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
-    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
+    const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
+    const upgradeCall = l1WethBridgeInterface.encodeFunctionData(
       "initializeChainGovernance(uint256,address,address)",
       [chainId, ADDRESS_ONE, ADDRESS_ONE]
     );
 
-    await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
+    await executeUpgrade(deployer, deployWallet, l1WethBridge.address, 0, upgradeCall);
   });
 
   it("Should have correct base token", async () => {
@@ -137,54 +139,37 @@ describe("Custom base token tests", () => {
     expect(l1ERC20Bridge.address).equal(baseTokenBridgeAddress);
   });
 
-  it("Check startErc20BridgeInitOnChain", async () => {
+  it("Check startWethBridgeInitOnChain", async () => {
     // we should still be able to deploy the erc20 bridge
-    const txHash = await l1ERC20BridgeInit.bridgeImplDeployOnL2TxHash(chainId);
+    const txHash = await l1WethBridgeInit.bridgeImplDeployOnL2TxHash(chainId);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow direct deposits", async () => {
     const revertReason = await getCallRevertReason(
-    l1ERC20Bridge
+    l1WethBridge
       .connect(randomSigner)
-      .deposit(chainId, await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
+      .deposit(chainId, await randomSigner.getAddress(), wethTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
     );
 
-    expect(revertReason).equal("L1EB: deposit only for Eth based chains");
+    expect(revertReason).equal("L1WETH Bridge: Direct deposit via requestL2Transaction only available for Eth based chains");
   });
 
-  it("Should deposit base token successfully direct via bridgehub", async () => {
-    await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), ethers.utils.parseUnits("800", 18));
-    await (
-      await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
-    ).wait();
-    await bridgehub.connect(randomSigner).requestL2Transaction({
-      chainId,
-      l2Contract: await randomSigner.getAddress(),
-      mintValue: ethers.utils.parseUnits("800", 18),
-      l2Value: 1,
-      l2Calldata: "0x",
-      l2GasLimit: 10000000,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: [],
-      refundRecipient: await randomSigner.getAddress(),
-    });
-  });
-
-  it("Should deposit alternative token successfully twoBridges method", async () => {
-    const altTokenAmount = ethers.utils.parseUnits("800", 18);
+  it("Should deposit weth token successfully twoBridges method", async () => {
+    const wethTokenAmount = ethers.utils.parseUnits("800", 18);
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
-    await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), altTokenAmount);
+    await (await wethToken.connect(randomSigner).deposit({value: wethTokenAmount})).wait();
     await (
-      await altToken.connect(randomSigner).approve(l1ERC20Bridge.address, altTokenAmount)
+      await wethToken.connect(randomSigner).approve(l1WethBridge.address, wethTokenAmount)
     ).wait();
 
-    await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
+    await (await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount)).wait();
     await (
       await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)
     ).wait();
+
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
@@ -192,10 +177,10 @@ describe("Custom base token tests", () => {
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
       refundRecipient: await randomSigner.getAddress(),
-      secondBridgeAddress: l1ERC20Bridge.address,
-      secondBridgeSelector: l1ERC20Bridge.interface.getSighash("bridgehubDeposit"),
+      secondBridgeAddress: l1WethBridge.address,
+      secondBridgeSelector: l1WethBridge.interface.getSighash("bridgehubDeposit"),
       secondBridgeValue: 0,
-      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode([ "address","uint256", "address"], [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]),
+      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode([ "address","uint256", "address"], [wethTokenAddress, wethTokenAmount, await randomSigner.getAddress()]),
     });
   });
 

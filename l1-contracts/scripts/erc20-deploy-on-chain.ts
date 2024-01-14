@@ -6,7 +6,7 @@ import { web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
-import { startInitializeChain } from "../src.ts/erc20-initialize";
+import { startErc20BridgeInitOnChain } from "../src.ts/erc20-initialize";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -45,7 +45,7 @@ async function main() {
         verbose: true,
       });
 
-      await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice, cmd.erc20Bridge);
+      await startErc20BridgeInitOnChain(deployer, deployWallet, chainId, nonce, gasPrice, cmd.erc20Bridge);
     });
 
   await program.parseAsync(process.argv);

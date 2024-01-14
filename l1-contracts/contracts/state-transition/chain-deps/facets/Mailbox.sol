@@ -237,9 +237,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
         IL1Bridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
+            msg.sender,
             ETH_TOKEN_ADDRESS,
-            msg.value,
-            msg.sender
+            msg.value
         );
     }
 

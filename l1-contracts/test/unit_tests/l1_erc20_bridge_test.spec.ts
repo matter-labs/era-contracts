@@ -5,7 +5,7 @@ import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import { startInitializeChain } from "../../src.ts/erc20-initialize";
+import { startErc20BridgeInitOnChain } from "../../src.ts/erc20-initialize";
 import type { Bridgehub, L1ERC20Bridge } from "../../typechain";
 import { BridgehubFactory, L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
@@ -76,7 +76,7 @@ describe("L1ERC20Bridge tests", function () {
 
     const nonce = await deployWallet.getTransactionCount();
 
-    await startInitializeChain(deployer, deployWallet, chainId, nonce, gasPrice);
+    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId, nonce, gasPrice);
 
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
     const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
@@ -90,7 +90,7 @@ describe("L1ERC20Bridge tests", function () {
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
   });
 
-  it("Check startInitializeChain", async () => {
+  it("Check startErc20BridgeInitOnChain", async () => {
     const txHash = await l1ERC20BridgeInit.bridgeImplDeployOnL2TxHash(chainId);
 
     expect(txHash).not.equal(ethers.constants.HashZero);

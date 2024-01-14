@@ -50,7 +50,6 @@ async function getL1TxInfo(
   const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2Transaction", [
     {
       chainId,
-      payer: ethers.constants.AddressZero,
       l2Contract: to,
       mintValue: 0,
       l2Value: 0,
@@ -173,7 +172,6 @@ async function main() {
       const tx = await bridgehub.requestL2Transaction(
         {
           chainId,
-          payer: ethers.constants.AddressZero,
           l2Contract: l2WethTokenProxyAddress,
           mintValue: requiredValueToInitializeBridge,
           l2Value: 0,
