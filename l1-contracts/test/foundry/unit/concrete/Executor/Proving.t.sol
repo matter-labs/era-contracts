@@ -13,13 +13,12 @@ contract ProvingTest is ExecutorTest {
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-            );
+        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 

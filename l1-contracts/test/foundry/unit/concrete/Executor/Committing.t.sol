@@ -38,13 +38,12 @@ contract CommittingTest is ExecutorTest {
         bytes32 wrongNewBatchTimestamp = Utils.randomBytes32("wrongNewBatchTimestamp");
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
 
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                wrongNewBatchTimestamp
-            );
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            wrongNewBatchTimestamp
+        );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
@@ -61,13 +60,12 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
         uint256 wrongNewBatchTimestamp = 1;
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                Utils.packBatchTimestampAndBlockTimestamp(1, 1)
-            );
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(1, 1)
+        );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
@@ -85,13 +83,12 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
         uint64 wrongNewBatchTimestamp = 0xffffffff;
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                Utils.packBatchTimestampAndBlockTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
-            );
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
+        );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
@@ -172,13 +169,12 @@ contract CommittingTest is ExecutorTest {
     function test_RevertWhen_UnexpectedL2ToL1Log() public {
         address unexpectedAddress = address(0);
         bytes[] memory wrongL2Logs = Utils.createSystemLogs();
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                unexpectedAddress,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                bytes32("")
-            );
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            unexpectedAddress,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            bytes32("")
+        );
 
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);

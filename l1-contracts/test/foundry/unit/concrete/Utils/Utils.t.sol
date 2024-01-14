@@ -72,12 +72,7 @@ contract UtilsTest is Test {
 
         assertEq(
             logs[2],
-            Utils.constructL2Log(
-                true,
-                L2_TO_L1_MESSENGER,
-                uint256(SystemLogKey.STATE_DIFF_HASH_KEY),
-                bytes32("")
-            ),
+            Utils.constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32("")),
             "log[2] should be correct"
         );
 
@@ -149,23 +144,13 @@ contract UtilsTest is Test {
 
         assertEq(
             logs[7],
-            Utils.constructL2Log(
-                true,
-                PUBDATA_PUBLISHER_ADDRESS,
-                uint256(SystemLogKey.BLOB_ONE_HASH_KEY),
-                bytes32(0)
-            ),
+            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0)),
             "log[7] should be correct"
         );
 
         assertEq(
             logs[8],
-            Utils.constructL2Log(
-                true,
-                PUBDATA_PUBLISHER_ADDRESS,
-                uint256(SystemLogKey.BLOB_TWO_HASH_KEY),
-                bytes32(0)
-            ),
+            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0)),
             "log[8] should be correct"
         );
     }
