@@ -24,9 +24,11 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         bytes32 blob1Hash;
         bytes32 blob2Hash;
 
+        bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * 2);
+
         assembly {
-            // The pointer to the free memory slot
-            let ptr := mload(0x40)
+            // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+            let ptr := add(totalBlobs, 0x20)
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
 
             // We take the hash both up to BLOB_SIZE_BYTES even if _pubdata.length is less than 2 * BLOB_SIZE_BYTES
@@ -34,6 +36,8 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             blob1Hash := keccak256(ptr, BLOB_SIZE_BYTES)
             blob2Hash := keccak256(add(ptr, BLOB_SIZE_BYTES), BLOB_SIZE_BYTES)
         }
+
+        blob2Hash = blob2Hash == EMPTY_BLOB_HASH ? bytes32(0) : blob2Hash;
 
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blob1Hash);
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blob2Hash);

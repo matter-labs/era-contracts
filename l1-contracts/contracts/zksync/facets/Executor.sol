@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, EMPTY_BLOB_HASH} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -475,6 +475,7 @@ contract ExecutorFacet is Base, IExecutor {
                 // linear hash (hash of preimage from system logs) and 
                 // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
                 // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
+                // If we only utilize a single blob, _blob2Hash and _blobCommitments[1] will be bytes32(0)
                 _blob1Hash,
                 _blobCommitments[0],
                 _blob2Hash,
@@ -510,6 +511,8 @@ contract ExecutorFacet is Base, IExecutor {
 
         (bool success, bytes memory data) = POINT_EVALUATION_PRECOMPILE_ADDR.staticcall(precompileInput);
 
+        // We verify that the point evaluation precompile call was successful by testing the latter 32 bytes of the
+        // response is equal to BLS_MODULUS as defined in https://eips.ethereum.org/EIPS/eip-4844#point-evaluation-precompile
         require(success, "failed to call point evaluation precompile");
         (, uint256 result) = abi.decode(data, (uint256, uint256));
         require(result == BLS_MODULUS, "precompile unexpected output");
@@ -540,13 +543,13 @@ contract ExecutorFacet is Base, IExecutor {
 
             require(versionedHash != bytes32(0), "vh");
 
-            // First 16 bytes is the opening value. While we get the value as 16 bytes, the point evaluation precompile
-            // requires it to be 32 bytes. The blob commitment must use the opening value as 16 bytes though.
-            bytes32 openingValue = bytes32(uint256(uint128(bytes16(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]))));
+            // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile
+            // requires it to be 32 bytes. The blob commitment must use the opening point as 16 bytes though.
+            bytes32 openingPoint = bytes32(uint256(uint128(bytes16(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]))));
 
             _pointEvaluationPrecompile(
                 versionedHash,
-                openingValue,
+                openingPoint,
                 _pubdataCommitments[i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET:i + PUBDATA_COMMITMENT_SIZE]
             );
 
@@ -568,8 +571,8 @@ contract ExecutorFacet is Base, IExecutor {
         // We do this check to verify that either the second blob was empty/not used
         // or that we have both a linear hash and commitment for it.
         require(
-            (_blobHashes[1] == EMPTY_BLOB_HASH && blobCommitments[1] == bytes32(0)) ||
-            (_blobHashes[1] != EMPTY_BLOB_HASH && blobCommitments[1] != bytes32(0)),
+            (_blobHashes[1] == bytes32(0) && blobCommitments[1] == bytes32(0)) ||
+            (_blobHashes[1] != bytes32(0) && blobCommitments[1] != bytes32(0)),
             "bh"
         );
     }

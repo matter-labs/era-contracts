@@ -59,9 +59,6 @@ uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 /// @dev Offset in pubdata commitment of blobs for kzg commitment
 uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 
-/// @dev The hash of an empty blob, equal to keccak(new bytes(4096 * 31))
-bytes32 constant EMPTY_BLOB_HASH = 0xf6dbf942ccbdd8c156edaf1f93bb083a05b9da07a2379a624770c8cbea687f5c;
-
 /// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
