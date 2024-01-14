@@ -21,8 +21,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
         // TODO: Update for dynamic number of blobs
-        bytes32 blob1Hash;
-        bytes32 blob2Hash;
+        bytes32[] memory blobHashes = new bytes32[](2);
 
         bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * 2);
 
@@ -30,16 +29,26 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
             let ptr := add(totalBlobs, 0x20)
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
-
-            // We take the hash both up to BLOB_SIZE_BYTES even if _pubdata.length is less than 2 * BLOB_SIZE_BYTES
-            // since we need the data to be right padded with 0s up to BLOB_SIZE_BYTES size
-            blob1Hash := keccak256(ptr, BLOB_SIZE_BYTES)
-            blob2Hash := keccak256(add(ptr, BLOB_SIZE_BYTES), BLOB_SIZE_BYTES)
         }
 
-        blob2Hash = blob2Hash == EMPTY_BLOB_HASH ? bytes32(0) : blob2Hash;
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 start = BLOB_SIZE_BYTES * i;
 
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blob1Hash);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blob2Hash);
+            if (start >= _pubdata.length) {
+                break;
+            }
+
+            bytes32 blobHash;
+            assembly {
+                // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+                let ptr := add(totalBlobs, 0x20)
+                blobHash := keccak256(add(ptr, start), BLOB_SIZE_BYTES)
+            }
+
+            blobHashes[i] = blobHash;
+        }
+
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blobHashes[0]);
+        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blobHashes[1]);
     }
 }
