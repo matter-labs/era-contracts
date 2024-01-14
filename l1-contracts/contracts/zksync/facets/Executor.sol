@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -45,7 +45,7 @@ contract ExecutorFacet is Base, IExecutor {
         );
 
         // TODO: Adapt to handle dynamic number of blobs
-        bytes32[] memory blobCommitments = new bytes32[](2);
+        bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32 blob1Hash;
         bytes32 blob2Hash;
         if (pubdataSource == uint8(PubdataSource.Blob)) {
@@ -53,7 +53,7 @@ contract ExecutorFacet is Base, IExecutor {
             // Otherwise we should be using bytes32(0)
             blob1Hash = logOutput.blob1Hash;
             blob2Hash = logOutput.blob2Hash;
-            bytes32[2] memory blobHashes = [blob1Hash, blob2Hash];
+            bytes32[MAX_NUMBER_OF_BLOBS] memory blobHashes = [blob1Hash, blob2Hash];
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
@@ -524,18 +524,17 @@ contract ExecutorFacet is Base, IExecutor {
     /// pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     function _verifyBlobInformation(
         bytes calldata _pubdataCommitments,
-        bytes32[2] memory _blobHashes
+        bytes32[MAX_NUMBER_OF_BLOBS] memory _blobHashes
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
-        // TODO: This should be dynamic instead of being hardcoded to 2 blobs
         require(_pubdataCommitments.length > 0, "pl");
         require(
-            _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * 2 &&
+            _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS &&
                 _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0,
             "bs"
         );
-        blobCommitments = new bytes32[](2);
+        blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32 versionedHash;
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
@@ -568,13 +567,15 @@ contract ExecutorFacet is Base, IExecutor {
         versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
 
-        // We do this check to verify that either the second blob was empty/not used
-        // or that we have both a linear hash and commitment for it.
-        require(
-            (_blobHashes[1] == bytes32(0) && blobCommitments[1] == bytes32(0)) ||
-            (_blobHashes[1] != bytes32(0) && blobCommitments[1] != bytes32(0)),
-            "bh"
-        );
+        // We verify that for each set of blobHah/blobCommitment are either both empty
+        // or there are values for both.
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            require(
+                (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
+                (_blobHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
+                "bh"
+            );
+        }
     }
 
     /// Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract

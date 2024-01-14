@@ -59,6 +59,9 @@ uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 /// @dev Offset in pubdata commitment of blobs for kzg commitment
 uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 
+/// @dev Max number of blobs currently supported
+uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+
 /// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
