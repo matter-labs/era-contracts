@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, EMPTY_BLOB_HASH} from "./Constants.sol";
+import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemLogKey} from "./Constants.sol";
@@ -19,11 +19,13 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @dev Note: This is an early implementation, in the future we plan to support up to 16 blobs per l1 batch.
     /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
-        require(_pubdata.length <= BLOB_SIZE_BYTES * 2, "pubdata should fit in 2 blobs");
+        require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 2 blobs");
         // TODO: Update for dynamic number of blobs
-        bytes32[] memory blobHashes = new bytes32[](2);
+        bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
-        bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * 2);
+        // We allocate to the full size of MAX_NUMBER_OF_BLOBS * BLOB_SIZE_BYTES because we need to pad
+        // the data on the right with 0s if it doesnt take up the full blob
+        bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS);
 
         assembly {
             // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
@@ -31,16 +33,18 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             calldatacopy(ptr, _pubdata.offset, _pubdata.length)
         }
 
-        for (uint256 i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
+            // We break if the pubdata isnt enough to cover 2 blobs. On L1 it is expected that the hash
+            // will be bytes32(0) if a blob isnt going to be used.
             if (start >= _pubdata.length) {
                 break;
             }
 
             bytes32 blobHash;
             assembly {
-                // The pointer to the allocated memory above. We skip 32 bytes to avoid overwriting the length.
+                // The pointer to the allocated memory above skipping the length.
                 let ptr := add(totalBlobs, 0x20)
                 blobHash := keccak256(add(ptr, start), BLOB_SIZE_BYTES)
             }

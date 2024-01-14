@@ -139,5 +139,5 @@ uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
 /// @dev Our circuits will prove that a 4844 blob and our internal blob are the same.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 
-/// @dev The hash of an empty blob, equal to keccak(new bytes(BLOB_SIZE_BYTES))
-bytes32 constant EMPTY_BLOB_HASH = 0xf6dbf942ccbdd8c156edaf1f93bb083a05b9da07a2379a624770c8cbea687f5c;
+/// @dev Max number of blobs currently supported
+uint256 constant MAX_NUMBER_OF_BLOBS = 2;

@@ -46,14 +46,12 @@ contract ExecutorFacet is Base, IExecutor {
 
         // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        bytes32 blob1Hash;
-        bytes32 blob2Hash;
+        bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
-            blob1Hash = logOutput.blob1Hash;
-            blob2Hash = logOutput.blob2Hash;
-            bytes32[MAX_NUMBER_OF_BLOBS] memory blobHashes = [blob1Hash, blob2Hash];
+            blobHashes[0] = logOutput.blob1Hash;
+            blobHashes[1] = logOutput.blob2Hash;
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
@@ -75,8 +73,7 @@ contract ExecutorFacet is Base, IExecutor {
             _newBatch, 
             logOutput.stateDiffHash, 
             blobCommitments,
-            blob1Hash,
-            blob2Hash
+            blobHashes
         );
 
         return
@@ -430,12 +427,11 @@ contract ExecutorFacet is Base, IExecutor {
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
-        bytes32 _blob1Hash,
-        bytes32 _blob2Hash
+        bytes32[] memory _blobHashes
     ) internal view returns (bytes32) {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blob1Hash, _blob2Hash));
+        bytes32 auxiliaryOutputHash = keccak256(_batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes));
 
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
@@ -458,8 +454,7 @@ contract ExecutorFacet is Base, IExecutor {
         CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
-        bytes32 _blob1Hash,
-        bytes32 _blob2Hash
+        bytes32[] memory _blobHashes
     ) internal pure returns (bytes memory) {
         require(_batch.systemLogs.length <= MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, "pu");
 
@@ -475,10 +470,10 @@ contract ExecutorFacet is Base, IExecutor {
                 // linear hash (hash of preimage from system logs) and 
                 // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
                 // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
-                // If we only utilize a single blob, _blob2Hash and _blobCommitments[1] will be bytes32(0)
-                _blob1Hash,
+                // If we only utilize a single blob, _blobHash[1] and _blobCommitments[1] will be bytes32(0)
+                _blobHashes[0],
                 _blobCommitments[0],
-                _blob2Hash,
+                _blobHashes[1],
                 _blobCommitments[1]
             );
     }
@@ -524,7 +519,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
     function _verifyBlobInformation(
         bytes calldata _pubdataCommitments,
-        bytes32[MAX_NUMBER_OF_BLOBS] memory _blobHashes
+        bytes32[] memory _blobHashes
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
@@ -535,19 +530,19 @@ contract ExecutorFacet is Base, IExecutor {
             "bs"
         );
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        bytes32 versionedHash;
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
-            versionedHash = _getBlobVersionedHash(versionedHashIndex);
+            bytes32 blobVersionedHash;
+            blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
 
-            require(versionedHash != bytes32(0), "vh");
+            require(blobVersionedHash != bytes32(0), "vh");
 
             // First 16 bytes is the opening point. While we get the point as 16 bytes, the point evaluation precompile
             // requires it to be 32 bytes. The blob commitment must use the opening point as 16 bytes though.
             bytes32 openingPoint = bytes32(uint256(uint128(bytes16(_pubdataCommitments[i: i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET]))));
 
             _pointEvaluationPrecompile(
-                versionedHash,
+                blobVersionedHash,
                 openingPoint,
                 _pubdataCommitments[i + PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET:i + PUBDATA_COMMITMENT_SIZE]
             );
@@ -555,7 +550,7 @@ contract ExecutorFacet is Base, IExecutor {
             // Take the hash of the versioned hash || opening point || claimed value
             blobCommitments[versionedHashIndex] = keccak256(
                 abi.encodePacked(
-                    versionedHash, 
+                    blobVersionedHash, 
                     _pubdataCommitments[i:i + PUBDATA_COMMITMENT_COMMITMENT_OFFSET]
                 )
             );
@@ -564,7 +559,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         // This check is required because we want to ensure that there arent any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
-        versionedHash = _getBlobVersionedHash(versionedHashIndex);
+        bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
 
         // We verify that for each set of blobHah/blobCommitment are either both empty
