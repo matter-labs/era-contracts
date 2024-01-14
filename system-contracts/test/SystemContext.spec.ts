@@ -109,4 +109,47 @@ describe("SystemContext tests", () => {
       expect(blockTimestamp).to.be.equal(0);
     });
   });
+
+  describe("setL2Block", async () => {
+    it("should revert not called by bootlader", async () => {
+      await expect(systemContext.setL2Block(1, 1, Buffer.alloc(32, 0), true, 1)).to.be.rejectedWith(
+        "Callable only by the bootloader"
+      );
+    });
+
+    it("should revert timestamp < current batch timestamp", async () => {
+      // getBlockNumber
+      const blockNumber = await systemContext.getBlockNumber();
+      const newBlockNumber = blockNumber.add(1);
+      // getBatchNumberAndTimestamp
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      // get previous block hash
+      const previousBlockHash = await systemContext.getBlockHashEVM(blockNumber);
+      await expect(systemContext.connect(bootloaderAccount).setL2Block(newBlockNumber, batchData.batchTimestamp.sub(1), previousBlockHash, true, 1)).to.be.rejectedWith("The timestamp of the L2 block must be greater than or equal to the timestamp of the current batch");
+    });
+
+    it("should revert virtual blocks to create < 1", async () => {
+      // getBlockNumber
+      const blockNumber = await systemContext.getBlockNumber();
+      const newBlockNumber = blockNumber.add(1);
+      // getBatchNumberAndTimestamp
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const timestamp = batchData.batchTimestamp.add(1);
+      // get previous block hash
+      const previousBlockHash = await systemContext.getBlockHashEVM(blockNumber);
+      await expect(systemContext.connect(bootloaderAccount).setL2Block(newBlockNumber, timestamp, previousBlockHash, true, 0)).to.be.rejectedWith("There must be a virtual block created at the start of the batch");
+    });
+
+    it("should pass", async () => {
+      // getBlockNumber
+      const blockNumber = await systemContext.getBlockNumber();
+      const newBlockNumber = blockNumber.add(1);
+      // getBatchNumberAndTimestamp
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const timestamp = batchData.batchTimestamp.add(1);
+      // get previous block hash
+      const previousBlockHash = await systemContext.getBlockHashEVM(blockNumber);
+      await systemContext.connect(bootloaderAccount).setL2Block(newBlockNumber, timestamp, previousBlockHash, true, 1);
+    });
+  });
 });
