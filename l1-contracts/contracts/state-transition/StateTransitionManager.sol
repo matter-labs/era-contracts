@@ -24,9 +24,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// @notice total number of chains registered in the contract
-    uint256 public totalChains;
-
     /// @notice chainId => chainContract
     mapping(uint256 => address) public stateTransition;
 
@@ -234,7 +231,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address stateTransitionAddress = address(stateTransitionContract);
 
         stateTransition[_chainId] = stateTransitionAddress;
-        ++totalChains;
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);

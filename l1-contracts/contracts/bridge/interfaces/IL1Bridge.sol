@@ -15,13 +15,19 @@ interface IL1Bridge {
         uint256 amount
     );
 
-    // legacy before bridgehub, only used for Era
-    event DepositInitiated(
-        bytes32 indexed l2DepositTxHash,
+    event BridgehubDepositInitiatedSharedBridge(
+        uint256 indexed chainId,
+        bytes32 indexed txDataHash,
         address indexed from,
-        address indexed to,
+        address to,
         address l1Token,
         uint256 amount
+    );
+
+    event BridgehubDepositFinalized(
+        uint256 indexed chainId,
+        bytes32 indexed txDataHash,
+        bytes32 indexed l2DepositTxHash
     );
 
     event WithdrawalFinalizedSharedBridge(
@@ -30,18 +36,14 @@ interface IL1Bridge {
         address indexed l1Token,
         uint256 amount
     );
-    // legacy before bridgehub, only used for Era
-    event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
-
+   
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
         address indexed l1Token,
         uint256 amount
     );
-    // legacy before bridgehub, only used for Era
-    event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
-
+  
     function isWithdrawalFinalizedShared(
         uint256 chainId,
         uint256 _l2BatchNumber,

@@ -297,7 +297,6 @@ export class Deployer {
         protocolVersion,
       },
     ]);
-    // console.log('kl todo 1', diamondCut)
 
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",

@@ -3,7 +3,21 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
+/// @notice legacy before bridgehub, only used for Era
+
 interface IL1BridgeLegacy {
+    event DepositInitiated(
+        bytes32 indexed l2DepositTxHash,
+        address indexed from,
+        address indexed to,
+        address l1Token,
+        uint256 amount
+    );
+
+    event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
+    
+    event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
+
     function deposit(
         address _l2Receiver,
         address _l1Token,

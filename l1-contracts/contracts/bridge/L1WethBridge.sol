@@ -408,12 +408,11 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 refundRecipient
             );
         }
-        // kl todo
-        // bytes64 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
-        // emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // if (_chainId == ERA_CHAIN_ID) {
-        //     emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // }
+        emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        if (_chainId == ERA_CHAIN_ID) {
+            // kl todo. Should we emit this event here?
+            emit DepositInitiated(0, msg.sender, _l2Receiver, _l1Token, _amount);
+        }
     }
 
     function _depositSendTx(
@@ -493,11 +492,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 txDataHash: txDataHash
             });
         }
-        // kl todo
-        // emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // if (_chainId == ERA_CHAIN_ID) {
-        //     emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // }
+
+        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        if (_chainId == ERA_CHAIN_ID) {
+            // kl todo. does the weth bridge need to be compatible with events of the erc20 bridge?
+            emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        }
     }
 
     function bridgehubConfirmL2Transaction(
@@ -617,6 +617,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
             emit WithdrawalFinalizedSharedBridge(_chainId, l1WithdrawReceiver, l1WethAddress, amount);
             if (_chainId == ERA_CHAIN_ID) {
+                // kl todo. Do we need backward compatibility with erc20 bridge events?
                 emit WithdrawalFinalized(l1WithdrawReceiver, l1WethAddress, amount);
             }
         } else {

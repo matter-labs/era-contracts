@@ -103,6 +103,9 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
+    /// @notice we have this function so the event can be emitted, 
+    /// @notice as the genesis upgrade is not a normal upgrade, so the server handles it differently  
+    /// @notice based on this event
     function executeChainIdUpgrade(
         Diamond.DiamondCutData calldata _diamondCut,
         L2CanonicalTransaction memory _l2ProtocolUpgradeTx,

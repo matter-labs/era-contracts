@@ -64,14 +64,14 @@ contract L1ERC20Bridge is
     /// @dev The bytecode hash of the L2 token contract
     bytes32 public l2TokenProxyBytecodeHash;
 
-    mapping(address => uint256) public __DEPRECATED_lastWithdrawalLimitReset;
+    mapping(address => uint256) internal __DEPRECATED_lastWithdrawalLimitReset;
 
     /// @dev A mapping L1 token address => the accumulated withdrawn amount during the withdrawal limit window
-    mapping(address => uint256) public __DEPRECATED_withdrawnAmountInWindow;
+    mapping(address => uint256) internal __DEPRECATED_withdrawnAmountInWindow;
 
     /// @dev The accumulated deposited amount per user.
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
-    mapping(address => mapping(address => uint256)) public __DEPRECATED_totalDepositedAmountPerUser;
+    mapping(address => mapping(address => uint256)) internal __DEPRECATED_totalDepositedAmountPerUser;
 
     bytes32 public factoryDepsHash;
 
@@ -98,7 +98,7 @@ contract L1ERC20Bridge is
     /// @dev used for extra security until hyperbridging happens.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
 
-    /// @dev have we enabled hyperbridging for chain yet
+    /// @dev have we enabled hyperbridging for a given chain yet
     mapping(uint256 => bool) public hyperbridgingEnabled;
 
     function l2Bridge() external view returns (address) {
@@ -143,9 +143,9 @@ contract L1ERC20Bridge is
         address _owner
     ) external payable reinitializer(2) {
         _transferOwnership(_owner);
-        require(_l2TokenBeaconStandardAddress != address(0), "Token Beacon address 0");
-        require(_l2BridgeStandardAddress != address(0), "Bridge address 0");
-        require(_owner != address(0), "nh");
+        require(_l2TokenBeaconStandardAddress != address(0), "L1EB: tb  0");
+        require(_l2BridgeStandardAddress != address(0), "L1EB: bridge 0");
+        require(_owner != address(0), "L1EB: owner 0");
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
         require(_factoryDeps.length == 3, "mk");
         // The caller miscalculated deploy transactions fees
@@ -195,7 +195,6 @@ contract L1ERC20Bridge is
             require(_factoryDeps.length == 3, "L1EB: invalid number of factory deps");
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1EB: invalid factory deps");
         }
-        // The caller miscalculated deploy transactions fees
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
             if (ethIsBaseToken) {
@@ -203,7 +202,7 @@ contract L1ERC20Bridge is
             } else {
                 require(msg.value == 0, "L1EB: msg.value > 0, base token");
             }
-
+            // The caller miscalculated deploy transactions fees
             require(_mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: invalid fee");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -274,7 +273,7 @@ contract L1ERC20Bridge is
         bytes32[] calldata _bridgeProxyTxMerkleProof
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge already deployed");
-        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: bridge implementation tx not sent");
+        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: bridge impl tx not sent");
 
         require(
             bridgehub.proveL1ToL2TransactionStatus(
@@ -286,7 +285,7 @@ contract L1ERC20Bridge is
                 _bridgeImplTxMerkleProof,
                 TxStatus(1)
             ),
-            "L1EB: bridge implementation tx not confirmed"
+            "L1EB: bridge impl tx not confirmed"
         );
         require(
             bridgehub.proveL1ToL2TransactionStatus(
@@ -327,7 +326,7 @@ contract L1ERC20Bridge is
             ERA_CHAIN_ID,
             _l2Receiver,
             _l1Token,
-            0, // this is overriden by msg.value for era
+            msg.value,
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
@@ -359,7 +358,7 @@ contract L1ERC20Bridge is
             ERA_CHAIN_ID,
             _l2Receiver,
             _l1Token,
-            0, // this is overriden by msg.value for era
+            msg.value,
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
@@ -436,11 +435,10 @@ contract L1ERC20Bridge is
         bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
         deposited[_chainId][txDataHash][l2TxHash] = true;
 
-        // kl todo
-        // emit DepositInitiatedSharedBridge(_chainId, txDataHash);
-        // if (_chainId == ERA_CHAIN_ID) {
-        //     emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // }
+        emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        if (_chainId == ERA_CHAIN_ID) {
+            emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
+        }
     }
 
     // to avoid stack too deep error
@@ -457,8 +455,8 @@ contract L1ERC20Bridge is
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
-            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the other bridge for gas
-            l2Value: 0, // L2 msg.value, bridgehub does direct deposits, and we don't support wrapping functionality.
+            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub 
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -476,9 +474,9 @@ contract L1ERC20Bridge is
         address _l1Token,
         uint256 _amount
     ) public payable onlyBridgehub {
-        require(msg.value == 0, "L1EB: msg.value > 0 base deposit");
+        require(msg.value == 0, "L1EB: msg.value > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
-        if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract
+        if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
@@ -528,11 +526,11 @@ contract L1ERC20Bridge is
                 txDataHash: txDataHash
             });
         }
-        // kl todo
-        // emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // if (_chainId == ERA_CHAIN_ID) {
-        //     emit DepositInitiated(txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        // }
+        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        if (_chainId == ERA_CHAIN_ID) {
+            // kl todo. Should emit this event here? Should we not allow this method for era?
+            emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        }
     }
 
     function bridgehubConfirmL2Transaction(
@@ -542,6 +540,7 @@ contract L1ERC20Bridge is
     ) external override onlyBridgehub {
         require(!deposited[_chainId][_txDataHash][_txHash], "L1EB: tx already happened");
         deposited[_chainId][_txDataHash][_txHash] = true;
+        emit BridgehubDepositFinalized(_chainId, _txHash, _txDataHash);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
@@ -695,10 +694,6 @@ contract L1ERC20Bridge is
             chainBalance[_chainId][l1Token] -= amount;
         }
 
-        if (_chainId == ERA_CHAIN_ID) {
-            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
-        }
-
         {
             // Preventing the stack too deep error
             if (_chainId == ERA_CHAIN_ID) {
@@ -711,6 +706,9 @@ contract L1ERC20Bridge is
         // Withdraw funds
         IERC20(l1Token).safeTransfer(l1Receiver, amount);
 
+        if (_chainId == ERA_CHAIN_ID) {
+            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+        }
         emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
     }
 
