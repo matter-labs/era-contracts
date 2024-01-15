@@ -11,16 +11,15 @@ import {IL1BridgeLegacy} from "./interfaces/IL1BridgeLegacy.sol";
 import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2ERC20Bridge} from "./interfaces/IL2ERC20Bridge.sol";
+import {ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
 
 import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
-
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-
 import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {InitializableRandomStorage} from "../common/InitializableRandomStorage.sol";
@@ -49,13 +48,13 @@ contract L1ERC20Bridge is
     /// @dev Used to indicate that L2 -> L1 message was already processed
     /// @dev this is just used for ERA for backwards compatibility reasons
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
-        public isWithdrawalFinalized;
+        public isWithdrawalFinalizedEra;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev this is just used for ERA for backwards compatibility reasons
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
-        internal depositAmount;
+        internal depositAmountEra;
 
     /// @dev The standard address of deployed L2 bridge counterpart
     address public l2BridgeStandardAddress;

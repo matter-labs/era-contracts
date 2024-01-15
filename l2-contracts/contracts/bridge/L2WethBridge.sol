@@ -3,13 +3,15 @@
 pragma solidity 0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IL2Weth} from "./interfaces/IL2Weth.sol";
-import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-
-import {L2_ETH_ADDRESS} from "../L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IL2Weth} from "./interfaces/IL2Weth.sol";
+import {L2_ETH_ADDRESS, L2ContractHelper} from "../L2ContractHelper.sol";
+import {L2Weth} from "./L2Weth.sol";
+import {IL1BridgeDeprecated} from "./interfaces/IL1Bridge.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

@@ -9,6 +9,7 @@ import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
 import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
+import {ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
 
 import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
 
