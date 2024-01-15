@@ -7,6 +7,7 @@ import "../../libraries/Diamond.sol";
 import "../../../common/libraries/L2ContractHelper.sol";
 import {L2_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
 import "./Base.sol";
+import "../../IStateTransitionManager.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
@@ -96,20 +97,19 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         function upgradeChainFromVersion(
             uint256 _chainId,
             uint256 _oldProtocolVersion,
-            Diamond.DiamondCutData calldata _cutData
+            Diamond.DiamondCutData calldata _diamondCut
         ) external onlyGovernorOrStateTransitionManager {
-            bytes32 cutHashInput = keccak256(abi.encode(_cutData));
-            require(cutHashInput == StateTransitionManager(s.stateTransitionManager).upgradeCutHash[_oldProtocolVersion], "StateTransition: cutHash mismatch");
+            bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
+            require(cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion), "StateTransition: cutHash mismatch");
     
-            IZkSyncStateTransition stateTransitionContract = IZkSyncStateTransition(stateTransition[_chainId]);
             require(
-                stateTransitionContract.getProtocolVersion() == _oldProtocolVersion,
+                s.protocolVersion == _oldProtocolVersion,
                 "StateTransition: protocolVersion mismatch in STC when upgrading"
             );
             Diamond.diamondCut(_diamondCut);
             emit ExecuteUpgrade(_diamondCut);
             require(
-                stateTransitionContract.getProtocolVersion() > _oldProtocolVersion,
+                s.protocolVersion > _oldProtocolVersion,
                 "StateTransition: protocolVersion mismatch in STC after upgrading"
             );
         }
