@@ -123,10 +123,11 @@ describe("Custom base token weth tests", () => {
     await startWethBridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
     const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
-    const upgradeCall = l1WethBridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address,address)",
-      [chainId, ADDRESS_ONE, ADDRESS_ONE]
-    );
+    const upgradeCall = l1WethBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [
+      chainId,
+      ADDRESS_ONE,
+      ADDRESS_ONE,
+    ]);
 
     await executeUpgrade(deployer, deployWallet, l1WethBridge.address, 0, upgradeCall);
   });
@@ -148,27 +149,25 @@ describe("Custom base token weth tests", () => {
 
   it("Should not allow direct deposits", async () => {
     const revertReason = await getCallRevertReason(
-    l1WethBridge
-      .connect(randomSigner)
-      .deposit(chainId, await randomSigner.getAddress(), wethTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
+      l1WethBridge
+        .connect(randomSigner)
+        .deposit(chainId, await randomSigner.getAddress(), wethTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
     );
 
-    expect(revertReason).equal("L1WETH Bridge: Direct deposit via requestL2Transaction only available for Eth based chains");
+    expect(revertReason).equal(
+      "L1WETH Bridge: Direct deposit via requestL2Transaction only available for Eth based chains"
+    );
   });
 
   it("Should deposit weth token successfully twoBridges method", async () => {
     const wethTokenAmount = ethers.utils.parseUnits("800", 18);
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
-    await (await wethToken.connect(randomSigner).deposit({value: wethTokenAmount})).wait();
-    await (
-      await wethToken.connect(randomSigner).approve(l1WethBridge.address, wethTokenAmount)
-    ).wait();
+    await (await wethToken.connect(randomSigner).deposit({ value: wethTokenAmount })).wait();
+    await (await wethToken.connect(randomSigner).approve(l1WethBridge.address, wethTokenAmount)).wait();
 
     await (await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount)).wait();
-    await (
-      await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)
-    ).wait();
+    await (await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)).wait();
 
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
@@ -180,7 +179,10 @@ describe("Custom base token weth tests", () => {
       secondBridgeAddress: l1WethBridge.address,
       secondBridgeSelector: l1WethBridge.interface.getSighash("bridgehubDeposit"),
       secondBridgeValue: 0,
-      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode([ "address","uint256", "address"], [wethTokenAddress, wethTokenAmount, await randomSigner.getAddress()]),
+      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "address"],
+        [wethTokenAddress, wethTokenAmount, await randomSigner.getAddress()]
+      ),
     });
   });
 

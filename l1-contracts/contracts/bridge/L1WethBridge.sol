@@ -268,7 +268,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev We have to confirm that the deploy transactions succeeded.
     function finishInitializeChain(
         uint256 _chainId,
-        ConfirmL2TxStatus calldata _bridgeImplTxStatus, 
+        ConfirmL2TxStatus calldata _bridgeImplTxStatus,
         ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
@@ -419,7 +419,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     // we have to keep track of bridgehub deposits to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
-        address ,//_prevMsgSender,
+        address, //_prevMsgSender,
         address _token,
         uint256 _amount
     ) external payable override onlyBridgehubOrEthChain(_chainId) {

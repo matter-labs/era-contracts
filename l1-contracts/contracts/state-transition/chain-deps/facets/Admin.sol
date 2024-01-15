@@ -93,26 +93,29 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-        /// upgrade a specific chain
-        function upgradeChainFromVersion(
-            uint256 _chainId,
-            uint256 _oldProtocolVersion,
-            Diamond.DiamondCutData calldata _diamondCut
-        ) external onlyGovernorOrStateTransitionManager {
-            bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-            require(cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion), "StateTransition: cutHash mismatch");
-    
-            require(
-                s.protocolVersion == _oldProtocolVersion,
-                "StateTransition: protocolVersion mismatch in STC when upgrading"
-            );
-            Diamond.diamondCut(_diamondCut);
-            emit ExecuteUpgrade(_diamondCut);
-            require(
-                s.protocolVersion > _oldProtocolVersion,
-                "StateTransition: protocolVersion mismatch in STC after upgrading"
-            );
-        }
+    /// upgrade a specific chain
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyGovernorOrStateTransitionManager {
+        bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
+        require(
+            cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion),
+            "StateTransition: cutHash mismatch"
+        );
+
+        require(
+            s.protocolVersion == _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC when upgrading"
+        );
+        Diamond.diamondCut(_diamondCut);
+        emit ExecuteUpgrade(_diamondCut);
+        require(
+            s.protocolVersion > _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC after upgrading"
+        );
+    }
 
     /// @notice Executes an upgrade from the state transition
     /// @dev Only the state transition mananger can execute the upgrade

@@ -203,7 +203,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
     function requestL2Transaction(
         L2TransactionRequestDirect calldata _request
-    ) public payable override nonReentrant() returns (bytes32 canonicalTxHash) {
+    ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             // address tokenBridge = baseTokenBridge[_request.chainId];
@@ -248,13 +248,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ///  This assumes that either ether is the base token or
     ///  the msg.sender has approved the baseTokenBridge with the mintValue,
     ///  and also the necessary approvals are given for the second bridge.
-    /// @notice The logic of this bridge is to allow easy depositing for bridges. 
-    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows 
+    /// @notice The logic of this bridge is to allow easy depositing for bridges.
+    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
     /// the user to approve for each token only its respective bridge
     /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) public payable override nonReentrant() returns (bytes32 canonicalTxHash) {
+    ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             // address tokenBridge = baseTokenBridge[_request.chainId];
@@ -285,7 +285,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         {
             bool success;
             (success, data) = _request.secondBridgeAddress.call{value: _request.secondBridgeValue}(
-                abi.encodeWithSelector(_request.secondBridgeSelector, _request.chainId, msg.sender, _request.secondBridgeCalldata)
+                abi.encodeWithSelector(
+                    _request.secondBridgeSelector,
+                    _request.chainId,
+                    msg.sender,
+                    _request.secondBridgeCalldata
+                )
             );
             require(success, "Bridgehub: second bridge call failed");
         }

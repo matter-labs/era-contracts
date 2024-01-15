@@ -44,14 +44,14 @@ interface IL1Bridge {
         address indexed l1Token,
         uint256 amount
     );
-   
+
     event ClaimedFailedDepositSharedBridge(
         uint256 indexed chainId,
         address indexed to,
         address indexed l1Token,
         uint256 amount
     );
-  
+
     function isWithdrawalFinalizedShared(
         uint256 chainId,
         uint256 _l2BatchNumber,
@@ -94,11 +94,16 @@ interface IL1Bridge {
         uint256 _chainId,
         address _prevMsgSender,
         bytes calldata _data
+    )
+        external
+        payable
+        returns (
             // which is abi encoded :
             // address _l1Token,
             // uint256 _amount,
             // address _l2Receiver
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
+            L2TransactionRequestTwoBridgesInner memory request
+        );
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,

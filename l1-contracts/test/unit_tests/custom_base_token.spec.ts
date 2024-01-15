@@ -146,9 +146,9 @@ describe("Custom base token tests", () => {
 
   it("Should not allow direct deposits", async () => {
     const revertReason = await getCallRevertReason(
-    l1ERC20Bridge
-      .connect(randomSigner)
-      .deposit(chainId, await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
+      l1ERC20Bridge
+        .connect(randomSigner)
+        .deposit(chainId, await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
     );
 
     expect(revertReason).equal("L1EB: deposit only for Eth based chains");
@@ -177,14 +177,10 @@ describe("Custom base token tests", () => {
     const baseTokenAmount = ethers.utils.parseUnits("800", 18);
 
     await altToken.connect(randomSigner).mint(await randomSigner.getAddress(), altTokenAmount);
-    await (
-      await altToken.connect(randomSigner).approve(l1ERC20Bridge.address, altTokenAmount)
-    ).wait();
+    await (await altToken.connect(randomSigner).approve(l1ERC20Bridge.address, altTokenAmount)).wait();
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
-    await (
-      await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)
-    ).wait();
+    await (await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)).wait();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
@@ -195,7 +191,10 @@ describe("Custom base token tests", () => {
       secondBridgeAddress: l1ERC20Bridge.address,
       secondBridgeSelector: l1ERC20Bridge.interface.getSighash("bridgehubDeposit"),
       secondBridgeValue: 0,
-      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode([ "address","uint256", "address"], [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]),
+      secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "address"],
+        [altTokenAddress, altTokenAmount, await randomSigner.getAddress()]
+      ),
     });
   });
 

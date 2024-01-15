@@ -94,7 +94,7 @@ export async function startErc20BridgeInitOnChain(
     priorityTxMaxGasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-  
+
   if (!ethIsBaseToken) {
     const erc20 = deployer.baseTokenContract(deployWallet);
     const testErc20 = TestnetERC20TokenFactory.connect(deployer.addresses.BaseToken, deployWallet);

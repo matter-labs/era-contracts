@@ -109,11 +109,11 @@ contract L1ERC20Bridge is
         return ERA_TOKEN_BEACON_ADDRESS;
     }
 
-    function isWithdrawalFinalized(uint256 _chainId, uint256 _l2BatchNumber, uint256 _l2MessageIndex)
-        external
-        view
-        returns (bool)
-    {
+    function isWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool) {
         return isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex];
     }
 
@@ -265,7 +265,7 @@ contract L1ERC20Bridge is
     /// @dev We have to confirm that the deploy transactions succeeded.
     function finishInitializeChain(
         uint256 _chainId,
-        ConfirmL2TxStatus calldata _bridgeImplTxStatus, 
+        ConfirmL2TxStatus calldata _bridgeImplTxStatus,
         ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed 2");
@@ -454,7 +454,7 @@ contract L1ERC20Bridge is
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
             mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub 
+            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -475,7 +475,8 @@ contract L1ERC20Bridge is
         require(msg.value == 0, "L1EB: msg.value > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
         // #if !ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
-        if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
+        if (_prevMsgSender != address(this)) {
+            // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
@@ -529,7 +530,14 @@ contract L1ERC20Bridge is
                 txDataHash: txDataHash
             });
         }
-        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit BridgehubDepositInitiatedSharedBridge(
+            _chainId,
+            txDataHash,
+            _prevMsgSender,
+            _l2Receiver,
+            _l1Token,
+            _amount
+        );
         if (_chainId == ERA_CHAIN_ID) {
             // kl todo. Should emit this event here? Should we not allow this method for era?
             emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
@@ -776,7 +784,7 @@ contract L1ERC20Bridge is
         } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
             // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
             // and we use this interface so that when the switch happened the old messages could be processed
-            
+
             // this message is a token withdrawal
 
             // Check that the message length is correct.

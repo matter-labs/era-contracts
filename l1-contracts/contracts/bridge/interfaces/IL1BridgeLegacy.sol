@@ -15,7 +15,7 @@ interface IL1BridgeLegacy {
     );
 
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
-    
+
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
     function deposit(

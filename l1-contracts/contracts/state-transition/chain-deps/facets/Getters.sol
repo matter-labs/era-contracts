@@ -22,7 +22,6 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
-
     /// @return The address of the verifier smart contract
     function getVerifier() external view returns (address) {
         return address(s.verifier);
