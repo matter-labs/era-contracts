@@ -29,7 +29,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     string public constant override getName = "MailboxFacet";
 
-    // this is implemented in the bridghead, does not go through the router.
+    /// @notice when requesting transactions throught the bridgehub
     function bridgehubRequestL2Transaction(
         address _sender,
         address _contractL2,
