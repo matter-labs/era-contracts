@@ -119,26 +119,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
     }
 
-    /// upgrade a specific chain
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external onlyChainGovernor(_chainId) {
-        bytes32 cutHashInput = keccak256(abi.encode(_cutData));
-        require(cutHashInput == upgradeCutHash[_oldProtocolVersion], "StateTransition: cutHash mismatch");
-
-        IZkSyncStateTransition stateTransitionContract = IZkSyncStateTransition(stateTransition[_chainId]);
-        require(
-            stateTransitionContract.getProtocolVersion() == _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC when upgrading"
-        );
-        stateTransitionContract.executeUpgrade(_cutData);
-        require(
-            stateTransitionContract.getProtocolVersion() > _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC after upgrading"
-        );
-    }
+    
 
     /// registration
 
