@@ -161,11 +161,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         eraIsWithdrawalFinalizedStorageSwitch = _eraIsWithdrawalFinalizedStorageSwitch;
 
         // #if !EOA_GOVERNOR
-        uint32 size;
-        assembly {
-            size := extcodesize(_owner)
-        }
-        require(size > 0, "L1WETHBridge, owner cannot be EOA");
+        require(_owner.code.length > 0, "L1WETHBridge, owner cannot be EOA");
         // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
