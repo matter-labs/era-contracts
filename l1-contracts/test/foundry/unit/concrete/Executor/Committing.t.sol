@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {IExecutor, BLS_MODULUS} from "solpp/zksync/interfaces/IExecutor.sol";
+import {IExecutor} from "solpp/zksync/interfaces/IExecutor.sol";
 import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR, BLOB_VERSIONED_HASH_GETTER_ADDR} from "solpp/zksync/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "solpp/common/L2ContractAddresses.sol";
@@ -624,6 +624,46 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(bytes("lh"));
+        executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        vm.clearMockedCalls();
+    }
+
+    function test_RevertWhen_BlobDoesNotExist() public {
+        bytes memory pubdataCommitment = "\x01\xf4\x3d\x53\x8d\x91\xd4\x77\xb0\xf8\xf7\x7e\x19\x52\x48\x7f\x00\xb8\xdf\x41\xda\x90\x5c\x08\x75\xc5\xc9\x9b\xa1\x92\x26\x84\x0d\x0d\x0a\x25\x26\xee\x22\xc7\x96\x60\x65\x7c\xbe\x01\x95\x33\x5b\x44\x69\xbd\x92\x94\x6f\x7f\x74\xae\xc5\xce\xef\x31\xf4\x32\x53\xd4\x08\x96\x72\x65\xfa\x85\x5a\xc8\xa0\x0a\x19\x52\x93\x6e\x0f\xe9\x97\x01\xc0\xa4\x32\xa1\x32\x2c\x45\x67\x24\xf7\xad\xd8\xa5\xb4\x7a\x51\xda\x52\x17\x06\x06\x95\x34\x61\xab\xd7\x5b\x91\x49\xc7\xc7\x91\xf4\x07\xfd\xbc\xf8\x39\x53\x2c\xb1\x08\xe8\xa5\x00\x64\x40\xcf\x21\xbf\x68\x87\x20\x5a\xcf\x44\x3b\x66\x3a\x57\xf2";
+        bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
+
+        vm.mockCall(
+            BLOB_VERSIONED_HASH_GETTER_ADDR, 
+            abi.encode(uint256(0)),
+            abi.encode(bytes32(0))
+        );
+
+        bytes[] memory correctL2Logs = Utils.createSystemLogs();
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        correctL2Logs[uint256(SystemLogKey.BLOB_ONE_HASH_KEY)] = Utils.constructL2Log(
+            true,
+            L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
+            uint256(SystemLogKey.BLOB_ONE_HASH_KEY),
+            versionedHash1
+        );
+
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+
+        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].pubdataCommitments = pubdataCommitment;
+
+        vm.prank(validator);
+
+        vm.expectRevert(bytes("vh"));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
