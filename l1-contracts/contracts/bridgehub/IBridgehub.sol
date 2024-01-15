@@ -85,10 +85,6 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
-    function requestL2TransactionBaseTokenBridge(
-        L2TransactionRequestDirect calldata _request
-    ) external returns (bytes32 canonicalTxHash);
-
     function requestL2Transaction(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);

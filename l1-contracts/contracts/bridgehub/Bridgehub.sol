@@ -206,27 +206,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice this assumes that either ether is the base token or
     /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge.
     /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
-    function requestL2TransactionBaseTokenBridge(
-        L2TransactionRequestDirect calldata _request
-    ) public override onlyBaseTokenBridge(_request.chainId) returns (bytes32 canonicalTxHash) {
-        address stateTransition = getZkSyncStateTransition(_request.chainId);
-        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
-            msg.sender,
-            _request.l2Contract,
-            _request.mintValue,
-            _request.l2Value,
-            _request.l2Calldata,
-            _request.l2GasLimit,
-            _request.l2GasPerPubdataByteLimit,
-            _request.factoryDeps,
-            _request.refundRecipient
-        );
-    }
-
-    /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
-    /// @notice this assumes that either ether is the base token or
-    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge.
-    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
     function requestL2Transaction(
         L2TransactionRequestDirect calldata _request
     ) public payable override returns (bytes32 canonicalTxHash) {

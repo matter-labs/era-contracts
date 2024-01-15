@@ -433,7 +433,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             factoryDeps: new bytes[](0),
             refundRecipient: _refundRecipient
         });
-        txHash = bridgehub.requestL2TransactionBaseTokenBridge(request);
+        txHash = bridgehub.requestL2Transaction{value: _mintValue}(request);
     }
 
     // we have to keep track of bridgehub deposits to track each chain's assets
