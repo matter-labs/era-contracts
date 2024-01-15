@@ -150,8 +150,8 @@
     "contractName": "bootloader_test",
     "bytecodePath": "bootloader/build/artifacts/bootloader_test.yul.zbin",
     "sourceCodePath": "bootloader/build/bootloader_test.yul",
-    "bytecodeHash": "0x01000343b65fc4100ea396ff1399bb6693ac314e700019c2a82258c34bbb0730",
-    "sourceCodeHash": "0xfff9f9fb235da5e8de3b74e3ed87b297f75437c38c45ade7786026b202a32fee"
+    "bytecodeHash": "0x01000345ae45a836844d584f5d26905aac98cacf382b2e051ab28e7ad58fdcaf",
+    "sourceCodeHash": "0x8f349f199ab498adba424f7437c45e8b79c33fc29d8bea2af8c497bdd19d572d"
   },
   {
     "contractName": "fee_estimate",
