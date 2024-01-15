@@ -95,7 +95,7 @@ contract L1ERC20Bridge is
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) internal deposited;
 
-    /// @dev used for extra security until hyperbridging happens.
+    /// @dev used for extra security until hyperbridging is implemented.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
 
     /// @dev have we enabled hyperbridging for a given chain yet
