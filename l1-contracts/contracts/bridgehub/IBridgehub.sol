@@ -126,5 +126,5 @@ interface IBridgehub {
 
     function setWethBridge(address _wethBridge) external;
 
-    event NewChain(uint64 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
+    event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 }
