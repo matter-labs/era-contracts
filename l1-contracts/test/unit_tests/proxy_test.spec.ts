@@ -85,7 +85,7 @@ describe("Diamond proxy tests", function () {
       {
         chainId,
         bridgehub: "0x0000000000000000000000000000000000000000",
-        stateTransition: await owner.getAddress(),
+        stateTransitionManager: await owner.getAddress(),
         protocolVersion: 0,
         governor: governorAddress,
         admin: governorAddress,

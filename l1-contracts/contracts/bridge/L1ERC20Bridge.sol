@@ -135,7 +135,7 @@ contract L1ERC20Bridge is
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _l2BridgeStandardAddress Pre-calculated address of the L2 token upgradeable beacon
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
-    /// implementation
+    /// implementation. The owner should is not the ProxyAdmin from now on.
     function initializeV2(
         bytes[] calldata _factoryDeps,
         address _l2TokenBeaconStandardAddress,

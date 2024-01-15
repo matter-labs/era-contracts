@@ -337,7 +337,7 @@ export async function initialDeployment(
   const deployer = new Deployer({
     deployWallet,
     ownerAddress,
-    verbose: false,
+    verbose: false, // change here to view deployement
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
