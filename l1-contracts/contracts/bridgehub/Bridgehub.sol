@@ -35,7 +35,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         _;
     }
 
-    modifier onlystateTransitionManagerChain(uint256 _chainId) {
+    modifier onlyStateTransitionManagerChain(uint256 _chainId) {
         require(
             msg.sender == IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId),
             "Bridgehub: not state transition chain"
