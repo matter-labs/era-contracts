@@ -45,4 +45,10 @@ interface IL1BridgeLegacy {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external;
+
+    function l2TokenAddress(address _l1Token) external view returns (address);
+
+    function l2TokenBeacon() external view returns (address);
+
+    function l2Bridge() external view returns (address);
 }

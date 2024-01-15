@@ -22,14 +22,14 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
-import {InitializableRandomStorage} from "../common/InitializableRandomStorage.sol";
+import {InitializableRandomStorage} from "../common/random-storage/InitializableRandomStorage.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {Ownable2StepRandomStorage} from "../common/Ownable2StepRandomStorage.sol";
+import {Ownable2StepRandomStorage} from "../common/random-storage/Ownable2StepRandomStorage.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to zkSync Era
+/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
 contract L1ERC20Bridge is
@@ -41,8 +41,10 @@ contract L1ERC20Bridge is
 {
     using SafeERC20 for IERC20;
 
+    uint256 internal constant NUMBER_OF_FACTORY_DEPS = 3;
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehub public immutable bridgehub;
+    IBridgehub internal immutable bridgehub;
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -57,10 +59,10 @@ contract L1ERC20Bridge is
         internal depositAmountEra;
 
     /// @dev The standard address of deployed L2 bridge counterpart
-    address public l2BridgeStandardAddress;
+    address internal l2BridgeStandardAddress;
 
     /// @dev The standard address that acts as a beacon for L2 tokens
-    address public l2TokenBeaconStandardAddress;
+    address internal l2TokenBeaconStandardAddress;
 
     /// @dev The bytecode hash of the L2 token contract
     bytes32 public l2TokenProxyBytecodeHash;
@@ -74,7 +76,9 @@ contract L1ERC20Bridge is
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
     mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
-    bytes32 public factoryDepsHash;
+
+    /// @dev The hash of the factory deps, stored here so that the factory deps that each chain provides can be checked when it start the l2 bridge deployment
+    bytes32 internal factoryDepsHash;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2BridgeAddress;
@@ -82,11 +86,20 @@ contract L1ERC20Bridge is
     /// @dev A mapping chainId => l2TokenBeacon. Used to store the token beacon proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2TokenBeaconAddress;
 
-    /// @dev A mapping chainId => bridgeImplTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) public bridgeImplDeployOnL2TxHash;
+    /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address after deployment has started, but before it has finished.
+    mapping(uint256 => address) internal l2BridgePotentialAddress;
 
-    /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
+    /// @dev A mapping chainId => l2TokenBeacon. Used to store the token beacon proxy's address after deployment has started, but before it has finished.
+    mapping(uint256 => address) internal l2TokenBeaconPotentialAddress;
+
+    /// @dev we have to record if the bridgeImplTx succeeded
+    mapping(uint256 => bool) internal bridgeImplTxSucceeded;
+
+    /// @dev A mapping chainId => bridgeImplTxHash. Used to check the deploy transaction of the l2Bridge Implementation (which depends on its place in the priority queue).
+    mapping(uint256 => bytes32) internal bridgeImplDeployOnL2TxHash;
+
+    /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction of the l2Bridge Proxy (which depends on its place in the priority queue).
+    mapping(uint256 => bytes32) internal bridgeProxyDeployOnL2TxHash;
 
     /// @dev A mapping L2 _chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -97,16 +110,19 @@ contract L1ERC20Bridge is
     mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) internal depositHappened;
 
     /// @dev used for extra security until hyperbridging is implemented.
-    mapping(uint256 => mapping(address => uint256)) public chainBalance;
+    mapping(uint256 => mapping(address => uint256)) internal chainBalance;
 
     /// @dev have we enabled hyperbridging for a given chain yet
-    mapping(uint256 => bool) public hyperbridgingEnabled;
+    mapping(uint256 => bool) internal hyperbridgingEnabled;
 
-    function l2Bridge() external view returns (address) {
+
+    /// @dev legacy function gives the l2Bridge address on Era
+    function l2Bridge() external view override returns (address) {
         return l2BridgeAddress[ERA_CHAIN_ID];
     }
-
-    function l2TokenBeacon() external view returns (address) {
+    
+    /// @dev legacy function gives the l2TokenBeacon address on Era
+    function l2TokenBeacon() external view override returns (address) {
         return ERA_TOKEN_BEACON_ADDRESS;
     }
 
@@ -120,7 +136,7 @@ contract L1ERC20Bridge is
 
     /// @notice Checks that the message sender is the governor
     modifier onlyBridgehub() {
-        require(msg.sender == address(bridgehub), "L1EB: not bridgehub");
+        require(msg.sender == address(bridgehub), "L1EB not BH");
         _;
     }
 
@@ -144,7 +160,7 @@ contract L1ERC20Bridge is
     /// @notice is necessary for determining L2 token address by L1 address, see `l2TokenAddress(address)` function
     /// @param _l2BridgeStandardAddress Pre-calculated address of the L2 token upgradeable beacon
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
-    /// implementation. The owner should is not the ProxyAdmin from now on.
+    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge
     function initializeV2(
         bytes[] calldata _factoryDeps,
         address _l2TokenBeaconStandardAddress,
@@ -152,11 +168,11 @@ contract L1ERC20Bridge is
         address _owner
     ) external payable reinitializer(2) {
         _transferOwnership(_owner);
-        require(_l2TokenBeaconStandardAddress != address(0), "L1EB: tb  0");
-        require(_l2BridgeStandardAddress != address(0), "L1EB: bridge 0");
-        require(_owner != address(0), "L1EB: owner 0");
+        require(_l2TokenBeaconStandardAddress != address(0), "L1EB TB  0");
+        require(_l2BridgeStandardAddress != address(0), "L1EB BSA 0");
+        require(_owner != address(0), "L1EB owner 0");
         // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-        require(_factoryDeps.length == 3, "mk");
+        require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "mk");
         // The caller miscalculated deploy transactions fees
         l2TokenProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[2]);
         l2TokenBeaconStandardAddress = _l2TokenBeaconStandardAddress;
@@ -167,7 +183,7 @@ contract L1ERC20Bridge is
         assembly {
             size := extcodesize(_owner)
         }
-        require(size > 0, "L1EB, owner cannot be EOA");
+        require(size > 0, "L1EB owner EOA");
         // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
@@ -182,8 +198,7 @@ contract L1ERC20Bridge is
         l2TokenBeaconAddress[_chainId] = _l2TokenBeaconAddress;
     }
 
-    /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
-    /// @dev During initialization deploys L2 bridge counterpart as well as provides some factory deps for it
+    /// @dev Starts the deployment of the L2 bridge counterpart as well as provides some factory deps for it for a specific chain
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 bridge
     /// @notice _factoryDeps[0] == a raw bytecode of L2 bridge implementation
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 bridge
@@ -198,15 +213,16 @@ contract L1ERC20Bridge is
         uint256 _deployBridgeProxyFee
     ) external payable {
         {
-            require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed");
+            require(l2BridgeAddress[_chainId] == address(0), "L1EB B deployed");
             // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-            require(_factoryDeps.length == 3, "L1EB: wrong # of f. deps");
-            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1EB: wrong f. deps");
+            require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "L1EB w # of f-deps");
+            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1EB w f-deps");
+            require(bridgeProxyDeployOnL2TxHash[_chainId] == 0x00, "L1EB b. proxy tx sent"); // clear the tx first by proving the txs succeeded or failed
         }
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
             if (!ethIsBaseToken) {
-                require(msg.value == 0, "L1EB: msg.value > 0, base token");
+                require(msg.value == 0, "L1EB m.v > 0, e base");
             }
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -232,16 +248,16 @@ contract L1ERC20Bridge is
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(
                     IL2ERC20Bridge.initialize,
-                    (address(this), l2TokenProxyBytecodeHash, owner)
-                );
-                l2BridgeProxyConstructorData = abi.encode(
-                    bridgeImplementationAddr,
-                    owner,
-                    proxyInitializationParams
-                );
-            }
-
-            // Deploy L2 bridge proxy contract
+                        (address(this), l2TokenProxyBytecodeHash, l2Owner)
+                    );
+                    l2BridgeProxyConstructorData = abi.encode(
+                        bridgeImplementationAddr,
+                        l2Owner,
+                        proxyInitializationParams
+                    );
+                }
+        
+                // Deploy L2 bridge proxy contract
             (address bridgeProxyAddr, bytes32 bridgeProxyTxHash) = BridgeInitializationHelper.requestDeployTransaction(
                 ethIsBaseToken,
                 _chainId,
@@ -252,9 +268,11 @@ contract L1ERC20Bridge is
                 // No factory deps are needed for the L2 bridge proxy, because it is already passed in previous step
                 new bytes[](0)
             );
-            require(bridgeProxyAddr == l2BridgeStandardAddress, "L1EB: wrong b. address");
+            require(bridgeProxyAddr == l2BridgeStandardAddress, "L1EB w b. address");
             _setTxHashes(_chainId, bridgeImplTxHash, bridgeProxyTxHash);
         }
+        l2BridgePotentialAddress[_chainId] = l2BridgeStandardAddress;
+        l2TokenBeaconPotentialAddress[_chainId] = l2TokenBeaconStandardAddress;
     }
 
     // to avoid stack too deep error
@@ -269,22 +287,27 @@ contract L1ERC20Bridge is
         ConfirmL2TxStatus calldata _bridgeImplTxStatus,
         ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
-        require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed 2");
-        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: b. impl tx not sent");
+        require(l2BridgeAddress[_chainId] == address(0), "L1EB B deployed 2");
+        require(bridgeProxyDeployOnL2TxHash[_chainId] != 0x00, "L1EB b. impl tx n sent");
 
-        require(
-            bridgehub.proveL1ToL2TransactionStatus(
-                _chainId,
-                bridgeImplDeployOnL2TxHash[_chainId],
-                _bridgeImplTxStatus.batchNumber,
-                _bridgeImplTxStatus.messageIndex,
-                _bridgeImplTxStatus.numberInBatch,
-                _bridgeImplTxStatus.merkleProof,
-                TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
+        /// if it already succeeded we can skip it
+        if (!bridgeImplTxSucceeded[_chainId]){
+            require(
+                bridgehub.proveL1ToL2TransactionStatus(
+                    _chainId,
+                    bridgeImplDeployOnL2TxHash[_chainId],
+                    _bridgeImplTxStatus.batchNumber,
+                    _bridgeImplTxStatus.messageIndex,
+                    _bridgeImplTxStatus.numberInBatch,
+                    _bridgeImplTxStatus.merkleProof,
+                    TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
             ),
-            "L1EB: bridge impl tx not conf" // not confirmed
-        );
-        delete bridgeImplDeployOnL2TxHash[_chainId];
+                "L1EB b. impl tx n conf" // not confirmed
+            );
+            if (_bridgeImplTxStatus.succeeded) {
+                bridgeImplTxSucceeded[_chainId] = true;
+            }
+        }
 
         require(
             bridgehub.proveL1ToL2TransactionStatus(
@@ -296,12 +319,15 @@ contract L1ERC20Bridge is
                 _bridgeProxyTxStatus.merkleProof,
                 TxStatus(uint8(_bridgeProxyTxStatus.succeeded ? 1 : 0))
             ),
-            "L1EB: bridge proxy tx not conf" // not confirmed
+            "L1EB b. proxy tx n conf" // not confirmed
         );
-        delete bridgeProxyDeployOnL2TxHash[_chainId];
-        if (_bridgeProxyTxStatus.succeeded) {
-            l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
-            l2TokenBeaconAddress[_chainId] = l2TokenBeaconStandardAddress;
+        delete bridgeImplDeployOnL2TxHash[_chainId];
+        delete bridgeProxyDeployOnL2TxHash[_chainId]; 
+        if ((_bridgeProxyTxStatus.succeeded) && bridgeImplTxSucceeded[_chainId]) { 
+            l2BridgeAddress[_chainId] = l2BridgePotentialAddress[_chainId];
+            l2TokenBeaconAddress[_chainId] = l2TokenBeaconPotentialAddress[_chainId];
+            delete l2BridgePotentialAddress[_chainId];
+            delete l2TokenBeaconPotentialAddress[_chainId];
         }
     }
 
@@ -403,11 +429,11 @@ contract L1ERC20Bridge is
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        require(l2BridgeAddress[_chainId] != address(0), "L1EB: bridge not deployed");
+        require(l2BridgeAddress[_chainId] != address(0), "L1EB b. n deployed");
         {
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            require(ethIsBaseToken, "L1EB: deposit only for Eth chains");
-            require(_mintValue == msg.value, "L1EB: mintValue mismatch");
+            require(ethIsBaseToken, "L1EB deposit n E chain");
+            require(_mintValue == msg.value, "L1EB w mintValue");
 
             require(_amount != 0, "2T"); // empty deposit amount
             uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
@@ -478,7 +504,7 @@ contract L1ERC20Bridge is
         address _l1Token,
         uint256 _amount
     ) public payable onlyBridgehub {
-        require(msg.value == 0, "L1EB: msg.value > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
+        require(msg.value == 0, "L1EB m.v > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
         // #if !ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
         if (_prevMsgSender != address(this)) {
@@ -512,9 +538,9 @@ contract L1ERC20Bridge is
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
-        require(msg.value == 0, "L1EB: msg.value > 0 for bhub deposit");
-        require(l2BridgeAddress[_chainId] != address(0), "L1EB: bridge not deployed");
-        require(bridgehub.baseToken(_chainId) != _l1Token, "L1EB: base deposit not supported");
+        require(msg.value == 0, "L1EB m.v > 0 for BH dep");
+        require(l2BridgeAddress[_chainId] != address(0), "L1EB b. n deployed");
+        require(bridgehub.baseToken(_chainId) != _l1Token, "L1EB base deposit");
 
         require(_amount != 0, "6T"); // empty deposit amount
         uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
@@ -555,7 +581,7 @@ contract L1ERC20Bridge is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(!depositHappened[_chainId][_txDataHash][_txHash], "L1EB: tx already happened");
+        require(!depositHappened[_chainId][_txDataHash][_txHash], "L1EB tx happened");
         depositHappened[_chainId][_txDataHash][_txHash] = true;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
@@ -657,7 +683,7 @@ contract L1ERC20Bridge is
         }
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
-            require(chainBalance[_chainId][_l1Token] >= _amount, "L1EB: not enough funds");
+            require(chainBalance[_chainId][_l1Token] >= _amount, "L1EB n funds");
             chainBalance[_chainId][_l1Token] -= _amount;
         }
         // Withdraw funds
@@ -682,15 +708,15 @@ contract L1ERC20Bridge is
             { amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];}
             if (amount > 0){
                 usingLegacyDepositAmountStorageVar = true;
-                require(_amount == amount, "L1EB: amount mismatch");
+                require(_amount == amount, "L1EB w amount");
             } else {
                 bool deposited;
                 {deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];}
-                require(deposited, "L1EB: deposit did not happen");
+                require(deposited, "L1EB w deposit"); // wrong/invalid deposit
             }
         } else {
             bool deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
-            require(deposited, "L1EB: deposit did not happen");
+            require(deposited, "L1EB w deposit 2"); // wrong/invalid deposit
         }
     }
 
@@ -725,7 +751,7 @@ contract L1ERC20Bridge is
 
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "L1EB: not enough funds");
+            require(chainBalance[_chainId][l1Token] >= amount, "L1EB n funds 2"); // not enought funds 2
             chainBalance[_chainId][l1Token] -= amount;
         }
 
@@ -778,7 +804,7 @@ contract L1ERC20Bridge is
                 l2ToL1Message,
                 _merkleProof
             );
-            require(success, "L1EB: withdrawal proof failed");
+            require(success, "L1EB withd w pf"); // withdrawal wrong proof
         }
     }
 
@@ -797,7 +823,7 @@ contract L1ERC20Bridge is
         // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
 
         // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "L1EB: invalid message length");
+        require(_l2ToL1message.length >= 56, "L1EB w msg len");// wrong messsage length
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
@@ -819,7 +845,7 @@ contract L1ERC20Bridge is
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
         } else {
-            revert("Incorrect message function selector");
+            revert("W msg f slctr");
         }
     }
 
@@ -835,15 +861,5 @@ contract L1ERC20Bridge is
                 l2TokenProxyBytecodeHash,
                 constructorInputHash
             );
-    }
-
-    /// @dev returns address of proxyAdmin
-    function readProxyAdmin() public view returns (address) {
-        address proxyAdmin;
-        assembly {
-            /// @dev proxy admin storage slot
-            proxyAdmin := sload(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103)
-        }
-        return proxyAdmin;
     }
 }

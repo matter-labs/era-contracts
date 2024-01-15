@@ -50,6 +50,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
 
+    uint256 internal constant NUMBER_OF_FACTORY_DEPS = 2;
+
     /// @dev The address of the WETH token on L1
     address payable public immutable l1WethAddress;
 
@@ -58,18 +60,18 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
     /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
-    uint256 public eraIsWithdrawalFinalizedStorageSwitch;
+    uint256 internal eraIsWithdrawalFinalizedStorageSwitch;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
-    address public l2BridgeStandardAddressEthIsBase;
-    address public l2BridgeStandardAddressEthIsNotBase;
+    address internal l2BridgeStandardAddressEthIsBase;
+    address internal l2BridgeStandardAddressEthIsNotBase;
 
     /// @dev The address of the WETH on L2
-    address public l2WethStandardAddressEthIsBase;
-    address public l2WethStandardAddressEthIsNotBase;
+    address internal l2WethStandardAddressEthIsBase;
+    address internal l2WethStandardAddressEthIsNotBase;
 
     /// @dev Hash of the factory deps that were used to deploy L2 WETH bridge
-    bytes32 public factoryDepsHash;
+    bytes32 internal factoryDepsHash;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2BridgeAddress;
@@ -77,11 +79,20 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev A mapping chainId => WethProxy. Used to store the weth proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public l2WethAddress;
 
+    /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address after deployment has started, but before it has finished.
+    mapping(uint256 => address) internal l2BridgePotentialAddress;
+
+    /// @dev A mapping chainId => l2Weth. Used to store the weth proxy's address after deployment has started, but before it has finished.
+    mapping(uint256 => address) internal l2WethPotentialAddress;
+
     /// @dev A mapping chainId => bridgeImplTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) public bridgeImplDeployOnL2TxHash;
+    mapping(uint256 => bytes32) internal bridgeImplDeployOnL2TxHash;
+
+    /// @dev we have to record if the bridgeImplTx succeeded
+    mapping(uint256 => bool) internal bridgeImplTxSucceeded;
 
     /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
+    mapping(uint256 => bytes32) internal bridgeProxyDeployOnL2TxHash;
 
     /// @dev A mapping chainId => keccak256(account, amount) => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
@@ -94,19 +105,15 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         public isWithdrawalFinalizedShared;
 
     /// @dev A mapping chainId => amount. Used before we activate hyperbridging.
-    mapping(uint256 => uint256) public chainBalance;
+    mapping(uint256 => uint256) internal chainBalance;
 
     /// @dev have we enabled hyperbridging for chain yet
-    mapping(uint256 => bool) public hyperbridgingEnabled;
+    mapping(uint256 => bool) internal hyperbridgingEnabled;
 
     /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
     /// @param to The address to which the funds were sent
     /// @param amount The amount of funds that were sent
     event EthWithdrawalFinalized(uint256 chainId, address indexed to, uint256 amount);
-
-    function l2Bridge() external view returns (address) {
-        return l2BridgeAddress[ERA_CHAIN_ID];
-    }
 
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
     modifier onlyBridgehub() {
@@ -137,7 +144,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// implementation and proxy upon initialization
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethStandardAddressEthIsBase Pre-calculated address of L2 WETH token
-    /// @param _owner Address which can change L2 WETH token implementation and upgrade the bridge
+    /// @param _owner Address which can change L2 token implementation and upgrade the bridge
+    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge
     function initialize(
         bytes[] calldata _factoryDeps,
         address _l2WethStandardAddressEthIsBase,
@@ -153,7 +161,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         require(_l2BridgeStandardAddressEthIsBase != address(0), "L2 bridge address cannot be zero");
         require(_l2BridgeStandardAddressEthIsNotBase != address(0), "L2 bridge not eth based address cannot be zero");
         require(_owner != address(0), "Governor address cannot be zero");
-        require(_factoryDeps.length == 2, "Invalid base factory deps length provided");
+        require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "Invalid base factory deps length provided");
 
         l2WethStandardAddressEthIsBase = _l2WethStandardAddressEthIsBase;
         l2WethStandardAddressEthIsNotBase = _l2WethStandardAddressEthIsNotBase;
@@ -179,8 +187,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         l2WethAddress[_chainId] = _l2WethAddress;
     }
 
-    /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
-    /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
+    /// @dev Starts the deployment of the  L2 WETH bridge counterpart as well as provides some factory deps for it for a specific chain
     /// @param _chainId of the chosen chain
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
     /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
@@ -199,7 +206,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bool ethIsBaseToken;
         {
             require(l2BridgeAddress[_chainId] == address(0), "L1WB: bridge already deployed");
-            require(_factoryDeps.length == 2, "L1WB: Invalid number of factory deps");
+            require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "L1WB: Invalid number of factory deps");
 
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             if (!ethIsBaseToken) {
@@ -207,6 +214,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             }
 
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WB: Invalid factory deps");
+            require(bridgeProxyDeployOnL2TxHash[_chainId] == 0x00, "L1WB b. proxy tx sent"); // clear the tx first by proving the txs succeeded or failed
         }
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -266,6 +274,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             );
         }
         bridgeProxyDeployOnL2TxHash[_chainId] = bridgeProxyTxHash;
+        l2BridgePotentialAddress[_chainId] = ethIsBaseToken ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase;
+        l2WethPotentialAddress[_chainId] = ethIsBaseToken ? l2WethStandardAddressEthIsBase : l2WethStandardAddressEthIsNotBase;
     }
 
     /// @dev We have to confirm that the deploy transactions succeeded.
@@ -275,20 +285,25 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
-        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1ERC20Bridge: bridge implementation tx not sent");
+        require(bridgeProxyDeployOnL2TxHash[_chainId] != 0x00, "L1ERC20Bridge: bridge implementation tx not sent");
 
-        require(
-            bridgehub.proveL1ToL2TransactionStatus(
-                _chainId,
-                bridgeImplDeployOnL2TxHash[_chainId],
-                _bridgeImplTxStatus.batchNumber,
-                _bridgeImplTxStatus.messageIndex,
-                _bridgeImplTxStatus.numberInBatch,
-                _bridgeImplTxStatus.merkleProof,
-                TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
-            ),
-            "L1WB: bridge implementation tx not confirmed"
-        );
+        if (!bridgeImplTxSucceeded[_chainId]){
+            require(
+                bridgehub.proveL1ToL2TransactionStatus(
+                    _chainId,
+                    bridgeImplDeployOnL2TxHash[_chainId],
+                    _bridgeImplTxStatus.batchNumber,
+                    _bridgeImplTxStatus.messageIndex,
+                    _bridgeImplTxStatus.numberInBatch,
+                    _bridgeImplTxStatus.merkleProof,
+                    TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
+                ),
+                "L1WB: bridge implementation tx not confirmed"
+            );
+                    if (_bridgeImplTxStatus.succeeded) {
+                bridgeImplTxSucceeded[_chainId] = true;
+            }
+        }
         require(
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
@@ -304,10 +319,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
 
-        bool ethIsBase = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-
-        l2BridgeAddress[_chainId] = ethIsBase ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase;
-        l2WethAddress[_chainId] = ethIsBase ? l2WethStandardAddressEthIsBase : l2WethStandardAddressEthIsNotBase;
+        if ((_bridgeProxyTxStatus.succeeded) && bridgeImplTxSucceeded[_chainId]) { 
+            l2BridgeAddress[_chainId] = l2BridgePotentialAddress[_chainId];
+            l2WethAddress[_chainId] = l2WethPotentialAddress[_chainId];
+            delete l2BridgePotentialAddress[_chainId];
+            delete l2WethPotentialAddress[_chainId];
+        }
     }
 
     /// @notice Initiates a WETH deposit by depositing WETH into the L1 bridge contract, unwrapping it to ETH
@@ -696,11 +713,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         } else {
             revert("Incorrect message function selector");
         }
-    }
-
-    /// @return l2Token Address of an L2 token counterpart.
-    function l2TokenAddress(address _l1Token) public view override returns (address l2Token) {
-        l2Token = _l1Token == l1WethAddress ? l2WethStandardAddressEthIsBase : address(0);
     }
 
     /// @dev The receive function is called when ETH is sent directly to the contract.

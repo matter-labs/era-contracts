@@ -12,7 +12,7 @@ import "../../common/interfaces/IL2ContractDeployer.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev A helper library for initializing L2 bridges in zkSync L2 network.
+/// @dev A helper library for initializing L2 bridges in zkSync hyperchain L2 network.
 library BridgeInitializationHelper {
     using SafeERC20 for IERC20;
 
@@ -26,7 +26,7 @@ library BridgeInitializationHelper {
 
     /// @notice Requests L2 transaction that will deploy a contract with a given bytecode hash and constructor data.
     /// NOTE: it is always used to deploy via create2 with ZERO salt
-    /// @param _bridgehub The address of the zkSync contract
+    /// @param _bridgehub The address of the bridgehub contract
     /// @param _deployTransactionFee The fee that will be paid for the L1 -> L2 transaction
     /// @param _bytecodeHash The hash of the bytecode of the contract to be deployed
     /// @param _constructorData The data to be passed to the contract constructor

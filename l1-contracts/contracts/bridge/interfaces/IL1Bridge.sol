@@ -115,8 +115,4 @@ interface IL1Bridge {
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 chainId, bytes32 txDataHash, bytes32 txHash) external;
-
-    function l2TokenAddress(address _l1Token) external view returns (address);
-
-    function l2Bridge() external view returns (address);
 }
