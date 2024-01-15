@@ -23,6 +23,12 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
+    ) external;
+
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
     function freezeDiamond() external;
