@@ -83,12 +83,9 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
-        if (isEthBaseToken) {
-            revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
-        } else {
-            _mint(_to, _amount);
-            emit BridgeMint(_to, _amount);
-        }
+        require(!isEthBaseToken, "bridgeMint is not implemented! Use deposit/depositTo methods instead.");
+        _mint(_to, _amount);
+        emit BridgeMint(_to, _amount);
     }
 
     /// @dev Burn tokens from a given account and send the same amount of Ether to the bridge.
