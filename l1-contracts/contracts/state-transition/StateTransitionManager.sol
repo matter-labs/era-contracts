@@ -185,7 +185,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
             facetCuts: emptyArray,
             initAddress: genesisUpgrade,
-            initCalldata: abi.encodeWithSelector(IDefaultUpgrade.upgrade.selector, proposedUpgrade)
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
         IAdmin(_chainContract).executeChainIdUpgrade(cutData, l2ProtocolUpgradeTx, protocolVersion);
