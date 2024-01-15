@@ -18,7 +18,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 
-    /// @notice zkSync contract initialization
+    /// @notice hyperchain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {

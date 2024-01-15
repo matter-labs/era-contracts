@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
-/// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
+/// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param _governor address who can manage critical updates in the contract
 /// @param _admin address who can manage non-critical updates in the contract

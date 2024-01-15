@@ -8,9 +8,9 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Intermediate smart contract between the validator EOA account and the zkSync smart contract.
+/// @notice Intermediate smart contract between the validator EOA account and the hyperchains state transition diamond smart contract.
 /// @dev The primary purpose of this contract is to provide a trustless means of delaying batch execution without
-/// modifying the main zkSync contract. As such, even if this contract is compromised, it will not impact the main
+/// modifying the main hyperchain diamond contract. As such, even if this contract is compromised, it will not impact the main
 /// contract.
 /// @dev zkSync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
@@ -29,7 +29,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @notice The validator address is changed.
     event NewValidator(address _oldValidator, address _newValidator);
 
-    /// @dev The main zkSync smart contract.
+    /// @dev The main hyperchain diamond smart contract.
     address public immutable stateTransition;
 
     /// @dev The mapping of L2 batch number => timestamp when it was committed.
@@ -73,7 +73,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
-    /// a call to the zkSync contract with the same calldata.
+    /// a call to the hyperchain diamond contract with the same calldata.
     function commitBatches(
         StoredBatchInfo calldata,
         CommitBatchInfo[] calldata _newBatchesData
@@ -90,14 +90,14 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _propagateToZkSyncStateTransition();
     }
 
-    /// @dev Make a call to the zkSync contract with the same calldata.
+    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator {
         _propagateToZkSyncStateTransition();
     }
 
-    /// @dev Make a call to the zkSync contract with the same calldata.
+    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatches(
@@ -109,7 +109,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the zkSync contract with the same calldata.
+    /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator {
         uint256 delay = executionDelay; // uint32
         unchecked {
@@ -127,14 +127,14 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _propagateToZkSyncStateTransition();
     }
 
-    /// @dev Call the zkSync contract with the same calldata as this contract was called.
-    /// Note: it is called the zkSync contract, not delegatecalled!
+    /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
+    /// Note: it is called the hyperchain diamond contract, not delegatecalled!
     function _propagateToZkSyncStateTransition() internal {
         address contractAddress = stateTransition;
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
-            // Call method of the zkSync contract returns 0 on error
+            // Call method of the hyperchain diamond contract returns 0 on error
             let result := call(gas(), contractAddress, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()
