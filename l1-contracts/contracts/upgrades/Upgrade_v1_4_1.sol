@@ -36,7 +36,7 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
                 batchOverheadL1Gas: $(PRIORITY_TX_BATCH_OVERHEAD_L1_GAS),
                 maxPubdataPerBatch: $(PRIORITY_TX_PUBDATA_PER_BATCH),
                 maxL2GasPerBatch: $(PRIORITY_TX_MAX_GAS_PER_BATCH),
-                priorityTxMaxPubdata: $(PRIORITY_TX_PUBDATA_PER_BATCH),
+                priorityTxMaxPubdata: $(PRIORITY_TX_MAX_PUBDATA),
                 minimalL2GasPrice: $(PRIORITY_TX_MINIMAL_GAS_PRICE)
             })
         );
