@@ -184,7 +184,6 @@ contract L1ERC20Bridge is
     /// @param _deployBridgeProxyFee How much of the sent value should be allocated to deploying the L2 bridge proxy
     function startErc20BridgeInitOnChain(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes[] calldata _factoryDeps,
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
@@ -197,13 +196,9 @@ contract L1ERC20Bridge is
         }
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
-            if (ethIsBaseToken) {
-                _mintValue = msg.value;
-            } else {
+            if (!ethIsBaseToken) {
                 require(msg.value == 0, "L1EB: msg.value > 0, base token");
             }
-            // The caller miscalculated deploy transactions fees
-            require(_mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: wrong fee");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
@@ -225,11 +220,10 @@ contract L1ERC20Bridge is
             {
                 address proxyAdmin = readProxyAdmin();
                 address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
-                address l2Governor = AddressAliasHelper.applyL1ToL2Alias(owner());
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(
                     IL2ERC20Bridge.initialize,
-                    (address(this), l2TokenProxyBytecodeHash, l2ProxyAdmin, l2Governor)
+                    (address(this), l2TokenProxyBytecodeHash, l2ProxyAdmin)
                 );
                 l2BridgeProxyConstructorData = abi.encode(
                     bridgeImplementationAddr,
@@ -467,9 +461,9 @@ contract L1ERC20Bridge is
         l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(request);
     }
 
-    /// used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
+    /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
     function bridgehubDepositBaseToken(
-        uint256 _chainId, // we will need this for Marcin's idea: tracking chain's balances until hyperbridging
+        uint256 _chainId,
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount

@@ -179,7 +179,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @dev During initialization deploys L2 WETH bridge counterpart as well as provides some factory deps for it
     /// @param _chainId of the chosen chain
-    /// @param _mintValue the asset to be minted on the destination chain. If base token is ether, this will be msg.value
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
     /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
     /// implementation and proxy upon initialization
@@ -190,7 +189,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// proxy
     function startWethBridgeInitOnChain(
         uint256 _chainId,
-        uint256 _mintValue,
         bytes[] calldata _factoryDeps,
         uint256 _deployBridgeImplementationFee,
         uint256 _deployBridgeProxyFee
@@ -201,16 +199,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
 
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            if (ethIsBaseToken) {
-                require(_mintValue == msg.value, "L1WethBridge: msg.value not equal to mint value");
-            } else {
+            if (!ethIsBaseToken) {
                 require(msg.value == 0, "L1WethBridge: msg.value not 0 for non eth base token");
             }
-
-            require(
-                _mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee,
-                "Miscalculated deploy transactions fees"
-            );
 
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WethBridge: Invalid factory deps");
         }
@@ -236,11 +227,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         {
             address proxyAdmin = readProxyAdmin();
             address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
-            address l2Governor = AddressAliasHelper.applyL1ToL2Alias(owner());
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, l2ProxyAdmin, l2Governor, ethIsBaseToken)
+                (address(this), l1WethAddress, l2ProxyAdmin, ethIsBaseToken)
             );
             l2WethBridgeProxyConstructorData = abi.encode(
                 wethBridgeImplementationAddr,
