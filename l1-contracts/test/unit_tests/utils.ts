@@ -25,7 +25,7 @@ export enum SYSTEM_LOG_KEYS {
   NUMBER_OF_LAYER_1_TXS_KEY,
   BLOB_ONE_HASH_KEY,
   BLOB_TWO_HASH_KEY,
-  EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
+  EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
 // The default price for the pubdata in L2 gas to be used in L1->L2 transactions
