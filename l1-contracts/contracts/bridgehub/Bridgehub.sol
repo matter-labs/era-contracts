@@ -90,24 +90,24 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         bytes calldata _initData
     ) external onlyOwner returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
-        if (_chainId == 0) {
-            chainId = uint48(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            "CHAIN_ID",
-                            block.chainid,
-                            address(this),
-                            _stateTransitionManager,
-                            msg.sender,
-                            _salt
-                        )
-                    )
-                )
-            );
-        } else {
-            chainId = uint48(_chainId);
-        }
+        // if (_chainId == 0) {
+        //     chainId = uint48(
+        //         uint256(
+        //             keccak256(
+        //                 abi.encodePacked(
+        //                     "CHAIN_ID",
+        //                     block.chainid,
+        //                     address(this),
+        //                     _stateTransitionManager,
+        //                     msg.sender,
+        //                     _salt
+        //                 )
+        //             )
+        //         )
+        //     );
+        // } else { }
+        require(_chainId != 0, "Bridgehub: chainId cannot be 0");
+        chainId = uint48(_chainId);
 
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
