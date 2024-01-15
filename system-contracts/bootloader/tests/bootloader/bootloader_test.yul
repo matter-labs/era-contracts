@@ -48,7 +48,7 @@ function TEST_simple_transaction() {
     // We'll test the transaction from 0.json
     let txDataOffset := testing_txDataOffset(0)
     let innerTxDataOffset := add(txDataOffset, 0x20)
-    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xc350, "Invalid pubdata limit")
+    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0x5F5E100, "Invalid pubdata limit")
 }
 
 function TEST_getTransactionUpfrontOverhead() {
