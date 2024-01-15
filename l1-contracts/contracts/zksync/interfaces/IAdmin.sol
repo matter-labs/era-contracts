@@ -39,6 +39,10 @@ interface IAdmin is IBase {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the fee params for L1->L2 transactions
+    /// @param _newFeeParams The new fee params
+    function changeFeeParams(FeeParams calldata _newFeeParams) external;
+
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
