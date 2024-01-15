@@ -5,8 +5,6 @@ pragma solidity 0.8.20;
 import "../ZkSyncStateTransitionStorage.sol";
 import "../../../common/ReentrancyGuard.sol";
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

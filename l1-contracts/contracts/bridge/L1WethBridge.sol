@@ -409,10 +409,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             );
         }
         emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
-        if (_chainId == ERA_CHAIN_ID) {
-            // kl todo. Should we emit this event here?
-            emit DepositInitiated(0, msg.sender, _l2Receiver, _l1Token, _amount);
-        }
     }
 
     function _depositSendTx(
@@ -474,6 +470,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         }
 
         uint256 amount = _amount + msg.value;
+        bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
         {
             // Request the finalization of the deposit on the L2 side
             bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, amount);
@@ -484,7 +481,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             if (!hyperbridgingEnabled[_chainId]) {
                 chainBalance[_chainId] += amount;
             }
-            bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
             request = L2TransactionRequestTwoBridgesInner({
                 l2Contract: l2BridgeAddress[_chainId],
                 l2Calldata: l2TxCalldata,
@@ -494,10 +490,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         }
 
         emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
-        if (_chainId == ERA_CHAIN_ID) {
-            // kl todo. does the weth bridge need to be compatible with events of the erc20 bridge?
-            emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
-        }
     }
 
     function bridgehubConfirmL2Transaction(
@@ -616,10 +608,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             IERC20(l1WethAddress).safeTransfer(l1WithdrawReceiver, amount);
 
             emit WithdrawalFinalizedSharedBridge(_chainId, l1WithdrawReceiver, l1WethAddress, amount);
-            if (_chainId == ERA_CHAIN_ID) {
-                // kl todo. Do we need backward compatibility with erc20 bridge events?
-                emit WithdrawalFinalized(l1WithdrawReceiver, l1WethAddress, amount);
-            }
         } else {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)

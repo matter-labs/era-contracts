@@ -27,8 +27,6 @@ interface IStateTransitionManager {
 
     function bridgehub() external view returns (address);
 
-    function totalChains() external view returns (uint256);
-
     function stateTransition(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
