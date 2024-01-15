@@ -716,7 +716,7 @@ contract L1ERC20Bridge is
                 {
                     deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
                 }
-                require(deposited, "L1EB w deposit"); // wrong/invalid deposit
+                require(deposited, "L1EB: deposit did not happen");
             }
         } else {
             bool deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];

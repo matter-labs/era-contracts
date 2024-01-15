@@ -135,4 +135,4 @@ jobs:
         run: cargo run
 
       - name: Compare
-        run: diff tools/data/Verifier.sol l1-contracts/contracts/zksync/Verifier.sol
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol
