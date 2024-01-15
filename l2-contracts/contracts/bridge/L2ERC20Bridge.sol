@@ -120,6 +120,8 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         address _l1Token,
         uint256 _amount
     ) internal pure returns (bytes memory) {
+        // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+        // and we use this interface so that when the switch happened the old messages could be processed
         return abi.encodePacked(IL1BridgeDeprecated.finalizeWithdrawal.selector, _to, _l1Token, _amount);
     }
 

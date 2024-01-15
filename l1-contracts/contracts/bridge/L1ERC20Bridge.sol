@@ -470,10 +470,15 @@ contract L1ERC20Bridge is
     ) public payable onlyBridgehub {
         require(msg.value == 0, "L1EB: msg.value > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
+        // #if !ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
         if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
+        // #else
+        uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
+        require(amount == _amount, "3T"); // The token has non-standard transfer logic
+        // #endif
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
@@ -765,6 +770,9 @@ contract L1ERC20Bridge is
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
         } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
+            // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+            // and we use this interface so that when the switch happened the old messages could be processed
+            
             // this message is a token withdrawal
 
             // Check that the message length is correct.

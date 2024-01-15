@@ -679,6 +679,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
             }
         } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
+            // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+            // and we use this interface so that when the switch happened the old messages could be processed
+
             // this message is a token withdrawal
 
             // Check that the message length is correct.
