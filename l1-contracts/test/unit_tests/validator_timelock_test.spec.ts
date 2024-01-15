@@ -28,7 +28,7 @@ describe("ValidatorTimelock tests", function () {
       bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
       eventsQueueStateHash: ethers.utils.randomBytes(32),
       systemLogs: [],
-      totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
+      pubdataCommitments: "0x00290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
   }
 
