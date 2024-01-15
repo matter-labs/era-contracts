@@ -132,7 +132,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
         if (_baseToken == ETH_TOKEN_ADDRESS) {
             require(address(wethBridge) == _baseTokenBridge, "Bridgehub: baseTokenBridge has to be weth bridge");
-            require(address(wethBridge) != address(0), "Bridgehub: weth bridge not set");
+            require(address(_baseTokenBridge) != address(0), "Bridgehub: weth bridge not set");
         }
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
