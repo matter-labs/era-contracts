@@ -274,8 +274,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             );
         }
         bridgeProxyDeployOnL2TxHash[_chainId] = bridgeProxyTxHash;
-        l2BridgePotentialAddress[_chainId] = ethIsBaseToken ? l2BridgeStandardAddressEthIsBase : l2BridgeStandardAddressEthIsNotBase;
-        l2WethPotentialAddress[_chainId] = ethIsBaseToken ? l2WethStandardAddressEthIsBase : l2WethStandardAddressEthIsNotBase;
+        l2BridgePotentialAddress[_chainId] = ethIsBaseToken
+            ? l2BridgeStandardAddressEthIsBase
+            : l2BridgeStandardAddressEthIsNotBase;
+        l2WethPotentialAddress[_chainId] = ethIsBaseToken
+            ? l2WethStandardAddressEthIsBase
+            : l2WethStandardAddressEthIsNotBase;
     }
 
     /// @dev We have to confirm that the deploy transactions succeeded.
@@ -287,7 +291,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
         require(bridgeProxyDeployOnL2TxHash[_chainId] != 0x00, "L1ERC20Bridge: bridge implementation tx not sent");
 
-        if (!bridgeImplTxSucceeded[_chainId]){
+        if (!bridgeImplTxSucceeded[_chainId]) {
             require(
                 bridgehub.proveL1ToL2TransactionStatus(
                     _chainId,
@@ -300,7 +304,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 ),
                 "L1WB: bridge implementation tx not confirmed"
             );
-                    if (_bridgeImplTxStatus.succeeded) {
+            if (_bridgeImplTxStatus.succeeded) {
                 bridgeImplTxSucceeded[_chainId] = true;
             }
         }
@@ -319,7 +323,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
 
-        if ((_bridgeProxyTxStatus.succeeded) && bridgeImplTxSucceeded[_chainId]) { 
+        if ((_bridgeProxyTxStatus.succeeded) && bridgeImplTxSucceeded[_chainId]) {
             l2BridgeAddress[_chainId] = l2BridgePotentialAddress[_chainId];
             l2WethAddress[_chainId] = l2WethPotentialAddress[_chainId];
             delete l2BridgePotentialAddress[_chainId];
