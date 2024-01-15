@@ -643,7 +643,7 @@ contract L1ERC20Bridge is
         if (_chainId == ERA_CHAIN_ID) {
             delete depositAmount[_depositSender][_l1Token][_l2TxHash];
         } else {
-            delete deposited[_chainId][keccak256(abi.encode(msg.sender, _l1Token, _amount))][_l2TxHash];
+            delete deposited[_chainId][txDataHash][_l2TxHash];
         }
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
