@@ -216,7 +216,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         diamondCut.initCalldata = initData;
         // deploy stateTransitionContract
-        DiamondProxy stateTransitionContract = new DiamondProxy(block.chainid, diamondCut);
+        DiamondProxy stateTransitionContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
 
         // save data
         address stateTransitionAddress = address(stateTransitionContract);

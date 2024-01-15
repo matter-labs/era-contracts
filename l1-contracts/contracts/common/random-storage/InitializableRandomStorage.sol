@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v4.6.0) (proxy/utils/Initializable.sol)
+// OpenZeppelin Contracts (last updated v4.9.0) (proxy/utils/Initializable.sol)
 
 pragma solidity ^0.8.2;
 
-// import "./AddressUpgradeable.sol";
-
-/// this contract is a copy of the openzeppelin Initializable.sol contract, with storage at random locations
+import "./Address.sol";
 
 /**
  * @dev This is a base contract to aid in writing upgradeable contracts, or any kind of contract that will be deployed
@@ -20,12 +18,13 @@ pragma solidity ^0.8.2;
  * For example:
  *
  * [.hljs-theme-light.nopadding]
- * ```
+ * ```solidity
  * contract MyToken is ERC20Upgradeable {
  *     function initialize() initializer public {
  *         __ERC20_init("MyToken", "MTK");
  *     }
  * }
+ *
  * contract MyTokenV2 is MyToken, ERC20PermitUpgradeable {
  *     function initializeV2() reinitializer(2) public {
  *         __ERC20Permit_init("MyToken");
@@ -57,25 +56,24 @@ pragma solidity ^0.8.2;
  * ====
  */
 abstract contract InitializableRandomStorage {
-    /// @dev Indicates that the contract has been initialized.
-    /// @custom:oz-retyped-from bool
+    /**
+     * @dev Indicates that the contract has been initialized.
+     * @custom:oz-retyped-from bool
+     */
     /// @dev Address of initialized variable.
     /// @dev Flag is placed at random memory location to not interfere with Storage contract.
     // uint256(keccak256("initialized")) - 1;
     uint256 private constant INITIALIZED_ADDRESS = 0x93c0ba99f1a18bcdc81fcbcb6b4f15a9a6725f937075aed6fac107ffcb147067;
 
-    /// @dev Indicates that the contract is in the process of being initialized.
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
     /// @dev Address of initializing variable.
     /// @dev Flag is placed at random memory location to not interfere with Storage contract.
     // keccak256("initializing") - 1;
     uint256 private constant INITIALIZING_ADDRESS = 0x44081f60251556fce53bec73512243b02d9c4913e167664cfe1375f1bd65eacf;
 
-    /**
-     * @dev Triggered when the contract has been initialized or reinitialized.
-     */
-    event Initialized(uint8 version);
-
-    function _getInitializedVersion() internal view returns (uint8 _initialized) {
+    function _getInitializedVersionInner() internal view returns (uint8 _initialized) {
         assembly {
             _initialized := sload(INITIALIZED_ADDRESS)
         }
@@ -102,11 +100,27 @@ abstract contract InitializableRandomStorage {
     }
 
     /**
+     * @dev Triggered when the contract has been initialized or reinitialized.
+     */
+    event Initialized(uint8 version);
+
+    /**
      * @dev A modifier that defines a protected initializer function that can be invoked at most once. In its scope,
-     * `onlyInitializing` functions can be used to initialize parent contracts. Equivalent to `reinitializer(1)`.
+     * `onlyInitializing` functions can be used to initialize parent contracts.
+     *
+     * Similar to `reinitializer(1)`, except that functions marked with `initializer` can be nested in the context of a
+     * constructor.
+     *
+     * Emits an {Initialized} event.
      */
     modifier initializer() {
-        bool isTopLevelCall = _setInitializedVersion(1);
+        bool isTopLevelCall = !_getInitializing();
+        require(
+            (isTopLevelCall && _getInitializedVersionInner() < 1) ||
+                (!Address.isContract(address(this)) && _getInitializedVersionInner() == 1),
+            "Initializable: contract is already initialized"
+        );
+        _setInitializedVersionInner(1);
         if (isTopLevelCall) {
             _setInitializing(true);
         }
@@ -122,23 +136,29 @@ abstract contract InitializableRandomStorage {
      * contract hasn't been initialized to a greater version before. In its scope, `onlyInitializing` functions can be
      * used to initialize parent contracts.
      *
-     * `initializer` is equivalent to `reinitializer(1)`, so a reinitializer may be used after the original
-     * initialization step. This is essential to configure modules that are added through upgrades and that require
-     * initialization.
+     * A reinitializer may be used after the original initialization step. This is essential to configure modules that
+     * are added through upgrades and that require initialization.
+     *
+     * When `version` is 1, this modifier is similar to `initializer`, except that functions marked with `reinitializer`
+     * cannot be nested. If one is invoked in the context of another, execution will revert.
      *
      * Note that versions can jump in increments greater than 1; this implies that if multiple reinitializers coexist in
      * a contract, executing them in the right order is up to the developer or operator.
+     *
+     * WARNING: setting the version to 255 will prevent any future reinitialization.
+     *
+     * Emits an {Initialized} event.
      */
     modifier reinitializer(uint8 version) {
-        bool isTopLevelCall = _setInitializedVersion(version);
-        if (isTopLevelCall) {
-            _setInitializing(true);
-        }
+        require(
+            !_getInitializing() && _getInitializedVersionInner() < version,
+            "Initializable: contract is already initialized"
+        );
+        _setInitializedVersionInner(version);
+        _setInitializing(true);
         _;
-        if (isTopLevelCall) {
-            _setInitializing(false);
-            emit Initialized(version);
-        }
+        _setInitializing(false);
+        emit Initialized(version);
     }
 
     /**
@@ -155,27 +175,28 @@ abstract contract InitializableRandomStorage {
      * Calling this in the constructor of a contract will prevent that contract from being initialized or reinitialized
      * to any version. It is recommended to use this to lock implementation contracts that are designed to be called
      * through proxies.
+     *
+     * Emits an {Initialized} event the first time it is successfully executed.
      */
     function _disableInitializers() internal virtual {
-        _setInitializedVersion(type(uint8).max);
+        require(!_getInitializing(), "Initializable: contract is initializing");
+        if (_getInitializedVersionInner() != type(uint8).max) {
+            _setInitializedVersionInner(type(uint8).max);
+            emit Initialized(type(uint8).max);
+        }
     }
 
-    function _setInitializedVersion(uint8 version) private returns (bool) {
-        // If the contract is initializing we ignore whether _initialized is set in order to support multiple
-        // inheritance patterns, but we only do this in the context of a constructor, and for the lowest level
-        // of initializers, because in other contexts the contract may have been reentered.
-        // Matter Labs Note: we don't allow this, to avoid importing AddressUpgradeable.sol
-        if (_getInitializing()) {
-            // require(
-            //     version == 1 && !AddressUpgradeable.isContract(address(this)),
-            //     "Initializable: contract is already initialized"
-            // );
-            // return false;
-            revert();
-        } else {
-            require(_getInitializedVersion() < version, "Initializable: contract is already initialized");
-            _setInitializedVersionInner(version);
-            return true;
-        }
+    /**
+     * @dev Returns the highest version that has been initialized. See {reinitializer}.
+     */
+    function _getInitializedVersion() internal view returns (uint8) {
+        return _getInitializedVersionInner();
+    }
+
+    /**
+     * @dev Returns `true` if the contract is currently initializing. See {onlyInitializing}.
+     */
+    function _isInitializing() internal view returns (bool) {
+        return _getInitializing();
     }
 }
