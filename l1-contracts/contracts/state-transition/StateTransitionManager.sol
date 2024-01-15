@@ -212,7 +212,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
-            bytes32(uint256(uint160(address(bridgehub)))),
+            bytes32(uint256(uint160(bridgehub))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_governor))),
