@@ -134,6 +134,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             "StateTransition: protocolVersion mismatch in STC when upgrading"
         );
         stateTransitionContract.executeUpgrade(_cutData);
+        require(
+            stateTransitionContract.getProtocolVersion() > _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC after upgrading"
+        );
     }
 
     /// registration
@@ -188,7 +192,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
-        IAdmin(_chainContract).executeChainIdUpgrade(cutData, l2ProtocolUpgradeTx, protocolVersion);
+        IAdmin(_chainContract).executeUpgrade(cutData);
+        emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
     /// @notice called by Bridgehub when a chain registers

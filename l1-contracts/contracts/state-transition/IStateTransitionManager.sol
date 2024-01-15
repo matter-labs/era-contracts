@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Diamond} from "./libraries/Diamond.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @notice Struct that holds all data needed for initializing zkSync Diamond Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -24,6 +25,8 @@ struct StateTransitionManagerInitializeData {
 interface IStateTransitionManager {
     // when a new Chain is added
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
+    
+    event SetChainIdUpgrade(address _stateTransitionChain, L2CanonicalTransaction _l2Transaction, uint256 _protocolVersion);
 
     function bridgehub() external view returns (address);
 

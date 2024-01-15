@@ -100,21 +100,6 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit ExecuteUpgrade(_diamondCut);
     }
 
-    /// @notice Executes a proposed governor upgrade
-    /// @dev Only the state transition mananger can execute the upgrade
-    /// @param _diamondCut The diamond cut parameters to be executed
-    /// @notice we have this function so the event can be emitted, 
-    /// @notice as the genesis upgrade is not a normal upgrade, so the server handles it differently  
-    /// @notice based on this event
-    function executeChainIdUpgrade(
-        Diamond.DiamondCutData calldata _diamondCut,
-        L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
-        uint256 _protocolVersion
-    ) external onlyStateTransitionManager {
-        Diamond.diamondCut(_diamondCut);
-        emit SetChainIdUpgrade(_l2ProtocolUpgradeTx, block.timestamp, _protocolVersion);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/

@@ -35,6 +35,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         _;
     }
 
+    constructor() reentrancyGuardInitializer {}
+
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }

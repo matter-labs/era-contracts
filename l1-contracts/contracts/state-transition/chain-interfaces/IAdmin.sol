@@ -25,12 +25,6 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
-    function executeChainIdUpgrade(
-        Diamond.DiamondCutData calldata _diamondCut,
-        L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
-        uint256 _protocolVersion
-    ) external;
-
     function freezeDiamond() external;
 
     function unfreezeDiamond() external;
@@ -60,8 +54,6 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
-
-    event SetChainIdUpgrade(L2CanonicalTransaction l2Transaction, uint256 timestamp, uint256 protocolVersion);
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();
