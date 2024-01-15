@@ -48,12 +48,12 @@ contract L1ERC20Bridge is
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
     /// @dev this is just used for ERA for backwards compatibility reasons
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => bool)) internal isWithdrawalFinalizedEra;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev this is just used for ERA for backwards compatibility reasons
-    mapping(address => mapping(address => mapping(bytes32 => uint256))) internal depositAmount;
+    mapping(address => mapping(address => mapping(bytes32 => uint256))) internal depositAmountEra;
 
     /// @dev The standard address of deployed L2 bridge counterpart
     address public l2BridgeStandardAddress;
@@ -107,6 +107,14 @@ contract L1ERC20Bridge is
 
     function l2TokenBeacon() external view returns (address) {
         return ERA_TOKEN_BEACON_ADDRESS;
+    }
+
+    function isWithdrawalFinalized(uint256 _chainId, uint256 _l2BatchNumber, uint256 _l2MessageIndex)
+        external
+        view
+        returns (bool)
+    {
+        return isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex];
     }
 
     /// @notice Checks that the message sender is the governor
@@ -257,14 +265,8 @@ contract L1ERC20Bridge is
     /// @dev We have to confirm that the deploy transactions succeeded.
     function finishInitializeChain(
         uint256 _chainId,
-        uint256 _bridgeImplTxL2BatchNumber,
-        uint256 _bridgeImplTxL2MessageIndex,
-        uint16 _bridgeImplTxL2TxNumberInBatch,
-        bytes32[] calldata _bridgeImplTxMerkleProof,
-        uint256 _bridgeProxyTxL2BatchNumber,
-        uint256 _bridgeProxyTxL2MessageIndex,
-        uint16 _bridgeProxyTxL2TxNumberInBatch,
-        bytes32[] calldata _bridgeProxyTxMerkleProof
+        ConfirmL2TxStatus calldata _bridgeImplTxStatus, 
+        ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed 2");
         require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: b. impl tx not sent");
@@ -273,11 +275,11 @@ contract L1ERC20Bridge is
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
                 bridgeImplDeployOnL2TxHash[_chainId],
-                _bridgeImplTxL2BatchNumber,
-                _bridgeImplTxL2MessageIndex,
-                _bridgeImplTxL2TxNumberInBatch,
-                _bridgeImplTxMerkleProof,
-                TxStatus(1)
+                _bridgeImplTxStatus.batchNumber,
+                _bridgeImplTxStatus.messageIndex,
+                _bridgeImplTxStatus.numberInBatch,
+                _bridgeImplTxStatus.merkleProof,
+                TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
             ),
             "L1EB: bridge impl tx not conf" // not confirmed
         );
@@ -285,18 +287,20 @@ contract L1ERC20Bridge is
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
                 bridgeProxyDeployOnL2TxHash[_chainId],
-                _bridgeProxyTxL2BatchNumber,
-                _bridgeProxyTxL2MessageIndex,
-                _bridgeProxyTxL2TxNumberInBatch,
-                _bridgeProxyTxMerkleProof,
-                TxStatus(1)
+                _bridgeProxyTxStatus.batchNumber,
+                _bridgeProxyTxStatus.messageIndex,
+                _bridgeProxyTxStatus.numberInBatch,
+                _bridgeProxyTxStatus.merkleProof,
+                TxStatus(uint8(_bridgeProxyTxStatus.succeeded ? 1 : 0))
             ),
             "L1EB: bridge proxy tx not conf" // not confirmed
         );
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
-        l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
-        l2TokenBeaconAddress[_chainId] = l2TokenBeaconStandardAddress;
+        if (_bridgeProxyTxStatus.succeeded) {
+            l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
+            l2TokenBeaconAddress[_chainId] = l2TokenBeaconStandardAddress;
+        }
     }
 
     /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
@@ -539,7 +543,7 @@ contract L1ERC20Bridge is
     ) external override onlyBridgehub {
         require(!deposited[_chainId][_txDataHash][_txHash], "L1EB: tx already happened");
         deposited[_chainId][_txDataHash][_txHash] = true;
-        emit BridgehubDepositFinalized(_chainId, _txHash, _txDataHash);
+        emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
@@ -586,7 +590,7 @@ contract L1ERC20Bridge is
             ERA_CHAIN_ID,
             _depositSender,
             _l1Token,
-            depositAmount[_depositSender][_l1Token][_l2TxHash],
+            depositAmountEra[_depositSender][_l1Token][_l2TxHash],
             _l2TxHash,
             _l2BatchNumber,
             _l2MessageIndex,
@@ -631,7 +635,7 @@ contract L1ERC20Bridge is
 
         if (_chainId == ERA_CHAIN_ID) {
             uint256 amount = 0;
-            amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
+            amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];
             require(_amount == amount, "L1EB: amount mismatch");
         } else {
             bool depositHappened = deposited[_chainId][txDataHash][_l2TxHash];
@@ -640,7 +644,7 @@ contract L1ERC20Bridge is
         require(_amount > 0, "y1");
 
         if (_chainId == ERA_CHAIN_ID) {
-            delete depositAmount[_depositSender][_l1Token][_l2TxHash];
+            delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
         } else {
             delete deposited[_chainId][txDataHash][_l2TxHash];
         }
@@ -673,7 +677,7 @@ contract L1ERC20Bridge is
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         if (_chainId == ERA_CHAIN_ID) {
-            require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
+            require(!isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex], "pw");
         } else {
             require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         }
@@ -696,7 +700,7 @@ contract L1ERC20Bridge is
         {
             // Preventing the stack too deep error
             if (_chainId == ERA_CHAIN_ID) {
-                isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = true;
+                isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex] = true;
             } else {
                 isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
             }

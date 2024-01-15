@@ -4,6 +4,14 @@ pragma solidity 0.8.20;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 
+struct ConfirmL2TxStatus {
+    uint256 batchNumber;
+    uint256 messageIndex;
+    uint16 numberInBatch;
+    bytes32[] merkleProof;
+    bool succeeded;
+}
+
 /// @author Matter Labs
 interface IL1Bridge {
     event DepositInitiatedSharedBridge(

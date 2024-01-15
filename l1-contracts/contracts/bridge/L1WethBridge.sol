@@ -195,15 +195,15 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     ) external payable {
         bool ethIsBaseToken;
         {
-            require(l2BridgeAddress[_chainId] == address(0), "L1WETHBridge: bridge already deployed");
-            require(_factoryDeps.length == 2, "L1WethBridge: Invalid number of factory deps");
+            require(l2BridgeAddress[_chainId] == address(0), "L1WB: bridge already deployed");
+            require(_factoryDeps.length == 2, "L1WB: Invalid number of factory deps");
 
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             if (!ethIsBaseToken) {
-                require(msg.value == 0, "L1WethBridge: msg.value not 0 for non eth base token");
+                require(msg.value == 0, "L1WB: msg.value not 0 for non eth base token");
             }
 
-            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WethBridge: Invalid factory deps");
+            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WB: Invalid factory deps");
         }
 
         bytes32 l2WethBridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
@@ -268,14 +268,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev We have to confirm that the deploy transactions succeeded.
     function finishInitializeChain(
         uint256 _chainId,
-        uint256 _bridgeImplTxL2BatchNumber,
-        uint256 _bridgeImplTxL2MessageIndex,
-        uint16 _bridgeImplTxL2TxNumberInBatch,
-        bytes32[] calldata _bridgeImplTxMerkleProof,
-        uint256 _bridgeProxyTxL2BatchNumber,
-        uint256 _bridgeProxyTxL2MessageIndex,
-        uint16 _bridgeProxyTxL2TxNumberInBatch,
-        bytes32[] calldata _bridgeProxyTxMerkleProof
+        ConfirmL2TxStatus calldata _bridgeImplTxStatus, 
+        ConfirmL2TxStatus calldata _bridgeProxyTxStatus
     ) external {
         require(l2BridgeAddress[_chainId] == address(0), "L1ERC20Bridge: bridge already deployed");
         require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1ERC20Bridge: bridge implementation tx not sent");
@@ -284,25 +278,25 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
                 bridgeImplDeployOnL2TxHash[_chainId],
-                _bridgeImplTxL2BatchNumber,
-                _bridgeImplTxL2MessageIndex,
-                _bridgeImplTxL2TxNumberInBatch,
-                _bridgeImplTxMerkleProof,
-                TxStatus(1)
+                _bridgeImplTxStatus.batchNumber,
+                _bridgeImplTxStatus.messageIndex,
+                _bridgeImplTxStatus.numberInBatch,
+                _bridgeImplTxStatus.merkleProof,
+                TxStatus(uint8(_bridgeImplTxStatus.succeeded ? 1 : 0))
             ),
-            "L1ERC20Bridge: bridge implementation tx not confirmed"
+            "L1WB: bridge implementation tx not confirmed"
         );
         require(
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
                 bridgeProxyDeployOnL2TxHash[_chainId],
-                _bridgeProxyTxL2BatchNumber,
-                _bridgeProxyTxL2MessageIndex,
-                _bridgeProxyTxL2TxNumberInBatch,
-                _bridgeProxyTxMerkleProof,
-                TxStatus(1)
+                _bridgeProxyTxStatus.batchNumber,
+                _bridgeProxyTxStatus.messageIndex,
+                _bridgeProxyTxStatus.numberInBatch,
+                _bridgeProxyTxStatus.merkleProof,
+                TxStatus(uint8(_bridgeProxyTxStatus.succeeded ? 1 : 0))
             ),
-            "L1ERC20Bridge: bridge proxy tx not confirmed"
+            "L1WB: bridge proxy tx not confirmed"
         );
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
@@ -442,7 +436,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
-        require(l2BridgeAddress[_chainId] != address(0), "L1WethBridge: bridge not deployed");
+        require(l2BridgeAddress[_chainId] != address(0), "L1WB: bridge not deployed");
+        bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
+        require(!ethIsBaseToken, "L1WB: bridgehub deposit not allowed when eth is base token");
+        require((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS), "L1WB: Invalid L1 token address");
 
         if (_amount > 0) {
             // Deposit WETH tokens from the depositor address to the smart contract address
@@ -485,6 +482,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     ) external override onlyBridgehub {
         require(!deposited[_chainId][_txDataHash][_txHash], "L1WETHBridge: tx already happened");
         deposited[_chainId][_txDataHash][_txHash] = true;
+        emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 WETH bridge contract
@@ -523,12 +521,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             _merkleProof,
             TxStatus.Failure
         );
-        require(proofValid, "L1WethBridge: Invalid L2 transaction status proof");
+        require(proofValid, "L1WB: Invalid L2 transaction status proof");
 
         bool depositHappened = deposited[_chainId][keccak256(abi.encode(_depositSender, _amount))][_l2TxHash];
-        require(((_amount > 0) && (depositHappened)), "L1WethBridge: _amount is zero or deposit did not happen");
+        require(((_amount > 0) && (depositHappened)), "L1WB: _amount is zero or deposit did not happen");
         if (!hyperbridgingEnabled[_chainId]) {
-            require(chainBalance[_chainId] >= _amount, "L1WethBridge: chainBalance is too low");
+            require(chainBalance[_chainId] >= _amount, "L1WB: chainBalance is too low");
             chainBalance[_chainId] -= _amount;
         }
         delete deposited[_chainId][keccak256(abi.encode(_depositSender, _amount))][_l2TxHash];
@@ -582,7 +580,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             _merkleProof
         );
         if (!hyperbridgingEnabled[_chainId]) {
-            require(chainBalance[_chainId] >= amount, "L1WethBridge: chainBalance is too low");
+            require(chainBalance[_chainId] >= amount, "L1WB: chainBalance is too low");
             chainBalance[_chainId] -= amount;
         }
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
@@ -600,7 +598,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             assembly {
                 callSuccess := call(gas(), l1WithdrawReceiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "L1WethBridge: withdraw failed");
+            require(callSuccess, "L1WB: withdraw failed");
             emit EthWithdrawalFinalized(_chainId, l1WithdrawReceiver, amount);
         }
     }

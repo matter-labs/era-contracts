@@ -119,8 +119,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
     }
 
-    
-
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
