@@ -28,8 +28,6 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
     bytes32 internal l2TokenProxyBytecodeHash;
 
-    address public governor;
-
     /// @dev A mapping l2 token address => l1 token address
     mapping(address => address) public override l1TokenAddress;
 
@@ -42,15 +40,13 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     function initialize(
         address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _proxyAdmin,
-        address _governor
+        address _proxyAdmin
     ) external initializer {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
-        require(_governor != address(0), "sf");
+        require(_proxyAdmin != address(0), "sf");
 
         l1Bridge = _l1Bridge;
-        governor = _governor;
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());

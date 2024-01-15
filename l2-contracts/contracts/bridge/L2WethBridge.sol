@@ -34,9 +34,6 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @dev WETH token address on L2.
     address public l2WethAddress;
 
-    /// @dev governor address (on L1 and aliased)
-    address public governor;
-
     /// @dev isEthBaseToken
     bool public isEthBaseToken;
 
@@ -49,13 +46,11 @@ contract L2WethBridge is IL2Bridge, Initializable {
     /// @notice Initializes the contract with parameters needed for its functionality.
     /// @param _l1Bridge The address of the L1 Bridge contract.
     /// @param _l1WethAddress The address of the L1 WETH token.
-    /// @param _governor The address of the L1 governor aliased.
     /// @dev The function can only be called once during contract deployment due to the 'initializer' modifier.
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,
         address _proxyAdmin,
-        address _governor,
         bool _isEthBaseToken
     ) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
@@ -72,7 +67,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
             _proxyAdmin,
             initData
         );
-        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _governor, _isEthBaseToken);
+        L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _isEthBaseToken);
         l2WethAddress = address(l2Weth);
     }
 

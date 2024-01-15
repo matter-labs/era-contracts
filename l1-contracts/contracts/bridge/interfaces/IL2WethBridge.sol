@@ -7,7 +7,6 @@ interface IL2WethBridge {
         address _l1Bridge,
         address _l1WethAddress,
         address _proxyAdmin,
-        address _governor,
         bool _ethIsBaseToken
     ) external;
 }

@@ -7,7 +7,6 @@ interface IL2ERC20Bridge {
     function initialize(
         address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _proxyAdmin,
-        address _governor
+        address _proxyAdmin
     ) external;
 }

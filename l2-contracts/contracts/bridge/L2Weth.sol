@@ -25,9 +25,6 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     /// @dev Address of the L1 WETH token. It can be deposited to mint this L2 token.
     address public override l1Address;
 
-    /// @dev address of governor (on L1 aliased)
-    address public override governor;
-
     /// @dev whether the base token is eth. if yes then weth cannot be unwrapped
     bool public isEthBaseToken;
 
@@ -58,14 +55,12 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     function initializeV2(
         address _l2Bridge,
         address _l1Address,
-        address _governor,
         bool _isEthBaseToken
     ) external reinitializer(2) {
         require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
         require(_l1Address != address(0), "L1 WETH token address cannot be zero");
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
-        governor = _governor;
         isEthBaseToken = _isEthBaseToken;
     }
 
