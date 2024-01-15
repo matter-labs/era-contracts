@@ -81,7 +81,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
-    function setChainId(uint256 _newChainId) external onlyCallFromBootloader {
+    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
         chainId = _newChainId;
     }
 
