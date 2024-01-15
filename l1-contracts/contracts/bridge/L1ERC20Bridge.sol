@@ -8,7 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
 import {IL1BridgeLegacy} from "./interfaces/IL1BridgeLegacy.sol";
-import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
+import {IL1Bridge, ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2ERC20Bridge} from "./interfaces/IL2ERC20Bridge.sol";
 import {ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
@@ -48,7 +48,7 @@ contract L1ERC20Bridge is
     /// @dev Used to indicate that L2 -> L1 message was already processed
     /// @dev this is just used for ERA for backwards compatibility reasons
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
-        public isWithdrawalFinalizedEra;
+        internal isWithdrawalFinalizedEra;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
@@ -94,7 +94,7 @@ contract L1ERC20Bridge is
 
     /// @dev A mapping chainId => keccak256(account, tokenAddress, amount) => L2 deposit transaction hash => true
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) internal deposited;
+    mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) internal depositHappened;
 
     /// @dev used for extra security until hyperbridging is implemented.
     mapping(uint256 => mapping(address => uint256)) public chainBalance;
@@ -227,16 +227,16 @@ contract L1ERC20Bridge is
             // Prepare the proxy constructor data
             bytes memory l2BridgeProxyConstructorData;
             {
-                address proxyAdmin = readProxyAdmin();
-                address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
+                address owner = owner();
+                address l2Owner = AddressAliasHelper.applyL1ToL2Alias(owner);
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(
                     IL2ERC20Bridge.initialize,
-                    (address(this), l2TokenProxyBytecodeHash, l2ProxyAdmin)
+                    (address(this), l2TokenProxyBytecodeHash, owner)
                 );
                 l2BridgeProxyConstructorData = abi.encode(
                     bridgeImplementationAddr,
-                    l2ProxyAdmin,
+                    owner,
                     proxyInitializationParams
                 );
             }
@@ -284,6 +284,8 @@ contract L1ERC20Bridge is
             ),
             "L1EB: bridge impl tx not conf" // not confirmed
         );
+        delete bridgeImplDeployOnL2TxHash[_chainId];
+
         require(
             bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
@@ -296,7 +298,6 @@ contract L1ERC20Bridge is
             ),
             "L1EB: bridge proxy tx not conf" // not confirmed
         );
-        delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
         if (_bridgeProxyTxStatus.succeeded) {
             l2BridgeAddress[_chainId] = l2BridgeStandardAddress;
@@ -436,7 +437,7 @@ contract L1ERC20Bridge is
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
-        deposited[_chainId][txDataHash][l2TxHash] = true;
+        depositHappened[_chainId][txDataHash][l2TxHash] = true;
 
         emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
         if (_chainId == ERA_CHAIN_ID) {
@@ -554,8 +555,8 @@ contract L1ERC20Bridge is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(!deposited[_chainId][_txDataHash][_txHash], "L1EB: tx already happened");
-        deposited[_chainId][_txDataHash][_txHash] = true;
+        require(!depositHappened[_chainId][_txDataHash][_txHash], "L1EB: tx already happened");
+        depositHappened[_chainId][_txDataHash][_txHash] = true;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
@@ -631,6 +632,7 @@ contract L1ERC20Bridge is
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) public nonReentrant {
+
         {
             bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
@@ -642,24 +644,16 @@ contract L1ERC20Bridge is
                 TxStatus.Failure
             );
             require(proofValid, "yn");
+            require(_amount > 0, "y1");
         }
 
         bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
+        bool usingLegacyDepositAmountStorageVar = _checkDeposited(_chainId, _depositSender, _l1Token, txDataHash, _l2TxHash, _amount);
 
-        if (_chainId == ERA_CHAIN_ID) {
-            uint256 amount = 0;
-            amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];
-            require(_amount == amount, "L1EB: amount mismatch");
-        } else {
-            bool depositHappened = deposited[_chainId][txDataHash][_l2TxHash];
-            require(depositHappened, "L1EB: deposit did not happen");
-        }
-        require(_amount > 0, "y1");
-
-        if (_chainId == ERA_CHAIN_ID) {
+        if ((_chainId == ERA_CHAIN_ID) && usingLegacyDepositAmountStorageVar) {
             delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
         } else {
-            delete deposited[_chainId][txDataHash][_l2TxHash];
+            delete depositHappened[_chainId][txDataHash][_l2TxHash];
         }
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
@@ -672,6 +666,31 @@ contract L1ERC20Bridge is
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
         if (_chainId == ERA_CHAIN_ID) {
             emit ClaimedFailedDeposit(_depositSender, _l1Token, _amount);
+        }
+    }
+
+    function _checkDeposited(
+        uint256 _chainId,
+        address _depositSender,
+        address _l1Token,
+        bytes32 _txDataHash,
+        bytes32 _l2TxHash,
+        uint256 _amount
+    ) internal returns (bool usingLegacyDepositAmountStorageVar) {
+        uint256 amount = 0;
+        if (_chainId == ERA_CHAIN_ID) {
+            { amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];}
+            if (amount > 0){
+                usingLegacyDepositAmountStorageVar = true;
+                require(_amount == amount, "L1EB: amount mismatch");
+            } else {
+                bool deposited;
+                {deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];}
+                require(deposited, "L1EB: deposit did not happen");
+            }
+        } else {
+            bool deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
+            require(deposited, "L1EB: deposit did not happen");
         }
     }
 

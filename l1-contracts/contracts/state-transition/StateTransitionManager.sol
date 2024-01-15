@@ -121,6 +121,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
     }
 
+    /// @dev freezes the specified chain
+    function freezeChain(uint256 _chainId) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
+    }
+
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId

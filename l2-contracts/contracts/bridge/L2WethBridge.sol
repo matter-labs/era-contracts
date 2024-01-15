@@ -49,7 +49,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,
-        address _proxyAdmin,
+        address _aliasedOwner,
         bool _isEthBaseToken
     ) external initializer {
         require(_l1Bridge != address(0), "L1 WETH bridge address cannot be zero");
@@ -63,7 +63,7 @@ contract L2WethBridge is IL2Bridge, Initializable {
         bytes memory initData = abi.encodeWithSelector(L2Weth.initialize.selector, "Wrapped Ether", "WETH");
         TransparentUpgradeableProxy l2Weth = new TransparentUpgradeableProxy{salt: bytes32(0)}(
             l2WethImplementation,
-            _proxyAdmin,
+            _aliasedOwner,
             initData
         );
         L2Weth(payable(address(l2Weth))).initializeV2(address(this), l1WethAddress, _isEthBaseToken);

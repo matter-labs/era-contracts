@@ -64,4 +64,6 @@ interface IStateTransitionManager {
     ) external;
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
+
+    function freezeChain(uint256 _chainId) external;
 }
