@@ -1,9 +1,9 @@
 import { artifacts } from "hardhat";
 
-import { ADDRESS_ONE, deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
-import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { Interface } from "ethers/lib/utils";
+import { ADDRESS_ONE, deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
+import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
@@ -21,6 +21,13 @@ const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+}
+
+export function unapplyL1ToL2Alias(address: string): string {
+  // We still add ADDRESS_MODULO to avoid negative numbers
+  return ethers.utils.hexlify(
+    ethers.BigNumber.from(address).sub(L1_TO_L2_ALIAS_OFFSET).add(ADDRESS_MODULO).mod(ADDRESS_MODULO)
+  );
 }
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {

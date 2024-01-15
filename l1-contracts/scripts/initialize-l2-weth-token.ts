@@ -2,8 +2,7 @@ import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "../src.ts/utils";
-import { getNumberFromEnv, getTokens, web3Provider } from "./utils";
+import { getNumberFromEnv, getTokens, SYSTEM_CONFIG, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -29,7 +28,7 @@ const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLO
 const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2Weth");
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
   openzeppelinTransparentProxyArtifactsPath,
-  "TransparentUpgradeableProxy",
+  "ITransparentUpgradeableProxy",
   "TransparentUpgradeableProxy"
 );
 
@@ -55,7 +54,7 @@ async function getL1TxInfo(
       l2Value: 0,
       l2Calldata,
       l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
       factoryDeps: [], // It is assumed that the target has already been deployed
       refundRecipient,
     },
@@ -65,7 +64,7 @@ async function getL1TxInfo(
     chainId,
     gasPrice,
     DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    SYSTEM_CONFIG.requiredL2GasPricePerPubdata
   );
 
   return {
@@ -165,7 +164,7 @@ async function main() {
         chainId,
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        SYSTEM_CONFIG.requiredL2GasPricePerPubdata
       );
       const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
 
@@ -177,7 +176,7 @@ async function main() {
           l2Value: 0,
           l2Calldata: calldata,
           l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+          l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
           factoryDeps: [],
           refundRecipient: deployWallet.address,
         },

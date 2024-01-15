@@ -1,7 +1,7 @@
 pragma solidity 0.8.20;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {VerifierParams} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {VerifierParams} from "../../state-transition/chain-interfaces/IVerifier.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(

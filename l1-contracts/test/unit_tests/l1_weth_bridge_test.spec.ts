@@ -1,13 +1,13 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { getTokens, ADDRESS_ONE } from "../../scripts/utils";
-import type { L1WethBridge, WETH9 } from "../../typechain";
+import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import type { Deployer } from "../../src.ts/deploy";
+import type { L1WethBridge, WETH9 } from "../../typechain";
 import { L1WethBridgeFactory, WETH9Factory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import { getCallRevertReason, initialDeployment, CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade } from "./utils";
+import { CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, getCallRevertReason, initialDeployment } from "./utils";
 
 import { startWethBridgeInitOnChain } from "../../src.ts/weth-initialize";
 
@@ -151,8 +151,8 @@ describe("WETH Bridge tests", () => {
   it("Should deposit successfully", async () => {
     await l1Weth.connect(randomSigner).deposit({ value: 100 });
     await (await l1Weth.connect(randomSigner).approve(bridgeProxy.address, 100)).wait();
-    let value = ethers.constants.WeiPerEther;
-    let amount = 100;
+    const value = ethers.constants.WeiPerEther;
+    const amount = 100;
     await bridgeProxy
       .connect(randomSigner)
       .deposit(

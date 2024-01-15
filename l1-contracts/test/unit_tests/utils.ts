@@ -389,6 +389,17 @@ export async function initialDeployment(
   return deployer;
 }
 
+export function defaultFeeParams(): FeeParams {
+  return {
+    pubdataPricingMode: PubdataPricingMode.Rollup,
+    batchOverheadL1Gas: 1_000_000,
+    maxPubdataPerBatch: 110_000,
+    maxL2GasPerBatch: 80_000_000,
+    priorityTxMaxPubdata: 99_000,
+    minimalL2GasPrice: 250_000_000, // 0.25 gwei
+  };
+}
+
 export interface StoredBatchInfo {
   batchNumber: BigNumberish;
   batchHash: BytesLike;
@@ -441,4 +452,18 @@ export async function depositERC20(
       value: ethIsBaseToken ? neededValue : 0,
     }
   );
+}
+
+export enum PubdataPricingMode {
+  Rollup,
+  Validium,
+}
+
+export interface FeeParams {
+  pubdataPricingMode: PubdataPricingMode;
+  batchOverheadL1Gas: number;
+  maxPubdataPerBatch: number;
+  maxL2GasPerBatch: number;
+  priorityTxMaxPubdata: number;
+  minimalL2GasPrice: BigNumberish;
 }

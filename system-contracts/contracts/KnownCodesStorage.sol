@@ -5,7 +5,6 @@ pragma solidity 0.8.20;
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
 
 /**

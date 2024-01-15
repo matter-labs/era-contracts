@@ -3,15 +3,17 @@
 pragma solidity 0.8.20;
 
 import {ZkSyncStateTransitionBase} from "./Base.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey} from "../../chain-interfaces/IExecutor.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_INITIAL_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_REPEATED_STORAGE_CHANGES_COMMITMENT_BYTES, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
-import {VerifierParams} from "../ZkSyncStateTransitionStorage.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+
+// While formally the following import is not used, it is needed to inherit documentation from it
+import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IBase.sol";
 
 /// @title zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
@@ -20,6 +22,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
+    /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "ExecutorFacet";
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
@@ -180,14 +183,11 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // }
     }
 
-    /// @notice Commit batch
-    /// @notice 1. Checks timestamp.
-    /// @notice 2. Process L2 logs.
-    /// @notice 3. Store batch commitments.
+    /// @inheritdoc IExecutor
     function commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
-    ) external override nonReentrant onlyValidator {
+    ) external nonReentrant onlyValidator {
         // check that we have the right protocol version
         require(
             IStateTransitionManager(s.stateTransitionManager).protocolVersion() == s.protocolVersion,
@@ -282,7 +282,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // carried out within the first batch committed after the upgrade.
 
         // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when this function is called,
-        // this check is added just in case. Since it is a hot read, it does not encure noticable gas cost.
+        // this check is added just in case. Since it is a hot read, it does not encure noticeable gas cost.
         require(s.l2SystemContractsUpgradeBatchNumber == 0, "ik");
 
         // Save the batch number where the upgrade transaction was executed.
@@ -342,9 +342,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
     }
 
-    /// @notice Execute batches, complete priority operations and process withdrawals.
-    /// @notice 1. Processes all pending operations (Complete priority requests)
-    /// @notice 2. Finalizes batch on Ethereum
+    /// @inheritdoc IExecutor
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
         uint256 nBatches = _batchesData.length;
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
@@ -363,8 +361,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
     }
 
-    /// @notice Batches commitment verification.
-    /// @notice Only verifies batch commitments without any other processing
+    /// @inheritdoc IExecutor
     function proveBatches(
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
@@ -450,10 +447,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             ) >> PUBLIC_INPUT_SHIFT;
     }
 
-    /// @notice Reverts unexecuted batches
-    /// @param _newLastBatch batch number after which batches should be reverted
-    /// NOTE: Doesn't delete the stored data about batches, but only decreases
-    /// counters that are responsible for the number of batches
+    /// @inheritdoc IExecutor
     function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidator {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
@@ -470,11 +464,6 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
 
         emit BlocksRevert(s.totalBatchesCommitted, s.totalBatchesVerified, s.totalBatchesExecuted);
-    }
-
-    /// @notice Returns larger of two values
-    function _maxU256(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? b : a;
     }
 
     /// @dev Creates batch commitment from its data
@@ -516,7 +505,12 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash
+                _batch.eventsQueueStateHash,
+                // The following will be commitments to the EIP4844 blobs once they are supported on L1.
+                bytes32(0),
+                bytes32(0),
+                bytes32(0),
+                bytes32(0)
             );
     }
 

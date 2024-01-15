@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import "../libraries/Diamond.sol";
-import "./facets/Base.sol";
-
-import {L2_TX_MAX_GAS_LIMIT, L2_TO_L1_LOG_SERIALIZE_SIZE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE} from "../../common/Config.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../../common/L2ContractAddresses.sol";
+import {Diamond} from "../libraries/Diamond.sol";
+import {ZkSyncStateTransitionBase} from "./facets/Base.sol";
+import {FeeParams} from "./ZkSyncStateTransitionStorage.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
+import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 
 import "../l2-deps/ISystemContext.sol";
 
@@ -25,7 +25,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         require(address(_initializeData.verifier) != address(0), "vt");
         require(_initializeData.governor != address(0), "vy");
         require(_initializeData.admin != address(0), "hc");
-        require(_initializeData.priorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "vu");
+        require(_initializeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
@@ -43,6 +43,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
+        s.feeParams = _initializeData.feeParams;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

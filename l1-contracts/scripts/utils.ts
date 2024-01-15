@@ -2,10 +2,31 @@ import * as chalk from "chalk";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
-import type { DeployedAddresses } from "../src.ts/deploy";
 
 const warning = chalk.bold.yellow;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
+export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
+
+interface SystemConfig {
+  requiredL2GasPricePerPubdata: number;
+  priorityTxMinimalGasPrice: number;
+  priorityTxMaxGasPerBatch: number;
+  priorityTxPubdataPerBatch: number;
+  priorityTxBatchOverheadL1Gas: number;
+  priorityTxMaxPubdata: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const SYSTEM_CONFIG_JSON = require("../../SystemConfig.json");
+
+export const SYSTEM_CONFIG: SystemConfig = {
+  requiredL2GasPricePerPubdata: SYSTEM_CONFIG_JSON.REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMinimalGasPrice: SYSTEM_CONFIG_JSON.PRIORITY_TX_MINIMAL_GAS_PRICE,
+  priorityTxMaxGasPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_GAS_PER_BATCH,
+  priorityTxPubdataPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_PUBDATA_PER_BATCH,
+  priorityTxBatchOverheadL1Gas: SYSTEM_CONFIG_JSON.PRIORITY_TX_BATCH_OVERHEAD_L1_GAS,
+  priorityTxMaxPubdata: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_PUBDATA,
+};
 
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
@@ -54,41 +75,6 @@ export function getNumberFromEnv(envName: string): string {
   return number;
 }
 
-export function deployedAddressesFromEnv(): DeployedAddresses {
-  return {
-    Bridgehub: {
-      BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
-      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
-    },
-    StateTransition: {
-      StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
-      StateTransitionImplementation: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_IMPL_ADDR"),
-      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
-      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
-      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
-      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
-      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
-      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
-      GenesisUpgrade: getAddressFromEnv("CONTRACTS_GENESIS_UPGRADE_ADDR"),
-      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
-      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
-      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
-    },
-    Bridges: {
-      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
-      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
-      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
-      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
-      BaseTokenBridge: getAddressFromEnv("CONTRACTS_BASE_TOKEN_BRIDGE_ADDR"),
-    },
-    BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
-    TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
-    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
-    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
-    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-  };
-}
-
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
   return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
@@ -128,4 +114,77 @@ export function getTokens(network: string): L1Token[] {
       encoding: "utf-8",
     })
   );
+}
+
+export interface DeployedAddresses {
+  Bridgehub: {
+    BridgehubProxy: string;
+    BridgehubImplementation: string;
+  };
+  StateTransition: {
+    StateTransitionProxy: string;
+    StateTransitionImplementation: string;
+    Verifier: string;
+    AdminFacet: string;
+    MailboxFacet: string;
+    ExecutorFacet: string;
+    GettersFacet: string;
+    DiamondInit: string;
+    GenesisUpgrade: string;
+    DiamondUpgradeInit: string;
+    DefaultUpgrade: string;
+    DiamondProxy: string;
+  };
+  Bridges: {
+    ERC20BridgeImplementation: string;
+    ERC20BridgeProxy: string;
+    WethBridgeImplementation: string;
+    WethBridgeProxy: string;
+    BaseTokenBridge: string;
+  };
+  BaseToken: string;
+  TransparentProxyAdmin: string;
+  Governance: string;
+  ValidatorTimeLock: string;
+  Create2Factory: string;
+}
+
+export function deployedAddressesFromEnv(): DeployedAddresses {
+  return {
+    Bridgehub: {
+      BridgehubProxy: getAddressFromEnv("CONTRACTS_BRIDGEHUB_PROXY_ADDR"),
+      BridgehubImplementation: getAddressFromEnv("CONTRACTS_BRIDGEHUB_IMPL_ADDR"),
+    },
+    StateTransition: {
+      StateTransitionProxy: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_PROXY_ADDR"),
+      StateTransitionImplementation: getAddressFromEnv("CONTRACTS_STATE_TRANSITION_IMPL_ADDR"),
+      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
+      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
+      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
+      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
+      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
+      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
+      GenesisUpgrade: getAddressFromEnv("CONTRACTS_GENESIS_UPGRADE_ADDR"),
+      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
+      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
+      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
+    },
+    Bridges: {
+      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
+      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
+      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
+      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
+      BaseTokenBridge: getAddressFromEnv("CONTRACTS_BASE_TOKEN_BRIDGE_ADDR"),
+    },
+    BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
+    TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
+    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
+    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+  };
+}
+
+export enum PubdataPricingMode {
+  Rollup = 0,
+  Porter = 1,
 }

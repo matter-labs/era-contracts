@@ -103,13 +103,13 @@ export async function startWethBridgeInitOnChain(
     await mintTx.wait(1);
 
     const approveTx1 = await erc20.increaseAllowance(
-        deployer.addresses.Bridges.BaseTokenBridge,
-        requiredValueToPublishBytecodes
-      );
-      await approveTx1.wait(1);
+      deployer.addresses.Bridges.BaseTokenBridge,
+      requiredValueToPublishBytecodes
+    );
+    await approveTx1.wait(1);
 
     const approveTx2 = await erc20.increaseAllowance(
-    deployer.addresses.Bridges.WethBridgeProxy,
+      deployer.addresses.Bridges.WethBridgeProxy,
       requiredValueToInitializeBridge.mul(2)
     );
     await approveTx2.wait(1);

@@ -1,27 +1,27 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import { Action, facetCut, diamondCut, getAllSelectors } from "../../src.ts/diamondCut";
+import { Action, diamondCut, facetCut, getAllSelectors } from "../../src.ts/diamondCut";
 import type {
+  AdminFacet,
+  DiamondInit,
   DiamondProxy,
   DiamondProxyTest,
-  AdminFacet,
+  ExecutorFacet,
   GettersFacet,
   MailboxFacet,
-  ExecutorFacet,
-  DiamondInit,
 } from "../../typechain";
 import {
+  AdminFacetFactory,
+  DiamondInitFactory,
   DiamondProxyFactory,
   DiamondProxyTestFactory,
-  AdminFacetFactory,
+  ExecutorFacetFactory,
   GettersFacetFactory,
   MailboxFacetFactory,
-  ExecutorFacetFactory,
-  DiamondInitFactory,
   TestnetERC20TokenFactory,
 } from "../../typechain";
-import { getCallRevertReason } from "./utils";
+import { defaultFeeParams, getCallRevertReason } from "./utils";
 
 describe("Diamond proxy tests", function () {
   let proxy: DiamondProxy;
@@ -97,6 +97,7 @@ describe("Diamond proxy tests", function () {
         l2BootloaderBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         l2DefaultAccountBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+        feeParams: defaultFeeParams(),
       },
     ]);
 

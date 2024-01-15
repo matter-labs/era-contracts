@@ -2,22 +2,24 @@
 
 pragma solidity 0.8.20;
 
-import "../../chain-interfaces/IAdmin.sol";
-import "../../libraries/Diamond.sol";
-import "../../../common/libraries/L2ContractHelper.sol";
-import {L2_TX_MAX_GAS_LIMIT} from "../../../common/Config.sol";
-import "./Base.sol";
-import "../../IStateTransitionManager.sol";
+import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {Diamond} from "../../libraries/Diamond.sol";
+import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
+import {FeeParams} from "../ZkSyncStateTransitionStorage.sol";
+import {ZkSyncStateTransitionBase} from "./Base.sol";
+import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
+
+// While formally the following import is not used, it is needed to inherit documentation from it
+import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IBase.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
+    /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "AdminFacet";
 
-    /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
-    /// @notice New governor can accept governor rights by calling `acceptGovernor` function.
-    /// @param _newPendingGovernor Address of the new governor
+    /// @inheritdoc IAdmin
     function setPendingGovernor(address _newPendingGovernor) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
         address oldPendingGovernor = s.pendingGovernor;
@@ -26,7 +28,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
     }
 
-    /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
+    /// @inheritdoc IAdmin
     function acceptGovernor() external {
         address pendingGovernor = s.pendingGovernor;
         require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
@@ -39,9 +41,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewGovernor(previousGovernor, pendingGovernor);
     }
 
-    /// @notice Starts the transfer of admin rights. Only the current governor or admin can propose a new pending one.
-    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
-    /// @param _newPendingAdmin Address of the new admin
+    /// @inheritdoc IAdmin
     function setPendingAdmin(address _newPendingAdmin) external onlyGovernor {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = s.pendingAdmin;
@@ -50,7 +50,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
-    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    /// @inheritdoc IAdmin
     function acceptAdmin() external {
         address pendingAdmin = s.pendingAdmin;
         require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
@@ -63,60 +63,70 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
-    /// @notice Change validator status (active or not active)
-    /// @param _validator Validator address
-    /// @param _active Active flag
+    /// @inheritdoc IAdmin
     function setValidator(address _validator, bool _active) external onlyGovernorOrAdmin {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
 
-    /// @notice Change zk porter availability
-    /// @param _zkPorterIsAvailable The availability of zk porter shard
+    /// @inheritdoc IAdmin
     function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransitionManager {
         // Change the porter availability
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
     }
 
-    /// @notice Change the max L2 gas limit for L1 -> L2 transactions
-    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @inheritdoc IAdmin
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
-        require(_newPriorityTxMaxGasLimit <= L2_TX_MAX_GAS_LIMIT, "n5");
+        require(_newPriorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "n5");
 
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
         s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 
+    /// @notice Change the fee params for L1->L2 transactions
+    /// @param _newFeeParams The new fee params
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernor {
+        // Double checking that the new fee params are valid, i.e.
+        // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
+        require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
+
+        FeeParams memory oldFeeParams = s.feeParams;
+        s.feeParams = _newFeeParams;
+
+        emit NewFeeParams(oldFeeParams, _newFeeParams);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-        /// upgrade a specific chain
-        function upgradeChainFromVersion(
-            uint256 _chainId,
-            uint256 _oldProtocolVersion,
-            Diamond.DiamondCutData calldata _diamondCut
-        ) external onlyGovernorOrStateTransitionManager {
-            bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-            require(cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion), "StateTransition: cutHash mismatch");
-    
-            require(
-                s.protocolVersion == _oldProtocolVersion,
-                "StateTransition: protocolVersion mismatch in STC when upgrading"
-            );
-            Diamond.diamondCut(_diamondCut);
-            emit ExecuteUpgrade(_diamondCut);
-            require(
-                s.protocolVersion > _oldProtocolVersion,
-                "StateTransition: protocolVersion mismatch in STC after upgrading"
-            );
-        }
+    /// upgrade a specific chain
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyGovernorOrStateTransitionManager {
+        bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
+        require(
+            cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion),
+            "StateTransition: cutHash mismatch"
+        );
 
-    /// @notice Executes an upgrade from the state transition
-    /// @dev Only the state transition mananger can execute the upgrade
-    /// @param _diamondCut The diamond cut parameters to be executed
+        require(
+            s.protocolVersion == _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC when upgrading"
+        );
+        Diamond.diamondCut(_diamondCut);
+        emit ExecuteUpgrade(_diamondCut);
+        require(
+            s.protocolVersion > _oldProtocolVersion,
+            "StateTransition: protocolVersion mismatch in STC after upgrading"
+        );
+    }
+
+    /// @inheritdoc IAdmin
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransitionManager {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
@@ -126,8 +136,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Instantly pause the functionality of all freezable facets & their selectors
-    /// @dev Only the governance mechanism may freeze Diamond Proxy
+    /// @inheritdoc IAdmin
     function freezeDiamond() external onlyGovernorOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
@@ -137,8 +146,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit Freeze();
     }
 
-    /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the governor and its owner can unfreeze Diamond Proxy
+    /// @inheritdoc IAdmin
     function unfreezeDiamond() external onlyGovernorOrAdmin {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 

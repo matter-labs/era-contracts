@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./interfaces/IImmutableSimulator.sol";
+import {IImmutableSimulator, ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
@@ -18,7 +18,7 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 contract ImmutableSimulator is IImmutableSimulator {
     /// @dev mapping (contract address) => (index of immutable variable) => value
     /// @notice that address uses `uint256` type to leave the option to introduce 32-byte address space in future.
-    mapping(uint256 => mapping(uint256 => bytes32)) internal immutableDataStorage;
+    mapping(uint256 contractAddress => mapping(uint256 index => bytes32 value)) internal immutableDataStorage;
 
     /// @notice Method that returns the immutable with a certain index for a user.
     /// @param _dest The address which the immutable belongs to.

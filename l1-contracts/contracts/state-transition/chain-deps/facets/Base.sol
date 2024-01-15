@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "../ZkSyncStateTransitionStorage.sol";
-import "../../../common/ReentrancyGuard.sol";
+import {ZkSyncStateTransitionStorage} from "../ZkSyncStateTransitionStorage.sol";
+import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs

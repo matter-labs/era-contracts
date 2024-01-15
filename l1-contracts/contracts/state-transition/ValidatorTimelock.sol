@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "./chain-interfaces/IExecutor.sol";
-import "./libraries/LibMap.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {LibMap} from "./libraries/LibMap.sol";
+import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

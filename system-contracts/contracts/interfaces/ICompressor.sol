@@ -9,6 +9,12 @@ uint8 constant LENGTH_BITS_OFFSET = 3;
 // The maximal length in bytes that an enumeration index can have.
 uint8 constant MAX_ENUMERATION_INDEX_SIZE = 8;
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The interface for the Compressor contract, responsible for verifying the correctness of
+ * the compression of the state diffs and bytecodes.
+ */
 interface ICompressor {
     function publishCompressedBytecode(
         bytes calldata _bytecode,

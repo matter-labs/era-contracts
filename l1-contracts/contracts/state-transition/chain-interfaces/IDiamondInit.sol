@@ -3,8 +3,8 @@
 pragma solidity 0.8.20;
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
-import "../chain-interfaces/IExecutor.sol";
-import "./IVerifier.sol";
+import {IVerifier, VerifierParams} from "./IVerifier.sol";
+import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 
 /// @param chainId
 /// @param stateTransition contract's address
@@ -30,6 +30,7 @@ struct InitializeData {
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
     uint256 priorityTxMaxGasLimit;
+    FeeParams feeParams;
 }
 
 interface IDiamondInit {

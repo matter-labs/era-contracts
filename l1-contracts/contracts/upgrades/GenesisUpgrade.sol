@@ -13,13 +13,13 @@ contract GenesisUpgrade is BaseZkSyncUpgradeGenesis {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal override {}
 
     /// @notice placeholder function for custom logic for post-upgrade logic.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal override {}
 
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.

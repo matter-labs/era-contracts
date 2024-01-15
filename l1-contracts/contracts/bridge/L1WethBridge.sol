@@ -2,28 +2,29 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./interfaces/IL1Bridge.sol";
-import "./interfaces/IL1BridgeLegacy.sol";
-import "./interfaces/IL1BridgeDeprecated.sol";
-import "./interfaces/IL2WethBridge.sol";
-import "./interfaces/IL2Bridge.sol";
-import "./interfaces/IWETH9.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
-import "../state-transition/chain-interfaces/IMailbox.sol";
-import "../state-transition/chain-interfaces/IGetters.sol";
+import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
+import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
+import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IWETH9} from "./interfaces/IWETH9.sol";
 
-import "./libraries/BridgeInitializationHelper.sol";
+import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
 
-import "../common/Messaging.sol";
-import "../common/libraries/UnsafeBytes.sol";
-import "../common/ReentrancyGuard.sol";
-import "../common/libraries/L2ContractHelper.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {L2Message, TxStatus} from "../common/Messaging.sol";
+
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY} from "../common/Config.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
+import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY} from "../common/Config.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
+import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
@@ -88,7 +89,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @dev A mapping L2 chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
-    mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalizedShared;
+    mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
+        public isWithdrawalFinalizedShared;
 
     /// @dev A mapping chainId => amount. Used before we activate hyperbridging.
     mapping(uint256 => uint256) public chainBalance;
@@ -183,9 +185,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @notice _factoryDeps[0] == a raw bytecode of L2 WETH bridge implementation. Note this deploys the Weth token
     /// implementation and proxy upon initialization
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
-    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2
+    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2
     /// bridge implementation
-    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
+    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2 bridge
     /// proxy
     function startWethBridgeInitOnChain(
         uint256 _chainId,
@@ -253,7 +255,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 _deployBridgeProxyFee,
                 l2WethBridgeProxyBytecodeHash,
                 l2WethBridgeProxyConstructorData,
-                // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
+                // No factory deps are needed for the L2 bridge proxy, because it is already passed in the previous step
                 new bytes[](0)
             );
             require(
@@ -425,7 +427,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     // we have to keep track of bridgehub deposits to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
-        address ,//_prevMsgSender,
+        address, //_prevMsgSender,
         address _token,
         uint256 _amount
     ) external payable override onlyBridgehubOrEthChain(_chainId) {
@@ -475,7 +477,14 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             });
         }
 
-        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit BridgehubDepositInitiatedSharedBridge(
+            _chainId,
+            txDataHash,
+            _prevMsgSender,
+            _l2Receiver,
+            _l1Token,
+            _amount
+        );
     }
 
     function bridgehubConfirmL2Transaction(

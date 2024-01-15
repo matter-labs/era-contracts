@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.20;
 
+/// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 /// @notice legacy before bridgehub, only used for Era
-
 interface IL1BridgeLegacy {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
@@ -15,7 +16,7 @@ interface IL1BridgeLegacy {
     );
 
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
-    
+
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
 
     function deposit(

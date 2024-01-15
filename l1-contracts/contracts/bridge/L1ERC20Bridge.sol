@@ -2,31 +2,31 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./interfaces/IL1BridgeLegacy.sol";
-import "./interfaces/IL1BridgeDeprecated.sol";
-import "./interfaces/IL1Bridge.sol";
-import "./interfaces/IL2Bridge.sol";
-import "./interfaces/IL2ERC20Bridge.sol";
+import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
+import {IL1BridgeLegacy} from "./interfaces/IL1BridgeLegacy.sol";
+import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
+import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL2ERC20Bridge} from "./interfaces/IL2ERC20Bridge.sol";
 
-import "./libraries/BridgeInitializationHelper.sol";
+import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
 
-import "../state-transition/chain-interfaces/IMailbox.sol";
-
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehub.sol";
-import "../common/Messaging.sol";
-import "../common/libraries/UnsafeBytes.sol";
-import "../common/libraries/L2ContractHelper.sol";
-import "../common/ReentrancyGuard.sol";
-import "../common/InitializableRandomStorage.sol";
-import "../common/Ownable2StepRandomStorage.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {L2Message, TxStatus} from "../common/Messaging.sol";
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-
+import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
+import {InitializableRandomStorage} from "../common/InitializableRandomStorage.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
+import {Ownable2StepRandomStorage} from "../common/Ownable2StepRandomStorage.sol";
+import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -48,12 +48,14 @@ contract L1ERC20Bridge is
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
     /// @dev this is just used for ERA for backwards compatibility reasons
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
+        public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev this is just used for ERA for backwards compatibility reasons
-    mapping(address => mapping(address => mapping(bytes32 => uint256))) internal depositAmount;
+    mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
+        internal depositAmount;
 
     /// @dev The standard address of deployed L2 bridge counterpart
     address public l2BridgeStandardAddress;
@@ -64,14 +66,14 @@ contract L1ERC20Bridge is
     /// @dev The bytecode hash of the L2 token contract
     bytes32 public l2TokenProxyBytecodeHash;
 
-    mapping(address => uint256) internal __DEPRECATED_lastWithdrawalLimitReset;
+    mapping(address => uint256) private __DEPRECATED_lastWithdrawalLimitReset;
 
     /// @dev A mapping L1 token address => the accumulated withdrawn amount during the withdrawal limit window
-    mapping(address => uint256) internal __DEPRECATED_withdrawnAmountInWindow;
+    mapping(address => uint256) private __DEPRECATED_withdrawnAmountInWindow;
 
     /// @dev The accumulated deposited amount per user.
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
-    mapping(address => mapping(address => uint256)) internal __DEPRECATED_totalDepositedAmountPerUser;
+    mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
     bytes32 public factoryDepsHash;
 
@@ -240,7 +242,7 @@ contract L1ERC20Bridge is
                 _deployBridgeProxyFee,
                 l2BridgeProxyBytecodeHash,
                 l2BridgeProxyConstructorData,
-                // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
+                // No factory deps are needed for the L2 bridge proxy, because it is already passed in previous step
                 new bytes[](0)
             );
             require(bridgeProxyAddr == l2BridgeStandardAddress, "L1EB: wrong b. address");
@@ -301,7 +303,9 @@ contract L1ERC20Bridge is
 
     /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
     /// @dev Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted
+    /// of processing an L2 transaction where tokens would be minted.
+    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
+    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged
@@ -363,6 +367,8 @@ contract L1ERC20Bridge is
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted
     /// only used for eth based chains
+    /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
+    /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
     /// @param _amount The total amount of tokens to be bridged
@@ -450,7 +456,7 @@ contract L1ERC20Bridge is
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
             mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub 
+            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -471,7 +477,8 @@ contract L1ERC20Bridge is
         require(msg.value == 0, "L1EB: msg.value > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
         // #if !ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
-        if (_prevMsgSender != address(this)){ // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
+        if (_prevMsgSender != address(this)) {
+            // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
@@ -525,7 +532,14 @@ contract L1ERC20Bridge is
                 txDataHash: txDataHash
             });
         }
-        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit BridgehubDepositInitiatedSharedBridge(
+            _chainId,
+            txDataHash,
+            _prevMsgSender,
+            _l2Receiver,
+            _l1Token,
+            _amount
+        );
         if (_chainId == ERA_CHAIN_ID) {
             // kl todo. Should emit this event here? Should we not allow this method for era?
             emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
@@ -772,7 +786,7 @@ contract L1ERC20Bridge is
         } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
             // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
             // and we use this interface so that when the switch happened the old messages could be processed
-            
+
             // this message is a token withdrawal
 
             // Check that the message length is correct.

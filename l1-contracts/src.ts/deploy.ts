@@ -1,9 +1,10 @@
-import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
+import * as hardhat from "hardhat";
 
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
+import type { DeployedAddresses } from "../scripts/utils";
 import {
   ADDRESS_ONE,
   deployedAddressesFromEnv,
@@ -13,61 +14,30 @@ import {
   getTokens,
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
+  SYSTEM_CONFIG,
 } from "../scripts/utils";
+import { PubdataPricingMode } from "../test/unit_tests/utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
+import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
+import { deployViaCreate2 } from "./deploy-utils";
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
 import { hashL2Bytecode } from "./utils";
 
 import { ERC20Factory } from "../typechain";
-import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
-import { deployViaCreate2 } from "./deploy-utils";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
 export const EraLegacyChainId = 324;
 export const EraLegacyDiamondProxyAddress = "0x32400084C286CF3E17e7B677ea9583e60a000324";
-
-export interface DeployedAddresses {
-  Bridgehub: {
-    BridgehubProxy: string;
-    BridgehubImplementation: string;
-  };
-  StateTransition: {
-    StateTransitionProxy: string;
-    StateTransitionImplementation: string;
-    Verifier: string;
-    AdminFacet: string;
-    MailboxFacet: string;
-    ExecutorFacet: string;
-    GettersFacet: string;
-    DiamondInit: string;
-    GenesisUpgrade: string;
-    DiamondUpgradeInit: string;
-    DefaultUpgrade: string;
-    DiamondProxy: string;
-  };
-  Bridges: {
-    ERC20BridgeImplementation: string;
-    ERC20BridgeProxy: string;
-    WethBridgeImplementation: string;
-    WethBridgeProxy: string;
-    BaseTokenBridge: string;
-  };
-  BaseToken: string;
-  TransparentProxyAdmin: string;
-  Governance: string;
-  ValidatorTimeLock: string;
-  Create2Factory: string;
-}
 
 export interface DeployerConfig {
   deployWallet: Wallet;
@@ -124,6 +94,15 @@ export class Deployer {
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
+    const feeParams = {
+      pubdataPricingMode: PubdataPricingMode.Rollup,
+      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
+      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
+      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
+      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
+      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
+    };
+
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
       // these first 7 values are set in the contract
       {
@@ -141,6 +120,7 @@ export class Deployer {
         l2BootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
+        feeParams,
       },
     ]);
 
@@ -709,7 +689,7 @@ export class Deployer {
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
   }
 
   public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

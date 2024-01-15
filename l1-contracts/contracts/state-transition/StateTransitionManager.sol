@@ -2,20 +2,22 @@
 
 pragma solidity 0.8.20;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
-
-import "../common/ReentrancyGuard.sol";
-import "./chain-interfaces/IZkSyncStateTransition.sol";
-import "./chain-deps/DiamondProxy.sol";
+import {Diamond} from "./libraries/Diamond.sol";
+import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
+import {IAdmin} from "./chain-interfaces/IAdmin.sol";
+import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
+import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
-import "../bridgehub/IBridgehub.sol";
-import "./chain-interfaces/IDiamondInit.sol";
-import "../upgrades/IDefaultUpgrade.sol";
+import {ISystemContext} from "./l2-deps/ISystemContext.sol";
+import {IZkSyncStateTransition} from "./chain-interfaces/IZkSyncStateTransition.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
-import "./l2-deps/ISystemContext.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
 /// @author Matter Labs
@@ -118,8 +120,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyOwner {
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
     }
-
-    
 
     /// registration
 

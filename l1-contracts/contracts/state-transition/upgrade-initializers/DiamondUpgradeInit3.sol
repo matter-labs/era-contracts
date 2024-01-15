@@ -4,8 +4,7 @@ pragma solidity 0.8.20;
 
 import "../libraries/Diamond.sol";
 import "../chain-deps/facets/Base.sol";
-
-// import "../interfaces/IVerifier.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
 interface IOldDiamondCut {
     function proposeDiamondCut(Diamond.FacetCut[] calldata _facetCuts, address _initAddress) external;

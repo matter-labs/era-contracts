@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import "./libraries/Utils.sol";
-import "./libraries/EfficientCall.sol";
-import "./interfaces/ISystemContract.sol";
+import {Utils} from "./libraries/Utils.sol";
+import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 
@@ -18,7 +18,7 @@ import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT} from "./Co
  */
 contract MsgValueSimulator is ISystemContract {
     /// @notice Extract value, isSystemCall and to from the extraAbi params.
-    /// @dev The contract accepts value, the callee and whether the call should a system one via its ABI params.
+    /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
     /// @dev The first ABI param contains the value in the [0..127] bits. The 128th contains
     /// the flag whether or not the call should be a system one.
     /// The second ABI params contains the callee.
@@ -32,6 +32,10 @@ contract MsgValueSimulator is ISystemContract {
         to = address(uint160(addressAsUint));
     }
 
+    /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
+    /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
+    /// @param _data The calldata to be passed to the callee.
+    /// @return The return data from the callee.
     fallback(bytes calldata _data) external onlySystemCall returns (bytes memory) {
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
