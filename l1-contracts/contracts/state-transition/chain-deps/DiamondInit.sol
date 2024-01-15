@@ -29,7 +29,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
-        s.stateTransition = _initializeData.stateTransition;
+        s.stateTransitionManager = _initializeData.stateTransitionManager;
         s.baseToken = _initializeData.baseToken;
         s.baseTokenBridge = _initializeData.baseTokenBridge;
         s.protocolVersion = _initializeData.protocolVersion;

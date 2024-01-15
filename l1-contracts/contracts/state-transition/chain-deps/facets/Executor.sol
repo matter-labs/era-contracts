@@ -190,7 +190,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     ) external override nonReentrant onlyValidator {
         // check that we have the right protocol version
         require(
-            IStateTransitionManager(s.stateTransition).protocolVersion() == s.protocolVersion,
+            IStateTransitionManager(s.stateTransitionManager).protocolVersion() == s.protocolVersion,
             "Executor facet: wrong protocol version"
         );
         // Check that we commit batches after last committed batch

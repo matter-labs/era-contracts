@@ -109,7 +109,7 @@ struct ZkSyncStateTransitionStorage {
     /// new fields
     uint256 chainId;
     address bridgehub;
-    address stateTransition;
+    address stateTransitionManager;
     address baseToken;
     address baseTokenBridge;
 }

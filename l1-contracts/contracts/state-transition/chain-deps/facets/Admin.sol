@@ -72,7 +72,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
     /// @notice Change zk porter availability
     /// @param _zkPorterIsAvailable The availability of zk porter shard
-    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransition {
+    function setPorterAvailability(bool _zkPorterIsAvailable) external onlyStateTransitionManager {
         // Change the porter availability
         s.zkPorterIsAvailable = _zkPorterIsAvailable;
         emit IsPorterAvailableStatusUpdate(_zkPorterIsAvailable);
@@ -93,15 +93,15 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Executes an upgrade from the state transition
-    /// @dev Only the current governor can execute the upgrade
+    /// @dev Only the state transition mananger can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransition {
+    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyStateTransitionManager {
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
     }
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current governor can execute the upgrade
+    /// @dev Only the state transition mananger can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     /// @notice we have this function so the event can be emitted, 
     /// @notice as the genesis upgrade is not a normal upgrade, so the server handles it differently  
@@ -110,7 +110,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         Diamond.DiamondCutData calldata _diamondCut,
         L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
         uint256 _protocolVersion
-    ) external onlyStateTransition {
+    ) external onlyStateTransitionManager {
         Diamond.diamondCut(_diamondCut);
         emit SetChainIdUpgrade(_l2ProtocolUpgradeTx, block.timestamp, _protocolVersion);
     }
@@ -121,7 +121,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
-    function freezeDiamond() external onlyGovernorOrStateTransition {
+    function freezeDiamond() external onlyGovernorOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already

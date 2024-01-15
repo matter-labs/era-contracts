@@ -18,7 +18,7 @@ import "./IVerifier.sol";
 struct InitializeData {
     uint256 chainId;
     address bridgehub;
-    address stateTransition;
+    address stateTransitionManager;
     uint256 protocolVersion;
     address governor;
     address admin;

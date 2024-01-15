@@ -19,7 +19,7 @@ interface IGetters is IZkSyncStateTransitionBase {
 
     function getBridgehub() external view returns (address);
 
-    function getStateTransition() external view returns (address);
+    function getStateTransitionManager() external view returns (address);
 
     function getTotalBatchesCommitted() external view returns (uint256);
 

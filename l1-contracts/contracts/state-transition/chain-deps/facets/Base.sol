@@ -23,8 +23,8 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyStateTransition() {
-        require(msg.sender == s.stateTransition, "StateTransition Chain: not state transition");
+    modifier onlyStateTransitionManager() {
+        require(msg.sender == s.stateTransitionManager, "StateTransition Chain: not state transition manager");
         _;
     }
 
@@ -33,10 +33,10 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyGovernorOrStateTransition() {
+    modifier onlyGovernorOrStateTransitionManager() {
         require(
-            msg.sender == s.governor || msg.sender == s.stateTransition,
-            "StateTransition Chain: Only by governor or state transition"
+            msg.sender == s.governor || msg.sender == s.stateTransitionManager,
+            "StateTransition Chain: Only by governor or state transition manager"
         );
         _;
     }

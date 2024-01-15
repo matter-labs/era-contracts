@@ -44,8 +44,8 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     }
 
     /// @return The address of the state transition
-    function getStateTransition() external view returns (address) {
-        return address(s.stateTransition);
+    function getStateTransitionManager() external view returns (address) {
+        return address(s.stateTransitionManager);
     }
 
     /// @return The address of the base token
