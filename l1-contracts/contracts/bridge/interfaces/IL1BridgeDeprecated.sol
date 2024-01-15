@@ -3,6 +3,8 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
+/// @notice we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+// and we use this interface so that when the switch happened the old messages could be processed
 interface IL1BridgeDeprecated {
     function finalizeWithdrawal(
         uint256 _l2BatchNumber,

@@ -31,8 +31,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     function _commitOneBatch(
         StoredBatchInfo memory _previousBatch,
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        bool _outdatedProtocolVersion
+        bytes32 _expectedSystemContractUpgradeTxHash
     ) internal view returns (StoredBatchInfo memory) {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
@@ -45,7 +44,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp
-        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, _outdatedProtocolVersion);
+        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         require(_previousBatch.batchHash == previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -105,8 +104,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        bool _outdatedProtocolVersion
+        bytes32 _expectedSystemContractUpgradeTxHash
     )
         internal
         pure
@@ -177,10 +175,6 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         } else {
             require(processedLogs == 255, "b8");
         }
-
-        // if (_outdatedProtocolVersion) {
-        // check we did not execute more than the upgrade tx
-        // }
     }
 
     /// @inheritdoc IExecutor
@@ -189,6 +183,12 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
         // check that we have the right protocol version
+        // three comments:
+        // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
+        // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
+        // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
+        // as thier protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
+        // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
         require(
             IStateTransitionManager(s.stateTransitionManager).protocolVersion() == s.protocolVersion,
             "Executor facet: wrong protocol version"
@@ -205,48 +205,12 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             _commitBatchesWithSystemContractsUpgrade(
                 _lastCommittedBatchData,
                 _newBatchesData,
-                systemContractsUpgradeTxHash,
-                false
+                systemContractsUpgradeTxHash
             );
         }
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + _newBatchesData.length;
     }
-
-    // until we can confirm that no L2 txs were processed we cannot have this
-    // /// @notice Commit batch
-    // /// @notice 1. Checks timestamp.
-    // /// @notice 2. Process L2 logs.
-    // /// @notice 3. Store batch commitments.
-    // /// @notice here we should only commit a single batch, it should only contain a single tx,
-    // /// @notice and this tx should be the upgrade tx
-    // function commitBatchesOutdatedProtocolVersion(
-    //     StoredBatchInfo memory _lastCommittedBatchData,
-    //     CommitBatchInfo[] calldata _newBatchesData
-    // ) external override nonReentrant onlyValidator {
-    //     // Check that we commit batches after last committed batch
-    //     require(
-    //         s.storedBatchHashes[s.totalBatchesCommitted] ==
-    //             _hashStoredBatchInfo(_lastCommittedBatchData),
-    //         "i"
-    //     ); // incorrect previous batch data
-    //     require(_newBatchesData.length > 0, "No batches to commit");
-
-    //     bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-    //     // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
-    //     if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-    //         revert();
-    //     } else {
-    //         _commitBatchesWithSystemContractsUpgrade(
-    //             _lastCommittedBatchData,
-    //             _newBatchesData,
-    //             systemContractsUpgradeTxHash,
-    //             true
-    //         );
-    //     }
-
-    //     s.totalBatchesCommitted = s.totalBatchesCommitted + _newBatchesData.length;
-    // }
 
     /// @dev Commits new batches without any system contracts upgrade.
     /// @param _lastCommittedBatchData The data of the last committed batch.
@@ -256,7 +220,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0), false);
+            _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
@@ -274,8 +238,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     function _commitBatchesWithSystemContractsUpgrade(
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData,
-        bytes32 _systemContractUpgradeTxHash,
-        bool _outdatedProtocolVersion
+        bytes32 _systemContractUpgradeTxHash
     ) internal {
         // The system contract upgrade is designed to be executed atomically with the new bootloader, a default account,
         // ZKP verifier, and other system parameters. Hence, we ensure that the upgrade transaction is
@@ -288,20 +251,13 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // Save the batch number where the upgrade transaction was executed.
         s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
 
-        if (_outdatedProtocolVersion) {
-            // If we are committing batches with an outdated protocol version, we need to check that the upgrade transaction
-            // is the only transaction in the batch.
-            require(_newBatchesData.length == 1, "ik");
-        }
-
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             // The upgrade transaction must only be included in the first batch.
             bytes32 expectedUpgradeTxHash = i == 0 ? _systemContractUpgradeTxHash : bytes32(0);
             _lastCommittedBatchData = _commitOneBatch(
                 _lastCommittedBatchData,
                 _newBatchesData[i],
-                expectedUpgradeTxHash,
-                _outdatedProtocolVersion
+                expectedUpgradeTxHash
             );
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);

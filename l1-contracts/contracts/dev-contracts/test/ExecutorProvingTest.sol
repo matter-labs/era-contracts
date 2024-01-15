@@ -34,7 +34,7 @@ contract ExecutorProvingTest is ExecutorFacet {
             uint256 packedBatchAndL2BlockTimestamp
         )
     {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, false);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.

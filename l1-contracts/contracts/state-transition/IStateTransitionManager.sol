@@ -25,8 +25,12 @@ struct StateTransitionManagerInitializeData {
 interface IStateTransitionManager {
     // when a new Chain is added
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
-    
-    event SetChainIdUpgrade(address _stateTransitionChain, L2CanonicalTransaction _l2Transaction, uint256 _protocolVersion);
+
+    event SetChainIdUpgrade(
+        address _stateTransitionChain,
+        L2CanonicalTransaction _l2Transaction,
+        uint256 _protocolVersion
+    );
 
     function bridgehub() external view returns (address);
 
