@@ -164,7 +164,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
             return bytes32(0);
         }
 
-        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 sys upgrade tx type is wrong");
+        require(_l2ProtocolUpgradeTx.txType == SYSTEM_UPGRADE_L2_TX_TYPE, "L2 system upgrade tx type is wrong");
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 

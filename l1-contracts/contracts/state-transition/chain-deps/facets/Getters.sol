@@ -22,6 +22,12 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
+
+    /// @return The address of the verifier smart contract
+    function getVerifier() external view returns (address) {
+        return address(s.verifier);
+    }
+
     /// @return The address of the current governor
     function getGovernor() external view returns (address) {
         return s.governor;
@@ -50,11 +56,6 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     /// @return The address of the base token bridge
     function getBaseTokenBridge() external view returns (address) {
         return address(s.baseTokenBridge);
-    }
-
-    /// @return The address of the verifier smart contract
-    function getVerifier() external view returns (address) {
-        return address(s.verifier);
     }
 
     /// @return The total number of batches that were committed

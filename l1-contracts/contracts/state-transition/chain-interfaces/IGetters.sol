@@ -11,6 +11,8 @@ interface IGetters is IZkSyncStateTransitionBase {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    function getVerifier() external view returns (address);
+
     function getGovernor() external view returns (address);
 
     function getPendingGovernor() external view returns (address);
@@ -18,8 +20,6 @@ interface IGetters is IZkSyncStateTransitionBase {
     function getBridgehub() external view returns (address);
 
     function getStateTransition() external view returns (address);
-
-    function getVerifier() external view returns (address);
 
     function getTotalBatchesCommitted() external view returns (uint256);
 
