@@ -443,7 +443,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
         require(l2BridgeAddress[_chainId] != address(0), "L1WethBridge: bridge not deployed");
-        require(msg.value == 0, "L1WETHBridge: msg.value not 0 for WETH");
 
         if (_amount > 0) {
             // Deposit WETH tokens from the depositor address to the smart contract address
@@ -451,11 +450,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
             IWETH9(l1WethAddress).withdraw(_amount);
         }
+        uint256 amount = _amount + msg.value;
+
         if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId] += _amount;
+            chainBalance[_chainId] += amount;
         }
 
-        uint256 amount = _amount + msg.value;
         bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
         {
             // Request the finalization of the deposit on the L2 side
@@ -475,7 +475,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             });
         }
 
-        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
     }
 
     function bridgehubConfirmL2Transaction(
