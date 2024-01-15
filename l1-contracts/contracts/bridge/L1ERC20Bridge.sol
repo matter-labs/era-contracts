@@ -190,10 +190,10 @@ contract L1ERC20Bridge is
         uint256 _deployBridgeProxyFee
     ) external payable {
         {
-            require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge already deployed");
+            require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed");
             // We are expecting to see the exact three bytecodes that are needed to initialize the bridge
-            require(_factoryDeps.length == 3, "L1EB: invalid number of factory deps");
-            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1EB: invalid factory deps");
+            require(_factoryDeps.length == 3, "L1EB: wrong # of f. deps");
+            require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1EB: wrong f. deps");
         }
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
@@ -203,7 +203,7 @@ contract L1ERC20Bridge is
                 require(msg.value == 0, "L1EB: msg.value > 0, base token");
             }
             // The caller miscalculated deploy transactions fees
-            require(_mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: invalid fee");
+            require(_mintValue == _deployBridgeImplementationFee + _deployBridgeProxyFee, "L1EB: wrong fee");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
@@ -249,7 +249,7 @@ contract L1ERC20Bridge is
                 // No factory deps are needed for L2 bridge proxy, because it is already passed in previous step
                 new bytes[](0)
             );
-            require(bridgeProxyAddr == l2BridgeStandardAddress, "L1EB: bridge address does not match");
+            require(bridgeProxyAddr == l2BridgeStandardAddress, "L1EB: wrong b. address");
             _setTxHashes(_chainId, bridgeImplTxHash, bridgeProxyTxHash);
         }
     }
@@ -272,8 +272,8 @@ contract L1ERC20Bridge is
         uint16 _bridgeProxyTxL2TxNumberInBatch,
         bytes32[] calldata _bridgeProxyTxMerkleProof
     ) external {
-        require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge already deployed");
-        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: bridge impl tx not sent");
+        require(l2BridgeAddress[_chainId] == address(0), "L1EB: bridge deployed 2");
+        require(bridgeImplDeployOnL2TxHash[_chainId] != 0x00, "L1EB: b. impl tx not sent");
 
         require(
             bridgehub.proveL1ToL2TransactionStatus(
@@ -285,7 +285,7 @@ contract L1ERC20Bridge is
                 _bridgeImplTxMerkleProof,
                 TxStatus(1)
             ),
-            "L1EB: bridge impl tx not confirmed"
+            "L1EB: bridge impl tx not conf" // not confirmed
         );
         require(
             bridgehub.proveL1ToL2TransactionStatus(
@@ -297,7 +297,7 @@ contract L1ERC20Bridge is
                 _bridgeProxyTxMerkleProof,
                 TxStatus(1)
             ),
-            "L1EB: bridge proxy tx not confirmed"
+            "L1EB: bridge proxy tx not conf" // not confirmed
         );
         delete bridgeImplDeployOnL2TxHash[_chainId];
         delete bridgeProxyDeployOnL2TxHash[_chainId];
@@ -402,7 +402,7 @@ contract L1ERC20Bridge is
         require(l2BridgeAddress[_chainId] != address(0), "L1EB: bridge not deployed");
         {
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            require(ethIsBaseToken, "L1EB: deposit only for Eth based chains");
+            require(ethIsBaseToken, "L1EB: deposit only for Eth chains");
             require(_mintValue == msg.value, "L1EB: mintValue mismatch");
 
             require(_amount != 0, "2T"); // empty deposit amount
