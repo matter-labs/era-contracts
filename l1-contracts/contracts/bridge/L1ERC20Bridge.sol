@@ -234,11 +234,7 @@ contract L1ERC20Bridge is
                     IL2ERC20Bridge.initialize,
                     (address(this), l2TokenProxyBytecodeHash, owner)
                 );
-                l2BridgeProxyConstructorData = abi.encode(
-                    bridgeImplementationAddr,
-                    owner,
-                    proxyInitializationParams
-                );
+                l2BridgeProxyConstructorData = abi.encode(bridgeImplementationAddr, owner, proxyInitializationParams);
             }
 
             // Deploy L2 bridge proxy contract
@@ -632,7 +628,6 @@ contract L1ERC20Bridge is
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) public nonReentrant {
-
         {
             bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
                 _chainId,
@@ -648,7 +643,14 @@ contract L1ERC20Bridge is
         }
 
         bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
-        bool usingLegacyDepositAmountStorageVar = _checkDeposited(_chainId, _depositSender, _l1Token, txDataHash, _l2TxHash, _amount);
+        bool usingLegacyDepositAmountStorageVar = _checkDeposited(
+            _chainId,
+            _depositSender,
+            _l1Token,
+            txDataHash,
+            _l2TxHash,
+            _amount
+        );
 
         if ((_chainId == ERA_CHAIN_ID) && usingLegacyDepositAmountStorageVar) {
             delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
@@ -679,13 +681,17 @@ contract L1ERC20Bridge is
     ) internal returns (bool usingLegacyDepositAmountStorageVar) {
         uint256 amount = 0;
         if (_chainId == ERA_CHAIN_ID) {
-            { amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];}
-            if (amount > 0){
+            {
+                amount = depositAmountEra[_depositSender][_l1Token][_l2TxHash];
+            }
+            if (amount > 0) {
                 usingLegacyDepositAmountStorageVar = true;
                 require(_amount == amount, "L1EB: amount mismatch");
             } else {
                 bool deposited;
-                {deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];}
+                {
+                    deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
+                }
                 require(deposited, "L1EB: deposit did not happen");
             }
         } else {
