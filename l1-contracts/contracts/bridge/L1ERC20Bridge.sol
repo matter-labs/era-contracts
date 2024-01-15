@@ -513,12 +513,12 @@ contract L1ERC20Bridge is
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
+        bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, _l1Token, _amount));
 
         {
             // Request the finalization of the deposit on the L2 side
             bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
 
-            bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, _l1Token, _amount));
             request = L2TransactionRequestTwoBridgesInner({
                 l2Contract: l2BridgeAddress[_chainId],
                 l2Calldata: l2TxCalldata,
