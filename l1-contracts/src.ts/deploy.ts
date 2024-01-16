@@ -21,8 +21,12 @@ import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
+
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
+import { ERC20BridgeMessageParsingFactory } from "../typechain/ERC20BridgeMessageParsingFactory";
+
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
@@ -203,13 +207,30 @@ export class Deployer {
 
   public async deployTransparentProxyAdmin(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ProxyAdmin", [], create2Salt, ethTxOptions);
-
     if (this.verbose) {
-      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${contractAddress}`);
+      console.log("Deploying Proxy Admin factory");
     }
 
-    this.addresses.TransparentProxyAdmin = contractAddress;
+    const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
+      signer: this.deployWallet,
+    });
+
+    const proxyAdmin = await contractFactory.deploy(...[ethTxOptions]);
+    const rec = await proxyAdmin.deployTransaction.wait();
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
+      console.log(`Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}`);
+    }
+    
+    this.addresses.TransparentProxyAdmin = proxyAdmin.address;
+
+    const tx = await proxyAdmin.transferOwnership(this.addresses.Governance);
+    const receipt = await tx.wait();
+    
+    if (this.verbose) {
+      console.log(`ProxyAdmin ownership transferred to Governance in tx ${receipt.transactionHash}, gas used: ${receipt.gasUsed.toString()}`);
+    }
   }
 
   public async deployBridgehubProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -351,13 +372,30 @@ export class Deployer {
     this.addresses.StateTransition.Verifier = contractAddress;
   }
 
+  public async deployERC20BridgeMessageParsing(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "ERC20BridgeMessageParsing",
+      [],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_ERC20_BRIDGE_MESSAGE_PARSING_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Bridges.ERC20BridgeMessageParsing = contractAddress;
+  }
+
   public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
-      ethTxOptions
+      ethTxOptions,
+      {ERC20BridgeMessageParsing: this.addresses.Bridges.ERC20BridgeMessageParsing}
     );
 
     if (this.verbose) {
@@ -387,7 +425,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.newTokenBridge(this.addresses.Bridges.ERC20BridgeProxy);
+    const tx = await bridgehub.addTokenBridge(this.addresses.Bridges.ERC20BridgeProxy);
 
     const receipt = await tx.wait();
     if (this.verbose) {
@@ -442,11 +480,11 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.newTokenBridge(this.addresses.Bridges.WethBridgeProxy);
+    const tx = await bridgehub.addTokenBridge(this.addresses.Bridges.WethBridgeProxy);
     const receipt = await tx.wait();
 
     /// registering ETH as a valid token, with address 1.
-    const tx2 = await bridgehub.newToken(ADDRESS_ONE);
+    const tx2 = await bridgehub.addToken(ADDRESS_ONE);
     const receipt2 = await tx2.wait();
 
     const tx3 = await bridgehub.setWethBridge(this.addresses.Bridges.WethBridgeProxy);
@@ -549,7 +587,7 @@ export class Deployer {
   public async registerStateTransition() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.newStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
+    const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);
 
     const receipt = await tx.wait();
     if (this.verbose) {
@@ -582,7 +620,7 @@ export class Deployer {
       [diamondCutData]
     );
 
-    const tx = await bridgehub.newChain(
+    const tx = await bridgehub.createNewChain(
       inputChainId,
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
@@ -637,7 +675,7 @@ export class Deployer {
   public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.newToken(tokenAddress);
+    const tx = await bridgehub.addToken(tokenAddress);
 
     const receipt = await tx.wait();
     if (this.verbose) {
@@ -648,9 +686,10 @@ export class Deployer {
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
-    await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 });
+    await this.deployERC20BridgeMessageParsing(create2Salt, { gasPrice, nonce: nonce });
+    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce +1 });
+    await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 2 });
+    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 3 });
   }
 
   public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -723,11 +762,19 @@ export class Deployer {
     return L1ERC20BridgeFactory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
   }
 
+  public defaultERC20BridgeMessageParsing(signerOrProvider: Signer | providers.Provider) {
+    return ERC20BridgeMessageParsingFactory.connect(this.addresses.Bridges.ERC20BridgeMessageParsing, signerOrProvider);
+  }
+
   public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {
     return L1WethBridgeFactory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {
     return ERC20Factory.connect(this.addresses.BaseToken, signerOrProvider);
+  }
+
+  public proxyAdminContract(signerOrProvider: Signer | providers.Provider) {
+    return ProxyAdminFactory.connect(this.addresses.TransparentProxyAdmin, signerOrProvider);
   }
 }

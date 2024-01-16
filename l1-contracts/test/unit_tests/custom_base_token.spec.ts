@@ -152,7 +152,7 @@ describe("Custom base token tests", () => {
         .deposit(chainId, await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
     );
 
-    expect(revertReason).equal("L1EB deposit n E chain");
+    expect(revertReason).equal("EB d.it n E chain");
   });
 
   it("Should deposit base token successfully direct via bridgehub", async () => {
@@ -202,7 +202,7 @@ describe("Custom base token tests", () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
     );
-    expect(revertReason).equal("L1EB w msg len");
+    expect(revertReason).equal("EB w msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {

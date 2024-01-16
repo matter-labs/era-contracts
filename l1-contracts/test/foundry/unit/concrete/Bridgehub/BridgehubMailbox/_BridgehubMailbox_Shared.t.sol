@@ -30,7 +30,7 @@ contract BridgehubMailboxTest is BridgehubTest {
         vm.mockCall(chainStateTransition, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
-        bridgehub.newStateTransition(chainStateTransition);
-        bridgehub.newChain(chainId, chainStateTransition, chainGovernor, chainAllowList, getDiamondCutData());
+        bridgehub.addStateTransition(chainStateTransition);
+        bridgehub.createNewChain(chainId, chainStateTransition, chainGovernor, chainAllowList, getDiamondCutData());
     }
 }

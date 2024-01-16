@@ -137,6 +137,7 @@ export interface DeployedAddresses {
   };
   Bridges: {
     ERC20BridgeImplementation: string;
+    ERC20BridgeMessageParsing: string;
     ERC20BridgeProxy: string;
     WethBridgeImplementation: string;
     WethBridgeProxy: string;
@@ -171,6 +172,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     },
     Bridges: {
       ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
+      ERC20BridgeMessageParsing: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_MESSAGE_PARSING_ADDR"),
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
       WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),

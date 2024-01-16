@@ -26,7 +26,7 @@ contract NewChainTest is RegistryTest {
         allowList = new AllowList(governorAddress);
 
         vm.prank(GOVERNOR);
-        bridgehub.newStateTransition(stateTransitionAddress);
+        bridgehub.addStateTransition(stateTransitionAddress);
     }
 
     function getChainContractAddress() internal returns (address chainContractAddress) {
@@ -61,7 +61,7 @@ contract NewChainTest is RegistryTest {
     function test_RevertWhen_NonGovernor() public {
         vm.startPrank(NON_GOVERNOR);
         vm.expectRevert(bytes.concat("12g"));
-        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.createNewChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
     function test_RevertWhen_StateTransitionIsNotInStorage() public {
@@ -69,7 +69,7 @@ contract NewChainTest is RegistryTest {
 
         vm.startPrank(GOVERNOR);
         vm.expectRevert(bytes.concat("r19"));
-        bridgehub.newChain(chainId, nonExistentStateTransitionAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.createNewChain(chainId, nonExistentStateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
     function test_RevertWhen_ChainIdIsAlreadyInUse() public {
@@ -81,10 +81,10 @@ contract NewChainTest is RegistryTest {
         vm.mockCall(stateTransitionAddress, abi.encodeWithSelector(IStateTransitionManager.newChain.selector), "");
 
         vm.startPrank(GOVERNOR);
-        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.createNewChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
 
         vm.expectRevert(bytes.concat("r20"));
-        bridgehub.newChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.createNewChain(chainId, stateTransitionAddress, governorAddress, allowList, getDiamondCutData());
     }
 
     function test_NewChainSuccessfullyWithNonZeroChainId() public {
@@ -128,7 +128,7 @@ contract NewChainTest is RegistryTest {
         vm.recordLogs();
         vm.startPrank(GOVERNOR);
 
-        uint256 resChainId = bridgehub.newChain(
+        uint256 resChainId = bridgehub.createNewChain(
             chainId,
             stateTransitionAddress,
             governorAddress,
@@ -216,7 +216,7 @@ contract NewChainTest is RegistryTest {
         vm.recordLogs();
         vm.startPrank(GOVERNOR);
 
-        uint256 resChainId = bridgehub.newChain(
+        uint256 resChainId = bridgehub.createNewChain(
             inputChainId,
             stateTransitionAddress,
             governorAddress,

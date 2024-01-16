@@ -133,7 +133,7 @@ describe("L1ERC20Bridge tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("L1EB w msg len");
+    expect(revertReason).equal("EB w msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
@@ -186,6 +186,6 @@ describe("L1ERC20Bridge tests", function () {
         .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
-    expect(revertReason).equal("L1EB withd w pf");
+    expect(revertReason).equal("EB withd w pf");
   });
 });

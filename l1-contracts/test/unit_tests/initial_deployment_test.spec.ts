@@ -60,7 +60,7 @@ describe("Initial Deployment", function () {
     const stateTransitionAddress2 = await stateTransition.stateTransition(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress2.toLowerCase());
 
-    const stateTransitionAddress3 = await bridgehub.getZkSyncStateTransition(chainId);
+    const stateTransitionAddress3 = await bridgehub.getStateTransition(chainId);
     expect(stateTransitionAddress1.toLowerCase()).equal(stateTransitionAddress3.toLowerCase());
   });
 });
