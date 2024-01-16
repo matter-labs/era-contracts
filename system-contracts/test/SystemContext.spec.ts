@@ -286,17 +286,34 @@ describe("SystemContext tests", () => {
       ).to.be.rejectedWith("The current L2 block hash is incorrect");
     });
 
+    it("should revert The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block", async () => {
+      const blockData = await systemContext.getBlockNumberAndTimestamp();
+      const blockNumber = blockData.blockNumber.add(2);
+      const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
+      const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
+      const expectedBlockHash = ethers.utils.keccak256(
+        ethers.utils.defaultAbiCoder.encode(
+          ["uint128", "uint128", "bytes32", "bytes32"],
+          [blockData.blockNumber.add(1), blockData.blockTimestamp.add(1), prevL2BlockHash, blockTxsRollingHash]
+        )
+      );
+      await expect(
+        systemContext.connect(bootloaderAccount).setL2Block(blockNumber, 0, expectedBlockHash, false, 0)
+      ).to.be.rejectedWith(
+        "The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block"
+      );
+    });
+
     it("should set block again2", async () => {
       const blockData = await systemContext.getBlockNumberAndTimestamp();
       const blockNumber = blockData.blockNumber.add(2);
       const blockTimestamp = blockData.blockTimestamp.add(2);
       const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
-      const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0)); // fine
-
+      const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
       const expectedBlockHash = ethers.utils.keccak256(
         ethers.utils.defaultAbiCoder.encode(
           ["uint128", "uint128", "bytes32", "bytes32"],
-          [blockData.blockNumber, blockData.blockTimestamp, prevL2BlockHash, blockTxsRollingHash]
+          [blockData.blockNumber.add(1), blockData.blockTimestamp.add(1), prevL2BlockHash, blockTxsRollingHash]
         )
       );
       await systemContext
