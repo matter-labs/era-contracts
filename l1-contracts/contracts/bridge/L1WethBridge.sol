@@ -458,7 +458,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         uint256 _chainId,
         address _prevMsgSender,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable override nonReentrant onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
         require(l2BridgeAddress[_chainId] != address(0), "L1WB: bridge not deployed");
         bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
