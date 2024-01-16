@@ -238,7 +238,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             // #if !EOA_GOVERNOR
             require(owner.code.length > 0, "L1EB owner EOA");
             // #endif
-            address l1Owner = AddressAliasHelper.applyL1ToL2Alias(owner);
+            address l2Owner = AddressAliasHelper.applyL1ToL2Alias(owner);
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
@@ -468,11 +468,12 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
         (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
-        require(l2BridgeAddress[_chainId] != address(0), "L1WB: bridge not deployed");
-        bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-        require(!ethIsBaseToken, "L1WB: bridgehub deposit not allowed when eth is base token");
-        require((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS), "L1WB: Invalid L1 token address");
-
+        {
+            require(l2BridgeAddress[_chainId] != address(0), "L1WB: bridge not deployed");
+            bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
+            require(!ethIsBaseToken, "L1WB: bridgehub deposit not allowed when eth is base token");
+            require((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS), "L1WB: Invalid L1 token address");
+        }
         if (_amount > 0) {
             // Deposit WETH tokens from the depositor address to the smart contract address
             IERC20(l1WethAddress).safeTransferFrom(_prevMsgSender, address(this), _amount);
