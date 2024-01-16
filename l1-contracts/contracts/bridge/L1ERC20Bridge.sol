@@ -537,7 +537,7 @@ contract L1ERC20Bridge is
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
-        bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, _l1Token, _amount));
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
 
         {
             // Request the finalization of the deposit on the L2 side
