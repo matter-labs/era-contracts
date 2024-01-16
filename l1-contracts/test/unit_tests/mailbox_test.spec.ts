@@ -312,7 +312,7 @@ describe("Mailbox tests", function () {
     const mintValue = await overrides.value;
     overrides.gasLimit = 10000000;
 
-    let encodeRequest = (refundRecipient) =>
+    const encodeRequest = (refundRecipient) =>
       bridgehub.interface.encodeFunctionData("requestL2Transaction", [
         {
           chainId,
