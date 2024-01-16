@@ -303,12 +303,12 @@ describe("Mailbox tests", function () {
 
     const overrides: ethers.PayableOverrides = {};
     overrides.gasPrice = await bridgehub.provider.getGasPrice();
-    overrides.value = await (await bridgehub.l2TransactionBaseCost(
+    overrides.value = await bridgehub.l2TransactionBaseCost(
       chainId,
       overrides.gasPrice,
       l2GasLimit,
       REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    ));
+    );
     const mintValue = await overrides.value;
     overrides.gasLimit = 10000000;
 
@@ -324,7 +324,7 @@ describe("Mailbox tests", function () {
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           factoryDeps: [new Uint8Array(32)],
           refundRecipient,
-        }
+        },
       ]);
 
     callViaForwarder = async (refundRecipient) => {
