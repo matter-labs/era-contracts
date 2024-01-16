@@ -12,7 +12,6 @@ import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
-    /// new fields
     /// @notice we store registered stateTransitionManagers
     mapping(address => bool) public stateTransitionManagerIsRegistered;
     /// @notice we store registered tokens (for arbitrary base token)
@@ -88,13 +87,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _salt,
         address _l2Governor,
         bytes calldata _initData
-    ) external onlyOwner returns (uint256 chainId) {
+    ) external onlyOwner nonReentrant returns (uint256 chainId) {
         // KL TODO: clear up this formula for chainId generation
         // if (_chainId == 0) {
         //     chainId = uint48(
         //         uint256(
         //             keccak256(
-        //                 abi.encodePacked(
+        //                 abi.encode(
         //                     "CHAIN_ID",
         //                     block.chainid,
         //                     address(this),
@@ -107,7 +106,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         //     );
         // } else { }
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
-        chainId = uint48(_chainId);
+        require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
@@ -206,7 +205,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
-            // address tokenBridge = baseTokenBridge[_request.chainId];
 
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
@@ -257,7 +255,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
-            // address tokenBridge = baseTokenBridge[_request.chainId];
 
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");

@@ -209,9 +209,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "L1WB: Invalid number of factory deps");
 
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            if (!ethIsBaseToken) {
-                require(msg.value == 0, "L1WB: msg.value not 0 for non eth base token");
-            }
+            require((ethIsBaseToken) || (msg.value == 0), "L1WB: msg.value not 0 for non eth base token");
 
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WB: Invalid factory deps");
             require(bridgeProxyDeployOnL2TxHash[_chainId] == 0x00, "L1WB b. proxy tx sent"); // clear the tx first by proving the txs succeeded or failed
@@ -477,7 +475,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             chainBalance[_chainId] += amount;
         }
 
-        bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, amount));
         {
             // Request the finalization of the deposit on the L2 side
             bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, l1WethAddress, amount);
