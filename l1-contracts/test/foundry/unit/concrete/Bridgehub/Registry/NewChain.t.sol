@@ -69,7 +69,13 @@ contract NewChainTest is RegistryTest {
 
         vm.startPrank(GOVERNOR);
         vm.expectRevert(bytes.concat("r19"));
-        bridgehub.createNewChain(chainId, nonExistentStateTransitionAddress, governorAddress, allowList, getDiamondCutData());
+        bridgehub.createNewChain(
+            chainId,
+            nonExistentStateTransitionAddress,
+            governorAddress,
+            allowList,
+            getDiamondCutData()
+        );
     }
 
     function test_RevertWhen_ChainIdIsAlreadyInUse() public {

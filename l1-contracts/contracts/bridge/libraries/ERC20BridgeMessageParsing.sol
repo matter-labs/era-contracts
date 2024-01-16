@@ -11,7 +11,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev A helper library for initializing L2 bridges in zkSync hyperchain L2 network.
-library ERC20BridgeMessageParsing {    
+library ERC20BridgeMessageParsing {
     /// @dev Decode the withdraw message that came from L2
     function parseL2WithdrawalMessage(
         address _bridgehub,

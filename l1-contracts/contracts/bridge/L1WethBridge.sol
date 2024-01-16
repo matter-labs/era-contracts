@@ -196,16 +196,16 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     }
 
     /// @notice The initialization is as follows, anybody can start the process by calling startWethBridgeInit
-    /// This sets the bridgeImplTxHash and bridgeProxyTxHash, as well as the expected addresses. 
-    /// After this the finishInitializeChain function is called to confirm the state of the txs. 
+    /// This sets the bridgeImplTxHash and bridgeProxyTxHash, as well as the expected addresses.
+    /// After this the finishInitializeChain function is called to confirm the state of the txs.
     /// If the txs fail, the txs can be retried by calling startErc20BridgeInit again.
-    /// Note that if the first tx fails, then normally the second will also fail, as the proxy calls the implementation at deployment, see here: 
+    /// Note that if the first tx fails, then normally the second will also fail, as the proxy calls the implementation at deployment, see here:
     /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L40
-    /// So the second tx can only succeed if a contract has been deployed at the destination address. 
-    /// However, that address might be frontrun. To check this we store if the impl tx has succeeded between retries in bridgeImplTxSucceeded. 
+    /// So the second tx can only succeed if a contract has been deployed at the destination address.
+    /// However, that address might be frontrun. To check this we store if the impl tx has succeeded between retries in bridgeImplTxSucceeded.
     /// We only finalize the address of the transaction if both txs have succeeded.
     /// Finally, we store the potential addresses in l2BridgePotentialAddress and l2WethPotentialAddress, and not just use the l2BridgeStandardAddressEthIsBase etc
-    /// so that we can change the bytecode of the bridges, and the standard addresses. 
+    /// so that we can change the bytecode of the bridges, and the standard addresses.
     /// @dev Starts the deployment of the  L2 WETH bridge counterpart as well as provides some factory deps for it for a specific chain
     /// @param _chainId of the chosen chain
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge

@@ -222,14 +222,18 @@ export class Deployer {
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
       console.log(`Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}`);
     }
-    
+
     this.addresses.TransparentProxyAdmin = proxyAdmin.address;
 
     const tx = await proxyAdmin.transferOwnership(this.addresses.Governance);
     const receipt = await tx.wait();
-    
+
     if (this.verbose) {
-      console.log(`ProxyAdmin ownership transferred to Governance in tx ${receipt.transactionHash}, gas used: ${receipt.gasUsed.toString()}`);
+      console.log(
+        `ProxyAdmin ownership transferred to Governance in tx ${
+          receipt.transactionHash
+        }, gas used: ${receipt.gasUsed.toString()}`
+      );
     }
   }
 
@@ -374,12 +378,7 @@ export class Deployer {
 
   public async deployERC20BridgeMessageParsing(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2(
-      "ERC20BridgeMessageParsing",
-      [],
-      create2Salt,
-      ethTxOptions
-    );
+    const contractAddress = await this.deployViaCreate2("ERC20BridgeMessageParsing", [], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ERC20_BRIDGE_MESSAGE_PARSING_ADDR=${contractAddress}`);
@@ -395,7 +394,7 @@ export class Deployer {
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
       ethTxOptions,
-      {ERC20BridgeMessageParsing: this.addresses.Bridges.ERC20BridgeMessageParsing}
+      { ERC20BridgeMessageParsing: this.addresses.Bridges.ERC20BridgeMessageParsing }
     );
 
     if (this.verbose) {
@@ -687,7 +686,7 @@ export class Deployer {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     await this.deployERC20BridgeMessageParsing(create2Salt, { gasPrice, nonce: nonce });
-    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce +1 });
+    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.registerERC20Bridge({ gasPrice, nonce: nonce + 3 });
   }

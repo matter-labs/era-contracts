@@ -40,7 +40,6 @@ struct L2TransactionRequestTwoBridgesInner {
 }
 
 interface IBridgehub {
-
     struct ChainData {
         address stateTransitionManager;
         address baseToken;
