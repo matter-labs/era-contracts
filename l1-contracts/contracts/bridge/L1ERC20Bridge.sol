@@ -360,7 +360,7 @@ contract L1ERC20Bridge is
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
     /// @return l2TxHash The L2 transaction hash of deposit finalization
     /// @param _refundRecipient The address on L2 that will receive the refund for the transaction.
-    /// NOTE: the function doesn't use `nonreentrant` and `senderCanCallFunction` modifiers,
+    /// NOTE: the function doesn't use `nonreentrant` modifier,
     /// because the inner method does.
     function deposit(
         address _l2Receiver,
