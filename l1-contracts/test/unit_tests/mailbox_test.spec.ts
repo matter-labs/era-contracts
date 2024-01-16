@@ -301,30 +301,31 @@ describe("Mailbox tests", function () {
       };
     };
 
-    const encodeRequest = (refundRecipient) =>
+    const overrides: ethers.PayableOverrides = {};
+    overrides.gasPrice = await bridgehub.provider.getGasPrice();
+    overrides.value = await (await bridgehub.l2TransactionBaseCost(
+      chainId,
+      overrides.gasPrice,
+      l2GasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    ));
+    const mintValue = await overrides.value;
+    overrides.gasLimit = 10000000;
+
+    let encodeRequest = (refundRecipient) =>
       bridgehub.interface.encodeFunctionData("requestL2Transaction", [
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
-          mintValue: 0,
+          mintValue: mintValue,
           l2Value: 0,
           l2Calldata: "0x",
           l2GasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           factoryDeps: [new Uint8Array(32)],
           refundRecipient,
-        },
+        }
       ]);
-
-    const overrides: ethers.PayableOverrides = {};
-    overrides.gasPrice = await bridgehub.provider.getGasPrice();
-    overrides.value = await bridgehub.l2TransactionBaseCost(
-      chainId,
-      overrides.gasPrice,
-      l2GasLimit,
-      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    );
-    overrides.gasLimit = 10000000;
 
     callViaForwarder = async (refundRecipient) => {
       return {
