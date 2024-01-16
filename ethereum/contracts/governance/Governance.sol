@@ -29,7 +29,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @dev - 0 means the operation is not created.
     /// @dev - 1 (EXECUTED_PROPOSAL_TIMESTAMP) means the operation is already executed.
     /// @dev - any other value means timestamp in seconds when the operation will be ready for execution.
-    mapping(bytes32 => uint256) public timestamps;
+    mapping(bytes32 operationId => uint256 executionTimestamp) public timestamps;
 
     /// @notice The minimum delay in seconds for operations to be ready for execution.
     uint256 public minDelay;

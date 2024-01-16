@@ -33,11 +33,11 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 message was already processed
-    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)) public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(address => mapping(address => mapping(bytes32 => uint256))) internal depositAmount;
+    mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount))) internal depositAmount;
 
     /// @dev The address of deployed L2 bridge counterpart
     address public l2Bridge;
@@ -55,7 +55,7 @@ contract L1ERC20Bridge is IL1Bridge, IL1BridgeLegacy, ReentrancyGuard {
 
     /// @dev The accumulated deposited amount per user.
     /// @dev A mapping L1 token address => user address => the total deposited amount by the user
-    mapping(address => mapping(address => uint256)) public totalDepositedAmountPerUser;
+    mapping(address => mapping(address => uint256)) public __DEPRECATED_totalDepositedAmountPerUser;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
