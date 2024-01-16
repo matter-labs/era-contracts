@@ -7,7 +7,6 @@ import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
-import { IZkSyncStateTransition } from "../../typechain/IZkSyncStateTransition";
 import {
   AdminFacetFactory,
   CustomUpgradeTestFactory,
