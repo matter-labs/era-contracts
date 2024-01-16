@@ -236,6 +236,9 @@ contract L1ERC20Bridge is
             bytes memory l2BridgeProxyConstructorData;
             {
                 address owner = owner();
+                // #if !EOA_GOVERNOR
+                require(owner.code.length > 0, "L1EB owner EOA");
+                // #endif
                 address l2Owner = AddressAliasHelper.applyL1ToL2Alias(owner);
                 // Data to be used in delegate call to initialize the proxy
                 bytes memory proxyInitializationParams = abi.encodeCall(

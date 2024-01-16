@@ -234,16 +234,19 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         // Prepare the proxy constructor data
         bytes memory l2WethBridgeProxyConstructorData;
         {
-            address proxyAdmin = readProxyAdmin();
-            address l2ProxyAdmin = AddressAliasHelper.applyL1ToL2Alias(proxyAdmin);
+            address owner = owner();
+            // #if !EOA_GOVERNOR
+            require(owner.code.length > 0, "L1EB owner EOA");
+            // #endif
+            address l1Owner = AddressAliasHelper.applyL1ToL2Alias(owner);
             // Data to be used in delegate call to initialize the proxy
             bytes memory proxyInitializationParams = abi.encodeCall(
                 IL2WethBridge.initialize,
-                (address(this), l1WethAddress, l2ProxyAdmin, ethIsBaseToken)
+                (address(this), l1WethAddress, l2Owner, ethIsBaseToken)
             );
             l2WethBridgeProxyConstructorData = abi.encode(
                 wethBridgeImplementationAddr,
-                l2ProxyAdmin,
+                l2Owner,
                 proxyInitializationParams
             );
         }
