@@ -50,6 +50,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
 
+    /// @dev specifiec the number of factory specs needed for L2 deployment
     uint256 internal constant NUMBER_OF_FACTORY_DEPS = 2;
 
     /// @dev The address of the WETH token on L1
@@ -178,6 +179,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
+    /// @dev used to specify special bridges not deployed by this contract
+    /// these bridges can be custom bridges, so this is only allowed for the owner
     function initializeChainGovernance(
         uint256 _chainId,
         address _l2BridgeAddress,
@@ -284,6 +287,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     }
 
     /// @dev We have to confirm that the deploy transactions succeeded.
+    /// @param _chainId of the chosen chain
+    /// @param _bridgeImplTxStatus The status of the L2 bridge implementation deploy transaction
+    /// @param _bridgeProxyTxStatus The status of the L2 bridge proxy deploy transaction
     function finishInitializeChain(
         uint256 _chainId,
         ConfirmL2TxStatus calldata _bridgeImplTxStatus,
@@ -416,6 +422,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         emit DepositInitiatedSharedBridge(_chainId, txHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
+    /// @dev internal to avoid stack too deep error
     function _depositSendTx(
         uint256 _chainId,
         uint256 _mintValue,
@@ -441,7 +448,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         txHash = bridgehub.requestL2Transaction{value: _mintValue}(request);
     }
 
-    // we have to keep track of bridgehub deposits to track each chain's assets
+    /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
+    /// we also use it to keep to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address, //_prevMsgSender,
@@ -455,6 +463,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         }
     }
 
+    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
+    /// specifies called chainId and caller, and requested transaction in _data. 
+    /// currently we only support a single tx, depositing. 
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -508,6 +519,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
     }
 
+    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
+    /// used to confirm that the Mailbox has accepted a transaction. 
+    /// we can store the fact that the tx has happened using txDataHash and txHash
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,

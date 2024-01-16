@@ -50,16 +50,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bridgehub = _bridgehub;
     }
 
+    /// @notice only the bridgehub can call 
     modifier onlyBridgehub() {
         require(msg.sender == bridgehub, "StateTransition: only bridgehub");
         _;
     }
 
+    /// @notice only the state transition chain contract can call
     modifier onlyChain(uint256 _chainId) {
         require(stateTransition[_chainId] == msg.sender, "StateTransition: only chain");
         _;
     }
 
+    /// @notice only the governor of the chain can call
     modifier onlyChainGovernor(uint256 _chainId) {
         require(
             IZkSyncStateTransition(stateTransition[_chainId]).getGovernor() == msg.sender,

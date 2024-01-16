@@ -27,16 +27,20 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice a bridge can have multiple tokens
     mapping(uint256 => address) public baseTokenBridge;
 
+    /// @notice all the ether is held by the weth bridge
     IL1Bridge public wethBridge;
 
+    /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
 
+    /// @notice used to initialize the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 
     ///// Getters
 
+    /// @notice return the state transition chain contract for a chainId
     function getZkSyncStateTransition(uint256 _chainId) public view returns (address) {
         return IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId);
     }
@@ -74,11 +78,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         tokenBridgeIsRegistered[_tokenBridge] = true;
     }
 
+    /// @notice To set main Weth bridge, only Owner. Not done in initialize, as 
+    /// the order of deployment is Bridgehub, L1WethBridge, and then we call this
     function setWethBridge(address _wethBridge) external onlyOwner {
         wethBridge = IL1Bridge(_wethBridge);
     }
 
-    /// @notice for Eth the baseToken address is 0.
+    /// @notice register new chain
+    /// @notice for Eth the baseToken address is 1, and the baseTokenBridge is the wethBridge is required
     function newChain(
         uint256 _chainId,
         address _stateTransitionManager,
@@ -138,6 +145,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
     //// Mailbox forwarder
 
+    /// @notice forwards function call to Mailbox based on ChainId
     function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -148,7 +156,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         address stateTransition = getZkSyncStateTransition(_chainId);
         return IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
-
+    
+    /// @notice forwards function call to Mailbox based on ChainId
     function proveL2LogInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -160,6 +169,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         return IZkSyncStateTransition(stateTransition).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
+    /// @notice forwards function call to Mailbox based on ChainId
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
         bytes32 _l2TxHash,
@@ -181,6 +191,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             );
     }
 
+    /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(
         uint256 _chainId,
         uint256 _gasPrice,
@@ -197,9 +208,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice the mailbox is called directly after the baseTokenBridge received the deposit
-    /// @notice this assumes that either ether is the base token or
-    /// @notice the msg.sender has approved mintValue allowance for the baseTokenBridge.
-    /// @notice This means this is not ideal for contract calls, as the contract would have to handle token allowance.
+    /// this assumes that either ether is the base token or
+    /// the msg.sender has approved mintValue allowance for the baseTokenBridge.
+    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
     function requestL2Transaction(
         L2TransactionRequestDirect calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {

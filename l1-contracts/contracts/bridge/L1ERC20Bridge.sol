@@ -41,6 +41,7 @@ contract L1ERC20Bridge is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev specifiec the number of factory specs needed for L2 deployment
     uint256 internal constant NUMBER_OF_FACTORY_DEPS = 3;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
@@ -119,11 +120,12 @@ contract L1ERC20Bridge is
         return l2BridgeAddress[ERA_CHAIN_ID];
     }
 
-    /// @dev legacy function gives the l2TokenBeacon address on Era
+    /// @dev legacy getter function gives the l2TokenBeacon address on Era
     function l2TokenBeacon() external view override returns (address) {
         return ERA_TOKEN_BEACON_ADDRESS;
     }
 
+    /// @dev legacy getter function gives the state of a withdrawal from Era
     function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -183,6 +185,9 @@ contract L1ERC20Bridge is
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
+
+    /// @dev used to specify special bridges not deployed by this contract
+    /// these bridges can be custom bridges, so this is only allowed for the owner
     function initializeChainGovernance(
         uint256 _chainId,
         address _l2BridgeAddress,
@@ -266,13 +271,16 @@ contract L1ERC20Bridge is
         l2TokenBeaconPotentialAddress[_chainId] = l2TokenBeaconStandardAddress;
     }
 
-    // to avoid stack too deep error
+    /// @dev to avoid stack too deep error
     function _setTxHashes(uint256 _chainId, bytes32 _bridgeImplTxHash, bytes32 _bridgeProxyTxHash) internal {
         bridgeImplDeployOnL2TxHash[_chainId] = _bridgeImplTxHash;
         bridgeProxyDeployOnL2TxHash[_chainId] = _bridgeProxyTxHash;
     }
 
     /// @dev We have to confirm that the deploy transactions succeeded.
+    /// @param _chainId of the chosen chain
+    /// @param _bridgeImplTxStatus The status of the L2 bridge implementation deploy transaction
+    /// @param _bridgeProxyTxStatus The status of the L2 bridge proxy deploy transaction
     function finishInitializeChain(
         uint256 _chainId,
         ConfirmL2TxStatus calldata _bridgeImplTxStatus,
@@ -462,7 +470,7 @@ contract L1ERC20Bridge is
         }
     }
 
-    // to avoid stack too deep error
+    /// @dev internal to avoid stack too deep error
     function _depositSendTx(
         uint256 _chainId,
         uint256 _mintValue,
@@ -489,6 +497,7 @@ contract L1ERC20Bridge is
     }
 
     /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
+    /// we also use it to keep to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address _prevMsgSender,
@@ -523,6 +532,9 @@ contract L1ERC20Bridge is
         return balanceAfter - balanceBefore;
     }
 
+    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
+    /// specifies called chainId and caller, and requested transaction in _data. 
+    /// currently we only support a single tx, depositing. 
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -567,6 +579,9 @@ contract L1ERC20Bridge is
         }
     }
 
+    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
+    /// used to confirm that the Mailbox has accepted a transaction. 
+    /// we can store the fact that the tx has happened using txDataHash and txHash
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -692,6 +707,7 @@ contract L1ERC20Bridge is
         }
     }
 
+    /// @dev internal to avoid stack too deep error
     function _checkDeposited(
         uint256 _chainId,
         address _depositSender,
