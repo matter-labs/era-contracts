@@ -25,7 +25,6 @@ import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDir
 import {InitializableRandomStorage} from "../common/random-storage/InitializableRandomStorage.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 import {Ownable2StepRandomStorage} from "../common/random-storage/Ownable2StepRandomStorage.sol";
-import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -121,16 +120,12 @@ contract L1ERC20Bridge is
     }
 
     /// @dev legacy getter function gives the l2TokenBeacon address on Era
-    function l2TokenBeacon() external view override returns (address) {
+    function l2TokenBeacon() external pure override returns (address) {
         return ERA_TOKEN_BEACON_ADDRESS;
     }
 
     /// @dev legacy getter function gives the state of a withdrawal from Era
-    function isWithdrawalFinalized(
-        uint256 _chainId,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex
-    ) external view returns (bool) {
+    function isWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
         return isWithdrawalFinalizedEra[_l2BatchNumber][_l2MessageIndex];
     }
 
@@ -714,7 +709,7 @@ contract L1ERC20Bridge is
         bytes32 _txDataHash,
         bytes32 _l2TxHash,
         uint256 _amount
-    ) internal returns (bool usingLegacyDepositAmountStorageVar) {
+    ) internal view returns (bool usingLegacyDepositAmountStorageVar) {
         uint256 amount = 0;
         if (_chainId == ERA_CHAIN_ID) {
             {
