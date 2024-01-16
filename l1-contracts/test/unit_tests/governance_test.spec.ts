@@ -52,7 +52,7 @@ describe("Admin facet tests", function () {
 
   it("random account fails to set porter availability", async () => {
     const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).setPorterAvailability(false));
-    expect(revertReason).equal("StateTransition Chain: not state transition");
+    expect(revertReason).equal("StateTransition Chain: not state transition manager");
   });
 
   it("governor successfully set priority transaction max gas limit", async () => {

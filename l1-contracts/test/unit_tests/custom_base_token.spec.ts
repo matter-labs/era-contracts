@@ -14,6 +14,7 @@ import { startErc20BridgeInitOnChain } from "../../src.ts/erc20-initialize";
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
 import { hashL2Bytecode } from "../../src.ts/utils";
+import type { Deployer } from "../../src.ts/deploy";
 
 import { Interface } from "ethers/lib/utils";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
@@ -67,6 +68,8 @@ export async function create2DeployFromL1(
 describe("Custom base token tests", () => {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
+  let deployWallet: Wallet;
+  let deployer: Deployer;
   let l1ERC20Bridge: IL1Bridge;
   let bridgehub: IBridgehub;
   let l1ERC20BridgeInit: L1ERC20Bridge;
@@ -79,7 +82,7 @@ describe("Custom base token tests", () => {
   before(async () => {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
-    const deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(owner.provider);
+    deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic4, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
 
     const gasPrice = await owner.provider.getGasPrice();
@@ -95,7 +98,7 @@ describe("Custom base token tests", () => {
 
     await owner.sendTransaction(tx);
     // note we can use initialDeployment so we don't go into deployment details here
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [], "BAT");
+    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [], "BAT");
     chainId = deployer.chainId;
     bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
@@ -107,20 +110,8 @@ describe("Custom base token tests", () => {
     altToken = TestnetERC20TokenFactory.connect(altTokenAddress, owner);
 
     // prepare the bridge
-
     l1ERC20Bridge = IL1BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
     l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
-    const nonce = await deployWallet.getTransactionCount();
-
-    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
-
-    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address,address)",
-      [chainId, ADDRESS_ONE, ADDRESS_ONE]
-    );
-
-    await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
   });
 
   it("Should have correct base token", async () => {
@@ -132,8 +123,24 @@ describe("Custom base token tests", () => {
   });
 
   it("Check startErc20BridgeInitOnChain", async () => {
-    // we should still be able to deploy the erc20 bridge
-    const txHash = await l1ERC20BridgeInit.bridgeImplDeployOnL2TxHash(chainId);
+    const nonce = await deployWallet.getTransactionCount();
+    const gasPrice = await owner.provider.getGasPrice();
+
+    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
+
+    const txHash = await l1ERC20BridgeInit.bridgeProxyDeployOnL2TxHash(chainId);
+
+    expect(txHash).not.equal(ethers.constants.HashZero);
+  });
+
+  it("Check should initialize through governance", async () => {
+    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
+    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address,address)",
+      [chainId, ADDRESS_ONE, ADDRESS_ONE]
+    );
+
+    const txHash = await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
   });
@@ -145,7 +152,7 @@ describe("Custom base token tests", () => {
         .deposit(chainId, await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
     );
 
-    expect(revertReason).equal("L1EB: deposit only for Eth based chains");
+    expect(revertReason).equal("L1EB deposit n E chain");
   });
 
   it("Should deposit base token successfully direct via bridgehub", async () => {
@@ -196,13 +203,13 @@ describe("Custom base token tests", () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [])
     );
-    expect(revertReason).equal("L1EB: invalid message length");
+    expect(revertReason).equal("L1EB w msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(96), [])
     );
-    expect(revertReason).equal("Incorrect message function selector");
+    expect(revertReason).equal("W msg f slctr");
   });
 });

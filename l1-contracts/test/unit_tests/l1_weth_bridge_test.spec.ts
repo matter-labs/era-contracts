@@ -66,11 +66,11 @@ export async function create2DeployFromL1(
 describe("WETH Bridge tests", () => {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
+  let deployWallet: Wallet;
+  let deployer: Deployer;
   let bridgeProxy: L1WethBridge;
   let l1Weth: WETH9;
   const functionSignature = "0x6c0960f9";
-  let deployWallet: Wallet;
-  let deployer: Deployer;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
@@ -111,7 +111,7 @@ describe("WETH Bridge tests", () => {
 
     await startWethBridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
 
-    const txHash = await bridgeProxy.bridgeImplDeployOnL2TxHash(chainId);
+    const txHash = await bridgeProxy.bridgeProxyDeployOnL2TxHash(chainId);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
   });
