@@ -7,7 +7,14 @@ import {DiamondInit} from "solpp/zksync/DiamondInit.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/zksync/Storage.sol";
 import {Diamond} from "solpp/zksync/libraries/Diamond.sol";
 import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
+import {Base} from "solpp/zksync/facets/Base.sol";
 import {Governance} from "solpp/governance/Governance.sol";
+
+contract GettersMock is Base {
+    function getFeeParams() public returns (FeeParams memory) {
+        return s.feeParams;
+    }
+}
 
 contract AdminTest is Test {
     DiamondProxy internal diamondProxy;
@@ -16,9 +23,10 @@ contract AdminTest is Test {
     address internal governor;
     AdminFacet internal adminFacet;
     AdminFacet internal proxyAsAdmin;
+    GettersMock internal proxyAsGettersMock;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](10);
+        bytes4[] memory dcSelectors = new bytes4[](11);
         dcSelectors[0] = adminFacet.setPendingGovernor.selector;
         dcSelectors[1] = adminFacet.acceptGovernor.selector;
         dcSelectors[2] = adminFacet.setPendingAdmin.selector;
@@ -29,6 +37,13 @@ contract AdminTest is Test {
         dcSelectors[7] = adminFacet.executeUpgrade.selector;
         dcSelectors[8] = adminFacet.freezeDiamond.selector;
         dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
+        dcSelectors[10] = adminFacet.changeFeeParams.selector;
+        return dcSelectors;
+    }
+
+    function getGettersMockSelectors() private view returns (bytes4[] memory) {
+        bytes4[] memory dcSelectors = new bytes4[](1);
+        dcSelectors[0] = proxyAsGettersMock.getFeeParams.selector;
         return dcSelectors;
     }
 
@@ -54,6 +69,7 @@ contract AdminTest is Test {
         });
 
         adminFacet = new AdminFacet();
+        GettersMock gettersMock = new GettersMock();
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(
             diamondInit.initialize.selector,
@@ -72,12 +88,18 @@ contract AdminTest is Test {
             feeParams
         );
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(adminFacet),
             action: Diamond.Action.Add,
             isFreezable: false,
             selectors: getAdminSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(gettersMock),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: getGettersMockSelectors()
         });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -88,5 +110,6 @@ contract AdminTest is Test {
 
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
+        proxyAsGettersMock = GettersMock(address(diamondProxy));
     }
 }
