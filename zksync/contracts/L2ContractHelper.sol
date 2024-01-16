@@ -11,7 +11,7 @@ pragma solidity 0.8.20;
  * the first one is taken from the context, the other three are chosen by the sender.
  * @dev To send a variable-length message we use this trick:
  * - This system contract accepts an arbitrary length message and sends a fixed length message with
- * parameters `senderAddress == this`, `marker == true`, `key == msg.sender`, `value == keccak256(message)`.
+ * parameters `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
  * it requires that the preimage of `value` be provided.
  */
