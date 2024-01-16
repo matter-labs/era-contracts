@@ -464,8 +464,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// specifies called chainId and caller, and requested transaction in _data. 
-    /// currently we only support a single tx, depositing. 
+    /// specifies called chainId and caller, and requested transaction in _data.
+    /// currently we only support a single tx, depositing.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -520,7 +520,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// used to confirm that the Mailbox has accepted a transaction. 
+    /// used to confirm that the Mailbox has accepted a transaction.
     /// we can store the fact that the tx has happened using txDataHash and txHash
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,

@@ -78,7 +78,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         tokenBridgeIsRegistered[_tokenBridge] = true;
     }
 
-    /// @notice To set main Weth bridge, only Owner. Not done in initialize, as 
+    /// @notice To set main Weth bridge, only Owner. Not done in initialize, as
     /// the order of deployment is Bridgehub, L1WethBridge, and then we call this
     function setWethBridge(address _wethBridge) external onlyOwner {
         wethBridge = IL1Bridge(_wethBridge);
@@ -156,7 +156,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         address stateTransition = getZkSyncStateTransition(_chainId);
         return IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
-    
+
     /// @notice forwards function call to Mailbox based on ChainId
     function proveL2LogInclusion(
         uint256 _chainId,

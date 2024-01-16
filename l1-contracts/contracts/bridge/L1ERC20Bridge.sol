@@ -185,7 +185,6 @@ contract L1ERC20Bridge is
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
     }
 
-
     /// @dev used to specify special bridges not deployed by this contract
     /// these bridges can be custom bridges, so this is only allowed for the owner
     function initializeChainGovernance(
@@ -533,8 +532,8 @@ contract L1ERC20Bridge is
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// specifies called chainId and caller, and requested transaction in _data. 
-    /// currently we only support a single tx, depositing. 
+    /// specifies called chainId and caller, and requested transaction in _data.
+    /// currently we only support a single tx, depositing.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -580,7 +579,7 @@ contract L1ERC20Bridge is
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// used to confirm that the Mailbox has accepted a transaction. 
+    /// used to confirm that the Mailbox has accepted a transaction.
     /// we can store the fact that the tx has happened using txDataHash and txHash
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,

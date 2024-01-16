@@ -50,7 +50,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bridgehub = _bridgehub;
     }
 
-    /// @notice only the bridgehub can call 
+    /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         require(msg.sender == bridgehub, "StateTransition: only bridgehub");
         _;
