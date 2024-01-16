@@ -177,11 +177,7 @@ contract L1ERC20Bridge is
         l2BridgeStandardAddress = _l2BridgeStandardAddress;
 
         // #if !EOA_GOVERNOR
-        uint32 size;
-        assembly {
-            size := extcodesize(_owner)
-        }
-        require(size > 0, "L1EB owner EOA");
+        require(_owner.code.length > 0, "L1EB owner EOA");
         // #endif
 
         factoryDepsHash = keccak256(abi.encode(_factoryDeps));
