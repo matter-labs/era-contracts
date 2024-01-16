@@ -215,9 +215,7 @@ contract L1ERC20Bridge is
         }
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
-            if (!ethIsBaseToken) {
-                require(msg.value == 0, "L1EB m.v > 0, e base");
-            }
+            require(ethIsBaseToken || msg.value == 0, "L1EB m.v > 0, e base");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
