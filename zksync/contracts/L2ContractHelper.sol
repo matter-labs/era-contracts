@@ -82,7 +82,7 @@ IEthToken constant L2_ETH_ADDRESS = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 
  */
 library L2ContractHelper {
     /// @dev The prefix used to create CREATE2 addresses.
-    bytes32 constant CREATE2_PREFIX = keccak256("zksyncCreate2");
+    bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
