@@ -178,7 +178,6 @@ describe("Custom base token weth tests", () => {
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
       refundRecipient: await randomSigner.getAddress(),
       secondBridgeAddress: l1WethBridge.address,
-      secondBridgeSelector: l1WethBridge.interface.getSighash("bridgehubDeposit"),
       secondBridgeValue: 0,
       secondBridgeCalldata: ethers.utils.defaultAbiCoder.encode(
         ["address", "uint256", "address"],

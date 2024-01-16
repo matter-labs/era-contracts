@@ -104,3 +104,5 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 
 /// @dev address of era's diamond proxy
 address constant ERA_DIAMOND_PROXY = $(ERA_DIAMOND_PROXY);
+
+bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE"))-1);

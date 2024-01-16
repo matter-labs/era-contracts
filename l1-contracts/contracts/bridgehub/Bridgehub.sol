@@ -9,7 +9,8 @@ import "../bridge/interfaces/IL1Bridge.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice we store registered stateTransitionManagers
@@ -114,7 +115,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         // } else { }
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
-
+        chainId = _chainId;
+        
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
             "Bridgehub: state transition not registered"
@@ -290,25 +292,24 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address stateTransition = getZkSyncStateTransition(_request.chainId);
         bytes memory data;
-        {
-            bool success;
-            (success, data) = _request.secondBridgeAddress.call{value: _request.secondBridgeValue}(
-                abi.encodeWithSelector(
-                    _request.secondBridgeSelector,
-                    _request.chainId,
-                    msg.sender,
-                    _request.secondBridgeCalldata
-                )
-            );
-            require(success, "Bridgehub: second bridge call failed");
-        }
-        L2TransactionRequestTwoBridgesInner memory outputRequest = abi.decode(
-            data,
-            (L2TransactionRequestTwoBridgesInner)
-        );
-
-        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
+        
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1Bridge(_request.secondBridgeAddress).bridgehubDeposit{value: _request.secondBridgeValue}(
+            _request.chainId,
             msg.sender,
+            _request.secondBridgeCalldata
+        );
+        
+        require (outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
+
+        // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
+        address refundRecipient = _request.refundRecipient == address(0) ? msg.sender : _request.refundRecipient;
+        // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+        if (refundRecipient.code.length > 0) {
+            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(refundRecipient);
+        }
+        require(_request.secondBridgeAddress > address(1000), "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
+        canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
+            _request.secondBridgeAddress,
             outputRequest.l2Contract,
             _request.mintValue,
             _request.l2Value,
@@ -316,7 +317,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             _request.l2GasLimit,
             _request.l2GasPerPubdataByteLimit,
             outputRequest.factoryDeps,
-            _request.refundRecipient
+            refundRecipient
         );
 
         IL1Bridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(

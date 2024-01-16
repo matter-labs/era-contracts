@@ -20,7 +20,7 @@ import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ERA_CHAIN_ID, ERA_TOKEN_BEACON_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {InitializableRandomStorage} from "../common/random-storage/InitializableRandomStorage.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
@@ -553,6 +553,7 @@ contract L1ERC20Bridge is
             bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
 
             request = L2TransactionRequestTwoBridgesInner({
+                magicValue: TWO_BRIDGES_MAGIC_VALUE,
                 l2Contract: l2BridgeAddress[_chainId],
                 l2Calldata: l2TxCalldata,
                 factoryDeps: new bytes[](0),

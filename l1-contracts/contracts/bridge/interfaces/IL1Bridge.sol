@@ -92,6 +92,10 @@ interface IL1Bridge {
         bytes32[] calldata _merkleProof
     ) external;
 
+    /// data is abi encoded :
+    /// address _l1Token,
+    /// uint256 _amount,
+    /// address _l2Receiver
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -100,10 +104,6 @@ interface IL1Bridge {
         external
         payable
         returns (
-            // which is abi encoded :
-            // address _l1Token,
-            // uint256 _amount,
-            // address _l2Receiver
             L2TransactionRequestTwoBridgesInner memory request
         );
 

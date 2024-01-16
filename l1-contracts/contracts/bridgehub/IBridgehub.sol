@@ -27,12 +27,12 @@ struct L2TransactionRequestTwoBridgesOuter {
     uint256 l2GasPerPubdataByteLimit;
     address refundRecipient;
     address secondBridgeAddress;
-    bytes4 secondBridgeSelector;
     uint256 secondBridgeValue;
     bytes secondBridgeCalldata;
 }
 
 struct L2TransactionRequestTwoBridgesInner {
+    bytes32 magicValue;
     address l2Contract;
     bytes l2Calldata;
     bytes[] factoryDeps;

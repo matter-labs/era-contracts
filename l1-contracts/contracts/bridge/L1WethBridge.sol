@@ -22,7 +22,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
-import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY} from "../common/Config.sol";
+import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
@@ -509,6 +509,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
                 chainBalance[_chainId] += amount;
             }
             request = L2TransactionRequestTwoBridgesInner({
+                magicValue: TWO_BRIDGES_MAGIC_VALUE,
                 l2Contract: l2BridgeAddress[_chainId],
                 l2Calldata: l2TxCalldata,
                 factoryDeps: new bytes[](0),
