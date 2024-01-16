@@ -85,14 +85,16 @@ async function main() {
 
       const tx = await wethBridge.finishInitializeChain(
         chainId,
-        implL1BatchNumber,
-        implL2MessageIndex,
-        implL2TxNumberInBlock,
-        implProof,
-        proxyL1BatchNumber,
-        proxyL2MessageIndex,
-        proxyL2TxNumberInBlock,
-        proxyProof
+        { batchNumber: implL1BatchNumber,
+          messageIndex: implL2MessageIndex,
+          numberInBatch: implL2TxNumberInBlock,
+          merkleProof: implProof,
+          succeeded: true},
+        { batchNumber:proxyL1BatchNumber,
+          messageIndex:proxyL2MessageIndex,
+          numberInBatch:proxyL2TxNumberInBlock,
+          merkleProof:proxyProof,
+          succeeded: true}
       );
 
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
@@ -100,6 +102,14 @@ async function main() {
       const receipts = await tx.wait(2);
 
       console.log(`Weth bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
+      console.log(
+        `CONTRACTS_L2_WETH_BRIDGE_ADDR=${await wethBridge.l2BridgeAddress(chainId)}`
+      );
+      console.log(
+        `CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${
+          await wethBridge.l2WethAddress(chainId)
+        }`
+      );
     });
 
   await program.parseAsync(process.argv);

@@ -62,7 +62,6 @@ export function calculateWethAddresses(
   const bridgeProxyInitializationParams = L2_WETH_BRIDGE_INTERFACE.encodeFunctionData("initialize", [
     l1WethBridgeAddress,
     l1WethAddress,
-    l2ProxyAdminAddress,
     l2GovernorAddress,
     ethIsBaseToken,
   ]);
@@ -73,7 +72,7 @@ export function calculateWethAddresses(
     ethers.utils.arrayify(
       abiCoder.encode(
         ["address", "address", "bytes"],
-        [l2WethBridgeImplAddress, l2ProxyAdminAddress, bridgeProxyInitializationParams]
+        [l2WethBridgeImplAddress, l2GovernorAddress, bridgeProxyInitializationParams]
       )
     ),
     ethers.constants.HashZero
@@ -93,7 +92,7 @@ export function calculateWethAddresses(
     ethers.utils.arrayify(
       abiCoder.encode(
         ["address", "address", "bytes"],
-        [l2WethImplAddress, l2ProxyAdminAddress, proxyInitializationParams]
+        [l2WethImplAddress, l2GovernorAddress, proxyInitializationParams]
       )
     ),
     ethers.constants.HashZero
@@ -119,7 +118,6 @@ export function calculateERC20Addresses(
   const proxyInitializationParams = L2_ERC20_BRIDGE_INTERFACE.encodeFunctionData("initialize", [
     erc20Bridge.address,
     hashL2Bytecode(L2_STANDARD_ERC20_PROXY_BYTECODE),
-    l2ProxyAdminAddress,
     l2GovernorAddress,
   ]);
 
@@ -129,7 +127,7 @@ export function calculateERC20Addresses(
     ethers.utils.arrayify(
       abiCoder.encode(
         ["address", "address", "bytes"],
-        [l2ERC20BridgeImplAddr, l2ProxyAdminAddress, proxyInitializationParams]
+        [l2ERC20BridgeImplAddr, l2GovernorAddress, proxyInitializationParams]
       )
     ),
     ethers.constants.HashZero

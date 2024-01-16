@@ -139,7 +139,6 @@ export async function startErc20BridgeInitOnChain(
   );
   const tx2 = await erc20Bridge.startErc20BridgeInitOnChain(
     chainId,
-    requiredValueToInitializeBridge.mul(2),
     [L2_ERC20_BRIDGE_IMPLEMENTATION_BYTECODE, L2_ERC20_BRIDGE_PROXY_BYTECODE, L2_STANDARD_ERC20_PROXY_BYTECODE],
     requiredValueToInitializeBridge,
     requiredValueToInitializeBridge,
@@ -160,6 +159,5 @@ export async function startErc20BridgeInitOnChain(
   const receipts = await Promise.all(txs.map((tx) => tx.wait(1)));
   if (deployer.verbose) {
     console.log(`ERC20 bridge deploy tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
-    console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await erc20Bridge.l2BridgeStandardAddress()}`);
   }
 }
