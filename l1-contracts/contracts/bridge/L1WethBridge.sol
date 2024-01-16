@@ -22,7 +22,7 @@ import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
-import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_WETH_ADDRESS, ERA_WETH_BRIDGE_ADDRESS, ERA_DIAMOND_PROXY, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
@@ -61,7 +61,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
 
     /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
     /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
-    uint256 internal eraIsWithdrawalFinalizedStorageSwitch;
+    /// this number is the first batch number that is settled on Era ST Diamond  before we update the Mailbox,
+    /// as withdrawals from batches older than this might already be finalized
+    uint256 internal eraIsWithdrawalFinalizedStorageSwitchBatchNumber;
 
     /// @dev The address of deployed L2 WETH bridge counterpart
     address internal l2BridgeStandardAddressEthIsBase;
@@ -154,7 +156,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         address _l2BridgeStandardAddressEthIsBase,
         address _l2BridgeStandardAddressEthIsNotBase,
         address _owner,
-        uint256 _eraIsWithdrawalFinalizedStorageSwitch
+        uint256 _eraIsWithdrawalFinalizedStorageSwitchBatchNumber
     ) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
         require(_l2WethStandardAddressEthIsBase != address(0), "L2 WETH address cannot be zero");
@@ -170,7 +172,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         l2BridgeStandardAddressEthIsBase = _l2BridgeStandardAddressEthIsBase;
         l2BridgeStandardAddressEthIsNotBase = _l2BridgeStandardAddressEthIsNotBase;
 
-        eraIsWithdrawalFinalizedStorageSwitch = _eraIsWithdrawalFinalizedStorageSwitch;
+        eraIsWithdrawalFinalizedStorageSwitchBatchNumber = _eraIsWithdrawalFinalizedStorageSwitchBatchNumber;
+
+        l2WethAddress[ERA_CHAIN_ID] = ERA_WETH_ADDRESS;
+        l2BridgeAddress[ERA_CHAIN_ID] = ERA_WETH_BRIDGE_ADDRESS;
 
         // #if !EOA_GOVERNOR
         require(_owner.code.length > 0, "L1WETHBridge, owner cannot be EOA");
@@ -190,6 +195,17 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         l2WethAddress[_chainId] = _l2WethAddress;
     }
 
+    /// @notice The initialization is as follows, anybody can start the process by calling startWethBridgeInit
+    /// This sets the bridgeImplTxHash and bridgeProxyTxHash, as well as the expected addresses. 
+    /// After this the finishInitializeChain function is called to confirm the state of the txs. 
+    /// If the txs fail, the txs can be retried by calling startErc20BridgeInit again.
+    /// Note that if the first tx fails, then normally the second will also fail, as the proxy calls the implementation at deployment, see here: 
+    /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/proxy/ERC1967/ERC1967Upgrade.sol#L40
+    /// So the second tx can only succeed if a contract has been deployed at the destination address. 
+    /// However, that address might be frontrun. To check this we store if the impl tx has succeeded between retries in bridgeImplTxSucceeded. 
+    /// We only finalize the address of the transaction if both txs have succeeded.
+    /// Finally, we store the potential addresses in l2BridgePotentialAddress and l2WethPotentialAddress, and not just use the l2BridgeStandardAddressEthIsBase etc
+    /// so that we can change the bytecode of the bridges, and the standard addresses. 
     /// @dev Starts the deployment of the  L2 WETH bridge counterpart as well as provides some factory deps for it for a specific chain
     /// @param _chainId of the chosen chain
     /// @param _factoryDeps A list of raw bytecodes that are needed for deployment of the L2 WETH bridge
@@ -286,7 +302,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             : l2WethStandardAddressEthIsNotBase;
     }
 
-    /// @dev We have to confirm that the deploy transactions succeeded.
+    /// @dev We have to confirm that the deploy transactions succeeded. Read startWethBridgeInitOnChain for details
     /// @param _chainId of the chosen chain
     /// @param _bridgeImplTxStatus The status of the L2 bridge implementation deploy transaction
     /// @param _bridgeProxyTxStatus The status of the L2 bridge proxy deploy transaction
@@ -608,7 +624,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             "Withdrawal is already finalized"
         );
 
-        if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitch))) {
+        if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitchBatchNumber))) {
             // in this case we have to check we don't double withdraw ether
             // we are not fully finalized if eth has not been withdrawn
             // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.

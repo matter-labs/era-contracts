@@ -40,6 +40,13 @@ struct L2TransactionRequestTwoBridgesInner {
 }
 
 interface IBridgehub {
+
+    struct ChainData {
+        address stateTransitionManager;
+        address baseToken;
+        address baseTokenBridge;
+    }
+
     /// Getters
     function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
 
@@ -55,7 +62,7 @@ interface IBridgehub {
 
     function baseTokenBridge(uint256 _chainId) external view returns (address);
 
-    function getZkSyncStateTransition(uint256 _chainId) external view returns (address);
+    function getStateTransition(uint256 _chainId) external view returns (address);
 
     /// Mailbox forwarder
 
@@ -102,7 +109,7 @@ interface IBridgehub {
 
     //// Registry
 
-    function newChain(
+    function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
@@ -112,13 +119,13 @@ interface IBridgehub {
         bytes calldata _initData
     ) external returns (uint256 chainId);
 
-    function newStateTransitionManager(address _stateTransitionManager) external;
+    function addStateTransitionManager(address _stateTransitionManager) external;
 
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
-    function newToken(address _token) external;
+    function addToken(address _token) external;
 
-    function newTokenBridge(address _tokenBridge) external;
+    function addTokenBridge(address _tokenBridge) external;
 
     function setWethBridge(address _wethBridge) external;
 

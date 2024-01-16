@@ -49,7 +49,7 @@ interface IStateTransitionManager {
     function initialize(StateTransitionManagerInitializeData calldata _initalizeData) external;
 
     /// @notice
-    function newChain(
+    function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _baseTokenBridge,

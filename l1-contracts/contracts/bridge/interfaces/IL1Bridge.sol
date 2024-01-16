@@ -100,12 +100,7 @@ interface IL1Bridge {
         uint256 _chainId,
         address _prevMsgSender,
         bytes calldata _data
-    )
-        external
-        payable
-        returns (
-            L2TransactionRequestTwoBridgesInner memory request
-        );
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,

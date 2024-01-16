@@ -186,7 +186,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice called by Bridgehub when a chain registers
-    function newChain(
+    function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _baseTokenBridge,

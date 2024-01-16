@@ -20,13 +20,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice we store registered bridges
     mapping(address => bool) public tokenBridgeIsRegistered;
 
-    /// @notice chainID => stateTransitionManager contract address
-    mapping(uint256 => address) public stateTransitionManager;
-    /// @notice chainID => base token address
-    mapping(uint256 => address) public baseToken;
-    /// @notice chainID => bridge holding the base token
-    /// @notice a bridge can have multiple tokens
-    mapping(uint256 => address) public baseTokenBridge;
+    /// @notice chainID => ChainData contract address, storing StateTransitionManager, baseToken, baseTokenBridge
+    mapping(uint256 => ChainData) public chainData;
 
     /// @notice all the ether is held by the weth bridge
     IL1Bridge public wethBridge;
@@ -42,14 +37,26 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ///// Getters
 
     /// @notice return the state transition chain contract for a chainId
-    function getZkSyncStateTransition(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId);
+    function getStateTransition(uint256 _chainId) public view returns (address) {
+        return IStateTransitionManager(chainData[_chainId].stateTransitionManager).stateTransition(_chainId);
+    }
+
+    function baseToken(uint256 _chainId) external view override returns (address) {
+        return chainData[_chainId].baseToken;
+    }
+
+    function baseTokenBridge(uint256 _chainId) external view override returns (address) {
+        return chainData[_chainId].baseTokenBridge;
+    }
+
+    function stateTransitionManager(uint256 _chainId) external view override returns (address) {
+        return chainData[_chainId].stateTransitionManager;
     }
 
     //// Registry
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
-    function newStateTransitionManager(address _stateTransitionManager) external onlyOwner {
+    function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
         require(
             !stateTransitionManagerIsRegistered[_stateTransitionManager],
             "Bridgehub: state transition already registered"
@@ -68,13 +75,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
-    function newToken(address _token) external onlyOwner {
+    function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
     }
 
     /// @notice Bridge can be any contract with the appropriate interface/functionality
-    function newTokenBridge(address _tokenBridge) external onlyOwner {
+    function addTokenBridge(address _tokenBridge) external onlyOwner {
         require(!tokenBridgeIsRegistered[_tokenBridge], "Bridgehub: token bridge already registered");
         tokenBridgeIsRegistered[_tokenBridge] = true;
     }
@@ -87,7 +94,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
     /// @notice register new chain
     /// @notice for Eth the baseToken address is 1, and the baseTokenBridge is the wethBridge is required
-    function newChain(
+    function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
@@ -96,27 +103,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         address _l2Governor,
         bytes calldata _initData
     ) external onlyOwner nonReentrant returns (uint256 chainId) {
-        // KL TODO: clear up this formula for chainId generation
-        // if (_chainId == 0) {
-        //     chainId = uint48(
-        //         uint256(
-        //             keccak256(
-        //                 abi.encode(
-        //                     "CHAIN_ID",
-        //                     block.chainid,
-        //                     address(this),
-        //                     _stateTransitionManager,
-        //                     msg.sender,
-        //                     _salt
-        //                 )
-        //             )
-        //         )
-        //     );
-        // } else { }
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
-        chainId = _chainId;
-        
+        _chainId;
+
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
             "Bridgehub: state transition not registered"
@@ -128,21 +118,21 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         }
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
-        require(stateTransitionManager[chainId] == address(0), "Bridgehub: chainId already registered");
+        require(chainData[_chainId].stateTransitionManager == address(0), "Bridgehub: chainId already registered");
 
-        stateTransitionManager[chainId] = _stateTransitionManager;
-        baseToken[chainId] = _baseToken;
-        baseTokenBridge[chainId] = _baseTokenBridge;
+        chainData[_chainId].stateTransitionManager = _stateTransitionManager;
+        chainData[_chainId].baseToken = _baseToken;
+        chainData[_chainId].baseTokenBridge = _baseTokenBridge;
 
-        IStateTransitionManager(_stateTransitionManager).newChain(
-            chainId,
+        IStateTransitionManager(_stateTransitionManager).createNewChain(
+            _chainId,
             _baseToken,
             _baseTokenBridge,
             _l2Governor,
             _initData
         );
 
-        emit NewChain(chainId, _stateTransitionManager, msg.sender);
+        emit NewChain(_chainId, _stateTransitionManager, msg.sender);
     }
 
     //// Mailbox forwarder
@@ -155,7 +145,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransition = getZkSyncStateTransition(_chainId);
+        address stateTransition = getStateTransition(_chainId);
         return IZkSyncStateTransition(stateTransition).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
@@ -167,7 +157,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address stateTransition = getZkSyncStateTransition(_chainId);
+        address stateTransition = getStateTransition(_chainId);
         return IZkSyncStateTransition(stateTransition).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
@@ -181,7 +171,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address stateTransition = getZkSyncStateTransition(_chainId);
+        address stateTransition = getStateTransition(_chainId);
         return
             IZkSyncStateTransition(stateTransition).proveL1ToL2TransactionStatus(
                 _l2TxHash,
@@ -200,7 +190,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256) {
-        address stateTransition = getZkSyncStateTransition(_chainId);
+        address stateTransition = getStateTransition(_chainId);
         return
             IZkSyncStateTransition(stateTransition).l2TransactionBaseCost(
                 _gasPrice,
@@ -217,12 +207,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2TransactionRequestDirect calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
-            address token = baseToken[_request.chainId];
+            address token = chainData[_request.chainId].baseToken;
 
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
+                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -231,7 +221,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
+                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -240,7 +230,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             }
         }
 
-        address stateTransition = getZkSyncStateTransition(_request.chainId);
+        address stateTransition = getStateTransition(_request.chainId);
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             msg.sender,
             _request.l2Contract,
@@ -267,12 +257,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
-            address token = baseToken[_request.chainId];
+            address token = chainData[_request.chainId].baseToken;
 
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken{value: _request.mintValue}(
+                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -281,7 +271,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(baseTokenBridge[_request.chainId]).bridgehubDepositBaseToken(
+                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -290,16 +280,17 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             }
         }
 
-        address stateTransition = getZkSyncStateTransition(_request.chainId);
+        address stateTransition = getStateTransition(_request.chainId);
         bytes memory data;
-        
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1Bridge(_request.secondBridgeAddress).bridgehubDeposit{value: _request.secondBridgeValue}(
+
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1Bridge(_request.secondBridgeAddress)
+            .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
             _request.secondBridgeCalldata
         );
-        
-        require (outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
+
+        require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
 
         // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
         address refundRecipient = _request.refundRecipient == address(0) ? msg.sender : _request.refundRecipient;

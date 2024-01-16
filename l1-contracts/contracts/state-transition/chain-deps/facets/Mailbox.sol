@@ -34,7 +34,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "MailboxFacet";
 
-    /// @notice when requesting transactions throught the bridgehub
+    /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         address _sender,
         address _contractL2,

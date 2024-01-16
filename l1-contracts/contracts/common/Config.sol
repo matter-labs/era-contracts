@@ -95,14 +95,20 @@ uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 10000;
 /// the operator in case the batch is closed because of the memory for transactions being filled up.
 uint256 constant MEMORY_OVERHEAD_GAS = 10;
 
+address constant ETH_TOKEN_ADDRESS = address(1);
+
 /// @dev Era's chainID
 uint256 constant ERA_CHAIN_ID = $(ERA_CHAIN_ID);
 
 address constant ERA_TOKEN_BEACON_ADDRESS = $(ERA_TOKEN_BEACON_ADDRESS);
 
-address constant ETH_TOKEN_ADDRESS = address(1);
+address constant ERA_ERC20_BRIDGE_ADDRESS = $(ERA_ERC20_BRIDGE_ADDRESS);
+
+address constant ERA_WETH_BRIDGE_ADDRESS = $(ERA_WETH_BRIDGE_ADDRESS);
+
+address constant ERA_WETH_ADDRESS = $(ERA_WETH_ADDRESS);
 
 /// @dev address of era's diamond proxy
 address constant ERA_DIAMOND_PROXY = $(ERA_DIAMOND_PROXY);
 
-bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE"))-1);
+bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
