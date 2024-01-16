@@ -98,7 +98,7 @@ contract L1ERC20Bridge is
     mapping(uint256 => bytes32) internal bridgeImplDeployOnL2TxHash;
 
     /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction of the l2Bridge Proxy (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) internal bridgeProxyDeployOnL2TxHash;
+    mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
 
     /// @dev A mapping L2 _chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -500,7 +500,7 @@ contract L1ERC20Bridge is
     ) public payable onlyBridgehub {
         require(msg.value == 0, "L1EB m.v > 0 base deposit"); // this bridge does not hold eth, the weth bridge does
         require(_amount != 0, "4T"); // empty deposit amount
-        // #if !ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
+        // #if ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
         if (_prevMsgSender != address(this)) {
             // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
             uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);

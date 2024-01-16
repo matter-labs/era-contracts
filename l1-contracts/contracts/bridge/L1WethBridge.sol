@@ -93,7 +93,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     mapping(uint256 => bool) internal bridgeImplTxSucceeded;
 
     /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
-    mapping(uint256 => bytes32) internal bridgeProxyDeployOnL2TxHash;
+    mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
 
     /// @dev A mapping chainId => keccak256(account, amount) => L2 deposit transaction hash => amount
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
