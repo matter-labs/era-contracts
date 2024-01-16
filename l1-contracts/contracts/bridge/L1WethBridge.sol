@@ -480,7 +480,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes32 txDataHash = keccak256(abi.encodePacked(_prevMsgSender, amount));
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, l1WethAddress, amount);
 
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
