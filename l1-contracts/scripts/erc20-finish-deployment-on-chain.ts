@@ -85,16 +85,20 @@ async function main() {
 
       const tx = await erc20Bridge.finishInitializeChain(
         chainId,
-        { batchNumber: implL1BatchNumber,
+        {
+          batchNumber: implL1BatchNumber,
           messageIndex: implL2MessageIndex,
           numberInBatch: implL2TxNumberInBlock,
           merkleProof: implProof,
-          succeeded: true},
-        { batchNumber:proxyL1BatchNumber,
-          messageIndex:proxyL2MessageIndex,
-          numberInBatch:proxyL2TxNumberInBlock,
-          merkleProof:proxyProof,
-          succeeded: true}
+          succeeded: true,
+        },
+        {
+          batchNumber: proxyL1BatchNumber,
+          messageIndex: proxyL2MessageIndex,
+          numberInBatch: proxyL2TxNumberInBlock,
+          merkleProof: proxyProof,
+          succeeded: true,
+        }
       );
 
       console.log(`Transaction sent with hash ${tx.hash} and nonce ${tx.nonce}. Waiting for receipt...`);
@@ -103,7 +107,6 @@ async function main() {
 
       console.log(`ERC20 bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
       console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await erc20Bridge.l2BridgeAddress(chainId)}`);
-
     });
 
   await program.parseAsync(process.argv);
