@@ -11,7 +11,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// @notice Placeholder function for custom logic for upgrading L1 contract.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for upgrade, which may be interpreted differently for each upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal {
+    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal override {
         emit Test();
     }
 
@@ -19,7 +19,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal override {}
 
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.

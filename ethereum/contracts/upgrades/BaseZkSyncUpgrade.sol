@@ -66,6 +66,22 @@ abstract contract BaseZkSyncUpgrade is Base {
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
+
+        _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
+        _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
+        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
+
+        bytes32 txHash;
+        txHash = _setL2SystemContractUpgrade(
+            _proposedUpgrade.l2ProtocolUpgradeTx,
+            _proposedUpgrade.factoryDeps,
+            _proposedUpgrade.newProtocolVersion
+        );
+
+        _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
+
+        emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
     }
 
     /// @notice Change default account bytecode hash, that is used on L2
@@ -121,6 +137,10 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice Change the verifier parameters
     /// @param _newVerifierParams New parameters for the verifier
     function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
+        // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier params will fail. Ensure all commited batches are finalized before the
+        // verifier is upgraded.
         if (
             _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) &&
             _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) &&
@@ -229,4 +249,16 @@ abstract contract BaseZkSyncUpgrade is Base {
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
+
+    /// @notice Placeholder function for custom logic for upgrading L1 contract.
+    /// Typically this function will never be used.
+    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
+    /// upgrade.
+    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
+
+    /// @notice placeholder function for custom logic for post-upgrade logic.
+    /// Typically this function will never be used.
+    /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
+    /// upgrade.
+    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
 }
