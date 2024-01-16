@@ -55,7 +55,7 @@ interface IL1Bridge {
     );
 
     function isWithdrawalFinalizedShared(
-        uint256 chainId,
+        uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool);
@@ -114,5 +114,5 @@ interface IL1Bridge {
         uint256 _amount
     ) external payable;
 
-    function bridgehubConfirmL2Transaction(uint256 chainId, bytes32 txDataHash, bytes32 txHash) external;
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 }

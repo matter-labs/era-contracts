@@ -40,7 +40,7 @@ contract L1ERC20Bridge is
 {
     using SafeERC20 for IERC20;
 
-    /// @dev specifiec the number of factory specs needed for L2 deployment
+    /// @dev Specifies the number of factory specs needed for L2 deployment
     uint256 internal constant NUMBER_OF_FACTORY_DEPS = 3;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
