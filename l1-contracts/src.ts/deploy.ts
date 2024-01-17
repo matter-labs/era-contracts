@@ -1,5 +1,5 @@
-import "@nomiclabs/hardhat-ethers";
 import * as hardhat from "hardhat";
+import "@nomiclabs/hardhat-ethers";
 
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
