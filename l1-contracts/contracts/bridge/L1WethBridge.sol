@@ -97,10 +97,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
     mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
 
-    /// @dev A mapping chainId => keccak256(account, amount) => L2 deposit transaction hash => amount
+    /// @dev A mapping chainId => keccak256(account, amount) => L2 deposit transaction hash
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev only used when it is not the base token, as then it is sent to refund recipient
-    mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) internal depositHappened;
+    mapping(uint256 => mapping(bytes32 => bytes32)) internal depositHappened;
 
     /// @dev A mapping L2 chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed
@@ -544,8 +544,8 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(!depositHappened[_chainId][_txDataHash][_txHash], "L1WETHBridge: tx already happened");
-        depositHappened[_chainId][_txDataHash][_txHash] = true;
+        require(depositHappened[_chainId][_txDataHash] == 0x00, "L1WETHBridge: tx already happened");
+        depositHappened[_chainId][_txDataHash]= _txHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
@@ -587,13 +587,13 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         );
         require(proofValid, "L1WB: Invalid L2 transaction status proof");
 
-        bool deposited = depositHappened[_chainId][keccak256(abi.encode(_depositSender, _amount))][_l2TxHash];
-        require(((_amount > 0) && (deposited)), "L1WB: _amount is zero or deposit did not happen");
+        bytes32 txHash = depositHappened[_chainId][keccak256(abi.encode(_depositSender, _amount))];
+        require(((_amount > 0) && (txHash == _l2TxHash)), "L1WB: _amount is zero or deposit did not happen");
         if (!hyperbridgingEnabled[_chainId]) {
             require(chainBalance[_chainId] >= _amount, "L1WB: chainBalance is too low");
             chainBalance[_chainId] -= _amount;
         }
-        delete depositHappened[_chainId][keccak256(abi.encode(_depositSender, _amount))][_l2TxHash];
+        delete depositHappened[_chainId][keccak256(abi.encode(_depositSender, _amount))];
 
         // Withdraw funds
         // Wrap ETH to WETH tokens (smart contract address receives the equivalent _amount of WETH)

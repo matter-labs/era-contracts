@@ -105,7 +105,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ) external onlyOwner nonReentrant returns (uint256 chainId) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
-        _chainId;
 
         require(
             stateTransitionManagerIsRegistered[_stateTransitionManager],
@@ -133,6 +132,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         );
 
         emit NewChain(_chainId, _stateTransitionManager, msg.sender);
+        return _chainId;
     }
 
     //// Mailbox forwarder
@@ -275,7 +275,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         }
 
         address stateTransition = getStateTransition(_request.chainId);
-        bytes memory data;
 
         L2TransactionRequestTwoBridgesInner memory outputRequest = IL1Bridge(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(

@@ -105,9 +105,9 @@ contract L1ERC20Bridge is
     /// @dev Used to indicate that L2 -> L1 message was already processed
     mapping(uint256 => mapping(uint256 => mapping(uint256 => bool))) public isWithdrawalFinalizedShared;
 
-    /// @dev A mapping chainId => keccak256(account, tokenAddress, amount) => L2 deposit transaction hash => true
+    /// @dev A mapping chainId => keccak256(account, tokenAddress, amount) => L2 deposit transaction hash
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
-    mapping(uint256 => mapping(bytes32 => mapping(bytes32 => bool))) public depositHappened;
+    mapping(uint256 => mapping(bytes32 => bytes32)) public depositHappened;
 
     /// @dev used for extra security until hyperbridging is implemented.
     mapping(uint256 => mapping(address => uint256)) internal chainBalance;
@@ -480,7 +480,7 @@ contract L1ERC20Bridge is
 
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
-        depositHappened[_chainId][txDataHash][l2TxHash] = true;
+        depositHappened[_chainId][txDataHash] = l2TxHash;
 
         emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
         if (_chainId == ERA_CHAIN_ID) {
@@ -606,8 +606,8 @@ contract L1ERC20Bridge is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(!depositHappened[_chainId][_txDataHash][_txHash], "EB tx hap");
-        depositHappened[_chainId][_txDataHash][_txHash] = true;
+        require(depositHappened[_chainId][_txDataHash]== 0x00, "EB tx hap");
+        depositHappened[_chainId][_txDataHash]= _txHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
@@ -710,7 +710,7 @@ contract L1ERC20Bridge is
         if ((_chainId == ERA_CHAIN_ID) && usingLegacyDepositAmountStorageVar) {
             delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
         } else {
-            delete depositHappened[_chainId][txDataHash][_l2TxHash];
+            delete depositHappened[_chainId][txDataHash];
         }
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
@@ -744,15 +744,15 @@ contract L1ERC20Bridge is
                 usingLegacyDepositAmountStorageVar = true;
                 require(_amount == amount, "EB w amnt");
             } else {
-                bool deposited;
+                bytes32 txHash;
                 {
-                    deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
+                    txHash = depositHappened[_chainId][_txDataHash];
                 }
-                require(deposited, "EB: d.it not hap");
+                require(txHash == _l2TxHash, "EB: d.it not hap");
             }
         } else {
-            bool deposited = depositHappened[_chainId][_txDataHash][_l2TxHash];
-            require(deposited, "EB w d.it 2"); // wrong/invalid deposit
+            bytes32 txHash = depositHappened[_chainId][_txDataHash];
+            require(txHash == _l2TxHash, "EB w d.it 2"); // wrong/invalid deposit
         }
     }
 
