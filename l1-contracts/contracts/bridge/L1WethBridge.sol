@@ -545,7 +545,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes32 _txHash
     ) external override onlyBridgehub {
         require(depositHappened[_chainId][_txDataHash] == 0x00, "L1WETHBridge: tx already happened");
-        depositHappened[_chainId][_txDataHash]= _txHash;
+        depositHappened[_chainId][_txDataHash] = _txHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 

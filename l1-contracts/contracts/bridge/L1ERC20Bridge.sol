@@ -606,8 +606,8 @@ contract L1ERC20Bridge is
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(depositHappened[_chainId][_txDataHash]== 0x00, "EB tx hap");
-        depositHappened[_chainId][_txDataHash]= _txHash;
+        require(depositHappened[_chainId][_txDataHash] == 0x00, "EB tx hap");
+        depositHappened[_chainId][_txDataHash] = _txHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
