@@ -65,8 +65,12 @@ const localConfig = {
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 9,
-  ERA_TOKEN_BEACON_ADDRESS: "address(0)",
   ERA_DIAMOND_PROXY: "address(0)",
+  ERA_TOKEN_BEACON_ADDRESS: "address(0)",
+  ERA_ERC20_BRIDGE_ADDRESS: "address(0)",
+  ERA_WETH_ADDRESS: "address(0)",
+  ERA_WETH_BRIDGE_ADDRESS: "address(0)",
+  ERC20_BRIDGE_IS_BASETOKEN_BRIDGE: true,
 };
 // const hardhatConfig = {
 //   ...prodConfig,
