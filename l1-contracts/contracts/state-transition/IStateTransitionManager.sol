@@ -27,9 +27,9 @@ interface IStateTransitionManager {
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
     event SetChainIdUpgrade(
-        address _stateTransitionChain,
+        address indexed _stateTransitionChain,
         L2CanonicalTransaction _l2Transaction,
-        uint256 _protocolVersion
+        uint256 indexed _protocolVersion
     );
 
     function bridgehub() external view returns (address);
