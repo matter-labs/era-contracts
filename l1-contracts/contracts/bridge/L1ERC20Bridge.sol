@@ -697,7 +697,7 @@ contract L1ERC20Bridge is
             require(_amount > 0, "y1");
         }
 
-        bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
+        bytes32 txDataHash = keccak256(abi.encode(_depositSender, _l1Token, _amount));
         bool usingLegacyDepositAmountStorageVar = _checkDeposited(
             _chainId,
             _depositSender,
