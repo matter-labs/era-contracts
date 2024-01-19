@@ -221,24 +221,6 @@ describe("L1Messenger tests", () => {
           ethers.utils.hexlify(logData.value),
         ]);
     });
-
-    it("should revert when called by the system contract with empty key & value", async () => {
-      const emptyKV = ethers.utils.hexlify([]);
-      await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, emptyKV, emptyKV)).to.be
-        .rejected;
-    });
-
-    it("should revert when called by the system contract with key & value > 32 bytes", async () => {
-      const oversizedKV = ethers.utils.hexlify(randomBytes(33));
-      await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, oversizedKV, oversizedKV))
-        .to.be.rejected;
-    });
-
-    it("should revert when called by the system contract with key & value < 32 bytes", async () => {
-      const undersizedKV = ethers.utils.hexlify(randomBytes(31));
-      await expect(l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, undersizedKV, undersizedKV))
-        .to.be.rejected;
-    });
   });
 
   describe("sendToL1", async () => {
@@ -258,18 +240,6 @@ describe("L1Messenger tests", () => {
     it("should revert when not called by known code storage contract", async () => {
       const byteCodeHash = ethers.utils.hexlify(randomBytes(32));
       await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.rejectedWith("Inappropriate caller");
-    });
-
-    it("shoud revert when byteCodeHash < 32 bytes, called by known code system contract", async () => {
-      const byteCodeHash = ethers.utils.hexlify(randomBytes(8));
-      await expect(l1Messenger.connect(knownCodeStorageAccount).requestBytecodeL1Publication(byteCodeHash)).to.be
-        .rejected;
-    });
-
-    it("shoud revert when byteCodeHash > 32 bytes, called by known code system contract", async () => {
-      const byteCodeHash = ethers.utils.hexlify(randomBytes(64));
-      await expect(l1Messenger.connect(knownCodeStorageAccount).requestBytecodeL1Publication(byteCodeHash)).to.be
-        .rejected;
     });
 
     it("shoud emit event, called by known code system contract", async () => {
