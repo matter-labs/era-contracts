@@ -183,7 +183,7 @@ describe("L1Messenger tests", () => {
 
   describe("sendL2ToL1Log", async () => {
     it("should revert when not called by the system contract", async () => {
-      await expect(l1Messenger.sendL2ToL1Log(logData.isService, logData.key, logData.value)).to.be.rejectedWith(
+      await expect(l1Messenger.sendL2ToL1Log(true, logData.key, logData.value)).to.be.rejectedWith(
         "This method require the caller to be system contract"
       );
     });
@@ -192,12 +192,12 @@ describe("L1Messenger tests", () => {
       await expect(
         l1Messenger
           .connect(l1MessengerAccount)
-          .sendL2ToL1Log(logData.isService, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
+          .sendL2ToL1Log(true, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
       )
         .to.emit(l1Messenger, "L2ToL1LogSent")
         .withArgs([
           0,
-          logData.isService,
+          true,
           1,
           l1MessengerAccount.address,
           ethers.utils.hexlify(logData.key),
@@ -336,7 +336,7 @@ interface LogData {
 function setupLogData(): LogData {
   return {
     isService: true,
-    key: Buffer.alloc(32, 1),
+        key: Buffer.alloc(32, 1),
     value: Buffer.alloc(32, 2),
     message: Buffer.alloc(32, 3),
     currentMessageLengthBytes: ethers.utils.hexZeroPad(ethers.utils.hexlify(32), 4),
@@ -378,45 +378,6 @@ async function setupBytecodeData(l1MessengerAddress: string): Promise<BytecodeDa
   };
 }
 
-function createTotalL2ToL1PubdataAndStateDiffs(
-  numberOfLogs: number,
-  logs: string[],
-  numberOfMessages: number,
-  messages: BytecodeData[],
-  numberOfBytecodes: number,
-  bytecodes: BytecodeData[],
-  compressedStateDiffsSizeBytes: string,
-  enumerationIndexSizeBytes: string,
-  compressedStateDiffs: string,
-  numberOfStateDiffsBytes: string,
-  encodedStateDiffs: string,
-  version: string = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1)
-): string {
-  const messagePairs = [];
-  for (let i = 0; i < numberOfMessages; i++) {
-    messagePairs.push(messages[i].lengthBytes, messages[i].content);
-  }
-
-  const bytecodePairs = [];
-  for (let i = 0; i < numberOfBytecodes; i++) {
-    bytecodePairs.push(bytecodes[i].lengthBytes, bytecodes[i].content);
-  }
-
-  return ethers.utils.concat([
-    ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4),
-    ...logs,
-    ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4),
-    ...messagePairs,
-    ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4),
-    ...bytecodePairs,
-    version,
-    compressedStateDiffsSizeBytes,
-    enumerationIndexSizeBytes,
-    compressedStateDiffs,
-    numberOfStateDiffsBytes,
-    encodedStateDiffs,
-  ]);
-}
 class L1MessengerPubdataEmulator {
   numberOfLogs: number;
   logs: string[];
@@ -464,19 +425,29 @@ class L1MessengerPubdataEmulator {
   }
 
   buildTotalL2ToL1PubdataAndStateDiffs() {
-    return createTotalL2ToL1PubdataAndStateDiffs(
-      this.numberOfLogs,
-      this.logs,
-      this.numberOfMessages,
-      this.messages,
-      this.numberOfBytecodes,
-      this.bytecodes,
+    const messagePairs = [];
+    for (let i = 0; i < this.numberOfMessages; i++) {
+      messagePairs.push(this.messages[i].lengthBytes, this.messages[i].content);
+    }
+  
+    const bytecodePairs = [];
+    for (let i = 0; i < this.numberOfBytecodes; i++) {
+      bytecodePairs.push(this.bytecodes[i].lengthBytes, this.bytecodes[i].content);
+    }
+  
+    return ethers.utils.concat([
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfLogs), 4),
+      ...this.logs,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfMessages), 4),
+      ...messagePairs,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfBytecodes), 4),
+      ...bytecodePairs,
+      this.version,
       this.stateDiffsSetupData.compressedStateDiffsSizeBytes,
       this.stateDiffsSetupData.enumerationIndexSizeBytes,
       this.stateDiffsSetupData.compressedStateDiffs,
       this.stateDiffsSetupData.numberOfStateDiffsBytes,
       this.stateDiffsSetupData.encodedStateDiffs,
-      this.version
-    );
+    ]);
   }
 }
