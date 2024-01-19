@@ -378,18 +378,13 @@ async function setupBytecodeData(l1MessengerAddress: string): Promise<BytecodeDa
   };
 }
 
-interface DataPair {
-  lengthBytes: string;
-  content: string;
-}
-
 function createTotalL2ToL1PubdataAndStateDiffs(
   numberOfLogs: number,
   logs: string[],
   numberOfMessages: number,
-  messages: DataPair[],
+  messages: BytecodeData[],
   numberOfBytecodes: number,
-  bytecodes: DataPair[],
+  bytecodes: BytecodeData[],
   compressedStateDiffsSizeBytes: string,
   enumerationIndexSizeBytes: string,
   compressedStateDiffs: string,
@@ -426,9 +421,9 @@ class L1MessengerPubdataEmulator {
   numberOfLogs: number;
   logs: string[];
   numberOfMessages: number;
-  messages: DataPair[];
+  messages: BytecodeData[];
   numberOfBytecodes: number;
-  bytecodes: DataPair[];
+  bytecodes: BytecodeData[];
   stateDiffsSetupData: StateDiffSetupData;
   version: string;
 
@@ -454,12 +449,12 @@ class L1MessengerPubdataEmulator {
     this.numberOfLogs++;
   }
 
-  addMessage(message: DataPair) {
+  addMessage(message: BytecodeData) {
     this.messages.push(message);
     this.numberOfMessages++;
   }
 
-  addBytecode(bytecode: DataPair) {
+  addBytecode(bytecode: BytecodeData) {
     this.bytecodes.push(bytecode);
     this.numberOfBytecodes++;
   }
