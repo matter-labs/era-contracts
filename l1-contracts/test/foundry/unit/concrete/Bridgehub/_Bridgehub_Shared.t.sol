@@ -3,33 +3,29 @@
 pragma solidity ^0.8.17;
 
 import {Test} from "forge-std/Test.sol";
-import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
-import {BridgehubDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-deps/BridgehubDiamondInit.sol";
-import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
+
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {IDiamondInit} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 
 contract BridgehubTest is Test {
     DiamondProxy internal bridgehub;
-    BridgehubDiamondInit internal bridgehubDiamondInit;
+    IDiamondInit internal bridgehubDiamondInit;
     address internal constant GOVERNOR = address(0x101010101010101010101);
     address internal constant NON_GOVERNOR = address(0x202020202020202020202);
 
     constructor() {
         vm.chainId(31337);
-        bridgehubDiamondInit = new BridgehubDiamondInit();
+        bridgehubDiamondInit = new DiamondInit();
 
         bridgehub = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgehubDiamondInit)));
     }
 
-    function getDiamondCutData(address diamondInit) internal returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address diamondInit) internal pure returns (Diamond.DiamondCutData memory) {
         address governor = GOVERNOR;
-        IAllowList allowList = IAllowList(GOVERNOR);
 
-        bytes memory initCalldata = abi.encodeWithSelector(
-            BridgehubDiamondInit.initialize.selector,
-            governor,
-            allowList
-        );
+        bytes memory initCalldata = abi.encodeWithSelector(IDiamondInit.initialize.selector, governor);
 
         return
             Diamond.DiamondCutData({

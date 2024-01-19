@@ -40,6 +40,10 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the fee params for L1->L2 transactions
+    /// @param _newFeeParams The new fee params
+    function changeFeeParams(FeeParams calldata _newFeeParams) external;
+
     function upgradeChainFromVersion(
         uint256 _chainId,
         uint256 _protocolVersion,

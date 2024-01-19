@@ -3,27 +3,23 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {L1WethBridge} from "../../../../../../cache/solpp-generated-contracts/bridge/L1WethBridge.sol";
-import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contracts/WETH9.sol";
-// import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Getters.sol";
-// import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Mailbox.sol";
-// import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/DiamondInit.sol";
-// import {VerifierParams} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-// import {Diamond} from "../../../../../../cache/solpp-generated-contracts/common/libraries/Diamond.sol";
-// import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
-// import {Utils} from "../../Utils/Utils.sol";
-import {IZkSyncStateTransition} from "../../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
-import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
-import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {IZkSync} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IZkSync.sol";
-import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {IVerifier} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
+
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+import {Bridgehub} from "solpp/bridgehub/BridgeHub.sol";
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
+import {IBridgehub} from "solpp/bridgehub/IBridgehub.sol";
+import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {IZkSyncStateTransition} from "solpp/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
+import {L1WethBridge} from "solpp/bridge/L1WethBridge.sol";
+import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {WETH9} from "solpp/dev-contracts/WETH9.sol";
 
 contract L1WethBridgeTest is Test {
     address internal owner;
@@ -54,23 +50,31 @@ contract L1WethBridgeTest is Test {
         bytes8 dummyHash = 0x1234567890123456;
         address dummyAddress = makeAddr("dummyAddress");
 
-        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
-            verifier: IVerifier(dummyAddress), // verifier
+        InitializeData memory params = InitializeData({
+            // TODO REVIEW
+            chainId: 1,
+            bridgehub: makeAddr("bridgehub"),
+            stateTransitionManager: makeAddr("stateTransitionManager"),
+            protocolVersion: 0,
             governor: owner,
             admin: owner,
-            genesisBatchHash: bytes32(0),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(0),
+            baseToken: makeAddr("baseToken"),
+            baseTokenBridge: makeAddr("baseTokenBridge"),
+            storedBatchZero: bytes32(0),
+            // genesisBatchHash: bytes32(0),
+            // genesisIndexRepeatedStorageChanges: 0,
+            // genesisBatchCommitment: bytes32(0),
+            verifier: IVerifier(dummyAddress),
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: 0,
                 recursionLeafLevelVkHash: 0,
                 recursionCircuitsSetVksHash: 0
             }),
-            zkPorterIsAvailable: false,
+            // zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 10000000,
-            initialProtocolVersion: 0,
+            // initialProtocolVersion: 0,
             feeParams: defaultFeeParams()
         });
 
@@ -103,9 +107,8 @@ contract L1WethBridgeTest is Test {
 
         // address[] addresses = Utils.initial_deployment();
 
-        IZkSyncStateTransition zkSync = IZkSyncStateTransition(address(diamondProxy));
-
-        L1WethBridge bridge = new L1WethBridge(payable(address(l1Weth)), zkSync);
+        IBridgehub bridgehub = new Bridgehub();
+        L1WethBridge bridge = new L1WethBridge(payable(address(l1Weth)), bridgehub);
 
         bytes memory garbageBytecode = abi.encodePacked(
             bytes32(0x1111111111111111111111111111111111111111111111111111111111111111)

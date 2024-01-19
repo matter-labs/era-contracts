@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
-//import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
-import {TransactionValidator} from "cache/solpp-generated-contracts/zksync/libraries/TransactionValidator.sol";
+
+import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
+import {TransactionValidator} from "solpp/state-transition/libraries/TransactionValidator.sol";
 
 contract TransactionValidatorSharedTest is Test {
     constructor() {}
 
-    function createTestTransaction() public pure returns (IMailbox.L2CanonicalTransaction memory testTx) {
-        testTx = IMailbox.L2CanonicalTransaction({
+    function createTestTransaction() public pure returns (L2CanonicalTransaction memory testTx) {
+        testTx = L2CanonicalTransaction({
             txType: 0,
             from: uint256(uint160(1_000_000_000)),
             to: uint256(uint160(0)),
@@ -30,14 +31,14 @@ contract TransactionValidatorSharedTest is Test {
         });
     }
 
-    function createUpgradeTransaction() public pure returns (IMailbox.L2CanonicalTransaction memory testTx) {
+    function createUpgradeTransaction() public pure returns (L2CanonicalTransaction memory testTx) {
         testTx = createTestTransaction();
         testTx.from = uint256(0x8001);
         testTx.to = uint256(0x8007);
     }
 
     function validateL1ToL2Transaction(
-        IMailbox.L2CanonicalTransaction memory _transaction,
+        L2CanonicalTransaction memory _transaction,
         uint256 _priorityTxMaxGasLimit,
         uint256 _priorityTxMaxPubdata
     ) public pure {

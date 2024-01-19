@@ -3,7 +3,8 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {UnsafeBytesTest} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/UnsafeBytesTest.sol";
+
+import {UnsafeBytesTest} from "solpp/dev-contracts/test/UnsafeBytesTest.sol";
 
 contract UnsafeBytesTestTest is Test {
     UnsafeBytesTest private unsafeBytesTest;
