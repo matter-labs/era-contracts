@@ -24,7 +24,6 @@ describe("L1Messenger tests", () => {
   let bootloaderAccount: ethers.Signer;
   let stateDiffsSetupData: StateDiffSetupData;
   let logData: LogData;
-  let logs: string[];
   let bytecodeData: BytecodeData;
   let emulator: L1MessengerPubdataEmulator;
 
@@ -38,8 +37,7 @@ describe("L1Messenger tests", () => {
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
     // setup
     stateDiffsSetupData = await setupStateDiffs();
-    logData = setupLogData();
-    logs = createLogs(l1MessengerAccount, l1Messenger, logData);
+    logData = setupLogData(l1MessengerAccount, l1Messenger);
     bytecodeData = await setupBytecodeData(l1Messenger.address);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
@@ -48,21 +46,9 @@ describe("L1Messenger tests", () => {
     emulator = new L1MessengerPubdataEmulator();
   });
 
-  // this part is necessary to clean the state of L1Messenger contract
+  
   after(async () => {
-    emulator.addLog(logs[0]);
-    const fourthLog = ethers.utils.concat([
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexlify([0]),
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 2),
-      ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-      logData.key,
-      logData.value,
-    ]);
-    emulator.addLog(fourthLog);
-    emulator.addLog(logs[1]);
-    emulator.addMessage({ lengthBytes: logData.currentMessageLengthBytes, content: logData.message });
-    emulator.addBytecode(bytecodeData);
+    // cleaning the state of l1Messenger
     await l1Messenger
       .connect(bootloaderAccount)
       .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs());
@@ -85,9 +71,9 @@ describe("L1Messenger tests", () => {
       await (
         await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
       ).wait();
-      emulator.addLog(logs[0]);
+      emulator.addLog(logData.logs[0]);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.message)).wait();
-      emulator.addLog(logs[1]);
+      emulator.addLog(logData.logs[1]);
       emulator.addMessage({ lengthBytes: logData.currentMessageLengthBytes, content: logData.message });
       await (
         await l1Messenger
@@ -139,7 +125,7 @@ describe("L1Messenger tests", () => {
     });
 
     it("should revert chainedMessageHash mismatch", async () => {
-      emulator.logs[1] = logs[1];
+      emulator.logs[1] = logData.logs[1];
       // Buffer.alloc(32, 6), to trigger the revert
       const wrongMessage = { lengthBytes: logData.currentMessageLengthBytes, content: Buffer.alloc(32, 6) };
       emulator.messages[0] = wrongMessage;
@@ -189,6 +175,7 @@ describe("L1Messenger tests", () => {
     });
 
     it("should emit L2ToL1LogSent event when called by the system contract", async () => {
+      emulator.addLog(logData.logs[0]);
       await expect(
         l1Messenger
           .connect(l1MessengerAccount)
@@ -206,6 +193,15 @@ describe("L1Messenger tests", () => {
     });
 
     it("should emit L2ToL1LogSent event when called by the system contract with isService false", async () => {
+      const fourthLog = ethers.utils.concat([
+        ethers.utils.hexlify([0]),
+        ethers.utils.hexlify([0]),
+        ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 2),
+        ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
+        logData.key,
+        logData.value,
+      ]);
+      emulator.addLog(fourthLog);
       await expect(
         l1Messenger
           .connect(l1MessengerAccount)
@@ -225,6 +221,8 @@ describe("L1Messenger tests", () => {
 
   describe("sendToL1", async () => {
     it("should emit L1MessageSent & L2ToL1LogSent events", async () => {
+      emulator.addLog(logData.logs[1]);
+      emulator.addMessage({ lengthBytes: logData.currentMessageLengthBytes, content: logData.message });
       const expectedKey = ethers.utils
         .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
         .toLowerCase();
@@ -237,6 +235,7 @@ describe("L1Messenger tests", () => {
   });
 
   describe("requestBytecodeL1Publication", async () => {
+    emulator.addBytecode(bytecodeData);
     it("should revert when not called by known code storage contract", async () => {
       const byteCodeHash = ethers.utils.hexlify(randomBytes(32));
       await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.rejectedWith("Inappropriate caller");
@@ -256,7 +255,7 @@ describe("L1Messenger tests", () => {
   });
 });
 
-// STATE DIFFS
+// Interface represents the structure of the data that that is used in totalL2ToL1PubdataAndStateDiffs
 interface StateDiffSetupData {
   encodedStateDiffs: string;
   compressedStateDiffs: string;
@@ -324,46 +323,48 @@ async function setupStateDiffs(): Promise<StateDiffSetupData> {
   };
 }
 
-// LOG
+// The LogData interface represents the structure of the data that will be logged 
 interface LogData {
   isService: boolean;
   key: Buffer;
   value: Buffer;
   message: Buffer;
   currentMessageLengthBytes: string;
+  logs: string[];
 }
 
-function setupLogData(): LogData {
-  return {
-    isService: true,
-        key: Buffer.alloc(32, 1),
-    value: Buffer.alloc(32, 2),
-    message: Buffer.alloc(32, 3),
-    currentMessageLengthBytes: ethers.utils.hexZeroPad(ethers.utils.hexlify(32), 4),
-  };
-}
-
-function createLogs(l1MessengerAccount: ethers.Signer, l1Messenger: L1Messenger, logData: LogData): string[] {
-  const firstLog = ethers.utils.concat([
+function setupLogData(l1MessengerAccount: ethers.Signer, l1Messenger: L1Messenger): LogData {
+  const key = Buffer.alloc(32, 1);
+  const value = Buffer.alloc(32, 2);
+  const message = Buffer.alloc(32, 3);
+  const currentMessageLengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(32), 4);
+  const logs = [ethers.utils.concat([
     ethers.utils.hexlify([0]),
     ethers.utils.hexlify(1),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 2),
     ethers.utils.hexZeroPad(l1MessengerAccount.address, 20),
-    logData.key,
-    logData.value,
-  ]);
-  const secondLog = ethers.utils.concat([
+    key,
+    value,
+  ]), ethers.utils.concat([
     ethers.utils.hexlify([0]),
     ethers.utils.hexlify(1),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 2),
     ethers.utils.hexZeroPad(l1Messenger.address, 20),
     ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase(),
-    ethers.utils.keccak256(logData.message),
-  ]);
-  return [firstLog, secondLog];
+    ethers.utils.keccak256(message),
+  ]) 
+]
+  return {
+    isService: true,
+    key,
+    value,
+    message,
+    currentMessageLengthBytes,
+    logs, 
+  };
 }
 
-// bytecode
+//Represents the structure of the bytecode/message data that is part of the pubdata.
 interface BytecodeData {
   content: string;
   lengthBytes: string;
@@ -378,6 +379,7 @@ async function setupBytecodeData(l1MessengerAddress: string): Promise<BytecodeDa
   };
 }
 
+// Used for emulating the pubdata published by the L1Messenger.
 class L1MessengerPubdataEmulator {
   numberOfLogs: number;
   logs: string[];
@@ -424,7 +426,7 @@ class L1MessengerPubdataEmulator {
     this.stateDiffsSetupData = data;
   }
 
-  buildTotalL2ToL1PubdataAndStateDiffs() {
+  buildTotalL2ToL1PubdataAndStateDiffs(): string {
     const messagePairs = [];
     for (let i = 0; i < this.numberOfMessages; i++) {
       messagePairs.push(this.messages[i].lengthBytes, this.messages[i].content);
