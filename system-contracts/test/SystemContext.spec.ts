@@ -150,18 +150,31 @@ describe("SystemContext tests", () => {
     it("should set new batch", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [batchData.batchNumber]))
       await systemContext
         .connect(bootloaderAccount)
-        .setNewBatch(batchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1);
+        .setNewBatch(newBatchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1);
       const batchDataAfter = await systemContext.getBatchNumberAndTimestamp();
       expect(batchDataAfter.batchNumber).to.be.equal(batchData.batchNumber.add(1));
       expect(batchDataAfter.batchTimestamp).to.be.equal(batchData.batchTimestamp.add(1));
+      const batchHashAfter = await systemContext.getBatchHash(batchData.batchNumber);
+      expect(batchHashAfter).to.not.be.equal(batchHash);
+      expect(batchHashAfter).to.be.equal(newBatchHash);
+
+      const blockHash = await systemContext.getBlockHashEVM(0);
+      console.log("blockHash", blockHash);
+      const blockHash1 = await systemContext.getBlockHashEVM(1);
+      console.log("blockHash", blockHash1);
+      const blockHash2 = await systemContext.getBlockHashEVM(2);
+      console.log("blockHash", blockHash2);
+      
+      
     });
   });
 
   describe("setL2Block", async () => {
     it("should revert Callable only by the bootloader", async () => {
-      const blockData = await systemContext.getBlockNumberAndTimestamp();
+      const blockData = await systemContext.getL2BlockNumberAndTimestamp();
       const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
       await expect(
         systemContext.setL2Block(
@@ -322,9 +335,7 @@ describe("SystemContext tests", () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
       const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
-      const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);
-      console.log(prevBlockHash);
-      
+      const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);      
       const expectedBlockHash = ethers.utils.keccak256(
         ethers.utils.defaultAbiCoder.encode(
           ["uint128", "uint128", "bytes32", "bytes32"],
