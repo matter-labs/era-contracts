@@ -32,6 +32,11 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 /// @dev The current version of state diff compression being used.
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The interface of the L1 Messenger contract, responsible for sending messages to L1.
+ */
 interface IL1Messenger {
     // Possibly in the future we will be able to track the messages sent to L1 with
     // some hooks in the VM. For now, it is much easier to track them with L2 events.

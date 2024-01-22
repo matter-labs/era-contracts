@@ -149,7 +149,7 @@ data from L2 and to prove that they were sent on L1 using only `l2ToL1log`. To s
 this trick:
 
 - One of the system contracts accepts an arbitrary length message and sends a fixed length message with parameters
-  `senderAddress == this`, `marker == true`, `key == msg.sender`, `value == keccak256(message)`.
+  `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
 - The contract on L1 accepts all sent messages and if the message came from this system contract it requires that the
   preimage of `value` be provided.
 

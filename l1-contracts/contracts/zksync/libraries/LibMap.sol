@@ -2,11 +2,13 @@
 pragma solidity 0.8.20;
 
 /// @notice Library for storage of packed unsigned integers.
-/// @author Solady (https://github.com/vectorized/solady/blob/main/src/utils/LibMap.sol)
+/// @author Matter Labs
+/// @dev This library is an adaptation of the corresponding Solady library (https://github.com/vectorized/solady/blob/main/src/utils/LibMap.sol)
+/// @custom:security-contact security@matterlabs.dev
 library LibMap {
     /// @dev A uint32 map in storage.
     struct Uint32Map {
-        mapping(uint256 => uint256) map;
+        mapping(uint256 packedIndex => uint256 eightPackedValues) map;
     }
 
     /// @dev Retrieves the uint32 value at a specific index from the Uint32Map.
@@ -31,7 +33,7 @@ library LibMap {
 
     /// @dev Updates the uint32 value at `_index` in `map`.
     /// @param _map The Uint32Map instance containing the packed uint32 values.
-    /// @param _index The index of the uint32 value to retrieve.
+    /// @param _index The index of the uint32 value to set.
     /// @param _value The new value at the specified index.
     function set(Uint32Map storage _map, uint256 _index, uint32 _value) internal {
         unchecked {

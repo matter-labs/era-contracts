@@ -126,9 +126,10 @@ export async function publishFactoryDeps(
   nonce: number,
   gasPrice: BigNumber
 ) {
-  if (dependencies.length == 0) {
-    return [];
+  if (dependencies.length === 0) {
+    throw new Error("The dependencies must be non-empty");
   }
+
   const bytecodes = getBytecodes(dependencies);
   const combinedLength = totalBytesLength(bytecodes);
 
@@ -152,15 +153,14 @@ export async function publishFactoryDeps(
       gasLimit: 3000000,
     },
   });
+
   console.log(`Transaction hash: ${txHandle.hash}`);
 
-  // Waiting for the transaction to be processed by the server
-  await txHandle.wait();
+  console.log("Waiting for transaction commit on L1");
 
-  console.log("Transaction complete! Checking markers on L2...");
+  await txHandle.waitL1Commit(2);
 
-  // Double checking that indeed the dependencies have been marked as known
-  await checkMarkers(bytecodes, deployer);
+  return txHandle;
 }
 
 // Returns an array of bytecodes that should be published along with their total length in bytes

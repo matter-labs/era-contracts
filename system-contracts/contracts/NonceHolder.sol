@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./interfaces/INonceHolder.sol";
-import "./interfaces/IContractDeployer.sol";
+import {INonceHolder} from "./interfaces/INonceHolder.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 
@@ -25,20 +25,20 @@ import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
  * here serve more as a help to users to prevent from doing mistakes, rather than any invariants.
  */
 contract NonceHolder is INonceHolder, ISystemContract {
-    uint256 constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
+    uint256 private constant DEPLOY_NONCE_MULTIPLIER = 2 ** 128;
     /// The minNonce can be increased by at 2^32 at a time to prevent it from
     /// overflowing beyond 2**128.
-    uint256 constant MAXIMAL_MIN_NONCE_INCREMENT = 2 ** 32;
+    uint256 private constant MAXIMAL_MIN_NONCE_INCREMENT = 2 ** 32;
 
     /// RawNonces for accounts are stored in format
     /// minNonce + 2^128 * deploymentNonce, where deploymentNonce
     /// is the nonce used for deploying smart contracts.
-    mapping(uint256 => uint256) internal rawNonces;
+    mapping(uint256 account => uint256 packedMinAndDeploymentNonce) internal rawNonces;
 
     /// Mapping of values under nonces for accounts.
     /// The main key of the mapping is the 256-bit address of the account, while the
     /// inner mapping is a mapping from a nonce to the value stored there.
-    mapping(uint256 => mapping(uint256 => uint256)) internal nonceValues;
+    mapping(uint256 account => mapping(uint256 nonceKey => uint256 value)) internal nonceValues;
 
     /// @notice Returns the current minimal nonce for account.
     /// @param _address The account to return the minimal nonce for
@@ -147,6 +147,10 @@ contract NonceHolder is INonceHolder, ISystemContract {
         (prevDeploymentNonce, ) = _splitRawNonce(oldRawNonce);
     }
 
+    /// @notice A method that checks whether the nonce has been used before.
+    /// @param _address The address the nonce of which is being checked.
+    /// @param _nonce The nonce value which is checked.
+    /// @return `true` if the nonce has been used, `false` otherwise.
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
         return (_nonce < getMinNonce(_address) || nonceValues[addressAsKey][_nonce] > 0);
