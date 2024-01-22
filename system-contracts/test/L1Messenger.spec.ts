@@ -108,7 +108,8 @@ describe("L1Messenger tests", () => {
       ).wait();
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
       // set secondlog hash to random data to trigger the revert
-      const secondLogModified = encodeL2ToL1Log({
+      const overrideData = { encodedLogs: [...emulator.encodedLogs] };
+      overrideData.encodedLogs[1] = encodeL2ToL1Log({
         l2ShardId: 0,
         isService: true,
         txNumberInBlock: 1,
@@ -116,8 +117,6 @@ describe("L1Messenger tests", () => {
         key: ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase(),
         value: ethers.utils.hexlify(randomBytes(32)),
       });
-      const overrideData = { encodedLogs: [...emulator.encodedLogs] };
-      overrideData.encodedLogs[1] = secondLogModified;
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
@@ -207,14 +206,16 @@ describe("L1Messenger tests", () => {
           ethers.utils.hexlify(logData.key),
           ethers.utils.hexlify(logData.value),
         ]);
-      emulator.addLog(encodeL2ToL1Log({
-        l2ShardId: 0,
-        isService: false,
-        txNumberInBlock: 1,
-        sender: l1MessengerAccount.address,
-        key: logData.key,
-        value: logData.value,
-      }));
+      emulator.addLog(
+        encodeL2ToL1Log({
+          l2ShardId: 0,
+          isService: false,
+          txNumberInBlock: 1,
+          sender: l1MessengerAccount.address,
+          key: logData.key,
+          value: logData.value,
+        })
+      );
     });
   });
 

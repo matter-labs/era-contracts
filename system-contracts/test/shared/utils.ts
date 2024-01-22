@@ -202,7 +202,7 @@ export function encodeStateDiffs(stateDiffs: StateDiff[]): string {
 }
 
 export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: StateDiff[]): string {
-  let num_initial = 0;
+  let numInitial = 0;
   const initial = [];
   const repeated = [];
   for (const stateDiff of stateDiffs) {
@@ -230,7 +230,7 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
     const metadata = (len << 3) + op;
     const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
     if (stateDiff.index === 0) {
-      num_initial += 1;
+      numInitial += 1;
       initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, minHex]));
     } else {
       repeated.push(
@@ -239,6 +239,6 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
     }
   }
   return ethers.utils.hexlify(
-    ethers.utils.concat([ethers.utils.solidityPack(["uint16"], [num_initial]), ...initial, ...repeated])
+    ethers.utils.concat([ethers.utils.solidityPack(["uint16"], [numInitial]), ...initial, ...repeated])
   );
 }
