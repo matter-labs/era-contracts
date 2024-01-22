@@ -228,11 +228,11 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
       len = (minHex.length - 2) / 2;
     }
     const metadata = (len << 3) + op;
-    const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
     if (stateDiff.index === 0) {
       numInitial += 1;
       initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, minHex]));
     } else {
+      const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
       repeated.push(
         ethers.utils.solidityPack([enumerationIndexType, "uint8", "bytes"], [stateDiff.index, metadata, minHex])
       );
