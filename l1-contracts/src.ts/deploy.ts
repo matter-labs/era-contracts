@@ -608,8 +608,7 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
-    // const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const inputChainId = Math.floor(Math.random() * 2 ** 47);
+    const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const governor = this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode(

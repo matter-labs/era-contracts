@@ -106,7 +106,6 @@ async function main() {
       const receipts = await tx.wait(2);
 
       console.log(`ERC20 bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
-      console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${await erc20Bridge.l2BridgeAddress(chainId)}`);
     });
 
   await program.parseAsync(process.argv);
