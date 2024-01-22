@@ -614,8 +614,6 @@ object "Bootloader" {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
                         
-                        setPricePerPubdataByte(gasPerPubdata)
-
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
                         <!-- @endif -->
@@ -957,7 +955,6 @@ object "Bootloader" {
                 // For L1->L2 transactions we always use the pubdata price provided by the transaction. 
                 // This is needed to ensure DDoS protection. All the excess expenditure 
                 // will be refunded to the user.
-                setPricePerPubdataByte(gasPerPubdata)
 
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 32)
@@ -2591,9 +2588,12 @@ object "Bootloader" {
                 callSystemContext({{RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR}})
             }
 
-            /// @dev Set the new price per pubdata byte
-            function setPricePerPubdataByte(newPrice) {
-                verbatim_1i_0o("set_pubdata_price", newPrice)
+            function getMeta() -> ret {
+                ret := verbatim_0i_1o("meta")
+            }
+
+            function getPubdataSpent() -> ret {
+                ret := and(getMeta(), 0xFFFFFFFF)     
             }
 
             /// @dev Set the new value for the tx origin context value
@@ -3832,9 +3832,6 @@ object "Bootloader" {
                 // Increment tx index within the system.
                 considerNewTx()
             }
-            
-            // The bootloader doesn't have to pay anything
-            setPricePerPubdataByte(0)
 
             // Resetting tx.origin and gasPrice to 0, so we don't pay for
             // publishing them on-chain.
