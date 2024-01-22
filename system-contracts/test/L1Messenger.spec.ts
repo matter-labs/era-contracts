@@ -24,7 +24,7 @@ describe("L1Messenger tests", () => {
   let bootloaderAccount: ethers.Signer;
   let stateDiffsSetupData: StateDiffSetupData;
   let logData: LogData;
-  let bytecodeData: BytecodeData;
+  let bytecodeData: ContentLengthPair;
   let emulator: L1MessengerPubdataEmulator;
 
   before(async () => {
@@ -92,13 +92,11 @@ describe("L1Messenger tests", () => {
 
     it("should revert Too many L2->L1 logs", async () => {
       // set numberOfLogsBytes to 0x900 to trigger the revert (max value is 0x800)
-      emulator.numberOfLogs = 0x900;
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs())
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x900 }))
       ).to.be.rejectedWith("Too many L2->L1 logs");
-      emulator.numberOfLogs = 2;
     });
 
     it("should revert logshashes mismatch", async () => {
@@ -115,25 +113,25 @@ describe("L1Messenger tests", () => {
         ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase(),
         ethers.utils.hexlify(randomBytes(32)),
       ]);
-      emulator.logs[1] = secondLogModified;
+      const overrideData = { encodedLogs: [...emulator.encodedLogs] };
+      overrideData.encodedLogs[1] = secondLogModified;
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs())
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(overrideData))
       ).to.be.rejectedWith("reconstructedChainedLogsHash is not equal to chainedLogsHash");
-      emulator.logs[1] = logData.logs[1];
     });
 
     it("should revert chainedMessageHash mismatch", async () => {
       // Buffer.alloc(32, 6), to trigger the revert
       const wrongMessage = { lengthBytes: logData.currentMessageLengthBytes, content: Buffer.alloc(32, 6) };
-      emulator.messages[0] = wrongMessage;
+      const overrideData = { messages: [...emulator.messages] };
+      overrideData.messages[0] = wrongMessage;
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs())
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(overrideData))
       ).to.be.rejectedWith("reconstructedChainedMessagesHash is not equal to chainedMessagesHash");
-      emulator.messages[0] = { lengthBytes: logData.currentMessageLengthBytes, content: logData.message };
     });
 
     it("should revert state diff compression version mismatch", async () => {
@@ -145,13 +143,13 @@ describe("L1Messenger tests", () => {
           })
       ).wait();
       // modify version to trigger the revert
-      emulator.version = ethers.utils.hexZeroPad(ethers.utils.hexlify(66), 1);
       await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs())
+        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
+          emulator.buildTotalL2ToL1PubdataAndStateDiffs({
+            version: ethers.utils.hexZeroPad(ethers.utils.hexlify(66), 1),
+          })
+        )
       ).to.be.rejectedWith("state diff compression version mismatch");
-      emulator.version = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 1);
     });
 
     it("should revert extra data", async () => {
@@ -366,13 +364,13 @@ function setupLogData(l1MessengerAccount: ethers.Signer, l1Messenger: L1Messenge
   };
 }
 
-//Represents the structure of the bytecode/message data that is part of the pubdata.
-interface BytecodeData {
+// Represents the structure of the bytecode/message data that is part of the pubdata.
+interface ContentLengthPair {
   content: string;
   lengthBytes: string;
 }
 
-async function setupBytecodeData(l1MessengerAddress: string): Promise<BytecodeData> {
+async function setupBytecodeData(l1MessengerAddress: string): Promise<ContentLengthPair> {
   const content = await getCode(l1MessengerAddress);
   const lengthBytes = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.utils.arrayify(content).length), 4);
   return {
@@ -382,19 +380,19 @@ async function setupBytecodeData(l1MessengerAddress: string): Promise<BytecodeDa
 }
 
 // Used for emulating the pubdata published by the L1Messenger.
-class L1MessengerPubdataEmulator {
+class L1MessengerPubdataEmulator implements EmulatorData {
   numberOfLogs: number;
-  logs: string[];
+  encodedLogs: string[];
   numberOfMessages: number;
-  messages: BytecodeData[];
+  messages: ContentLengthPair[];
   numberOfBytecodes: number;
-  bytecodes: BytecodeData[];
+  bytecodes: ContentLengthPair[];
   stateDiffsSetupData: StateDiffSetupData;
   version: string;
 
   constructor() {
     this.numberOfLogs = 0;
-    this.logs = [];
+    this.encodedLogs = [];
     this.numberOfMessages = 0;
     this.messages = [];
     this.numberOfBytecodes = 0;
@@ -410,16 +408,16 @@ class L1MessengerPubdataEmulator {
   }
 
   addLog(log: string): void {
-    this.logs.push(log);
+    this.encodedLogs.push(log);
     this.numberOfLogs++;
   }
 
-  addMessage(message: BytecodeData): void {
+  addMessage(message: ContentLengthPair): void {
     this.messages.push(message);
     this.numberOfMessages++;
   }
 
-  addBytecode(bytecode: BytecodeData): void {
+  addBytecode(bytecode: ContentLengthPair): void {
     this.bytecodes.push(bytecode);
     this.numberOfBytecodes++;
   }
@@ -428,30 +426,57 @@ class L1MessengerPubdataEmulator {
     this.stateDiffsSetupData = data;
   }
 
-  buildTotalL2ToL1PubdataAndStateDiffs(): string {
+  buildTotalL2ToL1PubdataAndStateDiffs(overrideData: EmulatorOverrideData = {}): string {
+    const numberOfLogs = overrideData.numberOfLogs !== undefined ? overrideData.numberOfLogs : this.numberOfLogs;
+    const encodedLogs = overrideData.encodedLogs !== undefined ? overrideData.encodedLogs : this.encodedLogs;
+    const numberOfMessages =
+      overrideData.numberOfMessages !== undefined ? overrideData.numberOfMessages : this.numberOfMessages;
+    const messages = overrideData.messages !== undefined ? overrideData.messages : this.messages;
+    const numberOfBytecodes =
+      overrideData.numberOfBytecodes !== undefined ? overrideData.numberOfBytecodes : this.numberOfBytecodes;
+    const bytecodes = overrideData.bytecodes !== undefined ? overrideData.bytecodes : this.bytecodes;
+    const stateDiffsSetupData =
+      overrideData.stateDiffsSetupData !== undefined ? overrideData.stateDiffsSetupData : this.stateDiffsSetupData;
+    const version = overrideData.version !== undefined ? overrideData.version : this.version;
     const messagePairs = [];
-    for (let i = 0; i < this.numberOfMessages; i++) {
-      messagePairs.push(this.messages[i].lengthBytes, this.messages[i].content);
+    for (let i = 0; i < numberOfMessages; i++) {
+      messagePairs.push(messages[i].lengthBytes, messages[i].content);
     }
 
     const bytecodePairs = [];
-    for (let i = 0; i < this.numberOfBytecodes; i++) {
-      bytecodePairs.push(this.bytecodes[i].lengthBytes, this.bytecodes[i].content);
+    for (let i = 0; i < numberOfBytecodes; i++) {
+      bytecodePairs.push(bytecodes[i].lengthBytes, bytecodes[i].content);
     }
 
     return ethers.utils.concat([
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfLogs), 4),
-      ...this.logs,
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfMessages), 4),
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfLogs), 4),
+      ...encodedLogs,
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfMessages), 4),
       ...messagePairs,
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(this.numberOfBytecodes), 4),
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(numberOfBytecodes), 4),
       ...bytecodePairs,
-      this.version,
-      this.stateDiffsSetupData.compressedStateDiffsSizeBytes,
-      this.stateDiffsSetupData.enumerationIndexSizeBytes,
-      this.stateDiffsSetupData.compressedStateDiffs,
-      this.stateDiffsSetupData.numberOfStateDiffsBytes,
-      this.stateDiffsSetupData.encodedStateDiffs,
+      version,
+      stateDiffsSetupData.compressedStateDiffsSizeBytes,
+      stateDiffsSetupData.enumerationIndexSizeBytes,
+      stateDiffsSetupData.compressedStateDiffs,
+      stateDiffsSetupData.numberOfStateDiffsBytes,
+      stateDiffsSetupData.encodedStateDiffs,
     ]);
   }
 }
+
+// Represents the structure of the data that the emulator uses.
+interface EmulatorData {
+  numberOfLogs: number;
+  encodedLogs: string[];
+  numberOfMessages: number;
+  messages: ContentLengthPair[];
+  numberOfBytecodes: number;
+  bytecodes: ContentLengthPair[];
+  stateDiffsSetupData: StateDiffSetupData;
+  version: string;
+}
+
+// Represents a type that allows for overriding specific properties of the EmulatorData.
+// This is useful when you want to change some properties of the emulator data without affecting the others.
+type EmulatorOverrideData = Partial<EmulatorData>;
