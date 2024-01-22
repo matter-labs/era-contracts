@@ -5,6 +5,7 @@ import { TEST_BOOTLOADER_FORMAL_ADDRESS, TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS } 
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { prepareEnvironment } from "./shared/mocks";
 import { expect } from "chai";
+import { log } from "console";
 
 describe("SystemContext tests", () => {
   const wallet = getWallets()[0];
@@ -346,8 +347,8 @@ describe("SystemContext tests", () => {
       );
       await systemContext
         .connect(bootloaderAccount)
-        .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(1), expectedBlockHash, false, 0);
-      // chech getBlockHashEVM; blockHashAfter = _getLatest257L2blockHash
+        .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(1), expectedBlockHash, false, 66);
+      // check getBlockHashEVM; blockHashAfter = _getLatest257L2blockHash
       const blockHashAfter = await systemContext.getBlockHashEVM(blockData.blockNumber);
       const blockDataAfter = await systemContext.getL2BlockNumberAndTimestamp();
       expect(blockDataAfter.blockNumber).to.be.equal(blockData.blockNumber.add(1));
