@@ -150,7 +150,7 @@ describe("SystemContext tests", () => {
     it("should set new batch", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
-      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [batchData.batchNumber]))
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [batchData.batchNumber.add(1)]));
       await systemContext
         .connect(bootloaderAccount)
         .setNewBatch(newBatchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1);
@@ -160,15 +160,6 @@ describe("SystemContext tests", () => {
       const batchHashAfter = await systemContext.getBatchHash(batchData.batchNumber);
       expect(batchHashAfter).to.not.be.equal(batchHash);
       expect(batchHashAfter).to.be.equal(newBatchHash);
-
-      const blockHash = await systemContext.getBlockHashEVM(0);
-      console.log("blockHash", blockHash);
-      const blockHash1 = await systemContext.getBlockHashEVM(1);
-      console.log("blockHash", blockHash1);
-      const blockHash2 = await systemContext.getBlockHashEVM(2);
-      console.log("blockHash", blockHash2);
-      
-      
     });
   });
 
@@ -237,7 +228,7 @@ describe("SystemContext tests", () => {
       ).to.be.rejectedWith("The previous L2 block hash is incorrect");
     });
 
-    it("should set L2 block", async () => {
+    it("should set L2 block, check blockNumber & blockTimestamp change, also check getBlockHashEVM", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
       const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber]));
       await systemContext
@@ -246,7 +237,18 @@ describe("SystemContext tests", () => {
       const blockDataAfter = await systemContext.getL2BlockNumberAndTimestamp();
       expect(blockDataAfter.blockNumber).to.be.equal(blockData.blockNumber.add(1));
       expect(blockDataAfter.blockTimestamp).to.be.equal(blockData.blockTimestamp.add(1));
-        
+      const blockNumber = await systemContext.getBlockNumber();
+      const blockTimestamp = await systemContext.getBlockTimestamp();
+      expect(blockNumber).to.be.equal(blockData.blockNumber.add(1));
+      expect(blockTimestamp).to.be.equal(blockData.blockTimestamp.add(1));
+      // getBlockHashEVM
+      // blockNumber <= block
+      const blockHash = await systemContext.getBlockHashEVM(blockData.blockNumber.add(100));
+      expect(blockHash).to.be.equal(ethers.constants.HashZero);
+      // block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch 
+      const blockHash1 = await systemContext.getBlockHashEVM(0);
+      const batchHash = await systemContext.getBatchHash(0);
+      expect(blockHash1).to.be.equal(batchHash);
     });
 
     it("should revert Can not reuse L2 block number from the previous batch", async () => {
@@ -331,7 +333,7 @@ describe("SystemContext tests", () => {
       );
     });
 
-    it("should set block again, and change data", async () => {
+    it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
       const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
@@ -345,6 +347,7 @@ describe("SystemContext tests", () => {
       await systemContext
         .connect(bootloaderAccount)
         .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp.add(1), expectedBlockHash, false, 0);
+      // chech getBlockHashEVM; blockHashAfter = _getLatest257L2blockHash
       const blockHashAfter = await systemContext.getBlockHashEVM(blockData.blockNumber);
       const blockDataAfter = await systemContext.getL2BlockNumberAndTimestamp();
       expect(blockDataAfter.blockNumber).to.be.equal(blockData.blockNumber.add(1));
