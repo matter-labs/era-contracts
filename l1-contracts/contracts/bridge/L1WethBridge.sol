@@ -97,7 +97,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @dev A mapping chainId => bridgeProxyTxHash. Used to check the deploy transaction (which depends on its place in the priority queue).
     mapping(uint256 => bytes32) public bridgeProxyDeployOnL2TxHash;
 
-    /// @dev A mapping chainId =>  L2 deposit transaction hash =>  keccak256(account, amount) 
+    /// @dev A mapping chainId =>  L2 deposit transaction hash =>  keccak256(account, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev only used when it is not the base token, as then it is sent to refund recipient
     mapping(uint256 => mapping(bytes32 => bytes32)) internal depositHappened;
@@ -545,7 +545,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         bytes32 _txHash
     ) external override onlyBridgehub {
         require(depositHappened[_chainId][_txHash] == 0x00, "L1WETHBridge: tx already happened");
-        depositHappened[_chainId][_txHash] =  _txDataHash;
+        depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
@@ -588,7 +588,10 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         require(proofValid, "L1WB: Invalid L2 transaction status proof");
 
         bytes32 txDataHash = depositHappened[_chainId][_l2TxHash];
-        require(((_amount > 0) && (txDataHash ==  keccak256(abi.encode(_depositSender, _amount)))), "L1WB: _amount is zero or deposit did not happen");
+        require(
+            ((_amount > 0) && (txDataHash == keccak256(abi.encode(_depositSender, _amount)))),
+            "L1WB: _amount is zero or deposit did not happen"
+        );
         if (!hyperbridgingEnabled[_chainId]) {
             require(chainBalance[_chainId] >= _amount, "L1WB: chainBalance is too low");
             chainBalance[_chainId] -= _amount;

@@ -35,10 +35,7 @@ export async function initializeErc20Bridge(
   // Governor should always be smart contract (except for unit tests)
   const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
-  const { l2TokenFactoryAddr, l2ERC20BridgeProxyAddr } = calculateERC20Addresses(
-    l2GovernorAddress,
-    erc20Bridge
-  );
+  const { l2TokenFactoryAddr, l2ERC20BridgeProxyAddr } = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
 
   const tx1 = await erc20Bridge.initialize();
   const tx2 = await erc20Bridge.initializeV2(
@@ -165,12 +162,8 @@ export async function startErc20BridgeInitOnChain(
     // Governor should always be smart contract (except for unit tests)
     const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
-    const { l2ERC20BridgeProxyAddr } = calculateERC20Addresses(
-    l2GovernorAddress,
-    erc20Bridge
-  );
+    const { l2ERC20BridgeProxyAddr } = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
 
     console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${l2ERC20BridgeProxyAddr}`);
   }
-
 }
