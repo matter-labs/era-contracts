@@ -93,7 +93,7 @@ describe("SystemContext tests", () => {
       expect(batchDataRestored.batchNumber).to.be.equal(0);
       expect(batchDataRestored.batchTimestamp).to.be.equal(0);
       expect(baseFeeRestored).to.be.equal(0);
-    }) 
+    });
   });
 
   describe("getL2BlockNumberAndTimestamp", async () => {
@@ -150,7 +150,9 @@ describe("SystemContext tests", () => {
     it("should set new batch", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
-      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [batchData.batchNumber.add(1)]));
+      const newBatchHash = await ethers.utils.keccak256(
+        ethers.utils.solidityPack(["uint32"], [batchData.batchNumber.add(1)])
+      );
       await systemContext
         .connect(bootloaderAccount)
         .setNewBatch(newBatchHash, batchData.batchTimestamp.add(1), batchData.batchNumber.add(1), 1);
@@ -245,7 +247,7 @@ describe("SystemContext tests", () => {
       // blockNumber <= block
       const blockHash = await systemContext.getBlockHashEVM(blockData.blockNumber.add(100));
       expect(blockHash).to.be.equal(ethers.constants.HashZero);
-      // block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch 
+      // block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch
       const blockHash1 = await systemContext.getBlockHashEVM(0);
       const batchHash = await systemContext.getBatchHash(0);
       expect(blockHash1).to.be.equal(batchHash);
@@ -285,7 +287,9 @@ describe("SystemContext tests", () => {
 
     it("should revert Can not create virtual blocks in the middle of the miniblock", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
+      const expectedBlockHash = ethers.utils.keccak256(
+        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
+      );
       await expect(
         systemContext
           .connect(bootloaderAccount)
@@ -295,7 +299,9 @@ describe("SystemContext tests", () => {
 
     it("should set block again, no data changed", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const expectedBlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
+      const expectedBlockHash = ethers.utils.keccak256(
+        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
+      );
       await systemContext
         .connect(bootloaderAccount)
         .setL2Block(blockData.blockNumber, blockData.blockTimestamp, expectedBlockHash, false, 0);
@@ -318,7 +324,9 @@ describe("SystemContext tests", () => {
 
     it("should revert The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
+      const prevL2BlockHash = ethers.utils.keccak256(
+        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
+      );
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
       const expectedBlockHash = ethers.utils.keccak256(
         ethers.utils.defaultAbiCoder.encode(
@@ -327,7 +335,9 @@ describe("SystemContext tests", () => {
         )
       );
       await expect(
-        systemContext.connect(bootloaderAccount).setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
+        systemContext
+          .connect(bootloaderAccount)
+          .setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
       ).to.be.rejectedWith(
         "The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block"
       );
@@ -335,9 +345,11 @@ describe("SystemContext tests", () => {
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const prevL2BlockHash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)]));
+      const prevL2BlockHash = ethers.utils.keccak256(
+        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
+      );
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
-      const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);      
+      const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);
       const expectedBlockHash = ethers.utils.keccak256(
         ethers.utils.defaultAbiCoder.encode(
           ["uint128", "uint128", "bytes32", "bytes32"],
@@ -379,9 +391,13 @@ describe("SystemContext tests", () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const baseFee = await systemContext.baseFee();
       await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(batchData.batchTimestamp, 0, baseFee);
-      await expect(systemContext.connect(bootloaderAccount).publishTimestampDataToL1()).to.be.rejectedWith("The current batch number must be greater than 0");
-      await systemContext.connect(bootloaderAccount).unsafeOverrideBatch(batchData.batchTimestamp, batchData.batchNumber, baseFee);
-    })
+      await expect(systemContext.connect(bootloaderAccount).publishTimestampDataToL1()).to.be.rejectedWith(
+        "The current batch number must be greater than 0"
+      );
+      await systemContext
+        .connect(bootloaderAccount)
+        .unsafeOverrideBatch(batchData.batchTimestamp, batchData.batchNumber, baseFee);
+    });
 
     it("should publish timestamp data to L1", async () => {
       await systemContext.connect(bootloaderAccount).publishTimestampDataToL1();
