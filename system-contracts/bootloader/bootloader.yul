@@ -435,7 +435,7 @@ object "Bootloader" {
 
             /// @dev The maximum number the VM hooks may accept
             function VM_HOOK_PARAMS() -> ret {
-                ret := 2
+                ret := 3
             }
 
             /// @dev The offset starting from which the parameters for VM hooks are located
@@ -959,6 +959,8 @@ object "Bootloader" {
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 32)
 
+                let basePubdataSpent := getPubdataSpent()
+
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
                     innerTxDataOffset,
                     transactionIndex, 
@@ -990,16 +992,30 @@ object "Bootloader" {
                 }
                 
                 if gt(gasLimitForTx, gasUsedOnPreparation) {
-                    let potentialRefund := 0
+                    let gasSpentOnExecution := 0
 
-                    potentialRefund, success := getExecuteL1TxAndGetRefund(txDataOffset, sub(gasLimitForTx, gasUsedOnPreparation))
+                    gasSpentOnExecution, success := getExecuteL1TxAndGetRefund(
+                        txDataOffset, 
+                        sub(gasLimitForTx, gasUsedOnPreparation),
+                        basePubdataSpent,
+                        reservedGas,
+                        gasPerPubdata,
+                    )
+
+                    // It is assumed that `comparePubdataSpent` ensured that the user did not publish too much pubdata
+                    let ergsSpentOnPubdata := getErgsSpentForPubdata(
+                        basePubdataSpent,
+                        gasPerPubdata
+                    )
+                    let potentialRefund := saturatingSub(add(reservedGas, gasSpentOnExecution), add(gasSpentOnExecution, ergsSpentOnPubdata))
+
 
                     // Asking the operator for refund
-                    askOperatorForRefund(potentialRefund)
+                    askOperatorForRefund(potentialRefund, ergsSpentOnPubdata, gasPerPubdata)
 
                     // In case the operator provided smaller refund than the one calculated
                     // by the bootloader, we return the refund calculated by the bootloader.
-                    refundGas := max(getOperatorRefundForTx(transactionIndex), safeAdd(potentialRefund, reservedGas, "iop"))
+                    refundGas := max(getOperatorRefundForTx(transactionIndex), potentialRefund)
                 }
 
                 if gt(refundGas, gasLimit) {
@@ -1057,7 +1073,13 @@ object "Bootloader" {
                 }   
             }
 
-            function getExecuteL1TxAndGetRefund(txDataOffset, gasForExecution) -> potentialRefund, success {
+            function getExecuteL1TxAndGetRefund(
+                txDataOffset, 
+                gasForExecution,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
+            ) -> gasSpentOnExecution, success {
                 debugLog("gasForExecution", gasForExecution)
 
                 let callAbi := getNearCallABI(gasForExecution)
@@ -1068,15 +1090,13 @@ object "Bootloader" {
                 let gasBeforeExecution := gas()
                 success := ZKSYNC_NEAR_CALL_executeL1Tx(
                     callAbi,
-                    txDataOffset
+                    txDataOffset,
+                    basePubdataSpent,
+                    reservedGas,
+                    gasPerPubdata
                 )
                 notifyExecutionResult(success)
-                let gasSpentOnExecution := sub(gasBeforeExecution, gas())
-
-                potentialRefund := sub(gasForExecution, gasSpentOnExecution)
-                if gt(gasSpentOnExecution, gasForExecution) {
-                    potentialRefund := 0
-                }
+                gasSpentOnExecution := sub(gasBeforeExecution, gas())
             }
 
             /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.
@@ -1441,7 +1461,7 @@ object "Bootloader" {
 
                 comparePubdataSpent(
                     basePubdataSpent,
-                    gasleft(),
+                    gas(),
                     reservedGas,
                     gasPerPubdata,
                     0
@@ -1494,7 +1514,7 @@ object "Bootloader" {
 
                 comparePubdataSpent(
                     basePubdataSpent,
-                    gasleft(),
+                    gas(),
                     reservedGas,
                     gasPerPubdata,
                     0
@@ -1572,13 +1592,7 @@ object "Bootloader" {
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
-                        switch gt(gasLeft, gasSpentByPostOp) 
-                        case 1 { 
-                            gasLeft := sub(gasLeft, gasSpentByPostOp)
-                        }
-                        default {
-                            gasLeft := 0
-                        }
+                        gasLeft := saturatingSub(gasLeft, gasSpentByPostOp)
                     } 
                 }
 
@@ -1589,17 +1603,13 @@ object "Bootloader" {
                     gasPerPubdata
                 )
 
-                let totalRefund := add(reservedGas, gasLeft)
+                let totalRefund := saturatingSub(add(reservedGas, gasLeft), spentOnPubdata)
 
-                switch gt(totalRefundWithoutPubdata, spentOnPubdata)
-                case 0 {
-                    totalRefund := 0
-                }
-                default {
-                    totalRefund := sub(totalRefund, spentOnPubdata)
-                }
-
-                askOperatorForRefund(totalRefund)
+                askOperatorForRefund(
+                    totalRefund,
+                    spentOnPubdata,
+                    gasPerPubdata
+                )
 
                 let operatorProvidedRefund := getOperatorRefundForTx(transactionIndex)
 
@@ -1777,7 +1787,10 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             function ZKSYNC_NEAR_CALL_executeL1Tx(
                 abi,
-                txDataOffset
+                txDataOffset,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata,
             ) -> success {
                 // Skipping the first word of the ABI encoding of the struct
                 let innerTxDataOffset := add(txDataOffset, 32)
@@ -1813,6 +1826,14 @@ object "Bootloader" {
                 if iszero(success) {
                     nearCallPanic()
                 }
+
+                comparePubdataSpent(
+                    basePubdataSpent,
+                    gas(),
+                    reservedGas,
+                    gasPerPubdata,
+                    0
+                )
             }
 
             /// @dev Returns the ABI for nearCalls.
@@ -2195,7 +2216,7 @@ object "Bootloader" {
                 txResult, 
                 maxRefundedGas,
                 basePubdataSpent, 
-                gasPerPubdata
+                gasPerPubdata,
                 reservedGas,
             ) -> success {
                 // The postOp method has the following signature:
@@ -2284,7 +2305,7 @@ object "Bootloader" {
 
                 comparePubdataSpent(
                     basePubdataSpent,
-                    gasleft(),
+                    gas(),
                     reservedGas,
                     gasPerPubdata,
                     0
@@ -3429,6 +3450,16 @@ object "Bootloader" {
                 ret := sub(x, y)
             }
 
+            function saturatingSub(x, y) -> ret {
+                switch gt(x,y)
+                case 0 {
+                    ret := 0
+                } 
+                default {
+                    ret := sub(x,y)
+                }
+            }
+
             ///
             /// Debug utilities
             ///
@@ -3477,8 +3508,14 @@ object "Bootloader" {
             /// into the memory slot (in the out of circuit execution).
             /// Since the slot after the transaction is not touched,
             /// this slot can be used in the in-circuit VM out of box.
-            function askOperatorForRefund(gasLeft) {
-                storeVmHookParam(0, gasLeft)
+            function askOperatorForRefund(
+                proposedRefund, 
+                spentOnPubdata,
+                gasPerPubdataByte
+            ) {
+                storeVmHookParam(0, proposedRefund)
+                storeVmHookParam(1, spentOnPubdata)
+                storeVmHookParam(2, gasPerPubdataByte)
                 setHook(VM_HOOK_ASK_OPERATOR_FOR_REFUND())
             }
             
