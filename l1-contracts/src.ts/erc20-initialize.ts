@@ -97,6 +97,9 @@ export async function startErc20BridgeInitOnChain(
       requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2))
     );
     await mintTx.wait(1);
+    if (deployer.verbose) {
+      console.log("Mint tx for baseTokenBridge sent for erc20 bridge deployment", mintTx.hash);
+    }
 
     const approveTx1 = await erc20.increaseAllowance(
       deployer.addresses.Bridges.BaseTokenBridge,
