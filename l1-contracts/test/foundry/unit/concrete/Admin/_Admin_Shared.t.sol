@@ -2,114 +2,115 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {DiamondProxy} from "solpp/zksync/DiamondProxy.sol";
-import {DiamondInit} from "solpp/zksync/DiamondInit.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/zksync/Storage.sol";
-import {Diamond} from "solpp/zksync/libraries/Diamond.sol";
-import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
-import {Base} from "solpp/zksync/facets/Base.sol";
-import {Governance} from "solpp/governance/Governance.sol";
-import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
 
-contract GettersMock is Base {
-    function getFeeParams() public returns (FeeParams memory) {
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {FeeParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {IAdmin} from "solpp/state-transition/chain-interfaces/IAdmin.sol";
+
+contract AdminWrapper is AdminFacet {
+    function util_setPendingGovernor(address _pendingGovernor) external {
+        s.governor = _pendingGovernor;
+    }
+
+    function util_getPendingGovernor() external view returns (address) {
+        return s.pendingGovernor;
+    }
+
+    function util_setGovernor(address _governor) external {
+        s.governor = _governor;
+    }
+
+    function util_getGovernor() external view returns (address) {
+        return s.governor;
+    }
+
+    function util_setPendingAdmin(address _pendingAdmin) external {
+        s.pendingAdmin = _pendingAdmin;
+    }
+
+    function util_getPendingAdmin() external view returns (address) {
+        return s.pendingAdmin;
+    }
+
+    function util_setAdmin(address _admin) external {
+        s.admin = _admin;
+    }
+
+    function util_getAdmin() external view returns (address) {
+        return s.admin;
+    }
+
+    function util_setValidator(address _validator, bool _active) external {
+        s.validators[_validator] = _active;
+    }
+
+    function util_getValidator(address _validator) external view returns (bool) {
+        return s.validators[_validator];
+    }
+
+    function util_setZkPorterAvailability(bool _available) external {
+        s.zkPorterIsAvailable = _available;
+    }
+
+    function util_getZkPorterAvailability() external view returns (bool) {
+        return s.zkPorterIsAvailable;
+    }
+
+    function util_setStateTransitionManager(address _stateTransitionManager) external {
+        s.stateTransitionManager = _stateTransitionManager;
+    }
+
+    function util_getStateTransitionManager() external view returns (address) {
+        return s.stateTransitionManager;
+    }
+
+    function util_setPriorityTxMaxGasLimit(uint256 _priorityTxMaxGasLimit) external {
+        s.priorityTxMaxGasLimit = _priorityTxMaxGasLimit;
+    }
+
+    function util_getPriorityTxMaxGasLimit() external view returns (uint256) {
+        return s.priorityTxMaxGasLimit;
+    }
+
+    function util_setFeeParams(FeeParams calldata _feeParams) external {
+        s.feeParams = _feeParams;
+    }
+
+    function util_getFeeParams() external view returns (FeeParams memory) {
         return s.feeParams;
+    }
+
+    function util_setProtocolVersion(uint256 _protocolVersion) external {
+        s.protocolVersion = _protocolVersion;
+    }
+
+    function util_getProtocolVersion() external view returns (uint256) {
+        return s.protocolVersion;
+    }
+
+    function util_setIsFrozen(bool _isFrozen) external {
+        Diamond.DiamondStorage storage s = Diamond.getDiamondStorage();
+        s.isFrozen = _isFrozen;
+    }
+
+    function util_getIsFrozen() external view returns (bool) {
+        Diamond.DiamondStorage storage s = Diamond.getDiamondStorage();
+        return s.isFrozen;
     }
 }
 
+bytes constant ERROR_ONLY_GOVERNOR = "StateTransition Chain: not governor";
+bytes constant ERROR_ONLY_ADMIN_OR_GOVERNOR = "StateTransition chain: Only by governor or admin";
+bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "StateTransition Chain: not state transition manager";
+bytes constant ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by governor or state transition manager";
+
 contract AdminTest is Test {
-    DiamondProxy internal diamondProxy;
-    address internal owner;
-    address internal securityCouncil;
-    address internal governor;
-    AdminFacet internal adminFacet;
-    AdminFacet internal proxyAsAdmin;
-    GettersMock internal proxyAsGettersMock;
+    IAdmin internal adminFacet;
+    AdminWrapper internal adminFacetWrapper;
 
-    function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](11);
-        dcSelectors[0] = adminFacet.setPendingGovernor.selector;
-        dcSelectors[1] = adminFacet.acceptGovernor.selector;
-        dcSelectors[2] = adminFacet.setPendingAdmin.selector;
-        dcSelectors[3] = adminFacet.acceptAdmin.selector;
-        dcSelectors[4] = adminFacet.setValidator.selector;
-        dcSelectors[5] = adminFacet.setPorterAvailability.selector;
-        dcSelectors[6] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        dcSelectors[7] = adminFacet.executeUpgrade.selector;
-        dcSelectors[8] = adminFacet.freezeDiamond.selector;
-        dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
-        dcSelectors[10] = adminFacet.changeFeeParams.selector;
-        return dcSelectors;
-    }
-
-    function getGettersMockSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](1);
-        dcSelectors[0] = proxyAsGettersMock.getFeeParams.selector;
-        return dcSelectors;
-    }
-
-    function setUp() public {
-        owner = makeAddr("owner");
-        securityCouncil = makeAddr("securityCouncil");
-        governor = makeAddr("governor");
-        DiamondInit diamondInit = new DiamondInit();
-
-        VerifierParams memory dummyVerifierParams = VerifierParams({
-            recursionNodeLevelVkHash: 0,
-            recursionLeafLevelVkHash: 0,
-            recursionCircuitsSetVksHash: 0
-        });
-
-        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
-            verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
-            governor: governor,
-            admin: owner,
-            genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(0),
-            verifierParams: dummyVerifierParams,
-            zkPorterIsAvailable: false,
-            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
-            initialProtocolVersion: 0,
-            feeParams: FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            })
-        });
-
-        adminFacet = new AdminFacet();
-        GettersMock gettersMock = new GettersMock();
-
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(adminFacet),
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: getAdminSelectors()
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: address(gettersMock),
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: getGettersMockSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(diamondInit),
-            initCalldata: diamondInitCalldata
-        });
-
-        diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
-        proxyAsAdmin = AdminFacet(address(diamondProxy));
-        proxyAsGettersMock = GettersMock(address(diamondProxy));
+    function setUp() public virtual {
+        adminFacetWrapper = new AdminWrapper();
+        adminFacet = IAdmin(adminFacetWrapper);
     }
 }
