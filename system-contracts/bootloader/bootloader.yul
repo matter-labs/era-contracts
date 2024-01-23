@@ -1148,6 +1148,7 @@ object "Bootloader" {
                 transactionIndex,
                 gasPerPubdata
             ) {
+                let basePubdataSpent := getPubdataSpent()
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
@@ -1171,11 +1172,15 @@ object "Bootloader" {
                     gasPrice
                 )
 
+                comparePubdataSpent(
+                    basePubdataSpent, gasLeft, reservedGas, gasPerPubdata, 1
+                )
+
                 debugLog("validation finished", 0)
 
                 let gasSpentOnExecute := 0
                 let success := 0
-                success, gasSpentOnExecute := l2TxExecution(txDataOffset, gasLeft)
+                success, gasSpentOnExecute := l2TxExecution(txDataOffset, gasLeft, basePubdataSpent, reservedGas, gasPerPubdata)
 
                 debugLog("execution finished", 0)
 
@@ -1193,7 +1198,9 @@ object "Bootloader" {
                     success,
                     gasToRefund,
                     gasPrice,
-                    reservedGas
+                    reservedGas,
+                    basePubdataSpent,
+                    gasPerPubdata
                 )
 
                 debugLog("refund", 0)
@@ -1322,6 +1329,9 @@ object "Bootloader" {
             function l2TxExecution(
                 txDataOffset,
                 gasLeft,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
             ) -> success, gasSpentOnExecute {
                 let newCompressedFactoryDepsPointer := 0
                 let gasSpentOnFactoryDeps := 0
@@ -1329,7 +1339,13 @@ object "Bootloader" {
                 if gasLeft {
                     let markingDependenciesABI := getNearCallABI(gasLeft)
                     checkEnoughGas(gasLeft)
-                    newCompressedFactoryDepsPointer := ZKSYNC_NEAR_CALL_markFactoryDepsL2(markingDependenciesABI, txDataOffset)
+                    newCompressedFactoryDepsPointer := ZKSYNC_NEAR_CALL_markFactoryDepsL2(
+                        markingDependenciesABI, 
+                        txDataOffset,
+                        basePubdataSpent,
+                        reservedGas,
+                        gasPerPubdata
+                    )
                     gasSpentOnFactoryDeps := sub(gasBeforeFactoryDeps, gas())
                 }
 
@@ -1358,7 +1374,10 @@ object "Bootloader" {
                     // for this one, we don't care whether or not it fails.
                     success := ZKSYNC_NEAR_CALL_executeL2Tx(
                         executeABI,
-                        txDataOffset
+                        txDataOffset,
+                        basePubdataSpent,
+                        reservedGas,
+                        gasPerPubdata
                     )
 
                     gasSpentOnExecute := add(gasSpentOnFactoryDeps, sub(gasBeforeExecute, gas()))
@@ -1399,7 +1418,10 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             function ZKSYNC_NEAR_CALL_executeL2Tx(
                 abi,
-                txDataOffset
+                txDataOffset,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata,
             ) -> success {
                 // Skipping the first word of the ABI-encoding encoding
                 let innerTxDataOffset := add(txDataOffset, 32)
@@ -1416,13 +1438,24 @@ object "Bootloader" {
                 }
 
                 success := executeL2Tx(txDataOffset, from)
+
+                comparePubdataSpent(
+                    basePubdataSpent,
+                    gasleft(),
+                    reservedGas,
+                    gasPerPubdata,
+                    0
+                )
                 debugLog("Executing L2 ret", success)
             }
 
             /// @dev Sets factory dependencies for an L2 transaction with possible usage of packed bytecodes.
             function ZKSYNC_NEAR_CALL_markFactoryDepsL2(
                 abi,
-                txDataOffset
+                txDataOffset,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
             ) -> newDataInfoPtr {
                 let innerTxDataOffset := add(txDataOffset, 32)
 
@@ -1459,6 +1492,14 @@ object "Bootloader" {
                 // For bytecodes published in the previous step, no need pubdata will have to be published 
                 markFactoryDepsForTx(innerTxDataOffset, false)
 
+                comparePubdataSpent(
+                    basePubdataSpent,
+                    gasleft(),
+                    reservedGas,
+                    gasPerPubdata,
+                    0
+                )
+
                 newDataInfoPtr := dataInfoPtr
             }
 
@@ -1492,7 +1533,9 @@ object "Bootloader" {
                 success, 
                 gasLeft,
                 gasPrice,
-                reservedGas
+                reservedGas,
+                basePubdataSpent,
+                gasPerPubdata
             ) -> finalRefund {
                 setTxOrigin(BOOTLOADER_FORMAL_ADDR())
 
@@ -1522,7 +1565,10 @@ object "Bootloader" {
                             success,
                             // Since the paymaster will be refunded with reservedGas,
                             // it should know about it
-                            safeAdd(gasLeft, reservedGas, "jkl")
+                            safeAdd(gasLeft, reservedGas, "jkl"),
+                            basePubdataSpent,
+                            reservedGas,
+                            gasPerPubdata
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
@@ -1536,13 +1582,30 @@ object "Bootloader" {
                     } 
                 }
 
-                askOperatorForRefund(gasLeft)
+                // It was expected that before this point various `comparePubdataSpent` methods would ensure that the user 
+                // has enough funds for pubdata. Now, we just subtract the leftovers from the user.
+                let spentOnPubdata := getErgsSpentForPubdata(
+                    basePubdataSpent,
+                    gasPerPubdata
+                )
+
+                let totalRefund := add(reservedGas, gasLeft)
+
+                switch gt(totalRefundWithoutPubdata, spentOnPubdata)
+                case 0 {
+                    totalRefund := 0
+                }
+                default {
+                    totalRefund := sub(totalRefund, spentOnPubdata)
+                }
+
+                askOperatorForRefund(totalRefund)
 
                 let operatorProvidedRefund := getOperatorRefundForTx(transactionIndex)
 
                 // If the operator provides the value that is lower than the one suggested for 
                 // the bootloader, we will use the one calculated by the bootloader.
-                let refundInGas := max(operatorProvidedRefund, add(reservedGas, gasLeft))
+                let refundInGas := max(operatorProvidedRefund, totalRefund)
 
                 // The operator cannot refund more than the gasLimit for the transaction
                 if gt(refundInGas, getGasLimit(innerTxDataOffset)) {
@@ -2125,7 +2188,16 @@ object "Bootloader" {
             /// @param maxRefundedGas The maximum number of gas the bootloader can be refunded. 
             /// This is the `maximum` number because it does not take into account the number of gas that
             /// can be spent by the paymaster itself.
-            function ZKSYNC_NEAR_CALL_callPostOp(abi, paymaster, txDataOffset, txResult, maxRefundedGas) -> success {
+            function ZKSYNC_NEAR_CALL_callPostOp(
+                abi, 
+                paymaster, 
+                txDataOffset, 
+                txResult, 
+                maxRefundedGas,
+                basePubdataSpent, 
+                gasPerPubdata
+                reservedGas,
+            ) -> success {
                 // The postOp method has the following signature:
                 // function postTransaction(
                 //     bytes calldata _context,
@@ -2207,6 +2279,14 @@ object "Bootloader" {
                     calldataPtr,
                     calldataLen,
                     0,
+                    0
+                )
+
+                comparePubdataSpent(
+                    basePubdataSpent,
+                    gasleft(),
+                    reservedGas,
+                    gasPerPubdata,
                     0
                 )
             }
@@ -2594,6 +2674,50 @@ object "Bootloader" {
 
             function getPubdataSpent() -> ret {
                 ret := and(getMeta(), 0xFFFFFFFF)     
+            }
+
+            function getErgsSpentForPubdata(
+                basePubdataSpent,
+                gasPerPubdata,  
+            ) -> ret {
+                let currentPubdataCounter := getPubdataSpent()
+                let spentPubdata := sub(currentPubdataCounter, basePubdataSpent)
+                if gt(basePubdataSpent, currentPubdataCounter) {
+                    spentPubdata := 0
+                }
+
+                // safemul?
+                ret := mul(spentPubdata, gasPerPubdata)
+            }
+
+            function comparePubdataSpent(
+                basePubdataSpent,
+                computeGas,
+                reservedGas,
+                gasPerPubdata,
+                rejectTransaction
+            ) {
+                let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
+                let allowedGasLimit := add(computeGas, reservedGas)
+
+                if gt(allowedGasLimit, spentErgs) {
+                    if rejectTransaction {
+                        // TODO: use better code
+                        revertWithReason(ACCOUNT_TX_VALIDATION_ERR_CODE(), 0)
+                    }
+
+                    nearCallPanic()
+                }
+
+                // switch gt(spentErgs, newReservedGas)
+                // case 0 {
+                //     newReservedGas := sub(newReservedGas, spentErgs)
+                //     newComputeGas := computeGas
+                // }
+                // default {
+                //     newReservedGas := 0
+                //     newComputeGas := sub(computeGas, sub(spentErgs, newReservedGas))
+                // }
             }
 
             /// @dev Set the new value for the tx origin context value
