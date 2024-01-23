@@ -10,6 +10,8 @@ import {
   TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
   TEST_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS,
   TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
+  TEST_COMPRESSOR_CONTRACT_ADDRESS,
 } from "./constants";
 import { deployContractOnAddress, getWallets, loadArtifact } from "./utils";
 
@@ -21,6 +23,8 @@ type CallResult = {
 // Currently listed only contracts, that actually need to be mocked in the tests.
 // But other contracts can be added if needed.
 const TEST_SYSTEM_CONTRACTS_MOCKS = {
+  Compressor: TEST_COMPRESSOR_CONTRACT_ADDRESS,
+  SystemContext: TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
   NonceHolder: TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
   L1Messenger: TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
   KnownCodesStorage: TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
