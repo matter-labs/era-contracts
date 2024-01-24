@@ -20,7 +20,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 2 blobs");
-        // TODO: Update for dynamic number of blobs
+
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         // We allocate to the full size of MAX_NUMBER_OF_BLOBS * BLOB_SIZE_BYTES because we need to pad
