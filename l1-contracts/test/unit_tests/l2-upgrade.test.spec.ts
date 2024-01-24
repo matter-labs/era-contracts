@@ -5,10 +5,11 @@ import { Wallet } from "ethers";
 import * as fs from "fs";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
-import { diamondCut } from "../../src.ts/diamondCut";
+import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {
   AdminFacetFactory,
+  DummyAdminFacetFactory,
   CustomUpgradeTestFactory,
   DefaultUpgradeFactory,
   ExecutorFacetFactory,
@@ -80,7 +81,11 @@ describe("L2 upgrade test", function () {
 
     await owner.sendTransaction(tx);
 
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    const dummyAdminFacetFactory = await hardhat.ethers.getContractFactory("DummyAdminFacet");
+    const dummyAdminfFacetContract = await dummyAdminFacetFactory.deploy();
+    const extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
+
+    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
     initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
 
     chainId = deployer.chainId;
@@ -89,19 +94,17 @@ describe("L2 upgrade test", function () {
     proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    const dummyAdminFacet = DummyAdminFacetFactory.connect(
+      deployer.addresses.StateTransition.DiamondProxy,
+      deployWallet
+    );
 
     stateTransitionManager = StateTransitionManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
 
-    await (await proxyAdmin.setValidator(await deployWallet.getAddress(), true)).wait();
-
-    //     let priorityOp = await proxyGetters.priorityQueueFrontOperation();
-    //     // priorityOpTxHash = priorityOp[0];
-    //     priorityOperationsHash = keccak256(
-    //         ethers.utils.defaultAbiCoder.encode(['uint256', 'uint256'], [EMPTY_STRING_KECCAK, priorityOp[0]])
-    //     );
+    await (await dummyAdminFacet.dummySetValidator(await deployWallet.getAddress())).wait();
 
     // do initial setChainIdUpgrade
     const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
@@ -109,11 +112,8 @@ describe("L2 upgrade test", function () {
       genesisStoredBatchInfo(),
       {
         batchNumber: 1,
-        // priorityOperationsHash: priorityOperationsHash,
-        // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
         priorityOperationsHash: EMPTY_STRING_KECCAK,
         numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
-        // systemLogs
       },
       upgradeTxHash
     );
@@ -129,11 +129,8 @@ describe("L2 upgrade test", function () {
   it("Upgrade should work even if not all batches are processed", async () => {
     batch2Info = await buildCommitBatchInfo(storedBatch1InfoChainIdUpgrade, {
       batchNumber: 2,
-      // priorityOperationsHash: priorityOperationsHash,
-      // numberOfLayer1Txs: '0x0000000000000000000000000000000000000000000000000000000000000001'
       priorityOperationsHash: EMPTY_STRING_KECCAK,
       numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
-      // systemLogs
     });
 
     const commitReceipt = await (
@@ -951,7 +948,7 @@ async function executeUpgrade(
       partialUpgrade.newProtocolVersion
     )
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }
 
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
@@ -1013,7 +1010,7 @@ async function executeCustomUpgrade(
   (
     await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }
 
 async function makeExecutedEqualCommitted(

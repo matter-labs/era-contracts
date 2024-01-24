@@ -90,10 +90,12 @@ interface IExecutor is IZkSyncStateTransitionBase {
         CommitBatchInfo[] calldata _newBatchesData
     ) external;
 
-    // function commitBatchesOutDatedProtocolVersion(
-    //     StoredBatchInfo calldata _lastCommittedBatchData,
-    //     CommitBatchInfo[] calldata _newBatchesData
-    // ) external;
+    /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    function commitBatchesSharedBridge(
+        uint256 _chainId,
+        StoredBatchInfo calldata _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external;
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
@@ -106,17 +108,31 @@ interface IExecutor is IZkSyncStateTransitionBase {
         ProofInput calldata _proof
     ) external;
 
+    /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    function proveBatchesSharedBridge(
+        uint256 _chainId,
+        StoredBatchInfo calldata _prevBatch,
+        StoredBatchInfo[] calldata _committedBatches,
+        ProofInput calldata _proof
+    ) external;
+
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
     /// @param _batchesData Data of the batches to be executed.
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
 
+    /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;
+
     /// @notice Reverts unexecuted batches
     /// @param _newLastBatch batch number after which batches should be reverted
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
     function revertBatches(uint256 _newLastBatch) external;
+
+    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs.
+    function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
     /// @dev It has the name "BlockCommit" and not "BatchCommit" due to backward compatibility considerations

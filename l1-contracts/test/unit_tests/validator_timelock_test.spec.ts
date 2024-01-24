@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import * as hardhat from "hardhat";
-import type { DummyExecutor, ValidatorTimelock } from "../../typechain";
-import { DummyExecutorFactory, ValidatorTimelockFactory } from "../../typechain";
+import type { DummyExecutor, ValidatorTimelock, DummyStateTransitionManager } from "../../typechain";
+import { DummyExecutorFactory, ValidatorTimelockFactory, DummyStateTransitionManagerFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
 
 describe("ValidatorTimelock tests", function () {
@@ -11,6 +11,8 @@ describe("ValidatorTimelock tests", function () {
   let randomSigner: ethers.Signer;
   let validatorTimelock: ValidatorTimelock;
   let dummyExecutor: DummyExecutor;
+  let dummyStateTransitionManager: DummyStateTransitionManager;
+  const chainId: number = 270;
 
   const MOCK_PROOF_INPUT = {
     recursiveAggregationInput: [],
@@ -52,17 +54,34 @@ describe("ValidatorTimelock tests", function () {
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
     dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
 
-    const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
-    const validatorTimelockContract = await validatorTimelockFactory.deploy(
-      await owner.getAddress(),
-      dummyExecutor.address,
-      0,
-      ethers.constants.AddressZero
+    const dummyStateTransitionManagerFactory = await hardhat.ethers.getContractFactory("DummyStateTransitionManager");
+    const dummyStateTransitionManagerContract = await dummyStateTransitionManagerFactory.deploy();
+    dummyStateTransitionManager = DummyStateTransitionManagerFactory.connect(
+      dummyStateTransitionManagerContract.address,
+      dummyStateTransitionManagerContract.signer
     );
+
+    const setSTtx = await dummyStateTransitionManager.setStateTransition(chainId, dummyExecutor.address);
+    await setSTtx.wait();
+
+    const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
+    const validatorTimelockContract = await validatorTimelockFactory.deploy(await owner.getAddress(), 0);
     validatorTimelock = ValidatorTimelockFactory.connect(
       validatorTimelockContract.address,
       validatorTimelockContract.signer
     );
+    const setSTMtx = await validatorTimelock.setStateTransitionManager(dummyStateTransitionManager.address);
+    await setSTMtx.wait();
+  });
+
+  it("Should check deployment", async () => {
+    expect(await validatorTimelock.owner()).equal(await owner.getAddress());
+    expect(await validatorTimelock.executionDelay()).equal(0);
+    expect(await validatorTimelock.validator(chainId)).equal(ethers.constants.AddressZero);
+    expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
+    expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
+    expect(await dummyStateTransitionManager.getChainGovernor(chainId)).equal(await owner.getAddress());
+    expect(await dummyExecutor.getGovernor()).equal(await owner.getAddress());
   });
 
   it("Should revert if non-validator commits batches", async () => {
@@ -97,12 +116,12 @@ describe("ValidatorTimelock tests", function () {
     expect(revertReason).equal("8h");
   });
 
-  it("Should revert if non-owner sets validator", async () => {
+  it("Should revert if not chain governor sets validator", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).setValidator(await randomSigner.getAddress())
+      validatorTimelock.connect(randomSigner).setValidator(chainId, await randomSigner.getAddress())
     );
 
-    expect(revertReason).equal("Ownable: caller is not the owner");
+    expect(revertReason).equal("9h");
   });
 
   it("Should revert if non-owner sets execution delay", async () => {
@@ -113,9 +132,9 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should successfully set the validator", async () => {
     const validatorAddress = await validator.getAddress();
-    await validatorTimelock.connect(owner).setValidator(validatorAddress);
+    await validatorTimelock.connect(owner).setValidator(chainId, validatorAddress);
 
-    expect(await validatorTimelock.validator()).equal(validatorAddress);
+    expect(await validatorTimelock.validator(chainId)).equal(validatorAddress);
   });
 
   it("Should successfully set the execution delay", async () => {
@@ -125,7 +144,9 @@ describe("ValidatorTimelock tests", function () {
   });
 
   it("Should successfully commit batches", async () => {
-    await validatorTimelock.connect(validator).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
+    await validatorTimelock
+      .connect(validator)
+      .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
 
     expect(await dummyExecutor.getTotalBatchesCommitted()).equal(1);
   });
@@ -133,49 +154,53 @@ describe("ValidatorTimelock tests", function () {
   it("Should successfully prove batches", async () => {
     await validatorTimelock
       .connect(validator)
-      .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1, 1)], MOCK_PROOF_INPUT);
+      .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1, 1)], MOCK_PROOF_INPUT);
 
     expect(await dummyExecutor.getTotalBatchesVerified()).equal(1);
   });
 
   it("Should revert on executing earlier than the delay", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(1)])
+      validatorTimelock.connect(validator).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(1)])
     );
 
     expect(revertReason).equal("5c");
   });
 
   it("Should successfully revert batches", async () => {
-    await validatorTimelock.connect(validator).revertBatches(0);
+    await validatorTimelock.connect(validator).revertBatchesSharedBridge(chainId, 0);
 
     expect(await dummyExecutor.getTotalBatchesVerified()).equal(0);
     expect(await dummyExecutor.getTotalBatchesCommitted()).equal(0);
   });
 
   it("Should successfully overwrite the committing timestamp on the reverted batches timestamp", async () => {
-    const revertedBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(1));
-
-    await validatorTimelock.connect(validator).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
+    const revertedBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(chainId, 1));
 
     await validatorTimelock
       .connect(validator)
-      .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT);
+      .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
 
-    const newBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(1));
+    await validatorTimelock
+      .connect(validator)
+      .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT);
+
+    const newBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(chainId, 1));
 
     expect(newBatchesTimestamp).greaterThanOrEqual(revertedBatchesTimestamp);
   });
 
   it("Should successfully execute batches after the delay", async () => {
     await hardhat.network.provider.send("hardhat_mine", ["0x2", "0xc"]); //mine 2 batches with intervals of 12 seconds
-    await validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(1)]);
+    await validatorTimelock.connect(validator).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(1)]);
     expect(await dummyExecutor.getTotalBatchesExecuted()).equal(1);
   });
 
   it("Should revert if validator tries to commit batches with invalid last committed batchNumber", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(validator).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(2)])
+      validatorTimelock
+        .connect(validator)
+        .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(2)])
     );
 
     // Error should be forwarded from the DummyExecutor
@@ -187,7 +212,7 @@ describe("ValidatorTimelock tests", function () {
     const revertReason = await getCallRevertReason(
       validatorTimelock
         .connect(validator)
-        .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(2, 1)], MOCK_PROOF_INPUT)
+        .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockStoredBatchInfo(2, 1)], MOCK_PROOF_INPUT)
     );
 
     expect(revertReason).equal("DummyExecutor: Invalid previous batch number");
@@ -196,7 +221,7 @@ describe("ValidatorTimelock tests", function () {
   it("Should revert if validator tries to execute more batches than were proven", async () => {
     await hardhat.network.provider.send("hardhat_mine", ["0x2", "0xc"]); //mine 2 batches with intervals of 12 seconds
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(validator).executeBatches([getMockStoredBatchInfo(2)])
+      validatorTimelock.connect(validator).executeBatchesSharedBridge(chainId, [getMockStoredBatchInfo(2)])
     );
 
     expect(revertReason).equal("DummyExecutor 2: Can");
@@ -207,7 +232,7 @@ describe("ValidatorTimelock tests", function () {
   it("Should commit multiple batches in one transaction", async () => {
     await validatorTimelock
       .connect(validator)
-      .commitBatches(getMockStoredBatchInfo(1), [
+      .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(1), [
         getMockCommitBatchInfo(2),
         getMockCommitBatchInfo(3),
         getMockCommitBatchInfo(4),
@@ -224,7 +249,12 @@ describe("ValidatorTimelock tests", function () {
     for (let i = 1; i < 8; i++) {
       await validatorTimelock
         .connect(validator)
-        .proveBatches(getMockStoredBatchInfo(i), [getMockStoredBatchInfo(i + 1)], MOCK_PROOF_INPUT);
+        .proveBatchesSharedBridge(
+          chainId,
+          getMockStoredBatchInfo(i),
+          [getMockStoredBatchInfo(i + 1)],
+          MOCK_PROOF_INPUT
+        );
 
       expect(await dummyExecutor.getTotalBatchesVerified()).equal(i + 1);
     }
@@ -234,7 +264,7 @@ describe("ValidatorTimelock tests", function () {
     await hardhat.network.provider.send("hardhat_mine", ["0x2", "0xc"]); //mine 2 batches with intervals of 12 seconds
     await validatorTimelock
       .connect(validator)
-      .executeBatches([
+      .executeBatchesSharedBridge(chainId, [
         getMockStoredBatchInfo(2),
         getMockStoredBatchInfo(3),
         getMockStoredBatchInfo(4),

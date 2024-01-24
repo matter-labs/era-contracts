@@ -44,7 +44,6 @@ export const L2_WETH_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2
 export const L2_ERC20_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2ERC20Bridge");
 
 export function calculateWethAddresses(
-  l2ProxyAdminAddress: string,
   l2GovernorAddress: string,
   l1WethBridgeAddress: string,
   l1WethAddress: string,
@@ -102,7 +101,6 @@ export function calculateWethAddresses(
 }
 
 export function calculateERC20Addresses(
-  l2ProxyAdminAddress: string,
   l2GovernorAddress: string,
   erc20Bridge: L1ERC20Bridge
 ): { l2TokenFactoryAddr: string; l2ERC20BridgeProxyAddr: string } {

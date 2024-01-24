@@ -127,16 +127,21 @@ struct ZkSyncStateTransitionStorage {
     /// yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
     /// @dev Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
-    address admin;
+    address __DEPRECATED_admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
-    address pendingAdmin;
+    address __DEPRECATED_pendingAdmin;
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
     /// new fields
+    /// @dev The chainId of the chain
     uint256 chainId;
+    /// @dev The address of the bridgehub
     address bridgehub;
+    /// @dev The address of the StateTransitionManager
     address stateTransitionManager;
+    /// @dev The address of the baseToken contract. Eth is address(1)
     address baseToken;
+    /// @dev The address of the baseTokenbridge. Eth uses the weth bridge.
     address baseTokenBridge;
 }

@@ -61,6 +61,7 @@ async function main() {
 
   program
     .command("add")
+    .option("--private-key <private-key>")
     .option("-n, --token-name <tokenName>")
     .option("-s, --symbol <symbol>")
     .option("-d, --decimals <decimals>")

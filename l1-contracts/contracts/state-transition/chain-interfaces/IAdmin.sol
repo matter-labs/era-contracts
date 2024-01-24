@@ -19,14 +19,6 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
     function acceptGovernor() external;
 
-    /// @notice Starts the transfer of admin rights. Only the current governor or admin can propose a new pending one.
-    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
-    /// @param _newPendingAdmin Address of the new admin
-    function setPendingAdmin(address _newPendingAdmin) external;
-
-    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
-    function acceptAdmin() external;
-
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
     /// @param _active Active flag
@@ -44,11 +36,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
 
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external;
+    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
@@ -75,13 +63,6 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Governor changed
     event NewGovernor(address indexed oldGovernor, address indexed newGovernor);
-
-    /// @notice pendingAdmin is changed
-    /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
-    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
-
-    /// @notice Admin changed
-    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

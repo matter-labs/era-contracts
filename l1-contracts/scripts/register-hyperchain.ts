@@ -35,7 +35,7 @@ async function main() {
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const ownerAddress = cmd.governorAddress || process.env.GOVERNOR_ADDRESS || deployWallet.address;
+      const ownerAddress = cmd.governorAddress || deployWallet.address;
       console.log(`Using governor address: ${ownerAddress}`);
 
       const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
@@ -78,7 +78,6 @@ async function main() {
       }
 
       await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);
-      await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
     });
 
   await program.parseAsync(process.argv);

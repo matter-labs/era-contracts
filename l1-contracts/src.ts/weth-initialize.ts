@@ -22,10 +22,8 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const l1WethBridge = deployer.defaultWethBridge(deployWallet);
   const nonce = await deployWallet.getTransactionCount();
 
-  const l1ProxyAdmin = deployer.addresses.TransparentProxyAdmin;
   const l1GovernorAddress = deployer.addresses.Governance;
 
-  const l2ProxyAdminAddress = applyL1ToL2Alias(l1ProxyAdmin);
   // Note governor can not be EOA
   const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
@@ -33,12 +31,12 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const {
     l2WethProxyAddress: l2WethProxyAddressEthIsBase,
     l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase,
-  } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
+  } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
 
   const {
     l2WethProxyAddress: l2WethProxyAddressEthIsNotBase,
     l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
-  } = calculateWethAddresses(l2ProxyAdminAddress, l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
+  } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
 
   const tx1 = await l1WethBridge.initialize(
     [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
@@ -153,5 +151,23 @@ export async function startWethBridgeInitOnChain(
   if (deployer.verbose) {
     console.log(`WETH bridge priority tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
     console.log(`WETH bridge initialized for chain ${chainId}, gasUsed: ${receipts[1].gasUsed.toString()}`);
+
+    // note we print the CONTRACTS_L2_WETH_BRIDGE_ADDR out here. This is because if we printed it out in
+    // finishWETHBridgeInit, then we would have to restart the server
+    const l1GovernorAddress = await l1WethBridge.owner();
+
+    // Note governor can not be EOA
+    const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
+
+    const l1WethAddress = await l1WethBridge.l1WethAddress();
+    const { l2WethProxyAddress, l2WethBridgeProxyAddress } = calculateWethAddresses(
+      l2GovernorAddress,
+      l1WethBridge.address,
+      l1WethAddress,
+      ethIsBaseToken
+    );
+
+    console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${l2WethBridgeProxyAddress}`);
+    console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${l2WethProxyAddress}`);
   }
 }

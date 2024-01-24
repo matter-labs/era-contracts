@@ -11,7 +11,7 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncStateTransition} from "./chain-interfaces/IZkSyncStateTransition.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
@@ -40,6 +40,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev current protocolVersion
     uint256 public protocolVersion;
+
+    /// @dev validatorTimelock contract address, used to setChainId
+    address public validatorTimelock;
 
     /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 => bytes32) public upgradeCutHash;
@@ -71,6 +74,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
+    function getChainGovernor(uint256 _chainId) external view override returns (address) {
+        return IZkSyncStateTransition(stateTransition[_chainId]).getGovernor();
+    }
+
     /// @dev initialize
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
@@ -80,6 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
@@ -99,6 +107,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+    }
+
+    /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
+        validatorTimelock = _validatorTimelock;
     }
 
     /// @dev set initial cutHash
@@ -139,7 +152,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-            from: uint256(uint160(L2_BOOTLOADER_ADDRESS)),
+            from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
             gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -210,7 +223,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_governor))),
-            bytes32(uint256(uint160(_governor))),
+            bytes32(uint256(uint160(validatorTimelock))),
             bytes32(uint256(uint160(_baseToken))),
             bytes32(uint256(uint160(_baseTokenBridge))),
             bytes32(storedBatchZero),

@@ -106,8 +106,6 @@ async function main() {
       const receipts = await tx.wait(2);
 
       console.log(`Weth bridge priority tx sent to hyperchain, gasUsed: ${receipts.gasUsed.toString()}`);
-      console.log(`CONTRACTS_L2_WETH_BRIDGE_ADDR=${await wethBridge.l2BridgeAddress(chainId)}`);
-      console.log(`CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR=${await wethBridge.l2WethAddress(chainId)}`);
     });
 
   await program.parseAsync(process.argv);

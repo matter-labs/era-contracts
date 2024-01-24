@@ -30,18 +30,12 @@ export async function initializeErc20Bridge(
     ? deployer.defaultERC20Bridge(deployWallet).attach(cmdErc20Bridge)
     : deployer.defaultERC20Bridge(deployWallet);
 
-  const l1ProxyAdmin = deployer.addresses.TransparentProxyAdmin;
   const l1GovernorAddress = deployer.addresses.Governance;
 
-  const l2ProxyAdminAddress = applyL1ToL2Alias(l1ProxyAdmin);
   // Governor should always be smart contract (except for unit tests)
   const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
-  const { l2TokenFactoryAddr, l2ERC20BridgeProxyAddr } = calculateERC20Addresses(
-    l2ProxyAdminAddress,
-    l2GovernorAddress,
-    erc20Bridge
-  );
+  const { l2TokenFactoryAddr, l2ERC20BridgeProxyAddr } = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
 
   const tx1 = await erc20Bridge.initialize();
   const tx2 = await erc20Bridge.initializeV2(
@@ -103,6 +97,9 @@ export async function startErc20BridgeInitOnChain(
       requiredValueToPublishBytecodes.add(requiredValueToInitializeBridge.mul(2))
     );
     await mintTx.wait(1);
+    if (deployer.verbose) {
+      console.log("Mint tx for baseTokenBridge sent for erc20 bridge deployment", mintTx.hash);
+    }
 
     const approveTx1 = await erc20.increaseAllowance(
       deployer.addresses.Bridges.BaseTokenBridge,
@@ -159,5 +156,17 @@ export async function startErc20BridgeInitOnChain(
   const receipts = await Promise.all(txs.map((tx) => tx.wait(1)));
   if (deployer.verbose) {
     console.log(`ERC20 bridge deploy tx sent to hyperchain, gasUsed: ${receipts[1].gasUsed.toString()}`);
+
+    // note we print the CONTRACTS_L2_ERC20_BRIDGE_ADDR out here. This is because if we printed it out in
+    // finishERC20BridgeInit, then we would have to restart the server
+    const erc20Bridge = deployer.defaultERC20Bridge(deployWallet);
+    const l1GovernorAddress = await erc20Bridge.owner();
+
+    // Governor should always be smart contract (except for unit tests)
+    const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
+
+    const { l2ERC20BridgeProxyAddr } = calculateERC20Addresses(l2GovernorAddress, erc20Bridge);
+
+    console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${l2ERC20BridgeProxyAddr}`);
   }
 }

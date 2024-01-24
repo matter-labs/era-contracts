@@ -40,10 +40,4 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         );
         _;
     }
-
-    /// @notice Checks that the message sender is an active governor or admin
-    modifier onlyGovernorOrAdmin() {
-        require(msg.sender == s.governor || msg.sender == s.admin, "StateTransition chain: Only by governor or admin");
-        _;
-    }
 }
