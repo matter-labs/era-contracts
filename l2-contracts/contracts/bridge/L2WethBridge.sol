@@ -60,9 +60,16 @@ contract L2WethBridge is IL2Bridge, Initializable {
         l1WethAddress = _l1WethAddress;
         isEthBaseToken = _isEthBaseToken;
 
-        if (block.chainid != ERA_CHAIN_ID){
+        if (block.chainid != ERA_CHAIN_ID) {
             address l2WethImplementation = address(new L2Weth{salt: bytes32(0)}());
-            bytes memory initData = abi.encodeWithSelector(L2Weth.initializeV2.selector, "Wrapped Ether", "WETH", address(this), l1WethAddress, _isEthBaseToken);
+            bytes memory initData = abi.encodeWithSelector(
+                L2Weth.initializeV2.selector,
+                "Wrapped Ether",
+                "WETH",
+                address(this),
+                l1WethAddress,
+                _isEthBaseToken
+            );
             TransparentUpgradeableProxy l2Weth = new TransparentUpgradeableProxy{salt: bytes32(0)}(
                 l2WethImplementation,
                 _aliasedOwner,
