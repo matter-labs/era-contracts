@@ -131,7 +131,7 @@ export class Deployer {
     return diamondCut(
       facetCuts,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + (4+9*32) * 2)
+      "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2)
     );
   }
 

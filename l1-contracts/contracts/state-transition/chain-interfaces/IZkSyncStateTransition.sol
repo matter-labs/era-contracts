@@ -13,7 +13,6 @@ import {VerifierParams} from "./IVerifier.sol";
 import "../libraries/Diamond.sol";
 
 interface IZkSyncStateTransition is IAdmin, IExecutor, IGetters, IMailbox {
-
     // KL todo: need this in the server for now
     event ProposeTransparentUpgrade(
         Diamond.DiamondCutData diamondCut,
