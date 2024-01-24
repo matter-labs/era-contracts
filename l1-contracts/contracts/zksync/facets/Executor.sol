@@ -189,7 +189,6 @@ contract ExecutorFacet is Base, IExecutor {
         require(_newBatchesData.length == 1, "e4");
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
-        require(_newBatchesData.length > 0, "No batches to commit");
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
