@@ -12,6 +12,7 @@ uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
 /// It needs to be padded with `00` to be treated as uint256 by Solidity
 uint256 constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
 
+/// @notice NOTE: The `getZkSyncMeta` that is used to obtain this struct will experience a breaking change in 2024.
 struct ZkSyncMeta {
     uint32 gasPerPubdataByte;
     uint32 heapSize;
@@ -35,8 +36,8 @@ enum Global {
  * @notice Library used for accessing zkEVM-specific opcodes, needed for the development
  * of system contracts.
  * @dev While this library will be eventually available to public, some of the provided
- * methods won't work for non-system contracts. We will not recommend this library
- * for external use.
+ * methods won't work for non-system contracts and also breaking changes at short notice are possilbe. 
+ * We do not recommend this library for external use.
  */
 library SystemContractHelper {
     /// @notice Send an L2Log to L1.
@@ -190,6 +191,7 @@ library SystemContractHelper {
     }
 
     /// @notice Get the packed representation of the `ZkSyncMeta` from the current context.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @return meta The packed representation of the ZkSyncMeta.
     /// @dev The fields in ZkSyncMeta are NOT tightly packed, i.e. there is a special rule on how
     /// they are packed. For more information, please read the documentation on ZkSyncMeta.
@@ -214,6 +216,7 @@ library SystemContractHelper {
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of gas
     /// that a single byte sent to L1 as pubdata costs.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @param meta Packed representation of the ZkSyncMeta.
     /// @return gasPerPubdataByte The current price in gas per pubdata byte.
     function getGasPerPubdataByteFromMeta(uint256 meta) internal pure returns (uint32 gasPerPubdataByte) {
@@ -266,6 +269,7 @@ library SystemContractHelper {
     }
 
     /// @notice Retrieves the ZkSyncMeta structure.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @return meta The ZkSyncMeta execution context parameters.
     function getZkSyncMeta() internal view returns (ZkSyncMeta memory meta) {
         uint256 metaPacked = getZkSyncMetaBytes();
