@@ -12,7 +12,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_calledByNonGovernorOrStateTransitionManager() public {
         address nonGovernorOrStateTransitionManager = makeAddr("nonGovernorOrStateTransitionManager");
-        uint256 chainId = 1337;
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -23,14 +22,13 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.expectRevert(ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER);
 
         vm.startPrank(nonGovernorOrStateTransitionManager);
-        adminFacet.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_cutHashMismatch() public {
         address governor = adminFacetWrapper.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
-        uint256 chainId = 1337;
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -50,14 +48,13 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.expectRevert("StateTransition: cutHash mismatch");
 
         vm.startPrank(governor);
-        adminFacet.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_ProtocolVersionMismatchWhenUpgrading() public {
         address governor = adminFacetWrapper.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
-        uint256 chainId = 1337;
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -78,14 +75,13 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.expectRevert("StateTransition: protocolVersion mismatch in STC when upgrading");
 
         vm.startPrank(governor);
-        adminFacet.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
 
     function test_revertWhen_ProtocolVersionMismatchAfterUpgrading() public {
         address governor = adminFacetWrapper.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
-        uint256 chainId = 1337;
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -109,7 +105,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         emit ExecuteUpgrade(diamondCutData);
 
         vm.startPrank(governor);
-        adminFacet.upgradeChainFromVersion(chainId, oldProtocolVersion, diamondCutData);
+        adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
 
     // TODO

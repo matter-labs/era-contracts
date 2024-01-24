@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {AdminTest, ERROR_ONLY_GOVERNOR} from "./_Admin_Shared.t.sol";
+import {AdminTest, ERROR_ONLY_STATE_TRANSITION_MANAGER} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
@@ -24,8 +24,8 @@ contract ChangeFeeParamsTest is AdminTest {
         );
     }
 
-    function test_revertWhen_calledByNonGovernor() public {
-        address nonGovernor = makeAddr("nonGovernor");
+    function test_revertWhen_calledByNonStateTransitionManager() public {
+        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
             batchOverheadL1Gas: 1_000_000,
@@ -35,15 +35,14 @@ contract ChangeFeeParamsTest is AdminTest {
             minimalL2GasPrice: 250_000_000
         });
 
-        vm.startPrank(nonGovernor);
-        vm.expectRevert(ERROR_ONLY_GOVERNOR);
+        vm.startPrank(nonStateTransitionManager);
+        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
 
         adminFacet.changeFeeParams(newFeeParams);
     }
 
     function test_revertWhen_newMaxPubdataPerBatchIsLessThanMaxPubdataPerTransaction() public {
-        address governor = adminFacetWrapper.util_getGovernor();
-        // FeeParams memory oldFeeParams = adminFacetWrapper.util_getFeeParams();
+        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
         uint32 priorityTxMaxPubdata = 88_000;
         uint32 maxPubdataPerBatch = priorityTxMaxPubdata - 1;
         FeeParams memory newFeeParams = FeeParams({
@@ -57,12 +56,12 @@ contract ChangeFeeParamsTest is AdminTest {
 
         vm.expectRevert(bytes.concat("n6"));
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
         adminFacet.changeFeeParams(newFeeParams);
     }
 
     function test_successfulChange() public {
-        address governor = adminFacetWrapper.util_getGovernor();
+        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
         FeeParams memory oldFeeParams = adminFacetWrapper.util_getFeeParams();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -76,7 +75,7 @@ contract ChangeFeeParamsTest is AdminTest {
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewFeeParams(oldFeeParams, newFeeParams);
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
         adminFacet.changeFeeParams(newFeeParams);
 
         bytes32 newFeeParamsHash = keccak256(abi.encode(newFeeParams));

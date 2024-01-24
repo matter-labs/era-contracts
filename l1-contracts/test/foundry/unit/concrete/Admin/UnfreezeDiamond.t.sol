@@ -2,17 +2,17 @@
 
 pragma solidity 0.8.20;
 
-import {AdminTest, ERROR_ONLY_ADMIN_OR_GOVERNOR} from "./_Admin_Shared.t.sol";
+import {AdminTest, ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER} from "./_Admin_Shared.t.sol";
 
 contract UnfreezeDiamondTest is AdminTest {
     event Unfreeze();
 
-    function test_revertWhen_calledByNonGovernorOrAdmin() public {
-        address nonGovernorOrAdmin = makeAddr("nonGovernorOrAdmin");
+    function test_revertWhen_calledByNonGovernorOrStateTransitionManager() public {
+        address nonGovernorOrStateTransitionManager = makeAddr("nonGovernorOrStateTransitionManager");
 
-        vm.expectRevert(ERROR_ONLY_ADMIN_OR_GOVERNOR);
+        vm.expectRevert(ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER);
 
-        vm.startPrank(nonGovernorOrAdmin);
+        vm.startPrank(nonGovernorOrStateTransitionManager);
         adminFacet.unfreezeDiamond();
     }
 

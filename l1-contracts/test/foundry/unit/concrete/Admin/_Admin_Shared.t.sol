@@ -25,22 +25,6 @@ contract AdminWrapper is AdminFacet {
         return s.governor;
     }
 
-    function util_setPendingAdmin(address _pendingAdmin) external {
-        s.pendingAdmin = _pendingAdmin;
-    }
-
-    function util_getPendingAdmin() external view returns (address) {
-        return s.pendingAdmin;
-    }
-
-    function util_setAdmin(address _admin) external {
-        s.admin = _admin;
-    }
-
-    function util_getAdmin() external view returns (address) {
-        return s.admin;
-    }
-
     function util_setValidator(address _validator, bool _active) external {
         s.validators[_validator] = _active;
     }
@@ -112,5 +96,9 @@ contract AdminTest is Test {
     function setUp() public virtual {
         adminFacetWrapper = new AdminWrapper();
         adminFacet = IAdmin(adminFacetWrapper);
+
+        adminFacetWrapper.util_setGovernor(makeAddr("governor"));
+        adminFacetWrapper.util_setPendingGovernor(makeAddr("pendingGovernor"));
+        adminFacetWrapper.util_setStateTransitionManager(makeAddr("stateTransitionManager"));
     }
 }
