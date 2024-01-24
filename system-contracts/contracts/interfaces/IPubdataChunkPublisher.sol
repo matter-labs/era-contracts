@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Interface for contract responsible chunking pubdata into the appropriate size for 4844 blobs.
+ * @notice Interface for contract responsible chunking pubdata into the appropriate size for EIP-4844 blobs.
  */
 interface IPubdataChunkPublisher {
     /// @notice Chunks pubdata into pieces that can fit into blobs.
