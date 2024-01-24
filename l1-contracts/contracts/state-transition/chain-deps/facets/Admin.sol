@@ -41,9 +41,8 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewGovernor(previousGovernor, pendingGovernor);
     }
 
-
     /// @inheritdoc IAdmin
-    function setValidator(address _validator, bool _active) external onlyStateTransitionManager() {
+    function setValidator(address _validator, bool _active) external onlyStateTransitionManager {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }

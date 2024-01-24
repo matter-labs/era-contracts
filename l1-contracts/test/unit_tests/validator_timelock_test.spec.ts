@@ -12,7 +12,7 @@ describe("ValidatorTimelock tests", function () {
   let validatorTimelock: ValidatorTimelock;
   let dummyExecutor: DummyExecutor;
   let dummyStateTransitionManager: DummyStateTransitionManager;
-  let chainId: number =  270;
+  let chainId: number = 270;
 
   const MOCK_PROOF_INPUT = {
     recursiveAggregationInput: [],
@@ -53,19 +53,19 @@ describe("ValidatorTimelock tests", function () {
     const dummyExecutorFactory = await hardhat.ethers.getContractFactory("DummyExecutor");
     const dummyExecutorContract = await dummyExecutorFactory.deploy();
     dummyExecutor = DummyExecutorFactory.connect(dummyExecutorContract.address, dummyExecutorContract.signer);
-    
+
     const dummyStateTransitionManagerFactory = await hardhat.ethers.getContractFactory("DummyStateTransitionManager");
     const dummyStateTransitionManagerContract = await dummyStateTransitionManagerFactory.deploy();
-    dummyStateTransitionManager = DummyStateTransitionManagerFactory.connect(dummyStateTransitionManagerContract.address, dummyStateTransitionManagerContract.signer);
+    dummyStateTransitionManager = DummyStateTransitionManagerFactory.connect(
+      dummyStateTransitionManagerContract.address,
+      dummyStateTransitionManagerContract.signer
+    );
 
     const setSTtx = await dummyStateTransitionManager.setStateTransition(chainId, dummyExecutor.address);
     await setSTtx.wait();
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
-    const validatorTimelockContract = await validatorTimelockFactory.deploy(
-      await owner.getAddress(),
-      0
-    );
+    const validatorTimelockContract = await validatorTimelockFactory.deploy(await owner.getAddress(), 0);
     validatorTimelock = ValidatorTimelockFactory.connect(
       validatorTimelockContract.address,
       validatorTimelockContract.signer
@@ -82,7 +82,7 @@ describe("ValidatorTimelock tests", function () {
     expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
     expect(await dummyStateTransitionManager.getChainGovernor(chainId)).equal(await owner.getAddress());
     expect(await dummyExecutor.getGovernor()).equal(await owner.getAddress());
-  })
+  });
 
   it("Should revert if non-validator commits batches", async () => {
     const revertReason = await getCallRevertReason(
@@ -144,7 +144,9 @@ describe("ValidatorTimelock tests", function () {
   });
 
   it("Should successfully commit batches", async () => {
-    await validatorTimelock.connect(validator).commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
+    await validatorTimelock
+      .connect(validator)
+      .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
 
     expect(await dummyExecutor.getTotalBatchesCommitted()).equal(1);
   });
@@ -175,7 +177,9 @@ describe("ValidatorTimelock tests", function () {
   it("Should successfully overwrite the committing timestamp on the reverted batches timestamp", async () => {
     const revertedBatchesTimestamp = Number(await validatorTimelock.getCommittedBatchTimestamp(chainId, 1));
 
-    await validatorTimelock.connect(validator).commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
+    await validatorTimelock
+      .connect(validator)
+      .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)]);
 
     await validatorTimelock
       .connect(validator)
@@ -194,7 +198,9 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if validator tries to commit batches with invalid last committed batchNumber", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(validator).commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(2)])
+      validatorTimelock
+        .connect(validator)
+        .commitBatchesSharedBridge(chainId, getMockStoredBatchInfo(0), [getMockCommitBatchInfo(2)])
     );
 
     // Error should be forwarded from the DummyExecutor
@@ -243,7 +249,12 @@ describe("ValidatorTimelock tests", function () {
     for (let i = 1; i < 8; i++) {
       await validatorTimelock
         .connect(validator)
-        .proveBatchesSharedBridge(chainId, getMockStoredBatchInfo(i), [getMockStoredBatchInfo(i + 1)], MOCK_PROOF_INPUT);
+        .proveBatchesSharedBridge(
+          chainId,
+          getMockStoredBatchInfo(i),
+          [getMockStoredBatchInfo(i + 1)],
+          MOCK_PROOF_INPUT
+        );
 
       expect(await dummyExecutor.getTotalBatchesVerified()).equal(i + 1);
     }

@@ -95,7 +95,10 @@ describe("L2 upgrade test", function () {
     proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
-    const dummyAdminFacet = DummyAdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    const dummyAdminFacet = DummyAdminFacetFactory.connect(
+      deployer.addresses.StateTransition.DiamondProxy,
+      deployWallet
+    );
 
     stateTransitionManager = StateTransitionManagerFactory.connect(
       deployer.addresses.StateTransition.StateTransitionProxy,

@@ -90,7 +90,7 @@ interface IExecutor is IZkSyncStateTransitionBase {
         CommitBatchInfo[] calldata _newBatchesData
     ) external;
 
-    /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs. 
+    /// @notice same as `commitBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function commitBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata _lastCommittedBatchData,
@@ -108,7 +108,7 @@ interface IExecutor is IZkSyncStateTransitionBase {
         ProofInput calldata _proof
     ) external;
 
-    /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs. 
+    /// @notice same as `proveBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function proveBatchesSharedBridge(
         uint256 _chainId,
         StoredBatchInfo calldata _prevBatch,
@@ -122,7 +122,7 @@ interface IExecutor is IZkSyncStateTransitionBase {
     /// @param _batchesData Data of the batches to be executed.
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external;
 
-    /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs. 
+    /// @notice same as `executeBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _batchesData) external;
 
     /// @notice Reverts unexecuted batches
@@ -131,7 +131,7 @@ interface IExecutor is IZkSyncStateTransitionBase {
     /// counters that are responsible for the number of batches
     function revertBatches(uint256 _newLastBatch) external;
 
-    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs. 
+    /// @notice same as `revertBatches` but with the chainId so ValidatorTimelock can sort the inputs.
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed

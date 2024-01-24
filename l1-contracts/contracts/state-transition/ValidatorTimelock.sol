@@ -68,7 +68,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         stateTransitionManager = _stateTransitionManager;
     }
 
-
     /// @dev Set new validator address.
     function setValidator(uint256 _chainId, address _newValidator) external onlyChainOwner(_chainId) {
         address oldValidator = validator[_chainId];
@@ -149,7 +148,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
     }
 
-
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
@@ -168,7 +166,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[ERA_CHAIN_ID].get(_newBatchesData[i].batchNumber);
+                uint256 commitBatchTimestamp = committedBatchTimestamp[ERA_CHAIN_ID].get(
+                    _newBatchesData[i].batchNumber
+                );
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
@@ -183,7 +183,10 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
-    function executeBatchesSharedBridge(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(_chainId) {
+    function executeBatchesSharedBridge(
+        uint256 _chainId,
+        StoredBatchInfo[] calldata _newBatchesData
+    ) external onlyValidator(_chainId) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {

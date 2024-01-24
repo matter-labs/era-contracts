@@ -376,7 +376,7 @@ export async function initialDeployment(
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
-  await deployer.setStateTransitionManagerInValidatorTimelock({gasPrice});
+  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
   await deployer.deployBridgeContracts(create2Salt, gasPrice);
   await initializeErc20Bridge(deployer, deployWallet, gasPrice, null);
 

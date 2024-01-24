@@ -32,10 +32,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
-    function upgradeChainFromVersion(
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external;
+    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the current governor can execute the upgrade
@@ -62,7 +59,6 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Governor changed
     event NewGovernor(address indexed oldGovernor, address indexed newGovernor);
-
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

@@ -595,12 +595,7 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(
-    baseTokenAddress: string,
-    extraFacets?: FacetCut[],
-    gasPrice?: BigNumberish,
-    nonce?
-  ) {
+  public async registerHyperchain(baseTokenAddress: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
     const gasLimit = 10_000_000;
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -713,12 +708,14 @@ export class Deployer {
       console.log(`CONTRACTS_VALIDATOR_TIMELOCK_ADDR=${contractAddress}`);
     }
     this.addresses.ValidatorTimeLock = contractAddress;
-
   }
 
   public async setStateTransitionManagerInValidatorTimelock(ethTxOptions: ethers.providers.TransactionRequest) {
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx = await validatorTimelock.setStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy, ethTxOptions);
+    const tx = await validatorTimelock.setStateTransitionManager(
+      this.addresses.StateTransition.StateTransitionProxy,
+      ethTxOptions
+    );
     const receipt = await tx.wait();
     if (this.verbose) {
       console.log(`StateTransitionManager was set in ValidatorTimelock, gas used: ${receipt.gasUsed.toString()}`);

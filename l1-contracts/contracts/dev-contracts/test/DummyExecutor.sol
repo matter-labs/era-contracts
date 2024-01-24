@@ -34,7 +34,7 @@ contract DummyExecutor is IExecutor {
     function getGovernor() external view returns (address) {
         return owner;
     }
-    
+
     /// @notice Removing txs from the priority queue
     function removePriorityQueueFront(uint256 _index) external {
         // KL todo
@@ -75,7 +75,7 @@ contract DummyExecutor is IExecutor {
     }
 
     function commitBatchesSharedBridge(
-        uint256, 
+        uint256,
         StoredBatchInfo calldata _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external {
@@ -104,7 +104,7 @@ contract DummyExecutor is IExecutor {
     }
 
     function proveBatchesSharedBridge(
-        uint256, 
+        uint256,
         StoredBatchInfo calldata _prevBatch,
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof

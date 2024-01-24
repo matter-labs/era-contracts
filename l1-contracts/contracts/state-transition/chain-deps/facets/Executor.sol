@@ -187,7 +187,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
-        uint256 , // _chainId
+        uint256, // _chainId
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
@@ -315,7 +315,10 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function executeBatchesSharedBridge(uint256, StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
+    function executeBatchesSharedBridge(
+        uint256,
+        StoredBatchInfo[] calldata _batchesData
+    ) external nonReentrant onlyValidator {
         _executeBatches(_batchesData);
     }
 
