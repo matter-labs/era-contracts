@@ -36,7 +36,7 @@ enum Global {
  * @notice Library used for accessing zkEVM-specific opcodes, needed for the development
  * of system contracts.
  * @dev While this library will be eventually available to public, some of the provided
- * methods won't work for non-system contracts and also breaking changes at short notice are possilbe. 
+ * methods won't work for non-system contracts and also breaking changes at short notice are possilbe.
  * We do not recommend this library for external use.
  */
 library SystemContractHelper {
