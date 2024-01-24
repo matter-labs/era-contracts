@@ -663,6 +663,18 @@ export class Deployer {
       );
     }
     this.chainId = parseInt(chainId, 16);
+
+    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const validatorTimelock = this.validatorTimelock(this.deployWallet);
+    const tx2 = await validatorTimelock.setValidator(chainId, validatorAddress, {
+      gasPrice,
+      nonce,
+      gasLimit,
+    });
+    const receipt2 = await tx2.wait();
+    if (this.verbose) {
+      console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
+    }
   }
 
   public async registerToken(tokenAddress: string) {
@@ -696,7 +708,6 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
       [this.ownerAddress, executionDelay],

@@ -12,7 +12,7 @@ describe("ValidatorTimelock tests", function () {
   let validatorTimelock: ValidatorTimelock;
   let dummyExecutor: DummyExecutor;
   let dummyStateTransitionManager: DummyStateTransitionManager;
-  let chainId: number = 270;
+  const chainId: number = 270;
 
   const MOCK_PROOF_INPUT = {
     recursiveAggregationInput: [],

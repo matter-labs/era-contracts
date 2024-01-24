@@ -5,7 +5,7 @@ import { Wallet } from "ethers";
 import * as fs from "fs";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
-import { diamondCut } from "../../src.ts/diamondCut";
+import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {
   AdminFacetFactory,
@@ -30,7 +30,6 @@ import {
   initialDeployment,
   packBatchTimestampAndBatchTimestamp,
 } from "./utils";
-import { Action, facetCut } from "../../src.ts/diamondCut";
 
 // process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
