@@ -520,11 +520,8 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 versionedHashIndex = 0;
 
         require(_pubdataCommitments.length > 0, "pl");
-        require(
-            _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS &&
-                _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0,
-            "bs"
-        );
+        require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS, "bd");
+        require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
