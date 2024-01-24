@@ -2,5 +2,5 @@
   "compilerOptions": {
     "types": ["node", "mocha"],
     "downlevelIteration": true
-  },
+  }
 }
