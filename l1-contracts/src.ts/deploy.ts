@@ -108,7 +108,7 @@ export class Deployer {
     };
 
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
-      // these first 7 values are set in the contract
+      // these first values are set in the contract
       {
         chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
         bridgehub: "0x0000000000000000000000000000000000001234",
@@ -131,7 +131,7 @@ export class Deployer {
     return diamondCut(
       facetCuts,
       this.addresses.StateTransition.DiamondInit,
-      "0x" + diamondInitCalldata.slice(2 + 292 * 2)
+      "0x" + diamondInitCalldata.slice(2 + (4+9*32) * 2)
     );
   }
 

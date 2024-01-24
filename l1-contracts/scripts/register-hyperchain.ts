@@ -77,7 +77,7 @@ async function main() {
         await deployer.registerToken(baseTokenAddress);
       }
 
-      await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);
+      await deployer.registerHyperchain(baseTokenAddress, null, gasPrice);
     });
 
   await program.parseAsync(process.argv);
