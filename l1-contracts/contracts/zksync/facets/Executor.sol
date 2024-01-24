@@ -185,7 +185,7 @@ contract ExecutorFacet is Base, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
-        // With the new changes for 4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         require(_newBatchesData.length == 1, "e4");
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
@@ -552,12 +552,12 @@ contract ExecutorFacet is Base, IExecutor {
             versionedHashIndex += 1;
         }
 
-        // This check is required because we want to ensure that there arent any extra blobs trying to be published.
+        // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
 
-        // We verify that for each set of blobHah/blobCommitment are either both empty
+        // We verify that for each set of blobHash/blobCommitment are either both empty
         // or there are values for both.
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             require(
