@@ -4,12 +4,40 @@ import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain";
+import { task } from "hardhat/config";
+import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   require("dotenv").config();
 }
+
+const prodConfig = {
+  ERA_CHAIN_ID: 324,
+};
+const testnetConfig = {
+  ERA_CHAIN_ID: 300,
+  ERA_WETH_ADDRESS: "address(0)",
+};
+const hardhatConfig = {
+  ERA_CHAIN_ID: 9,
+  ERA_WETH_ADDRESS: "address(0)",
+};
+const localConfig = {
+  ERA_CHAIN_ID: 9,
+  ERA_WETH_ADDRESS: "address(0)",
+};
+
+const contractDefs = {
+  sepolia: testnetConfig,
+  rinkeby: testnetConfig,
+  ropsten: testnetConfig,
+  goerli: testnetConfig,
+  mainnet: prodConfig,
+  hardhat: hardhatConfig,
+  localhost: localConfig,
+};
 
 export default {
   zksolc: {
@@ -21,6 +49,15 @@ export default {
   },
   solidity: {
     version: "0.8.20",
+  },
+  solpp: {
+    defs: (() => {
+      const defs = contractDefs[process.env.CHAIN_ETH_NETWORK];
+
+      return {
+        ...defs,
+      };
+    })(),
   },
   defaultNetwork: "localhost",
   networks: {
@@ -53,3 +90,8 @@ export default {
     },
   },
 };
+
+
+task("solpp", "Preprocess Solidity source files").setAction(async (_, hre) =>
+  hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS)
+);
