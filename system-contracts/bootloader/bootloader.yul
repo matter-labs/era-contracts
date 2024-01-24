@@ -3655,7 +3655,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 7
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////
