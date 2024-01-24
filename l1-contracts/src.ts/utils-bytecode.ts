@@ -84,7 +84,7 @@ export function calculateWethAddresses(
     ethers.constants.HashZero
   );
 
-  const proxyInitializationParams = L2_WETH_INTERFACE.encodeFunctionData("initialize", ["Wrapped Ether", "WETH"]);
+  const proxyInitializationParams = L2_WETH_INTERFACE.encodeFunctionData("initializeV2", ["Wrapped Ether", "WETH", l2WethBridgeProxyAddress, l1WethAddress, ethIsBaseToken ]);
   const l2WethProxyAddress = computeL2Create2Address(
     l2WethBridgeProxyAddress,
     L2_WETH_PROXY_BYTECODE,
