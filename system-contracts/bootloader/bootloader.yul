@@ -998,7 +998,10 @@ object "Bootloader" {
                         txDataOffset, 
                         sub(gasLimitForTx, gasUsedOnPreparation),
                         basePubdataSpent,
-                        reservedGas,
+                        // Note, that for L1->L2 transactions the reserved gas is used to protect the operator from
+                        // transactions that might accidentally cause to publish too many pubdata.
+                        // FIXME: maybe a more elegant approach can be chosen here.
+                        0,
                         gasPerPubdata,
                     )
 
@@ -1169,6 +1172,9 @@ object "Bootloader" {
                 gasPerPubdata
             ) {
                 let basePubdataSpent := getPubdataSpent()
+
+                debugLog("baseSepnt", basePubdataSpent)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
@@ -1402,6 +1408,8 @@ object "Bootloader" {
 
                     gasSpentOnExecute := add(gasSpentOnFactoryDeps, sub(gasBeforeExecute, gas()))
                 }
+
+                debugLog("notification", success)
 
                 notifyExecutionResult(success)
             }
@@ -2689,12 +2697,12 @@ object "Bootloader" {
                 callSystemContext({{RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR}})
             }
 
-            function getMeta() -> ret {
+            function $llvm_NoInline_llvm$_getMeta() -> ret {
                 ret := verbatim_0i_1o("meta")
             }
 
             function getPubdataSpent() -> ret {
-                ret := and(getMeta(), 0xFFFFFFFF)     
+                ret := and($llvm_NoInline_llvm$_getMeta(), 0xFFFFFFFF)     
             }
 
             function getErgsSpentForPubdata(
@@ -2702,6 +2710,8 @@ object "Bootloader" {
                 gasPerPubdata,  
             ) -> ret {
                 let currentPubdataCounter := getPubdataSpent()
+                debugLog("basePubdata", basePubdataSpent)
+                debugLog("currentPubdata", currentPubdataCounter)
                 let spentPubdata := sub(currentPubdataCounter, basePubdataSpent)
                 if gt(basePubdataSpent, currentPubdataCounter) {
                     spentPubdata := 0
@@ -2719,9 +2729,10 @@ object "Bootloader" {
                 rejectTransaction
             ) {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
+                debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
 
-                if gt(allowedGasLimit, spentErgs) {
+                if lt(allowedGasLimit, spentErgs) {
                     if rejectTransaction {
                         // TODO: use better code
                         revertWithReason(ACCOUNT_TX_VALIDATION_ERR_CODE(), 0)
@@ -2729,16 +2740,6 @@ object "Bootloader" {
 
                     nearCallPanic()
                 }
-
-                // switch gt(spentErgs, newReservedGas)
-                // case 0 {
-                //     newReservedGas := sub(newReservedGas, spentErgs)
-                //     newComputeGas := computeGas
-                // }
-                // default {
-                //     newReservedGas := 0
-                //     newComputeGas := sub(computeGas, sub(spentErgs, newReservedGas))
-                // }
             }
 
             /// @dev Set the new value for the tx origin context value

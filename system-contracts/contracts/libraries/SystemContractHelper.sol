@@ -149,7 +149,7 @@ library SystemContractHelper {
     function unsafePrecompileCall(uint256 _rawParams, uint32 _gasToBurn, uint32 _pubdataToSpend) internal view returns (bool success) {
         address callAddr = PRECOMPILE_CALL_ADDRESS;
 
-        uint256 params = uint256(_gasToBurn) * (uint256(_pubdataToSpend) << 32);
+        uint256 params = uint256(_gasToBurn) + (uint256(_pubdataToSpend) << 32);
 
         uint256 cleanupMask = UINT64_MASK;
         assembly {
