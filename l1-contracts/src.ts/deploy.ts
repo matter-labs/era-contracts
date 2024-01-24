@@ -115,7 +115,7 @@ export class Deployer {
         stateTransitionManager: "0x0000000000000000000000000000000000002234",
         protocolVersion: "0x0000000000000000000000000000000000002234",
         governor: "0x0000000000000000000000000000000000003234",
-        admin: "0x0000000000000000000000000000000000004234",
+        validatorTimelock: "0x0000000000000000000000000000000000004234",
         baseToken: "0x0000000000000000000000000000000000004234",
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
         storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
@@ -258,7 +258,7 @@ export class Deployer {
     this.addresses.Bridgehub.BridgehubProxy = contractAddress;
   }
 
-  public async deployStateTransitionImplementation(
+  public async deployStateTransitionManagerImplementation(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
@@ -277,7 +277,7 @@ export class Deployer {
     this.addresses.StateTransition.StateTransitionImplementation = contractAddress;
   }
 
-  public async deployStateTransitionProxy(
+  public async deployStateTransitionManagerProxy(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest,
     extraFacets?: FacetCut[]
@@ -289,11 +289,12 @@ export class Deployer {
     const diamondCut = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
 
-    const stateTransition = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
+    const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
-    const initCalldata = stateTransition.encodeFunctionData("initialize", [
+    const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
         governor: this.ownerAddress,
+        validatorTimelock: this.addresses.ValidatorTimeLock,
         genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
         genesisBatchHash,
         genesisIndexRepeatedStorageChanges: genesisRollupLeafIndex,
@@ -567,8 +568,8 @@ export class Deployer {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
-    await this.deployStateTransitionImplementation(create2Salt, { gasPrice });
-    await this.deployStateTransitionProxy(create2Salt, { gasPrice }, extraFacets);
+    await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
+    await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
     await this.registerStateTransition();
   }
 
@@ -596,7 +597,6 @@ export class Deployer {
 
   public async registerHyperchain(
     baseTokenAddress: string,
-    create2Salt: string,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
     nonce?
@@ -704,7 +704,7 @@ export class Deployer {
     const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.StateTransition.DiamondProxy, executionDelay, validatorAddress],
+      [this.ownerAddress, executionDelay],
       create2Salt,
       ethTxOptions
     );
@@ -712,8 +712,17 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_VALIDATOR_TIMELOCK_ADDR=${contractAddress}`);
     }
-
     this.addresses.ValidatorTimeLock = contractAddress;
+
+  }
+
+  public async setStateTransitionManagerInValidatorTimelock(ethTxOptions: ethers.providers.TransactionRequest) {
+    const validatorTimelock = this.validatorTimelock(this.deployWallet);
+    const tx = await validatorTimelock.setStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy, ethTxOptions);
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log(`StateTransitionManager was set in ValidatorTimelock, gas used: ${receipt.gasUsed.toString()}`);
+    }
   }
 
   public async deployMulticall3(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {

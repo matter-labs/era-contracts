@@ -78,7 +78,6 @@ async function main() {
       }
 
       await deployer.registerHyperchain(baseTokenAddress, create2Salt, null, gasPrice);
-      await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
     });
 
   await program.parseAsync(process.argv);

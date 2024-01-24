@@ -4,6 +4,7 @@ import * as hardhat from "hardhat";
 import type { AdminFacetTest } from "../../typechain";
 import { AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
 import { getCallRevertReason } from "./utils";
+import { TASK_TEST_RUN_SHOW_FORK_RECOMMENDATIONS } from "hardhat/builtin-tasks/task-names";
 
 function randomAddress() {
   return ethers.utils.hexlify(ethers.utils.randomBytes(20));
@@ -25,7 +26,7 @@ describe("Admin facet tests", function () {
     randomSigner = (await hardhat.ethers.getSigners())[1];
   });
 
-  it("governor successfully set validator", async () => {
+  it("StateTransitionManager successfully set validator", async () => {
     const validatorAddress = randomAddress();
     await adminFacetTest.setValidator(validatorAddress, true);
 
@@ -38,24 +39,22 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setValidator(validatorAddress, true)
     );
-    expect(revertReason).equal("StateTransition chain: Only by governor or admin");
+    expect(revertReason).equal("StateTransition Chain: not state transition manager");
   });
 
-  // kl todo
-  // disabled as state transition has to set porter availability
-  // it("governor successfully set porter availability", async () => {
-  //   await adminFacetTest.setPorterAvailability(true);
+  it("StateTransitionManager successfully set porter availability", async () => {
+    await adminFacetTest.setPorterAvailability(true);
 
-  //   const porterAvailability = await adminFacetTest.getPorterAvailability();
-  //   expect(porterAvailability).to.equal(true);
-  // });
+    const porterAvailability = await adminFacetTest.getPorterAvailability();
+    expect(porterAvailability).to.equal(true);
+  });
 
   it("random account fails to set porter availability", async () => {
     const revertReason = await getCallRevertReason(adminFacetTest.connect(randomSigner).setPorterAvailability(false));
     expect(revertReason).equal("StateTransition Chain: not state transition manager");
   });
 
-  it("governor successfully set priority transaction max gas limit", async () => {
+  it("StateTransitionManager successfully set priority transaction max gas limit", async () => {
     const gasLimit = "12345678";
     await adminFacetTest.setPriorityTxMaxGasLimit(gasLimit);
 
@@ -68,7 +67,7 @@ describe("Admin facet tests", function () {
     const revertReason = await getCallRevertReason(
       adminFacetTest.connect(randomSigner).setPriorityTxMaxGasLimit(gasLimit)
     );
-    expect(revertReason).equal("StateTransition Chain: not governor");
+    expect(revertReason).equal("StateTransition Chain: not state transition manager");
   });
 
   describe("change governor", function () {

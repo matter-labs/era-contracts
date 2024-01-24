@@ -371,10 +371,12 @@ export async function initialDeployment(
 
   await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
   await deployer.deployGovernance(create2Salt, { gasPrice });
+  await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
 
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
+  await deployer.setStateTransitionManagerInValidatorTimelock({gasPrice});
   await deployer.deployBridgeContracts(create2Salt, gasPrice);
   await initializeErc20Bridge(deployer, deployWallet, gasPrice, null);
 
@@ -385,7 +387,7 @@ export async function initialDeployment(
     await deployer.registerToken(baseTokenAddress);
   }
 
-  await deployer.registerHyperchain(baseTokenAddress, create2Salt, extraFacets, gasPrice);
+  await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice);
   return deployer;
 }
 
