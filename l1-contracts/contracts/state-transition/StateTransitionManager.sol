@@ -41,6 +41,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev current protocolVersion
     uint256 public protocolVersion;
 
+    /// @dev validatorTimelock contract address, used to setChainId
+    address public validatorTimelock;
+
     /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 => bytes32) public upgradeCutHash;
 
@@ -71,6 +74,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
+    function getChainGovernor(uint256 _chainId) external view override returns (address) {
+        return IZkSyncStateTransition(stateTransition[_chainId]).getGovernor();
+    }
+
     /// @dev initialize
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
@@ -80,6 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
@@ -99,6 +107,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
+    }
+
+    /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
+        validatorTimelock = _validatorTimelock;
     }
 
     /// @dev set initial cutHash
@@ -210,7 +223,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_governor))),
-            bytes32(uint256(uint160(_governor))),
+            bytes32(uint256(uint160(validatorTimelock))),
             bytes32(uint256(uint160(_baseToken))),
             bytes32(uint256(uint160(_baseTokenBridge))),
             bytes32(storedBatchZero),

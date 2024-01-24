@@ -41,30 +41,9 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewGovernor(previousGovernor, pendingGovernor);
     }
 
-    /// @inheritdoc IAdmin
-    function setPendingAdmin(address _newPendingAdmin) external onlyGovernor {
-        // Save previous value into the stack to put it into the event later
-        address oldPendingAdmin = s.pendingAdmin;
-        // Change pending admin
-        s.pendingAdmin = _newPendingAdmin;
-        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
-    }
 
     /// @inheritdoc IAdmin
-    function acceptAdmin() external {
-        address pendingAdmin = s.pendingAdmin;
-        require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
-
-        address previousAdmin = s.admin;
-        s.admin = pendingAdmin;
-        delete s.pendingAdmin;
-
-        emit NewPendingAdmin(pendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
-    }
-
-    /// @inheritdoc IAdmin
-    function setValidator(address _validator, bool _active) external onlyGovernorOrAdmin {
+    function setValidator(address _validator, bool _active) external onlyStateTransitionManager() {
         s.validators[_validator] = _active;
         emit ValidatorStatusUpdate(_validator, _active);
     }
@@ -77,7 +56,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyGovernor {
+    function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external onlyStateTransitionManager {
         require(_newPriorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "n5");
 
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
@@ -87,7 +66,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernor {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyStateTransitionManager {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
@@ -104,7 +83,6 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
     /// upgrade a specific chain
     function upgradeChainFromVersion(
-        uint256 _chainId,
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyGovernorOrStateTransitionManager {
@@ -147,7 +125,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function unfreezeDiamond() external onlyGovernorOrAdmin {
+    function unfreezeDiamond() external onlyGovernorOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen

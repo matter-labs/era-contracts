@@ -182,6 +182,22 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
+        _commitBatches(_lastCommittedBatchData, _newBatchesData);
+    }
+
+    /// @inheritdoc IExecutor
+    function commitBatchesSharedBridge(
+        uint256 , // _chainId
+        StoredBatchInfo memory _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) external nonReentrant onlyValidator {
+        _commitBatches(_lastCommittedBatchData, _newBatchesData);
+    }
+
+    function _commitBatches(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) internal {
         // check that we have the right protocol version
         // three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
@@ -299,7 +315,16 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    function executeBatchesSharedBridge(uint256, StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
+        _executeBatches(_batchesData);
+    }
+
+    /// @inheritdoc IExecutor
     function executeBatches(StoredBatchInfo[] calldata _batchesData) external nonReentrant onlyValidator {
+        _executeBatches(_batchesData);
+    }
+
+    function _executeBatches(StoredBatchInfo[] calldata _batchesData) internal {
         uint256 nBatches = _batchesData.length;
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
             _executeOneBatch(_batchesData[i], i);
@@ -323,6 +348,24 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         StoredBatchInfo[] calldata _committedBatches,
         ProofInput calldata _proof
     ) external nonReentrant onlyValidator {
+        _proveBatches(_prevBatch, _committedBatches, _proof);
+    }
+
+    /// @inheritdoc IExecutor
+    function proveBatchesSharedBridge(
+        uint256, // _chainId
+        StoredBatchInfo calldata _prevBatch,
+        StoredBatchInfo[] calldata _committedBatches,
+        ProofInput calldata _proof
+    ) external nonReentrant onlyValidator {
+        _proveBatches(_prevBatch, _committedBatches, _proof);
+    }
+
+    function _proveBatches(
+        StoredBatchInfo calldata _prevBatch,
+        StoredBatchInfo[] calldata _committedBatches,
+        ProofInput calldata _proof
+    ) internal {
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = _committedBatches.length;
@@ -405,6 +448,15 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidator {
+        _revertBatches(_newLastBatch);
+    }
+
+    /// @inheritdoc IExecutor
+    function revertBatchesSharedBridge(uint256, uint256 _newLastBatch) external nonReentrant onlyValidator {
+        _revertBatches(_newLastBatch);
+    }
+
+    function _revertBatches(uint256 _newLastBatch) internal {
         require(s.totalBatchesCommitted > _newLastBatch, "v1"); // The last committed batch is less than new last batch
         require(_newLastBatch >= s.totalBatchesExecuted, "v2"); // Already executed batches cannot be reverted
 

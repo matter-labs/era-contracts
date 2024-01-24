@@ -21,7 +21,7 @@ struct InitializeData {
     address stateTransitionManager;
     uint256 protocolVersion;
     address governor;
-    address admin;
+    address validatorTimelock;
     address baseToken;
     address baseTokenBridge;
     bytes32 storedBatchZero;
