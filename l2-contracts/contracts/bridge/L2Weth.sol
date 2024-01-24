@@ -37,11 +37,20 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
     }
 
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
+    /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
     /// @dev Sets up `name`/`symbol`/`decimals` getters.
     /// @param name_ The name of the token.
     /// @param symbol_ The symbol of the token.
+    /// @param _l2Bridge Address of the L2 bridge
+    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.
-    function initialize(string memory name_, string memory symbol_) external initializer {
+    function initializeV2(string memory name_, string memory symbol_, address _l2Bridge, address _l1Address, bool _isEthBaseToken) external reinitializer(2) {
+        require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
+        require(_l1Address != address(0), "L1 WETH token address cannot be zero");
+        l2Bridge = _l2Bridge;
+        l1Address = _l1Address;
+        isEthBaseToken = _isEthBaseToken;
+
         // Set decoded values for name and symbol.
         __ERC20_init_unchained(name_, symbol_);
 
@@ -49,17 +58,6 @@ contract L2Weth is ERC20PermitUpgradeable, IL2Weth, IL2StandardToken {
         __ERC20Permit_init(name_);
 
         emit Initialize(name_, symbol_, 18);
-    }
-
-    /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
-    /// @param _l2Bridge Address of the L2 bridge
-    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
-    function initializeV2(address _l2Bridge, address _l1Address, bool _isEthBaseToken) external reinitializer(2) {
-        require(_l2Bridge != address(0), "L2 bridge address cannot be zero");
-        require(_l1Address != address(0), "L1 WETH token address cannot be zero");
-        l2Bridge = _l2Bridge;
-        l1Address = _l1Address;
-        isEthBaseToken = _isEthBaseToken;
     }
 
     modifier onlyBridge() {
