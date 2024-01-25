@@ -146,7 +146,11 @@ library SystemContractHelper {
     /// system contracts corresponding to the list of precompiles above can do `precompileCall`.
     /// @dev If used not in the `sha256`, `keccak256` or `ecrecover` contracts, it will just burn the gas provided.
     /// @dev This method is `unsafe` because it does not check whether there is enough gas to burn.
-    function unsafePrecompileCall(uint256 _rawParams, uint32 _gasToBurn, uint32 _pubdataToSpend) internal view returns (bool success) {
+    function unsafePrecompileCall(
+        uint256 _rawParams,
+        uint32 _gasToBurn,
+        uint32 _pubdataToSpend
+    ) internal view returns (bool success) {
         address callAddr = PRECOMPILE_CALL_ADDRESS;
 
         uint256 params = uint256(_gasToBurn) + (uint256(_pubdataToSpend) << 32);
