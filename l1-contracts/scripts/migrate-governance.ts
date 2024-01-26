@@ -50,7 +50,9 @@ async function main() {
     .option("--gas-price <gas-price>")
     .option("--refund-recipient <refund-recipient>")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const refundRecipient = cmd.refundRecipient;

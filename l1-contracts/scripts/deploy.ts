@@ -36,7 +36,9 @@ async function main() {
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();

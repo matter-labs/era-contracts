@@ -316,7 +316,9 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`StateTransitionManagerProxy deployed, with protocol version: ${protocolVersion}, gasUsed: ${contractAddress}`);
+      console.log(
+        `StateTransitionManagerProxy deployed, with protocol version: ${protocolVersion}, gasUsed: ${contractAddress}`
+      );
       console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADDR=${contractAddress}`);
     }
 

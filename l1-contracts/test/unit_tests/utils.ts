@@ -330,7 +330,7 @@ export async function initialDeployment(
   ownerAddress: string,
   gasPrice: BigNumberish,
   extraFacets: FacetCut[],
-  baseTokenName?: string,
+  baseTokenName?: string
 ): Promise<Deployer> {
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 

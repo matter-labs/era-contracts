@@ -5,7 +5,7 @@ import { web3Provider } from "./utils";
 import * as fs from "fs";
 import * as path from "path";
 
-import { deployTokens,TokenDescription } from "../src.ts/deploy-token";
+import { deployTokens, TokenDescription } from "../src.ts/deploy-token";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -51,8 +51,8 @@ async function main() {
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
-      
-      console.log(JSON.stringify((await deployTokens(tokens, wallet, ethTestConfig.mnemonic, true, false)), null, 2));
+
+      console.log(JSON.stringify(await deployTokens(tokens, wallet, ethTestConfig.mnemonic, true, false), null, 2));
     });
 
   await program.parseAsync(process.argv);

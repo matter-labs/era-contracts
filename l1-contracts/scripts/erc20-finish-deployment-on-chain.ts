@@ -49,7 +49,9 @@ async function main() {
             "m/44'/60'/0'/0/0"
           ).connect(l2Provider);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
