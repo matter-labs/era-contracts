@@ -63,6 +63,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Sends L2ToL1Log.
+    /// @param _isService The `isService` flag.
+    /// @param _key The `key` part of the L2Log.
+    /// @param _value The `value` part of the L2Log.
     /// @dev Can be called only by a system contract.
     function sendL2ToL1Log(
         bool _isService,
