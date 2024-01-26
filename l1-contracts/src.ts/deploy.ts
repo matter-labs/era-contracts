@@ -316,6 +316,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
+      console.log(`StateTransitionManagerProxy deployed, with protocol version: ${protocolVersion}, gasUsed: ${contractAddress}`);
       console.log(`CONTRACTS_STATE_TRANSITION_PROXY_ADDR=${contractAddress}`);
     }
 
@@ -430,15 +431,6 @@ export class Deployer {
     const receipt = await tx.wait();
     if (this.verbose) {
       console.log(`ERC20 bridge was registered, gas used: ${receipt.gasUsed.toString()}`);
-    }
-  }
-
-  public async deployWethToken(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("WETH9", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_L1_WETH_TOKEN_ADDR=${contractAddress}`);
     }
   }
 

@@ -4,7 +4,7 @@ import type { Address } from "zksync-ethers/build/src/types";
 import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
-import { deployTestnetTokens } from "../../src.ts/deploy-testnet-token";
+import { deployTokens } from "../../src.ts/deploy-token";
 import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
 import { initializeWethBridge } from "../../src.ts/weth-initialize";
 
@@ -330,7 +330,7 @@ export async function initialDeployment(
   ownerAddress: string,
   gasPrice: BigNumberish,
   extraFacets: FacetCut[],
-  baseTokenName?: string
+  baseTokenName?: string,
 ): Promise<Deployer> {
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 
@@ -347,7 +347,9 @@ export async function initialDeployment(
 
   let nonce = await deployWallet.getTransactionCount();
 
-  await deployTestnetTokens(testnetTokens, deployWallet, testnetTokenPath, deployer.verbose);
+  const result = await deployTokens(testnetTokens, deployWallet, null, false, deployer.verbose);
+  fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
+
   const baseTokenAddress = baseTokenName
     ? testnetTokens.find((token: { symbol: string }) => token.symbol == baseTokenName).address
     : ADDRESS_ONE;

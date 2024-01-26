@@ -7,7 +7,7 @@ import * as fs from "fs";
 import * as hre from "hardhat";
 import { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias } from "../src.ts/utils";
-import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
+import { GAS_MULTIPLIER, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 
 import { getL1TxInfo } from "../../l2-contracts/src/utils";
 
@@ -50,7 +50,7 @@ async function main() {
     .option("--gas-price <gas-price>")
     .option("--refund-recipient <refund-recipient>")
     .action(async (cmd) => {
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const refundRecipient = cmd.refundRecipient;

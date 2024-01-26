@@ -4,7 +4,7 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Provider } from "./utils";
+import { GAS_MULTIPLIER, web3Provider} from "./utils";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -29,7 +29,7 @@ async function main() {
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();

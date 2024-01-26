@@ -3,7 +3,7 @@ import { Wallet } from "ethers";
 import * as zksync from "zksync-ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, deployedAddressesFromEnv } from "./utils";
+import { GAS_MULTIPLIER, web3Provider, deployedAddressesFromEnv } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -49,7 +49,7 @@ async function main() {
             "m/44'/60'/0'/0/0"
           ).connect(l2Provider);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();

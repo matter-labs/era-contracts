@@ -6,6 +6,7 @@ import * as path from "path";
 const warning = chalk.bold.yellow;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
+export const GAS_MULTIPLIER = 1;
 
 interface SystemConfig {
   requiredL2GasPricePerPubdata: number;
