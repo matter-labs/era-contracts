@@ -13,7 +13,8 @@ describe("PubdataChunkPublisher tests", () => {
 
   let pubdataChunkPublisher: PubdataChunkPublisher;
 
-  const genRanHex = (size) => [...Array(size * 2)].map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+  const genRandHex = (size) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
+
   const blobSizeInBytes = 126_976;
   const maxNumberBlobs = 2;
 
@@ -40,19 +41,19 @@ describe("PubdataChunkPublisher tests", () => {
     });
 
     it("Too Much Pubdata", async () => {
-      const pubdata = "0x" + genRanHex(blobSizeInBytes * maxNumberBlobs + 1);
+      const pubdata = "0x" + genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
         pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
       ).to.be.revertedWith("pubdata should fit in 2 blobs");
     });
 
     it("Publish 1 Blob", async () => {
-      const pubdata = "0x" + genRanHex(blobSizeInBytes);
+      const pubdata = "0x" + genRandHex(blobSizeInBytes);
       await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
     });
 
     it("Publish 2 Blobs", async () => {
-      const pubdata = "0x" + genRanHex(blobSizeInBytes * maxNumberBlobs);
+      const pubdata = "0x" + genRandHex(blobSizeInBytes * maxNumberBlobs);
       await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
     });
   });
