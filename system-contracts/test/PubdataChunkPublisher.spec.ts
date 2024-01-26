@@ -48,12 +48,12 @@ describe("PubdataChunkPublisher tests", () => {
 
     it("Publish 1 Blob", async () => {
       const pubdata = "0x" + genRanHex(blobSizeInBytes);
-      pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
+      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
     });
 
     it("Publish 2 Blobs", async () => {
       const pubdata = "0x" + genRanHex(blobSizeInBytes * maxNumberBlobs);
-      pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
+      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
     });
   });
 });
