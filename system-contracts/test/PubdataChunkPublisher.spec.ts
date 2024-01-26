@@ -1,67 +1,59 @@
 import { expect } from "chai";
-import type { BytesLike } from "ethers";
-import { BigNumber } from "ethers";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-web3";
-import * as zksync from "zksync-web3";
 import type { PubdataChunkPublisher } from "../typechain";
 import { PubdataChunkPublisherFactory } from "../typechain";
-import {
-    TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
-    TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
-} from "./shared/constants";
-import { encodeCalldata, getMock, prepareEnvironment, setResult } from "./shared/mocks";
+import { TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS } from "./shared/constants";
+import { prepareEnvironment } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 
 describe("PubdataChunkPublisher tests", () => {
-    let wallet: Wallet;
-    let l1MessengerAccount: ethers.Signer;
+  let wallet: Wallet;
+  let l1MessengerAccount: ethers.Signer;
 
-    let pubdataChunkPublisher: PubdataChunkPublisher;
+  let pubdataChunkPublisher: PubdataChunkPublisher;
 
-    const genRanHex = size => [...Array(size*2)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-    const blobSizeInBytes = 126_976;
-    const maxNumberBlobs = 2;
+  const genRanHex = (size) => [...Array(size * 2)].map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+  const blobSizeInBytes = 126_976;
+  const maxNumberBlobs = 2;
 
-    before(async () => {
-        await prepareEnvironment();
-        wallet = getWallets()[0];
+  before(async () => {
+    await prepareEnvironment();
+    wallet = getWallets()[0];
 
-        await deployContractOnAddress(TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS, "PubdataChunkPublisher");
-        pubdataChunkPublisher = PubdataChunkPublisherFactory.connect(TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS, wallet);
+    await deployContractOnAddress(TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS, "PubdataChunkPublisher");
+    pubdataChunkPublisher = PubdataChunkPublisherFactory.connect(TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS, wallet);
 
-        l1MessengerAccount = await ethers.getImpersonatedSigner(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
+    l1MessengerAccount = await ethers.getImpersonatedSigner(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
+  });
+
+  after(async () => {
+    await network.provider.request({
+      method: "hardhat_stopImpersonatingAccount",
+      params: [TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS],
+    });
+  });
+
+  describe("chunkAndPublishPubdata", () => {
+    it("non-L1Messenger failed to call", async () => {
+      await expect(pubdataChunkPublisher.chunkAndPublishPubdata("0x1337")).to.be.revertedWith("Inappropriate caller");
     });
 
-    after(async () => {
-        await network.provider.request({
-            method: "hardhat_stopImpersonatingAccount",
-            params: [TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS],
-          });
+    it("Too Much Pubdata", async () => {
+      const pubdata = "0x" + genRanHex(blobSizeInBytes * maxNumberBlobs + 1);
+      await expect(
+        pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
+      ).to.be.revertedWith("pubdata should fit in 2 blobs");
     });
 
-    describe("chunkAndPublishPubdata", () => {
-        it("non-L1Messenger failed to call", async () => {
-            await expect(pubdataChunkPublisher.chunkAndPublishPubdata("0x1337")).to.be.revertedWith(
-                "Inappropriate caller"
-            );
-        });
-        
-        it("Too Much Pubdata", async () => {
-            let pubdata = '0x' + genRanHex(blobSizeInBytes * maxNumberBlobs + 1);
-            await expect(
-                pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
-            ).to.be.revertedWith("pubdata should fit in 2 blobs");
-        });
-
-        it("Publish 1 Blob", async () => {
-            let pubdata = '0x' + genRanHex(blobSizeInBytes);
-            pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
-        });
-
-        it("Publish 2 Blobs", async () => {
-            let pubdata = '0x' + genRanHex(blobSizeInBytes * maxNumberBlobs);
-            pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
-        });
+    it("Publish 1 Blob", async () => {
+      const pubdata = "0x" + genRanHex(blobSizeInBytes);
+      pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
     });
+
+    it("Publish 2 Blobs", async () => {
+      const pubdata = "0x" + genRanHex(blobSizeInBytes * maxNumberBlobs);
+      pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata);
+    });
+  });
 });
