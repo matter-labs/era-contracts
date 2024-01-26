@@ -109,7 +109,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Public functionality to send messages to L1.
-    /// @param _message The preimage of the message intended to be sent to L1.
+    /// @param _message The message intended to be sent to L1.
     function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         uint256 gasBeforeMessageHashing = gasleft();
         hash = EfficientCall.keccak(_message);

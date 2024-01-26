@@ -157,7 +157,7 @@ interface IExecutor is IBase {
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed
     /// @param batchHash Hash of the L2 batch
-    /// @param commitment Verified input for the zkSync circuit
+    /// @param commitment Calculated input for the zkSync circuit
     /// @dev It has the name "BlockCommit" and not "BatchCommit" due to backward compatibility considerations
     event BlockCommit(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
@@ -168,15 +168,15 @@ interface IExecutor is IBase {
     event BlocksVerification(uint256 indexed previousLastVerifiedBatch, uint256 indexed currentLastVerifiedBatch);
 
     /// @notice Event emitted when a batch is executed
-    /// @param batchNumber Number of the batch committed
+    /// @param batchNumber Number of the batch executed
     /// @param batchHash Hash of the L2 batch
     /// @param commitment Verified input for the zkSync circuit
     /// @dev It has the name "BlockExecution" and not "BatchExecution" due to backward compatibility considerations
     event BlockExecution(uint256 indexed batchNumber, bytes32 indexed batchHash, bytes32 indexed commitment);
 
     /// @notice Event emitted when batches are reverted
-    /// @param totalBatchesCommitted Total number of committed batches
-    /// @param totalBatchesVerified Total number of verified batches
+    /// @param totalBatchesCommitted Total number of committed batches after the revert
+    /// @param totalBatchesVerified Total number of verified batches after the revert
     /// @param totalBatchesExecuted Total number of executed batches
     /// @dev It has the name "BlocksRevert" and not "BatchesRevert" due to backward compatibility considerations
     event BlocksRevert(uint256 totalBatchesCommitted, uint256 totalBatchesVerified, uint256 totalBatchesExecuted);
