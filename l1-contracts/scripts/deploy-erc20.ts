@@ -1,11 +1,11 @@
-import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { Wallet } from "ethers";
 import { web3Provider } from "./utils";
 import * as fs from "fs";
 import * as path from "path";
 
-import { deployTokens, TokenDescription } from "../src.ts/deploy-token";
+import type { TokenDescription } from "../src.ts/deploy-token";
+import { deployTokens } from "../src.ts/deploy-token";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));

@@ -1,7 +1,6 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Wallet } from "ethers";
-import * as fs from "fs";
 import { parseEther } from "ethers/lib/utils";
 
 const DEFAULT_ERC20 = "TestnetERC20Token";
@@ -20,7 +19,7 @@ export type TokenDescription = Token & {
 export async function deployTokens(
   tokens: Token[],
   wallet: Wallet,
-  mnemonic: any,
+  mnemonic: string,
   mintTokens: boolean = false,
   verbose: boolean = false
 ): Promise<Token[]> {
