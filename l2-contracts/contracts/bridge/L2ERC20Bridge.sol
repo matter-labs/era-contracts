@@ -31,6 +31,9 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address => address) public override l1TokenAddress;
 
+    /// @dev Address of the exchange smart contract. Any funds deposited to L2 will be transferred to the user main account under in this smart contract
+    address public exchangeAddress;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
@@ -48,6 +51,12 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
         l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
         l2TokenBeacon.transferOwnership(_governor);
+    }
+
+    /// @notice Set the address of GRVT smart contracts that can move the funds from user EOA to their exchange account. This should only be called once after the bridge is deployed
+    function setExchangeAddress(address _exchangeAddress) external {
+        require(_exchangeAddress != address(0), "grvt@");
+        exchangeAddress = _exchangeAddress;
     }
 
     /// @notice Finalize the deposit and mint funds
@@ -85,10 +94,11 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
     function _deployL2Token(address _l1Token, bytes calldata _data) internal returns (address) {
+        require(exchangeAddress != address(0), "grvt@");
         bytes32 salt = _getCreate2Salt(_l1Token);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt);
-        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data);
+        L2StandardERC20(address(l2Token)).bridgeInitialize(_l1Token, _data, exchangeAddress);
 
         return address(l2Token);
     }
