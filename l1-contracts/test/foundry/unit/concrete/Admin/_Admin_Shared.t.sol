@@ -84,11 +84,6 @@ contract AdminWrapper is AdminFacet {
     }
 }
 
-bytes constant ERROR_ONLY_GOVERNOR = "StateTransition Chain: not governor";
-bytes constant ERROR_ONLY_ADMIN_OR_GOVERNOR = "StateTransition chain: Only by governor or admin";
-bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "StateTransition Chain: not state transition manager";
-bytes constant ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by governor or state transition manager";
-
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     AdminWrapper internal adminFacetWrapper;

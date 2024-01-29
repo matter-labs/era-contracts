@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import {AdminTest, ERROR_ONLY_STATE_TRANSITION_MANAGER} from "./_Admin_Shared.t.sol";
+import {AdminTest} from "./_Admin_Shared.t.sol";
+import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../ZkSyncStateTransitionBase/_ZkSyncStateTransitionBase_Shared.t.sol";
 
 import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
 
