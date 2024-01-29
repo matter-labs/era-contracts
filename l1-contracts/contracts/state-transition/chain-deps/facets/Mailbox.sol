@@ -15,7 +15,7 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncStateTransitionBase} from "./Base.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS} from "../../../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS, ERA_CHAIN_ID} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -187,9 +187,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.baseToken == ETH_TOKEN_ADDRESS, " finalizeEthWithdrawal only available for Eth chains on mailbox");
+        require(s.chainId == ERA_CHAIN_ID, " finalizeEthWithdrawal only available for Era on mailbox");
         IL1Bridge(s.baseTokenBridge).finalizeWithdrawal(
-            s.chainId,
+            ERA_CHAIN_ID,
             _l2BatchNumber,
             _l2MessageIndex,
             _l2TxNumberInBatch,
@@ -208,7 +208,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.baseToken == ETH_TOKEN_ADDRESS, "legacy interface only available for eth base token");
+        require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
             msg.sender,
             _contractL2,

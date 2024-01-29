@@ -127,7 +127,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
     modifier onlyBridgehubOrEthChain(uint256 _chainId) {
         require(
-            (msg.sender == address(bridgehub)) || (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS),
+            (msg.sender == address(bridgehub)) || ((bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS) && msg.sender == bridgehub.getStateTransition(_chainId)),
             "L1WETHBridge: not bridgehub or eth chain"
         );
         _;

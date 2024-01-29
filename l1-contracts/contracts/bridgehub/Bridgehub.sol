@@ -131,7 +131,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             _initData
         );
 
-        emit NewChain(_chainId, _stateTransitionManager, msg.sender);
+        emit NewChain(_chainId, _stateTransitionManager, _l2Governor);
         return _chainId;
     }
 
@@ -285,11 +285,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
 
-        // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
-        address refundRecipient = _request.refundRecipient == address(0) ? msg.sender : _request.refundRecipient;
-        // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
-        if (refundRecipient.code.length > 0) {
-            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(refundRecipient);
+        address refundRecipient = _request.refundRecipient;
+        if (refundRecipient == address(0)) {
+            // // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
+            refundRecipient = msg.sender == tx.origin ? msg.sender : AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        } else if (refundRecipient.code.length > 0) {
+            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(_request.refundRecipient);
         }
         require(_request.secondBridgeAddress > address(1000), "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
