@@ -32,6 +32,10 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     /// @dev Address of the L1 token that can be deposited to mint this L2 token
     address public override l1Address;
 
+    // Up to 3 parameters can be indexed.
+    // Indexed parameters helps you filter the logs by the indexed parameter
+    event FundExchangeAccount(address indexed account, uint256 amount);
+
     /// @dev Contract is expected to be used as proxy implementation.
     constructor() {
         // Disable initialization to prevent Parity hack.
@@ -43,11 +47,13 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 token
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
-    function bridgeInitialize(address _l1Address, bytes memory _data) external initializer {
+    function bridgeInitialize(address _l1Address, bytes memory _data, address _exchangeAddress) external initializer {
         require(_l1Address != address(0), "in6"); // Should be non-zero address
         l1Address = _l1Address;
 
         l2Bridge = msg.sender;
+
+        exchangeAddress = _exchangeAddress;
 
         // We parse the data exactly as they were created on the L1 bridge
         (bytes memory nameBytes, bytes memory symbolBytes, bytes memory decimalsBytes) = abi.decode(
@@ -109,6 +115,16 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
+    }
+
+    /// @dev Move the user's fund to their main account under the exchange contract
+    /// @dev We don't directly move the fund in bridgeMint as we want GRVT's backend to be notified of the deposit first. Only after our risk engine has approved the deposit, we move the fund to the user's exchange account by calling this function. This way, we can prevent a state divergent where user balance is updated on chain before it is updated off chain.
+    // TODO: add a record of how much balance we can moved from user's EOA to exchange account
+    function fundExchangeAccount(address _from, uint256 _amount) external {
+        require(_from != exchangeAddress, "invalid address");
+        require(exchangeAddress != address(0), "invalid grvt address");
+        _transfer(_from, exchangeAddress, _amount);
+        emit FundExchangeAccount(_from, _amount);
     }
 
     /// @dev Burn tokens from a given account.
