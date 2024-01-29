@@ -34,8 +34,8 @@ library ERC20BridgeMessageParsing {
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
             // this message is a base token withdrawal
-            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
+            (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
         } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
             // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,

@@ -172,7 +172,7 @@ contract L1ERC20Bridge is
         address _l2TokenBeaconStandardAddress,
         address _l2BridgeStandardAddress,
         address _owner
-    ) external payable reinitializer(2) {
+    ) external reinitializer(2) {
         _transferOwnership(_owner);
         require(_l2TokenBeaconStandardAddress != address(0), "EB TB  0");
         require(_l2BridgeStandardAddress != address(0), "EB BSA 0");
@@ -239,7 +239,7 @@ contract L1ERC20Bridge is
         }
         bool ethIsBaseToken = bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS;
         {
-            require(ethIsBaseToken || msg.value == 0, "EB m.v > 0, e base");
+            require(((ethIsBaseToken) && (msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee))|| (msg.value == 0), "L1WB: msg.value mismatch");
         }
         bytes32 l2BridgeImplementationBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[0]);
         bytes32 l2BridgeProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(_factoryDeps[1]);
@@ -827,7 +827,7 @@ contract L1ERC20Bridge is
         );
         address l2Sender;
         {
-            bool thisIsBaseTokenBridge = (bridgehub.baseToken(_chainId) == address(this)) &&
+            bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) &&
                 (l1Token == bridgehub.baseToken(_chainId));
             l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
         }

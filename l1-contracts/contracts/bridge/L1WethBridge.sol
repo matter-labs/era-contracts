@@ -228,7 +228,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             require(_factoryDeps.length == NUMBER_OF_FACTORY_DEPS, "L1WB: Invalid number of factory deps");
 
             ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            require((ethIsBaseToken) || (msg.value == 0), "L1WB: msg.value not 0 for non eth base token");
+            require(((ethIsBaseToken) && (msg.value == _deployBridgeImplementationFee + _deployBridgeProxyFee))|| (msg.value == 0), "L1WB: msg.value mismatch");
 
             require(factoryDepsHash == keccak256(abi.encode(_factoryDeps)), "L1WB: Invalid factory deps");
             require(bridgeProxyDeployOnL2TxHash[_chainId] == 0x00, "L1WB b. proxy tx sent"); // clear the tx first by proving the txs succeeded or failed
@@ -407,11 +407,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
             IWETH9(l1WethAddress).withdraw(_amount);
         }
-        {
-            if (!hyperbridgingEnabled[_chainId]) {
-                chainBalance[_chainId] += _mintValue;
-            }
-        }
+        // we don't increase chainBalance since we do it in bridgehubDepositBaseToken
         {
             // Request the finalization of the deposit on the L2 side
             bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, l1WethAddress, _amount);
@@ -521,9 +517,6 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
             // If the recipient is a contract on L1, the address alias will be applied.
-            if (!hyperbridgingEnabled[_chainId]) {
-                chainBalance[_chainId] += amount;
-            }
             request = L2TransactionRequestTwoBridgesInner({
                 magicValue: TWO_BRIDGES_MAGIC_VALUE,
                 l2Contract: l2BridgeAddress[_chainId],
@@ -768,15 +761,5 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
         // 1. l1 WETH sends ether on `withdraw`
         require(msg.sender == l1WethAddress, "pn");
         emit EthReceived(msg.value);
-    }
-
-    /// @dev returns address of proxyAdmin
-    function readProxyAdmin() public view returns (address) {
-        address proxyAdmin;
-        assembly {
-            /// @dev proxy admin storage slot
-            proxyAdmin := sload(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103)
-        }
-        return proxyAdmin;
     }
 }
