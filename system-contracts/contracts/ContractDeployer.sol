@@ -102,22 +102,22 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         emit AccountNonceOrderingUpdated(msg.sender, _nonceOrdering);
     }
 
-    function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode) {
-        EvmContractState state = evmState[codeAddress];
-        require(state != EvmContractState.None, "not EVM proxy contract");
-        if (state == EvmContractState.ConstructorPending) {
-            evmState[codeAddress] = EvmContractState.ConstructorCalled;
-            isConstructor = true;
-            bytecode = evmCode[codeAddress];
-            evmCode[codeAddress] = hex"";
-        } else if (state == EvmContractState.Deployed) {
-            isConstructor = false;
-            bytecode = evmCode[codeAddress];
-        } else {
-            // EvmContractState.ConstructorCalled
-            revert("attempt to re-initialize EVM contract");
-        }
-    }
+    // function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode) {
+    //     EvmContractState state = evmState[codeAddress];
+    //     require(state != EvmContractState.None, "not EVM proxy contract");
+    //     if (state == EvmContractState.ConstructorPending) {
+    //         evmState[codeAddress] = EvmContractState.ConstructorCalled;
+    //         isConstructor = true;
+    //         bytecode = evmCode[codeAddress];
+    //         evmCode[codeAddress] = hex"";
+    //     } else if (state == EvmContractState.Deployed) {
+    //         isConstructor = false;
+    //         bytecode = evmCode[codeAddress];
+    //     } else {
+    //         // EvmContractState.ConstructorCalled
+    //         revert("attempt to re-initialize EVM contract");
+    //     }
+    // }
 
     /// @notice Updates the EVMProxy hash to use for new EVM accounts
     function updateEVMProxyHash(bytes32 _codeHash) external {

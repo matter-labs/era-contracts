@@ -7,6 +7,7 @@ import "./EvmContract.sol";
 import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
+import "./libraries/SystemContractHelper.sol";
 
 // TODO: move to Constants.sol (need to make contract interfaces)
 
@@ -18,27 +19,27 @@ function max(uint256 a, uint256 b) pure returns (uint256) {
     return a > b ? a : b;
 }
 
-library EvmUtils {
-    function expand(bytes memory bmem, uint256 newSize) internal pure returns (uint256 gasCost) {
-        unchecked {
-            uint256 oldSize = bmem.length;
+// library EvmUtils {
+//     function expand(bytes memory bmem, uint256 newSize) internal pure returns (uint256 gasCost) {
+//         unchecked {
+//             uint256 oldSize = bmem.length;
 
-            if (newSize > oldSize) {
-                // old size should be aligned, but align just in case to be on the safe side
-                uint256 oldSizeWords = _words(oldSize);
-                uint256 newSizeWords = _words(newSize);
+//             if (newSize > oldSize) {
+//                 // old size should be aligned, but align just in case to be on the safe side
+//                 uint256 oldSizeWords = _words(oldSize);
+//                 uint256 newSizeWords = _words(newSize);
 
-                uint256 words = newSizeWords - oldSizeWords;
-                gasCost = (words ** 2) / 512 + (3 * words);
-                assembly ("memory-safe") {
-                    let size := shl(5, newSizeWords)
-                    mstore(bmem, size)
-                    mstore(0x40, add(add(bmem, 0x20), size))
-                }
-            }
-        }
-    }
-}
+//                 uint256 words = newSizeWords - oldSizeWords;
+//                 gasCost = (words ** 2) / 512 + (3 * words);
+//                 assembly ("memory-safe") {
+//                     let size := shl(5, newSizeWords)
+//                     mstore(bmem, size)
+//                     mstore(0x40, add(add(bmem, 0x20), size))
+//                 }
+//             }
+//         }
+//     }
+// }
 
 contract EvmInterpreter {
     using EvmUtils for bytes;
@@ -46,7 +47,7 @@ contract EvmInterpreter {
     // event OverheadTrace(uint256 gasUsage);
     // event OpcodeTrace(uint256 opcode, uint256 gasUsage);
 
-    function _simulate(bytes memory code, bytes calldata input, uint256 gasLeft) internal {
+    function _simulate(bytes calldata input, uint256 gasLeft, uint256 _bytecodeLen) internal {
         unchecked {
             uint256 _ergTracking = gasleft();
             // NOTE: I tried putting these state variables in a struct but the
@@ -1028,17 +1029,47 @@ contract EvmInterpreter {
         return gasLimit;
     }
 
-    fallback() external payable {
-        // require(DEPLOYER_SYSTEM_CONTRACT.isEVM(msg.sender) || msg.sender == address(this) || msg.sender == address(DEPLOYER_SYSTEM_CONTRACT));
+    // todo: move to a separate lib
+    function _isEVM(address _addr) {
 
-        if (msg.data.length < 0x20) {
-            revert("interpreter: invalid calldata");
+    }
+
+    // Each evm gas is 200 zkEVM one
+    uint256 constant GAS_DIVISOR = 200;
+    uint256 constant EVM_GAS_STIPEND = (1 << 30);
+    uint256 constant OVERHEAD = 2000;
+    function _getEVMGas() internal view returns (uint256) {
+        uint256 _gas = gasleft();
+        uint256 requiredGas = EVM_GAS_STIPEND + OVERHEAD;
+
+        if (_gas < requiredGas) {
+            return 0;
+        } else {
+            return (_gas - requiredGas) / GAS_DIVISOR;
+        }
+    }
+
+    function _requestBytecode() internal view returns (bytes memory bytecode) {
+        SystemContractHelper.
+    }
+
+    fallback() external payable {
+        bytes calldata input;
+        bytes memory bytecode;
+        uint256 evmGas;
+
+        if(msg.sender == address(DEPLOYER_SYSTEM_CONTRACT)) {
+            evmGas = uint256(bytes32(msg.data[0:32]));
+            bytecode = msg.data[32:];
+        } else if (_isEVM(msg.sender)) {
+            evmGas = uint256(bytes32(msg.data[0:32]));
+            input = msg.data[32:];
+            bytecode = _requestBytecode(this);
+        } else {
+            evmGas = _getEVMGas();
+            input = msg.data;
         }
 
-        uint256 evmGas = EVM_GAS_MANAGER.getGasLeft();
-        address codeAddress = abi.decode(msg.data, (address));
-
-        bytes calldata input;
         (bool isConstructor, bytes memory bytecode) = DEPLOYER_SYSTEM_CONTRACT.prepareEvmExecution(codeAddress);
         if (bytecode.length == 0) {
             // It is EOA or empty contract
@@ -1061,3 +1092,29 @@ contract EvmInterpreter {
         revert("interpreter: unreachable");
     }
 }
+
+
+/*
+
+We need the following memory:
+- Bytecode (1k words)
+- Scratch space (10 words)
+- Stack (1024 words)
+- Unlimited memory space
+
+Rules of inter frame gas:
+
+call (accept):
+- caller is zkEVM -> convert
+- caller is EVM -> first 32 bytes are gas
+
+call (action):
+- Forbidden callees -> return(0,0)
+- EVM callees -> gas + data
+
+return/revert:
+- caller is zkEVM -> plain return
+- caller is EVM -> gas + return
+- panic -> return with no data
+
+*/
