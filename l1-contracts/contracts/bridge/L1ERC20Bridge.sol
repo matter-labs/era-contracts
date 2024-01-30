@@ -29,12 +29,7 @@ import {Ownable2StepRandomStorage} from "../common/random-storage/Ownable2StepRa
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
-contract L1ERC20Bridge is
-    IL1ERC20Bridge,
-    ReentrancyGuard,
-    InitializableRandomStorage,
-    Ownable2StepRandomStorage
-{
+contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomStorage, Ownable2StepRandomStorage {
     using SafeERC20 for IERC20;
 
     /// @dev Specifies the number of factory specs needed for L2 deployment
