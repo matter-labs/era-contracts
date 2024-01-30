@@ -97,10 +97,7 @@ interface IL1Bridge {
 
     function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
-    function depositHappened(
-        uint256 _chainId,
-        bytes32 _l2TxHash
-    ) external view returns (bytes32);
+    function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
     /// data is abi encoded :
     /// address _l1Token,
@@ -121,4 +118,3 @@ interface IL1Bridge {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 }
-
