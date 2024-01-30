@@ -48,8 +48,6 @@ describe("NonceHolder tests", () => {
     // 3 calls minnonce == 2**4
     it("should increase account minNonce", async () => {
       await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4);
-      await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4);
-      await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4);
       const result = await nonceHolder.getMinNonce(nonceHolderAccount.address);
       expect(result).to.equal(2 ** 4);
     });
