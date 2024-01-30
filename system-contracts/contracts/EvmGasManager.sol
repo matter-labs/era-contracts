@@ -10,6 +10,8 @@ contract EvmGasManager {
     mapping(address => bool) private warmAccounts;
     mapping(address => mapping(uint256 => bool)) private warmSlots;
 
+    bytes latestReturndata;
+
     modifier onlySystemEvm() {
         // TODO: uncomment
         //require(ContractDeployer.isEVM(msg.sender), "only system evm");

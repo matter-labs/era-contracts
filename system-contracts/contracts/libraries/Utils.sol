@@ -94,4 +94,18 @@ library Utils {
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
     }
+
+    // the real max supported number is 2^16, but we'll stick to evm convention
+    uint256 constant MAX_EVM_BYTECODE_LENGTH = 24576;
+    function hashEVMBytecode(bytes memory _bytecode) internal view returns (bytes32 hashedEVMBytecode) {
+        require(_bytecode.length <= MAX_EVM_BYTECODE_LENGTH, "po");
+
+        hashedEVMBytecode =
+            sha256(_bytecode) &
+            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+        // Setting the version of the hash
+        hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(2 << 248)));
+        hashedEVMBytecode = hashedEVMBytecode | bytes32(_bytecode.length << 224);
+    } 
 }

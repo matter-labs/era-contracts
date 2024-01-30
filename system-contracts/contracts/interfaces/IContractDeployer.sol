@@ -100,19 +100,19 @@ interface IContractDeployer {
     function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
 
     /// @notice whether an address is an evm contract
-    function isEVM(address _addr) external view returns (bool);
+    // function isEVM(address _addr) external view returns (bool);
 
     /// @notice code hash of an evm contract
-    function getCodeHash(address _addr) external view returns (bytes32);
+    // function getCodeHash(address _addr) external view returns (bytes32);
 
     /// @notice size of an evm contracts code
-    function getCodeSize(address addr) external view returns (uint256);
+    // function getCodeSize(address addr) external view returns (uint256);
 
     /// @notice code for a given evm contract
-    function getCode(address addr) external view returns (bytes memory code);
+    // function getCode(address addr) external view returns (bytes memory code);
 
     /// @notice prepares needed data for evm execution
-    function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode);
+    // function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode);
 
     function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
 

@@ -26,9 +26,12 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
 
+    /// TODO: maybe have a preprocessor for it.
+    bytes32 internal evmInterpreterHash;
+
     // The hash of the EVMProxy contract. Set during genesis or during an upgrade
     // NOTE: keep this in slot 1 or you will have to change it in core/bin/zksync_core/src/genesis.rs where evm_proxy_hash_log is
-    bytes32 internal evmProxyHash;
+    // bytes32 internal evmProxyHash;
 
     enum EvmContractState {
         None,
@@ -37,9 +40,16 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         Deployed
     }
 
-    mapping(address => EvmContractState) internal evmState;
     mapping(address => bytes) public evmCode;
     mapping(address => bytes32) public evmCodeHash;
+
+    function setDeployedCode(bytes calldata newDeployedCode) external {
+        // FIXME: check the correct behavior when deploying empty bytecode.
+        require(evmCode[msg.sender].length > 0, "Only EVM contracts can call it");
+
+        evmCode[msg.sender] = newDeployedCode;
+        evmCodeHash[msg.sender] = keccak256(newDeployedCode);
+    }
 
     modifier onlySelf() {
         require(msg.sender == address(this), "Callable only by self");
@@ -119,15 +129,15 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     //     }
     // }
 
-    /// @notice Updates the EVMProxy hash to use for new EVM accounts
-    function updateEVMProxyHash(bytes32 _codeHash) external {
-        require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER_CONTRACT");
+    // /// @notice Updates the EVMProxy hash to use for new EVM accounts
+    // function updateEVMProxyHash(bytes32 _codeHash) external {
+    //     require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER_CONTRACT");
 
-        bytes32 _oldHash = evmProxyHash;
-        evmProxyHash = _codeHash;
+    //     bytes32 _oldHash = evmProxyHash;
+    //     evmProxyHash = _codeHash;
 
-        emit EVMProxyHashUpdated(_oldHash, _codeHash);
-    }
+    //     emit EVMProxyHashUpdated(_oldHash, _codeHash);
+    // }
 
     /// @notice Calculates the address of a deployed contract via create2
     /// @param _sender The account that deploys the contract.
@@ -232,8 +242,9 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         return createAccount(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
     }
 
-    function isEVM(address addr) external view returns (bool) {
-        return (evmState[addr] != EvmContractState.None);
+    function isEVM(address addr) internal view returns (bool) {
+        // TODO
+        return false;
     }
 
     function createEVM(bytes calldata _initCode) external payable override returns (address) {
@@ -253,7 +264,13 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override returns (address) {
-        address newAddress = getNewAddressCreate2EVM(msg.sender, _salt, _initCode);
+        bytes calldata _initCodeForDerivation;
+        if (isEVM(msg.sender)) {
+            _initCodeForDerivation = _initCode[32:];
+        } else {
+            _initCodeForDerivation = _initCode;
+        }
+        address newAddress = getNewAddressCreate2EVM(msg.sender, _salt, _initCodeForDerivation);
 
         _evmDeployOnAddress(newAddress, _initCode);
 
@@ -386,40 +403,21 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     }
 
     function _evmDeployOnAddress(address _newAddress, bytes calldata _initCode) internal {
-        evmState[_newAddress] = EvmContractState.ConstructorPending;
-        evmCode[_newAddress] = _initCode;
+        // evmCode[_newAddress] = _initCode;
+
+        // A dummy code hash is used to avoid unneeded copy, since
+        // anyway the "hash" of the original code does not have to be preserved anywhere.
 
         // _initCode is set into evmCode, hence empty calldata is passed here (msg.data[0:0])
-        _performDeployOnAddress(evmProxyHash, _newAddress, AccountAbstractionVersion.None, _initCode[:0], false);
-
-        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
-
-        if (msg.value > 0) {
-            // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
-            SystemContractHelper.setValueForNextFarCall(uint128(msg.value));
-        }
-        // again no calldata as this will fetch constructor code from evmCode
-        bytes memory returnData = EfficientCall.mimicCall(
-            gasleft(),
-            _newAddress,
-            _initCode[:0],
-            msg.sender,
-            false,
-            false
+        _performDeployOnAddressEVM(
+             _newAddress, 
+             AccountAbstractionVersion.None, 
+             _initCode, 
+             false
         );
-
-        evmState[_newAddress] = EvmContractState.Deployed;
-        evmCode[_newAddress] = returnData;
-
-        bytes32 codeHash = keccak256(returnData);
-        evmCodeHash[_newAddress] = codeHash;
-
-        emit ContractDeployed(msg.sender, evmProxyHash, _newAddress);
-        // emit EvmContractDeployed(success, returnData);
     }
 
     /// @notice Deploy a certain bytecode on the address.
-    /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _newAddress The address of the contract to be deployed.
     /// @param _aaVersion The version of the account abstraction protocol to use.
     /// @param _input The constructor calldata.
@@ -439,6 +437,44 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         _storeAccountInfo(_newAddress, newAccountInfo);
 
         _constructContract(msg.sender, _newAddress, _bytecodeHash, _input, false, _callConstructor);
+    }
+
+    function convertToConstructorEVMInput(bytes calldata _input) internal pure returns (bytes memory) {
+        // With how the contracts work, the calldata to the constuctor must be an ABI-encoded `bytes`.
+        // This means that it should also contain offset as well as length
+        uint256 _fullLength = _input.length;
+        bytes memory extendedInput = new bytes(_input.length + 64);
+
+        assembly {
+            // "Offset" for the calldata
+            mstore(add(extendedInput, 0x20), 0x20)
+            // "Length"
+            mstore(add(extendedInput, 0x40), _fullLength)
+
+            calldatacopy(add(extendedInput, 0x60), _input.offset, _fullLength)
+        }
+
+        return extendedInput;
+    }
+
+    /// @notice Deploy a certain bytecode on the address.
+    /// @param _newAddress The address of the contract to be deployed.
+    /// @param _aaVersion The version of the account abstraction protocol to use.
+    /// @param _input The constructor calldata.
+    function _performDeployOnAddressEVM(
+        address _newAddress,
+        AccountAbstractionVersion _aaVersion,
+        bytes calldata _input,
+        bool _callConstructor
+    ) internal {
+        AccountInfo memory newAccountInfo;
+        newAccountInfo.supportedAAVersion = _aaVersion;
+        // Accounts have sequential nonces by default.
+        newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
+        _storeAccountInfo(_newAddress, newAccountInfo);
+        
+        // When constructing they just get the intrepeter bytecode hash in consutrcting mode
+        _constructEVMContract(msg.sender, _newAddress, evmInterpreterHash, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -499,26 +535,60 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
 
-    function getCodeSize(address addr) external view returns (uint256) {
-        if (evmState[addr] != EvmContractState.Deployed) return 0;
+    function _constructEVMContract(
+        address _sender,
+        address _newAddress,
+        bytes32 _bytecodeHash,
+        bytes memory _input
+    ) internal {
+        // FIXME: this is a temporary limitation. 
+        // To be removed in the future
+        require(_input.length > 0, "The input must be non-empty");
 
-        return evmCode[addr].length;
-    }
+        // Temporary: remember the constructor code.
+        evmCode[_newAddress] = _input;
 
-    function getCodeHash(address addr) external view returns (bytes32 hash) {
-        if (evmState[addr] != EvmContractState.Deployed) return 0;
-
-        bytes memory code = evmCode[addr];
-        assembly ("memory-safe") {
-            hash := keccak256(add(code, 0x20), mload(code))
+        uint256 value = msg.value;
+        // 1. Transfer the balance to the new address on the constructor call.
+        if (value > 0) {
+            ETH_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
         }
-    }
+        // 2. Set the constructed code hash on the account
+        _storeConstructingByteCodeHashOnAddress(_newAddress, _bytecodeHash);
 
-    function getCode(address addr) external view returns (bytes memory code) {
-        if (evmState[addr] != EvmContractState.Deployed) {
-            return hex"";
+        // 3. Call the constructor on behalf of the account
+        if (value > 0) {
+            // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
+            SystemContractHelper.setValueForNextFarCall(uint128(value));
         }
 
-        code = evmCode[addr];
+        // bytes memory input2;
+
+        // In case of EVM contracts returnData is the new deployed code
+        bool success = SystemContractHelper.mimicCall(
+            uint32(gasleft()),
+            _newAddress,
+            msg.sender,
+            _input,
+            true,
+            false
+        );
+
+        if (!success) {
+            // TODO: double check the behavior on EVM
+            assembly {
+                // Just propagate the error back
+                // TODO: treat deployment nonce correctly
+                returndatacopy(0,0,returndatasize())
+                revert(0,returndatasize())
+            }
+        }
+
+        require(evmCodeHash[_newAddress] != 0x0, "The code hash must be set after the constructor call");
+
+        bytes32 codeHash = Utils.hashEVMBytecode(evmCode[_newAddress]);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, codeHash);
+
+        emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
 }

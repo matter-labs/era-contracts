@@ -13,8 +13,8 @@ export default {
     },
   },
   zkSyncDeploy: {
-    zkSyncNetwork: "http://localhost:3050",
-    ethNetwork: "http://localhost:8545",
+    zkSyncNetwork: process.env.TESTNET2,
+    ethNetwork: process.env.INFURA,
   },
   solidity: {
     version: "0.8.20",

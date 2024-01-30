@@ -3,8 +3,9 @@
 pragma solidity 0.8.20;
 
 import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
+import {Utils} from "./Utils.sol";
 
-import {SystemContractsCaller, CalldataForwardingMode, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, MIMIC_CALL_BY_REF_CALL_ADDRESS, META_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {SystemContractsCaller, CalldataForwardingMode, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, MIMIC_CALL_BY_REF_CALL_ADDRESS, META_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, TO_L1_CALL_ADDRESS, MIMIC_CALL_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 
 uint256 constant UINT32_MASK = 0xffffffff;
 uint256 constant UINT64_MASK = 0xffffffffffffffff;
@@ -346,5 +347,40 @@ library SystemContractHelper {
             _pubdataToSpend
         );
         require(precompileCallSuccess, "Failed to charge gas");
+    }
+
+    function mimicCall(
+        uint32 gasLimit, 
+        address to, 
+        address whoToMimic,
+        bytes memory data,
+        bool isConstructorCall,
+        bool isSystemCall
+    ) internal returns (bool success) {
+        address callAddr = MIMIC_CALL_CALL_ADDRESS;
+
+        uint32 dataStart;
+        assembly {
+            dataStart := add(data, 0x20)
+        }
+        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            gasLimit,
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            isConstructorCall,
+            isSystemCall
+        );
+
+        // Doing the system call directly
+        assembly {
+            success := call(to, callAddr, 0, farCallAbi, whoToMimic, 0, 0)
+        }
     }
 }
