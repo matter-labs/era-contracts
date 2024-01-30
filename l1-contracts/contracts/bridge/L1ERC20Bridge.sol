@@ -178,7 +178,6 @@ contract L1ERC20Bridge is
         l2TokenBeaconAddress[_chainId] = _l2TokenBeaconAddress;
     }
 
-
     /// @notice Legacy deposit method with refunding the fee to the caller, use another `deposit` method instead.
     /// @dev Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted.
@@ -651,10 +650,7 @@ contract L1ERC20Bridge is
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
-        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(
-            _chainId,
-            _message
-        );
+        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
         address l2Sender;
         {
             bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) &&
@@ -736,19 +732,16 @@ contract L1ERC20Bridge is
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token
     function l2TokenAddressSharedBridge(uint256 _chainId, address _l1Token) public view returns (address) {
-
-        address l2TokenB = l2TokenBeaconAddress[_chainId] != address(0) ? l2TokenBeaconAddress[_chainId] : l2TokenBeaconStandardAddress;
-        address l2BridgeA = l2BridgeAddress[_chainId] != address(0) ? l2BridgeAddress[_chainId] : l2BridgeStandardAddress;
+        address l2TokenB = l2TokenBeaconAddress[_chainId] != address(0)
+            ? l2TokenBeaconAddress[_chainId]
+            : l2TokenBeaconStandardAddress;
+        address l2BridgeA = l2BridgeAddress[_chainId] != address(0)
+            ? l2BridgeAddress[_chainId]
+            : l2BridgeStandardAddress;
 
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenB), ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return
-            L2ContractHelper.computeCreate2Address(
-                l2BridgeA,
-                salt,
-                l2TokenProxyBytecodeHash,
-                constructorInputHash
-            );
+        return L2ContractHelper.computeCreate2Address(l2BridgeA, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 }

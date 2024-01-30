@@ -125,8 +125,7 @@ struct L2CanonicalTransaction {
     bytes reservedDynamic;
 }
 
-
-struct BridgehubL2TransactionRequest{
+struct BridgehubL2TransactionRequest {
     address sender;
     address contractL2;
     uint256 mintValue;

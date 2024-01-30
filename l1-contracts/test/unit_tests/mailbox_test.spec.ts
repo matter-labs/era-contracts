@@ -182,8 +182,8 @@ describe("Mailbox tests", function () {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
 
       const revertReason = await getCallRevertReason(
-         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
-      )
+        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+      );
       expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
 

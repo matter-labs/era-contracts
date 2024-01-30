@@ -167,13 +167,10 @@ describe("Mailbox Era's legacy functions tests", function () {
         [],
         ethers.constants.AddressZero,
         amount
-      )
+      );
       const priorityQueueLengthAfter = await getter.getPriorityQueueSize();
       expect(priorityQueueLengthAfter.sub(priorityQueueLengthBefore)).equal(1);
-
-
     });
-
 
     it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
@@ -190,4 +187,4 @@ describe("Mailbox Era's legacy functions tests", function () {
       expect(revertReason).equal("Withdrawal is already finalized");
     });
   });
-})
+});

@@ -102,7 +102,7 @@ describe("WETH Bridge tests", () => {
 
     bridgeProxy = L1WethBridgeFactory.connect(deployer.addresses.Bridges.WethBridgeProxy, deployWallet);
   });
-  
+
   it("Check should initialize through governance", async () => {
     const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
     const upgradeCall = l1WethBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [

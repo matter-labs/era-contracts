@@ -312,7 +312,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 l1GasPriceConverted: _request.l1GasPriceConverted,
                 factoryDeps: outputRequest.factoryDeps,
                 refundRecipient: refundRecipient
-            }) 
+            })
         );
 
         IL1Bridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(

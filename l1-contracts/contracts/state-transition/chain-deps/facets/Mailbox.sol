@@ -153,7 +153,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         }
 
         uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * _l1GasPriceConverted;
-        uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken + batchOverheadBaseToken / uint256(feeParams.maxPubdataPerBatch);
+        uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
+            batchOverheadBaseToken /
+            uint256(feeParams.maxPubdataPerBatch);
 
         uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadBaseToken / uint256(feeParams.maxL2GasPerBatch);
         uint256 minL2GasPriceBaseToken = (fullPubdataPriceBaseToken + _gasPerPubdata - 1) / _gasPerPubdata;

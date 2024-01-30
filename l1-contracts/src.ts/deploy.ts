@@ -672,7 +672,7 @@ export class Deployer {
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce  });
+    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
     await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 });
   }
