@@ -37,15 +37,10 @@ describe("NonceHolder tests", () => {
   });
 
   describe("increaseMinNonce", () => {
-    // expected revert doesn't work
-    // it("should revert This method require system call flag", async () => {
-    //   await (nonceHolder.increaseMinNonce(123))
-    // });
+    it("should revert This method require system call flag", async () => {
+      await expect(nonceHolder.increaseMinNonce(123)).to.be.rejectedWith("This method require system call flag");
+    });
 
-    // ?min nonce changes after 3 calls?
-    // 1st cal call revert exception
-    // 2 calls minnonce == 0
-    // 3 calls minnonce == 2**4
     it("should increase account minNonce", async () => {
       await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4);
       const result = await nonceHolder.getMinNonce(nonceHolderAccount.address);
