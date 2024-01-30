@@ -22,7 +22,6 @@ import {
   getCallRevertReason,
   initialDeployment,
   requestExecute,
-  requestExecuteDirect,
 } from "./utils";
 
 import * as ethers from "ethers";
@@ -36,8 +35,6 @@ describe("Mailbox tests", function () {
   let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
-  const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
-  const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -135,8 +132,6 @@ describe("Mailbox tests", function () {
     const BLOCK_NUMBER = 0;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
-    const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
 
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
@@ -179,8 +174,6 @@ describe("Mailbox tests", function () {
     });
 
     it("Successful withdrawal", async () => {
-      const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );

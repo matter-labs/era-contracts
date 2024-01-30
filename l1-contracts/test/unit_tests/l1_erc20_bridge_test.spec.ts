@@ -6,8 +6,8 @@ import * as hardhat from "hardhat";
 import * as fs from "fs";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import type { Deployer } from "../../src.ts/deploy";
-import type { Bridgehub, L1ERC20Bridge } from "../../typechain";
-import { BridgehubFactory, L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
+import type { Bridgehub } from "../../typechain";
+import { BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import type { IL1Bridge } from "../../typechain/IL1Bridge";
 import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
 import {
@@ -30,7 +30,6 @@ describe("L1ERC20Bridge tests", function () {
   let deployer: Deployer;
   let l1ERC20BridgeAddress: string;
   let l1ERC20Bridge: IL1Bridge;
-  let l1ERC20BridgeInit: L1ERC20Bridge;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
   let chainId = "0";
@@ -62,7 +61,6 @@ describe("L1ERC20Bridge tests", function () {
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
-    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
 
     l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
 

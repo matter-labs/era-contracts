@@ -1,29 +1,16 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
-import type { Bridgehub, Forwarder, GettersFacet, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
-import {
-  BridgehubFactory,
-  ForwarderFactory,
-  MailboxFacetFactory,
-  GettersFacetFactory,
-  MailboxFacetTestFactory,
-  MockExecutorFacetFactory,
-} from "../../typechain";
+import type { GettersFacet, MockExecutorFacet } from "../../typechain";
+import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
-import type { IGetters } from "../../typechain/IGetters";
 
 import {
   CONTRACTS_LATEST_PROTOCOL_VERSION,
-  DEFAULT_REVERT_REASON,
   L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
-  PubdataPricingMode,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  defaultFeeParams,
   ethTestConfig,
   getCallRevertReason,
   initialDeployment,
-  requestExecute,
   requestExecuteDirect,
 } from "./utils";
 
@@ -37,12 +24,9 @@ describe("Mailbox Era's legacy functions tests", function () {
   let mailbox: IMailbox;
   let getter: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
-  let bridgehub: Bridgehub;
   let owner: ethers.Signer;
   const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
   const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
-  let forwarder: Forwarder;
-  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
@@ -72,9 +56,6 @@ describe("Mailbox Era's legacy functions tests", function () {
     // we want to reset the original for the rest of the tests (including test files)
     process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = (270).toString();
 
-    chainId = deployer.chainId;
-
-    bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     getter = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
@@ -82,10 +63,6 @@ describe("Mailbox Era's legacy functions tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
-
-    const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
-    const forwarderContract = await forwarderFactory.deploy();
-    forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
   });
 
   /// we have this here as calling through the bridgehub does not work

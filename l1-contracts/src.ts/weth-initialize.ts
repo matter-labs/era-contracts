@@ -25,18 +25,18 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   const l1GovernorAddress = deployer.addresses.Governance;
 
   // Note governor can not be EOA
-  const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
+  // const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
-  const l1WethAddress = await l1WethBridge.l1WethAddress();
-  const {
-    l2WethProxyAddress: l2WethProxyAddressEthIsBase,
-    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase,
-  } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
+  // const l1WethAddress = await l1WethBridge.l1WethAddress();
+  // const {
+  //   l2WethProxyAddress: l2WethProxyAddressEthIsBase,
+  //   l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsBase,
+  // } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, true);
 
-  const {
-    l2WethProxyAddress: l2WethProxyAddressEthIsNotBase,
-    l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
-  } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
+  // const {
+  //   l2WethProxyAddress: l2WethProxyAddressEthIsNotBase,
+  //   l2WethBridgeProxyAddress: l2WethBridgeProxyAddressEthIsNotBase,
+  // } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
 
   const tx1 = await l1WethBridge.initialize(l1GovernorAddress, 0, { nonce: nonce, gasPrice });
 
@@ -104,6 +104,8 @@ export async function startWethBridgeInitOnChain(
     await approveTx2.wait(1);
   }
   nonce = await deployWallet.getTransactionCount();
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
+
   const tx1 = await bridgehub.requestL2Transaction(
     {
       chainId,
@@ -113,6 +115,7 @@ export async function startWethBridgeInitOnChain(
       l2Calldata: "0x",
       l2GasLimit: priorityTxMaxGasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted: l1GasPriceConverted,
       factoryDeps: [L2_WETH_PROXY_BYTECODE, L2_WETH_IMPLEMENTATION_BYTECODE],
       refundRecipient: deployWallet.address,
     },

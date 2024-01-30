@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import type { L1ERC20Bridge, TestnetERC20Token } from "../../typechain";
-import { L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
+import type { TestnetERC20Token } from "../../typechain";
+import { TestnetERC20TokenFactory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
@@ -72,7 +72,6 @@ describe("Custom base token tests", () => {
   let deployer: Deployer;
   let l1ERC20Bridge: IL1Bridge;
   let bridgehub: IBridgehub;
-  let l1ERC20BridgeInit: L1ERC20Bridge;
   let baseToken: TestnetERC20Token;
   let baseTokenAddress: string;
   let altTokenAddress: string;
@@ -111,7 +110,6 @@ describe("Custom base token tests", () => {
 
     // prepare the bridge
     l1ERC20Bridge = IL1BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
-    l1ERC20BridgeInit = L1ERC20BridgeFactory.connect(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
   });
 
   it("Should have correct base token", async () => {
