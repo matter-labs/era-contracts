@@ -25,7 +25,6 @@ import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
 import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
-import { ERC20BridgeMessageParsingFactory } from "../typechain/ERC20BridgeMessageParsingFactory";
 
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -380,25 +379,13 @@ export class Deployer {
     this.addresses.StateTransition.Verifier = contractAddress;
   }
 
-  public async deployERC20BridgeMessageParsing(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("ERC20BridgeMessageParsing", [], create2Salt, ethTxOptions);
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_L1_ERC20_BRIDGE_MESSAGE_PARSING_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.Bridges.ERC20BridgeMessageParsing = contractAddress;
-  }
-
   public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
       [this.addresses.Bridgehub.BridgehubProxy],
       create2Salt,
-      ethTxOptions,
-      { ERC20BridgeMessageParsing: this.addresses.Bridges.ERC20BridgeMessageParsing }
+      ethTxOptions
     );
 
     if (this.verbose) {
@@ -685,10 +672,9 @@ export class Deployer {
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployERC20BridgeMessageParsing(create2Salt, { gasPrice, nonce: nonce });
-    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 2 });
-    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 3 });
+    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce  });
+    await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 });
   }
 
   public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -769,10 +755,6 @@ export class Deployer {
 
   public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {
     return L1ERC20BridgeFactory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
-  }
-
-  public defaultERC20BridgeMessageParsing(signerOrProvider: Signer | providers.Provider) {
-    return ERC20BridgeMessageParsingFactory.connect(this.addresses.Bridges.ERC20BridgeMessageParsing, signerOrProvider);
   }
 
   public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {

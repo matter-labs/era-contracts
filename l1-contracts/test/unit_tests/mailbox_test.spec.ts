@@ -131,25 +131,6 @@ describe("Mailbox tests", function () {
     expect(revertReason).equal("ps");
   });
 
-  it("Should not accept bytecode that is too long", async () => {
-    const revertReason = await getCallRevertReason(
-      requestExecuteDirect(
-        mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
-        "0x",
-        ethers.BigNumber.from(100000),
-        [
-          // "+64" to keep the length in words odd and bytecode chunkable
-          new Uint8Array(MAX_CODE_LEN_BYTES + 64),
-        ],
-        ethers.constants.AddressZero
-      )
-    );
-
-    expect(revertReason).equal("pp");
-  });
-
   describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 0;
     const MESSAGE_INDEX = 0;
@@ -194,22 +175,23 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("vq");
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Successful withdrawal", async () => {
       const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
 
-      await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-      const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
+      const revertReason = await getCallRevertReason(
+         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+      )
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("Withdrawal is already finalized");
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
   });
 
@@ -311,6 +293,7 @@ describe("Mailbox tests", function () {
     );
     const mintValue = await overrides.value;
     overrides.gasLimit = 10000000;
+    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
     const encodeRequest = (refundRecipient) =>
       bridgehub.interface.encodeFunctionData("requestL2Transaction", [
@@ -322,6 +305,7 @@ describe("Mailbox tests", function () {
           l2Calldata: "0x",
           l2GasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+          l1GasPriceConverted,
           factoryDeps: [new Uint8Array(32)],
           refundRecipient,
         },

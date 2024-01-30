@@ -5,7 +5,6 @@ import * as hardhat from "hardhat";
 
 import * as fs from "fs";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import { startErc20BridgeInitOnChain } from "../../src.ts/erc20-initialize";
 import type { Deployer } from "../../src.ts/deploy";
 import type { Bridgehub, L1ERC20Bridge } from "../../typechain";
 import { BridgehubFactory, L1ERC20BridgeFactory, TestnetERC20TokenFactory } from "../../typechain";
@@ -73,17 +72,6 @@ describe("L1ERC20Bridge tests", function () {
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
-  });
-
-  it("Check startErc20BridgeInitOnChain", async () => {
-    const nonce = await deployWallet.getTransactionCount();
-    const gasPrice = await owner.provider.getGasPrice();
-
-    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
-
-    const txHash = await l1ERC20BridgeInit.bridgeProxyDeployOnL2TxHash(chainId);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Check should initialize through governance", async () => {

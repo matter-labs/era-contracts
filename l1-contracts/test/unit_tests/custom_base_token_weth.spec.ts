@@ -9,8 +9,6 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, getCallRevertReason, initialDeployment } from "./utils";
 
-import { startWethBridgeInitOnChain } from "../../src.ts/weth-initialize";
-
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
 import { hashL2Bytecode } from "../../src.ts/utils";
@@ -48,6 +46,7 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   await bridgehub.requestL2Transaction(
     {
@@ -58,6 +57,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       factoryDeps: [bytecode],
       refundRecipient: walletAddress,
     },
@@ -124,17 +124,6 @@ describe("Custom base token weth tests", () => {
     expect(l1ERC20Bridge.address).equal(baseTokenBridgeAddress);
   });
 
-  it("Check startWethBridgeInitOnChain", async () => {
-    const nonce = await deployWallet.getTransactionCount();
-    const gasPrice = await owner.provider.getGasPrice();
-
-    await startWethBridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
-
-    const txHash = await l1WethBridgeInit.bridgeProxyDeployOnL2TxHash(chainId);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
-  });
-
   it("Check should initialize through governance", async () => {
     const l1WethBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1WethBridge").abi);
     const upgradeCall = l1WethBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address,address)", [
@@ -169,6 +158,7 @@ describe("Custom base token weth tests", () => {
 
     await (await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount)).wait();
     await (await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)).wait();
+    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
@@ -176,6 +166,7 @@ describe("Custom base token weth tests", () => {
       l2Value: 1,
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       refundRecipient: await randomSigner.getAddress(),
       secondBridgeAddress: l1WethBridge.address,
       secondBridgeValue: 0,

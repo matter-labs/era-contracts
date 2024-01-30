@@ -9,8 +9,6 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION, executeUpgrade, getCallRevertReason, initialDeployment } from "./utils";
 
-import { startErc20BridgeInitOnChain } from "../../src.ts/erc20-initialize";
-
 import * as fs from "fs";
 // import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
 import { hashL2Bytecode } from "../../src.ts/utils";
@@ -48,6 +46,7 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   await bridgehub.requestL2Transaction(
     {
@@ -58,6 +57,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       factoryDeps: [bytecode],
       refundRecipient: walletAddress,
     },
@@ -122,17 +122,6 @@ describe("Custom base token tests", () => {
     expect(l1ERC20Bridge.address).equal(baseTokenBridgeAddress);
   });
 
-  it("Check startErc20BridgeInitOnChain", async () => {
-    const nonce = await deployWallet.getTransactionCount();
-    const gasPrice = await owner.provider.getGasPrice();
-
-    await startErc20BridgeInitOnChain(deployer, deployWallet, chainId.toString(), nonce, gasPrice);
-
-    const txHash = await l1ERC20BridgeInit.bridgeProxyDeployOnL2TxHash(chainId);
-
-    expect(txHash).not.equal(ethers.constants.HashZero);
-  });
-
   it("Check should initialize through governance", async () => {
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
     const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
@@ -160,6 +149,7 @@ describe("Custom base token tests", () => {
     await (
       await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, ethers.utils.parseUnits("800", 18))
     ).wait();
+    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
     await bridgehub.connect(randomSigner).requestL2Transaction({
       chainId,
       l2Contract: await randomSigner.getAddress(),
@@ -168,6 +158,7 @@ describe("Custom base token tests", () => {
       l2Calldata: "0x",
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       factoryDeps: [],
       refundRecipient: await randomSigner.getAddress(),
     });
@@ -182,12 +173,14 @@ describe("Custom base token tests", () => {
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
     await (await baseToken.connect(randomSigner).approve(l1ERC20Bridge.address, baseTokenAmount)).wait();
+    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
       l2Value: 1,
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       refundRecipient: await randomSigner.getAddress(),
       secondBridgeAddress: l1ERC20Bridge.address,
       secondBridgeValue: 0,

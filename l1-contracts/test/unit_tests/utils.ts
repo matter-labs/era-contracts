@@ -156,6 +156,7 @@ export async function requestExecute(
     );
     overrides.value = baseCost.add(l2Value);
   }
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   return await bridgehub.requestL2Transaction(
     {
@@ -166,6 +167,7 @@ export async function requestExecute(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       factoryDeps,
       refundRecipient,
     },
@@ -181,7 +183,8 @@ export async function requestExecuteDirect(
   calldata: ethers.BytesLike,
   l2GasLimit: ethers.BigNumber,
   factoryDeps: BytesLike[],
-  refundRecipient: string
+  refundRecipient: string,
+  value?: ethers.BigNumber
 ) {
   const gasPrice = await mailbox.provider.getGasPrice();
 
@@ -194,7 +197,7 @@ export async function requestExecuteDirect(
 
   const overrides = {
     gasPrice,
-    value: baseCost.add(ethers.BigNumber.from(0)),
+    value: baseCost.add(value || ethers.BigNumber.from(0)),
   };
 
   return await mailbox.requestL2Transaction(

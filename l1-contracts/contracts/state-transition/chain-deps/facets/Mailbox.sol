@@ -8,7 +8,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus} from "../../../common/Messaging.sol";
+import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -36,27 +36,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
-        address _sender,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        BridgehubL2TransactionRequest calldata _request
     ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = _requestL2TransactionSender(
-            _sender,
-            _contractL2,
-            _mintValue,
-            _l2Value,
-            _calldata,
-            _l2GasLimit,
-            _l2GasPerPubdataByteLimit,
-            _factoryDeps,
-            _refundRecipient
-        );
+        canonicalTxHash = _requestL2TransactionSender(_request, _request.l2Calldata, _request.factoryDeps);
     }
 
     /// @inheritdoc IMailbox
@@ -159,24 +141,24 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     /// @notice Derives the price for L2 gas in ETH to be paid.
-    /// @param _l1GasPrice The gas price on L1.
+    /// @param _l1GasPriceConverted The gas price on L1 converted to base token
     /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
-    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
+    function _deriveL2GasPrice(uint256 _l1GasPriceConverted, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
 
-        uint256 pubdataPriceETH;
+        uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            pubdataPriceETH = L1_GAS_PER_PUBDATA_BYTE * _l1GasPrice;
+            pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * _l1GasPriceConverted;
         }
 
-        uint256 batchOverheadETH = uint256(feeParams.batchOverheadL1Gas) * _l1GasPrice;
-        uint256 fullPubdataPriceETH = pubdataPriceETH + batchOverheadETH / uint256(feeParams.maxPubdataPerBatch);
+        uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * _l1GasPriceConverted;
+        uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken + batchOverheadBaseToken / uint256(feeParams.maxPubdataPerBatch);
 
-        uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadETH / uint256(feeParams.maxL2GasPerBatch);
-        uint256 minL2GasPriceETH = (fullPubdataPriceETH + _gasPerPubdata - 1) / _gasPerPubdata;
+        uint256 l2GasPrice = feeParams.minimalL2GasPrice + batchOverheadBaseToken / uint256(feeParams.maxL2GasPerBatch);
+        uint256 minL2GasPriceBaseToken = (fullPubdataPriceBaseToken + _gasPerPubdata - 1) / _gasPerPubdata;
 
-        return Math.max(l2GasPrice, minL2GasPriceETH);
+        return Math.max(l2GasPrice, minL2GasPriceBaseToken);
     }
 
     /// @inheritdoc IMailbox
@@ -187,7 +169,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == ERA_CHAIN_ID, " finalizeEthWithdrawal only available for Era on mailbox");
+        require(s.chainId == ERA_CHAIN_ID, "finalizeEthWithdrawal only available for Era on mailbox");
         IL1Bridge(s.baseTokenBridge).finalizeWithdrawal(
             ERA_CHAIN_ID,
             _l2BatchNumber,
@@ -210,15 +192,20 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     ) external payable returns (bytes32 canonicalTxHash) {
         require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
-            msg.sender,
-            _contractL2,
-            msg.value,
-            _l2Value,
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: _contractL2,
+                mintValue: msg.value,
+                l2Value: _l2Value,
+                l2Calldata: new bytes(0),
+                l2GasLimit: _l2GasLimit,
+                l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
+                l1GasPriceConverted: tx.gasprice,
+                factoryDeps: new bytes[](0),
+                refundRecipient: _refundRecipient
+            }),
             _calldata,
-            _l2GasLimit,
-            _l2GasPerPubdataByteLimit,
-            _factoryDeps,
-            _refundRecipient
+            _factoryDeps
         );
         IL1Bridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
@@ -229,41 +216,36 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     function _requestL2TransactionSender(
-        address _sender,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
+        BridgehubL2TransactionRequest memory _request,
         bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        bytes[] calldata _factoryDeps
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        address l2Sender = _sender;
+        address l2Sender = _request.sender;
         if (l2Sender != tx.origin) {
-            l2Sender = AddressAliasHelper.applyL1ToL2Alias(_sender);
+            l2Sender = AddressAliasHelper.applyL1ToL2Alias(_request.sender);
         }
 
-        // Enforcing that `_l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
-        // to ensure that users do not get used to using "exotic" numbers for _l2GasPerPubdataByteLimit, e.g. 1-2, etc.
+        // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
+        // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
-        // ability to provide `_l2GasPerPubdataByteLimit` for each independent transaction.
+        // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
-        require(_l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
+        require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
         // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
 
         params.sender = l2Sender;
-        params.l2Value = _l2Value;
-        params.contractAddressL2 = _contractL2;
-        params.l2GasLimit = _l2GasLimit;
-        params.l2GasPricePerPubdata = _l2GasPerPubdataByteLimit;
-        params.refundRecipient = _refundRecipient;
+        params.l2Value = _request.l2Value;
+        params.contractAddressL2 = _request.contractL2;
+        params.l2GasLimit = _request.l2GasLimit;
+        params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
+        params.l1GasPriceConverted = _request.l1GasPriceConverted;
+        params.refundRecipient = _request.refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(_mintValue, params, _calldata, _factoryDeps, false);
+        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _calldata, _factoryDeps, false);
     }
 
     function _requestL2Transaction(
@@ -279,7 +261,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
 
-        _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
+        _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(_params.l1GasPriceConverted, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
         require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 

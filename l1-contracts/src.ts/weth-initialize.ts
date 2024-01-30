@@ -39,11 +39,6 @@ export async function initializeWethBridge(deployer: Deployer, deployWallet: Wal
   } = calculateWethAddresses(l2GovernorAddress, l1WethBridge.address, l1WethAddress, false);
 
   const tx1 = await l1WethBridge.initialize(
-    [L2_WETH_BRIDGE_IMPLEMENTATION_BYTECODE, L2_WETH_BRIDGE_PROXY_BYTECODE],
-    l2WethProxyAddressEthIsBase,
-    l2WethProxyAddressEthIsNotBase,
-    l2WethBridgeProxyAddressEthIsBase,
-    l2WethBridgeProxyAddressEthIsNotBase,
     l1GovernorAddress,
     0,
     { nonce: nonce, gasPrice }

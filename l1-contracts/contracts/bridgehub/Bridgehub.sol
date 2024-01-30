@@ -10,6 +10,7 @@ import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
 import "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
@@ -231,15 +232,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address stateTransition = getStateTransition(_request.chainId);
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
-            msg.sender,
-            _request.l2Contract,
-            _request.mintValue,
-            _request.l2Value,
-            _request.l2Calldata,
-            _request.l2GasLimit,
-            _request.l2GasPerPubdataByteLimit,
-            _request.factoryDeps,
-            _request.refundRecipient
+            BridgehubL2TransactionRequest({
+                sender: msg.sender,
+                contractL2: _request.l2Contract,
+                mintValue: _request.mintValue,
+                l2Value: _request.l2Value,
+                l2Calldata: _request.l2Calldata,
+                l2GasLimit: _request.l2GasLimit,
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                l1GasPriceConverted: _request.l1GasPriceConverted,
+                factoryDeps: _request.factoryDeps,
+                refundRecipient: _request.refundRecipient
+            })
         );
     }
 
@@ -297,15 +301,18 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         }
         require(_request.secondBridgeAddress > address(1000), "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
-            _request.secondBridgeAddress,
-            outputRequest.l2Contract,
-            _request.mintValue,
-            _request.l2Value,
-            outputRequest.l2Calldata,
-            _request.l2GasLimit,
-            _request.l2GasPerPubdataByteLimit,
-            outputRequest.factoryDeps,
-            refundRecipient
+            BridgehubL2TransactionRequest({
+                sender: _request.secondBridgeAddress,
+                contractL2: outputRequest.l2Contract,
+                mintValue: _request.mintValue,
+                l2Value: _request.l2Value,
+                l2Calldata: outputRequest.l2Calldata,
+                l2GasLimit: _request.l2GasLimit,
+                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+                l1GasPriceConverted: _request.l1GasPriceConverted,
+                factoryDeps: outputRequest.factoryDeps,
+                refundRecipient: refundRecipient
+            }) 
         );
 
         IL1Bridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
