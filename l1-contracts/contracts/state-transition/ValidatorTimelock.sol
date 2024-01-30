@@ -29,21 +29,18 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
     /// @notice The validator address is changed.
-    event NewValidator(address _oldValidator, address _newValidator);
-
-    /// @notice The validator address is changed.
     event NewValidatorSharedBridge(uint256 _chainId, address _oldValidator, address _newValidator);
 
     /// @dev The stateTransitionManager smart contract.
     IStateTransitionManager public stateTransitionManager;
 
-    /// @dev The mapping of L2 batch number => timestamp when it was committed.
-    mapping(uint256 => LibMap.Uint32Map) internal committedBatchTimestamp;
+    /// @dev The mapping of chainId => L2 batch number => timestamp when it was committed.
+    mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestamp) internal committedBatchTimestamp;
 
-    /// @dev The address that can commit/revert/validate/execute batches.
-    mapping(uint256 => address) public validator;
+    /// @dev The mapping of chainID to address that can commit/revert/validate/execute batches in the chain.
+    mapping(uint256 chainId => address validator) public validator;
 
-    /// @dev The delay between committing and executing batches.
+    /// @dev The delay between committing and executing batches for all hyperchains.
     uint32 public executionDelay;
 
     constructor(address _initialOwner, uint32 _executionDelay) {
@@ -123,7 +120,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _propagateToZkSyncStateTransition(_chainId);
     }
 
-    /// @dev Make a call to the hyperchain diamond contract with the same calldata.
+    /// @dev Make a call to the zkSync Era contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
@@ -161,23 +158,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the hyperchain diamond contract with the same calldata.
+    /// make a call to the zkSync Era contract with the same calldata.
     function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(ERA_CHAIN_ID) {
-        uint256 delay = executionDelay; // uint32
-        unchecked {
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[ERA_CHAIN_ID].get(
-                    _newBatchesData[i].batchNumber
-                );
-
-                // Note: if the `commitBatchTimestamp` is zero, that means either:
-                // * The batch was committed, but not through this contract.
-                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
-                // We allow executing such batches.
-
-                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
-            }
-        }
+        _executeBatches(ERA_CHAIN_ID, _newBatchesData);
         _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
     }
 
@@ -187,6 +170,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(_chainId) {
+        _executeBatches(_chainId, _newBatchesData);
+        _propagateToZkSyncStateTransition(_chainId);
+    }
+
+    /// @dev Check that batches were committed at least X time ago and
+    function _executeBatches(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
@@ -200,7 +189,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToZkSyncStateTransition(_chainId);
     }
 
     /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
