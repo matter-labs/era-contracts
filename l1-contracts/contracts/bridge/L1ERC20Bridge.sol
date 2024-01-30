@@ -7,8 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
-import {IL1BridgeLegacy} from "./interfaces/IL1BridgeLegacy.sol";
-import {IL1Bridge, ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
+import {IL1ERC20Bridge, ConfirmL2TxStatus} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2ERC20Bridge} from "./interfaces/IL2ERC20Bridge.sol";
 import {ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
@@ -31,8 +30,7 @@ import {Ownable2StepRandomStorage} from "../common/random-storage/Ownable2StepRa
 /// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
 /// for any other custom token bridges.
 contract L1ERC20Bridge is
-    IL1Bridge,
-    IL1BridgeLegacy,
+    IL1ERC20Bridge,
     ReentrancyGuard,
     InitializableRandomStorage,
     Ownable2StepRandomStorage

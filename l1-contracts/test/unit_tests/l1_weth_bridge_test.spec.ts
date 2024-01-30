@@ -44,6 +44,7 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   await bridgehub.requestL2Transaction(
     {
@@ -54,6 +55,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted,
       factoryDeps: [bytecode],
       refundRecipient: walletAddress,
     },

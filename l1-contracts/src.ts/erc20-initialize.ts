@@ -121,6 +121,7 @@ export async function startErc20BridgeInitOnChain(
     }
   }
   nonce = await deployWallet.getTransactionCount();
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
   const tx1 = await bridgehub.requestL2Transaction(
     {
       chainId,
@@ -130,6 +131,7 @@ export async function startErc20BridgeInitOnChain(
       l2Calldata: "0x",
       l2GasLimit: priorityTxMaxGasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted: l1GasPriceConverted,
       factoryDeps: [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
       refundRecipient: deployWallet.address,
     },
