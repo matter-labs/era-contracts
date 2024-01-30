@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 struct ConfirmL2TxStatus {
     uint256 batchNumber;
@@ -92,6 +93,15 @@ interface IL1Bridge {
         bytes32[] calldata _merkleProof
     ) external;
 
+    function bridgehub() external view returns (IBridgehub);
+
+    function l2BridgeAddress(uint256 _chainId) external view returns (address);
+
+    function depositHappened(
+        uint256 _chainId,
+        bytes32 _l2TxHash
+    ) external view returns (bytes32);
+
     /// data is abi encoded :
     /// address _l1Token,
     /// uint256 _amount,
@@ -111,3 +121,4 @@ interface IL1Bridge {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 }
+

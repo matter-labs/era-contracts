@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IL1Bridge, ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
+import {IL1WethBridge, ConfirmL2TxStatus} from "./interfaces/IL1WethBridge.sol";
 import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
@@ -42,17 +42,17 @@ import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 /// WETH, and sends the WETH to the L1 recipient.
 /// @dev The `L1WethBridge` contract works in conjunction with its L2 counterpart, `L2WethBridge`.
 /// @dev Note VersionTracker stores at random addresses, so we can add it to the inheritance tree.
-contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step {
+contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2Step {
     using SafeERC20 for IERC20;
 
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
 
     /// @dev The address of the WETH token on L1
-    address payable public immutable l1WethAddress;
+    address payable public immutable override l1WethAddress;
 
     /// @dev bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehub public immutable bridgehub;
+    IBridgehub public immutable override bridgehub;
 
     /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
     /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
@@ -61,15 +61,15 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard, Initializable, Ownable2Step
     uint256 internal eraIsWithdrawalFinalizedStorageSwitchBatchNumber;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 => address) public l2BridgeAddress;
+    mapping(uint256 => address) public override l2BridgeAddress;
 
     /// @dev A mapping chainId => WethProxy. Used to store the weth proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 => address) public l2WethAddress;
+    mapping(uint256 => address) public override l2WethAddress;
 
     /// @dev A mapping chainId =>  L2 deposit transaction hash =>  keccak256(account, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
     /// @dev only used when it is not the base token, as then it is sent to refund recipient
-    mapping(uint256 => mapping(bytes32 => bytes32)) internal depositHappened;
+    mapping(uint256 => mapping(bytes32 => bytes32)) public override depositHappened;
 
     /// @dev A mapping L2 chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 WETH message was already processed

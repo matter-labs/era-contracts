@@ -36,7 +36,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     uint256 internal constant NUMBER_OF_FACTORY_DEPS = 3;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
-    IBridgehub internal immutable bridgehub;
+    IBridgehub public immutable override bridgehub;
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -69,10 +69,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 => address) public l2BridgeAddress;
+    mapping(uint256 => address) public override l2BridgeAddress;
 
     /// @dev A mapping chainId => l2TokenBeacon. Used to store the token beacon proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 => address) public l2TokenBeaconAddress;
+    mapping(uint256 => address) public override l2TokenBeaconAddress;
 
     /// @dev A mapping L2 _chainId => Batch number => message number => flag
     /// @dev Used to indicate that L2 -> L1 message was already processed
@@ -81,7 +81,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     /// @dev A mapping chainId => L2 deposit transaction hash  => keccak256(account, tokenAddress, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail.
     /// @dev the l2TxHash is unique, as it is determined by the contracts, while dataHash is not, so we that is the output.
-    mapping(uint256 => mapping(bytes32 => bytes32)) public depositHappened;
+    mapping(uint256 => mapping(bytes32 => bytes32)) public override depositHappened;
 
     /// @dev used for extra security until hyperbridging is implemented.
     mapping(uint256 => mapping(address => uint256)) internal chainBalance;
