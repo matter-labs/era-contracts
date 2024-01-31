@@ -43,6 +43,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     mapping(address => bytes) public evmCode;
     mapping(address => bytes32) public evmCodeHash;
 
+    // TODO: this is a hack before rewriting to assembly. 
+    // This is the only reliable way to pass gas into constructor
+    mapping(address => uint256) public constructorGas;
+
     function setDeployedCode(bytes calldata newDeployedCode) external {
         // FIXME: check the correct behavior when deploying empty bytecode.
         require(evmCode[msg.sender].length > 0, "Only EVM contracts can call it");
@@ -539,15 +543,19 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         address _sender,
         address _newAddress,
         bytes32 _bytecodeHash,
-        bytes memory _input
+        bytes calldata _input
     ) internal {
         // FIXME: this is a temporary limitation. 
         // To be removed in the future
         require(_input.length > 0, "The input must be non-empty");
 
         // Temporary: remember the constructor code.
-        evmCode[_newAddress] = _input;
 
+        if(isEVM(_sender)) {
+            _input = _input[32:];
+            constructorGas[_newAddress] = uint256(bytes32(_input[0:32]));
+        }
+        
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {
