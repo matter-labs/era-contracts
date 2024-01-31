@@ -78,8 +78,11 @@ export class Deployer {
     const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
+    const validiumMode = process.env["VALIDIUM_MODE"] == "true";
+    const pubdataPricingMode = validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
+
     const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
+      pubdataPricingMode,
       batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
       maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
       priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
