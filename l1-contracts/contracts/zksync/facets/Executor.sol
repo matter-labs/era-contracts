@@ -125,7 +125,7 @@ contract ExecutorFacet is Base, IExecutor {
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
 
-        // #if VALIDIUM_MODE == true
+        // #if VALIDIUM_MODE == false
         bytes32 providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
         // #endif
 

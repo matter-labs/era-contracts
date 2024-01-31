@@ -93,7 +93,7 @@ export default {
       return {
         ...systemParams,
         ...defs,
-        VALIDIUM_MODE: process.env.VALIDIUM_MODE === "true",
+        VALIDIUM_MODE: process.env.VALIDIUM_MODE == "true",
       };
     })(),
   },
