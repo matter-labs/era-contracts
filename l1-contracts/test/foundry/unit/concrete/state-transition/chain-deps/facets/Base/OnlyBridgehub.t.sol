@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_BRIDGEHUB} from "./_ZkSyncStateTransitionBase_Shared.t.sol";
+import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_BRIDGEHUB} from "./_Base_Shared.t.sol";
 
 contract OnlyBridgehubTest is ZkSyncStateTransitionBaseTest {
     function test_revertWhen_calledByNonBridgehub() public {

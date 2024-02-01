@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../ZkSyncStateTransitionBase/_ZkSyncStateTransitionBase_Shared.t.sol";
+import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 contract SetPorterAvailabilityTest is AdminTest {
     event IsPorterAvailableStatusUpdate(bool isPorterAvailable);

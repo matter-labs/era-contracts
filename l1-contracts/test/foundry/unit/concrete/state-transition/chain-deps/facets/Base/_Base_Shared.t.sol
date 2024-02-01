@@ -3,8 +3,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Utils} from "../Utils/Utils.sol";
-import {UtilsFacet} from "../Utils/UtilsFacet.sol";
+import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
+import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";

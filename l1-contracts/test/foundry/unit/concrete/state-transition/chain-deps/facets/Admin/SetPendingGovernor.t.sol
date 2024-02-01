@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_GOVERNOR} from "../ZkSyncStateTransitionBase/_ZkSyncStateTransitionBase_Shared.t.sol";
+import {ERROR_ONLY_GOVERNOR} from "../Base/_Base_Shared.t.sol";
 
 contract SetPendingGovernorTest is AdminTest {
     event NewPendingGovernor(address indexed oldPendingGovernor, address indexed newPendingGovernor);

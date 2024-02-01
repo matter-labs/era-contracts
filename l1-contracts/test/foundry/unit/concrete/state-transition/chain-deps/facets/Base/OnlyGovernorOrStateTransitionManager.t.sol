@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER} from "./_ZkSyncStateTransitionBase_Shared.t.sol";
+import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER} from "./_Base_Shared.t.sol";
 
 contract OnlyGovernorOrStateTransitionManagerTest is ZkSyncStateTransitionBaseTest {
     function test_revertWhen_calledByNonGovernor() public {
