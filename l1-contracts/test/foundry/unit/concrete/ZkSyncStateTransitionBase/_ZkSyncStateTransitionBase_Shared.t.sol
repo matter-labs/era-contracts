@@ -3,43 +3,13 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
+import {Utils} from "../Utils/Utils.sol";
+import {UtilsFacet} from "../Utils/UtilsFacet.sol";
+
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 
-contract BaseFacetWrapper is ZkSyncStateTransitionBase {
-    // === Util functions ===
-    function util_setGovernor(address _governor) external {
-        s.governor = _governor;
-    }
-
-    function util_getGovernor() external view returns (address) {
-        return s.governor;
-    }
-
-    function util_setValidatorStatus(address _validator, bool _active) external {
-        s.validators[_validator] = _active;
-    }
-
-    function util_getValidatorStatus(address _validator) external view returns (bool) {
-        return s.validators[_validator];
-    }
-
-    function util_setStateTransitionManager(address _stateTransitionManager) external {
-        s.stateTransitionManager = _stateTransitionManager;
-    }
-
-    function util_getStateTransitionManager() external view returns (address) {
-        return s.stateTransitionManager;
-    }
-
-    function util_setBridgehub(address _bridgehub) external {
-        s.bridgehub = _bridgehub;
-    }
-
-    function util_getBridgehub() external view returns (address) {
-        return s.bridgehub;
-    }
-
-    // === Modifier test functions ===
+contract TestBaseFacet is ZkSyncStateTransitionBase {
     function functionWithOnlyGovernorModifier() external onlyGovernor {}
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
@@ -58,11 +28,35 @@ bytes constant ERROR_ONLY_BRIDGEHUB = "StateTransition Chain: not bridgehub";
 bytes constant ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by governor or state transition manager";
 
 contract ZkSyncStateTransitionBaseTest is Test {
-    ZkSyncStateTransitionBase internal baseFacet;
-    BaseFacetWrapper internal baseFacetWrapper;
+    TestBaseFacet internal testBaseFacet;
+    UtilsFacet internal utilsFacet;
+
+    function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](5);
+        selectors[0] = TestBaseFacet.functionWithOnlyGovernorModifier.selector;
+        selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
+        selectors[2] = TestBaseFacet.functionWithOnlyStateTransitionManagerModifier.selector;
+        selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
+        selectors[4] = TestBaseFacet.functionWithOnlyGovernorOrStateTransitionManagerModifier.selector;
+    }
 
     function setUp() public virtual {
-        baseFacetWrapper = new BaseFacetWrapper();
-        baseFacet = ZkSyncStateTransitionBase(baseFacetWrapper);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(new TestBaseFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: getTestBaseFacetSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts);
+        testBaseFacet = TestBaseFacet(diamondProxy);
+        utilsFacet = UtilsFacet(diamondProxy);
     }
 }
