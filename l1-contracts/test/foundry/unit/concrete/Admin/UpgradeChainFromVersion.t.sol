@@ -27,7 +27,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_revertWhen_cutHashMismatch() public {
-        address governor = adminFacetWrapper.util_getGovernor();
+        address governor = utilsFacet.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
         uint256 oldProtocolVersion = 1;
@@ -37,7 +37,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
             initCalldata: new bytes(0)
         });
 
-        adminFacetWrapper.util_setStateTransitionManager(stateTransitionManager);
+        utilsFacet.util_setStateTransitionManager(stateTransitionManager);
 
         bytes32 cutHashInput = keccak256("random");
         vm.mockCall(
@@ -53,7 +53,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_revertWhen_ProtocolVersionMismatchWhenUpgrading() public {
-        address governor = adminFacetWrapper.util_getGovernor();
+        address governor = utilsFacet.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
         uint256 oldProtocolVersion = 1;
@@ -63,8 +63,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
             initCalldata: new bytes(0)
         });
 
-        adminFacetWrapper.util_setProtocolVersion(oldProtocolVersion + 1);
-        adminFacetWrapper.util_setStateTransitionManager(stateTransitionManager);
+        utilsFacet.util_setProtocolVersion(oldProtocolVersion + 1);
+        utilsFacet.util_setStateTransitionManager(stateTransitionManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
         vm.mockCall(
@@ -80,7 +80,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_revertWhen_ProtocolVersionMismatchAfterUpgrading() public {
-        address governor = adminFacetWrapper.util_getGovernor();
+        address governor = utilsFacet.util_getGovernor();
         address stateTransitionManager = makeAddr("stateTransitionManager");
 
         uint256 oldProtocolVersion = 1;
@@ -90,8 +90,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
             initCalldata: new bytes(0)
         });
 
-        adminFacetWrapper.util_setProtocolVersion(oldProtocolVersion);
-        adminFacetWrapper.util_setStateTransitionManager(stateTransitionManager);
+        utilsFacet.util_setProtocolVersion(oldProtocolVersion);
+        utilsFacet.util_setStateTransitionManager(stateTransitionManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
         vm.mockCall(

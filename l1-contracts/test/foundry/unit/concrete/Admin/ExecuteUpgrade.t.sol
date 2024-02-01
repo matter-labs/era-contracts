@@ -26,7 +26,7 @@ contract ExecuteUpgradeTest is AdminTest {
 
     // TODO
     // function test_successfulUpgrade() public {
-    // address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+    // address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
     // Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
     //     facetCuts: new Diamond.FacetCut[](0),
     //     initAddress: address(0),

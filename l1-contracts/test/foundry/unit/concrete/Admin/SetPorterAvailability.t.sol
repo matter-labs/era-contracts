@@ -19,10 +19,10 @@ contract SetPorterAvailabilityTest is AdminTest {
     }
 
     function test_setPorterAvailabilityToFalse() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         bool isPorterAvailable = false;
 
-        adminFacetWrapper.util_setZkPorterAvailability(true);
+        utilsFacet.util_setZkPorterAvailability(true);
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit IsPorterAvailableStatusUpdate(isPorterAvailable);
@@ -30,14 +30,14 @@ contract SetPorterAvailabilityTest is AdminTest {
         vm.startPrank(stateTransitionManager);
         adminFacet.setPorterAvailability(isPorterAvailable);
 
-        assertEq(adminFacetWrapper.util_getZkPorterAvailability(), isPorterAvailable);
+        assertEq(utilsFacet.util_getZkPorterAvailability(), isPorterAvailable);
     }
 
     function test_setPorterAvailabilityToTrue() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         bool isPorterAvailable = true;
 
-        adminFacetWrapper.util_setZkPorterAvailability(false);
+        utilsFacet.util_setZkPorterAvailability(false);
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit IsPorterAvailableStatusUpdate(isPorterAvailable);
@@ -45,6 +45,6 @@ contract SetPorterAvailabilityTest is AdminTest {
         vm.startPrank(stateTransitionManager);
         adminFacet.setPorterAvailability(isPorterAvailable);
 
-        assertEq(adminFacetWrapper.util_getZkPorterAvailability(), isPorterAvailable);
+        assertEq(utilsFacet.util_getZkPorterAvailability(), isPorterAvailable);
     }
 }

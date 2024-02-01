@@ -21,7 +21,7 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
     }
 
     function test_revertWhen_newPriorityTxMaxGasLimitIsGreaterThanMaxGasPerTransaction() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         uint256 newPriorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
 
         vm.expectRevert(bytes.concat("n5"));
@@ -31,8 +31,8 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
     }
 
     function test_successfulSet() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
-        uint256 oldPriorityTxMaxGasLimit = adminFacetWrapper.util_getPriorityTxMaxGasLimit();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        uint256 oldPriorityTxMaxGasLimit = utilsFacet.util_getPriorityTxMaxGasLimit();
         uint256 newPriorityTxMaxGasLimit = 100;
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
@@ -41,6 +41,6 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
         vm.startPrank(stateTransitionManager);
         adminFacet.setPriorityTxMaxGasLimit(newPriorityTxMaxGasLimit);
 
-        assertEq(adminFacetWrapper.util_getPriorityTxMaxGasLimit(), newPriorityTxMaxGasLimit);
+        assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), newPriorityTxMaxGasLimit);
     }
 }

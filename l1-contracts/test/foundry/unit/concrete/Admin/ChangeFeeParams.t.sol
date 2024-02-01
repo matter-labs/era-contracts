@@ -13,7 +13,7 @@ contract ChangeFeeParamsTest is AdminTest {
     function setUp() public override {
         super.setUp();
 
-        adminFacetWrapper.util_setFeeParams(
+        utilsFacet.util_setFeeParams(
             FeeParams({
                 pubdataPricingMode: PubdataPricingMode.Rollup,
                 batchOverheadL1Gas: 1_000_000,
@@ -43,7 +43,7 @@ contract ChangeFeeParamsTest is AdminTest {
     }
 
     function test_revertWhen_newMaxPubdataPerBatchIsLessThanMaxPubdataPerTransaction() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         uint32 priorityTxMaxPubdata = 88_000;
         uint32 maxPubdataPerBatch = priorityTxMaxPubdata - 1;
         FeeParams memory newFeeParams = FeeParams({
@@ -62,8 +62,8 @@ contract ChangeFeeParamsTest is AdminTest {
     }
 
     function test_successfulChange() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
-        FeeParams memory oldFeeParams = adminFacetWrapper.util_getFeeParams();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
+        FeeParams memory oldFeeParams = utilsFacet.util_getFeeParams();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
             batchOverheadL1Gas: 2_000_000,
@@ -80,7 +80,7 @@ contract ChangeFeeParamsTest is AdminTest {
         adminFacet.changeFeeParams(newFeeParams);
 
         bytes32 newFeeParamsHash = keccak256(abi.encode(newFeeParams));
-        bytes32 currentFeeParamsHash = keccak256(abi.encode(adminFacetWrapper.util_getFeeParams()));
+        bytes32 currentFeeParamsHash = keccak256(abi.encode(utilsFacet.util_getFeeParams()));
         require(currentFeeParamsHash == newFeeParamsHash, "Fee params were not changed correctly");
     }
 }

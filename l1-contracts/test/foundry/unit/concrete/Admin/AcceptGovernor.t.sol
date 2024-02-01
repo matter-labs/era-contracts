@@ -8,11 +8,6 @@ contract AcceptGovernorTest is AdminTest {
     event NewPendingGovernor(address indexed oldPendingGovernor, address indexed newPendingGovernor);
     event NewGovernor(address indexed oldGovernor, address indexed newGovernor);
 
-    function setUp() public override {
-        super.setUp();
-        adminFacetWrapper.util_setPendingGovernor(makeAddr("pendingGovernor"));
-    }
-
     function test_revertWhen_calledByNonPendingGovernor() public {
         address nonPendingGovernor = makeAddr("nonPendingGovernor");
 
@@ -23,8 +18,8 @@ contract AcceptGovernorTest is AdminTest {
     }
 
     function test_successfulCall() public {
-        address pendingGovernor = adminFacetWrapper.util_getPendingGovernor();
-        address previousGovernor = adminFacetWrapper.util_getGovernor();
+        address pendingGovernor = utilsFacet.util_getPendingGovernor();
+        address previousGovernor = utilsFacet.util_getGovernor();
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewPendingGovernor(pendingGovernor, address(0));
@@ -34,7 +29,7 @@ contract AcceptGovernorTest is AdminTest {
         vm.startPrank(pendingGovernor);
         adminFacet.acceptGovernor();
 
-        assertEq(adminFacetWrapper.util_getPendingGovernor(), address(0));
-        assertEq(adminFacetWrapper.util_getGovernor(), pendingGovernor);
+        assertEq(utilsFacet.util_getPendingGovernor(), address(0));
+        assertEq(utilsFacet.util_getGovernor(), pendingGovernor);
     }
 }

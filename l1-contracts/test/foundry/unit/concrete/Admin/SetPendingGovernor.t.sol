@@ -19,8 +19,8 @@ contract SetPendingGovernorTest is AdminTest {
     }
 
     function test_successfulCall() public {
-        address governor = adminFacetWrapper.util_getGovernor();
-        address oldPendingGovernor = adminFacetWrapper.util_getPendingGovernor();
+        address governor = utilsFacet.util_getGovernor();
+        address oldPendingGovernor = utilsFacet.util_getPendingGovernor();
         address newPendingGovernor = makeAddr("newPendingGovernor");
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
@@ -29,6 +29,6 @@ contract SetPendingGovernorTest is AdminTest {
         vm.startPrank(governor);
         adminFacet.setPendingGovernor(newPendingGovernor);
 
-        assertEq(adminFacetWrapper.util_getPendingGovernor(), newPendingGovernor);
+        assertEq(utilsFacet.util_getPendingGovernor(), newPendingGovernor);
     }
 }

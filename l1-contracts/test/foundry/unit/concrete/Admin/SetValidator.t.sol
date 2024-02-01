@@ -20,11 +20,11 @@ contract SetValidatorTest is AdminTest {
     }
 
     function test_deactivateValidator() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         address validator = makeAddr("validator");
         bool isActive = false;
 
-        adminFacetWrapper.util_setValidator(validator, true);
+        utilsFacet.util_setValidator(validator, true);
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ValidatorStatusUpdate(validator, isActive);
@@ -32,15 +32,15 @@ contract SetValidatorTest is AdminTest {
         vm.startPrank(stateTransitionManager);
         adminFacet.setValidator(validator, isActive);
 
-        assertEq(adminFacetWrapper.util_getValidator(validator), isActive);
+        assertEq(utilsFacet.util_getValidator(validator), isActive);
     }
 
     function test_reactivateValidator() public {
-        address stateTransitionManager = adminFacetWrapper.util_getStateTransitionManager();
+        address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
         address validator = makeAddr("validator");
         bool isActive = true;
 
-        adminFacetWrapper.util_setValidator(validator, false);
+        utilsFacet.util_setValidator(validator, false);
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ValidatorStatusUpdate(validator, isActive);
@@ -48,6 +48,6 @@ contract SetValidatorTest is AdminTest {
         vm.startPrank(stateTransitionManager);
         adminFacet.setValidator(validator, isActive);
 
-        assertEq(adminFacetWrapper.util_getValidator(validator), isActive);
+        assertEq(utilsFacet.util_getValidator(validator), isActive);
     }
 }
