@@ -398,6 +398,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         );
 
         if ((_chainId == ERA_CHAIN_ID) && usingLegacyDepositAmountStorageVar) {
+            delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
+        } else {
             delete depositHappened[_chainId][_l2TxHash];
         }
         if (!hyperbridgingEnabled[_chainId]) {
