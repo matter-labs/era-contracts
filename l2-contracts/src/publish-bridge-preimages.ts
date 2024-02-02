@@ -45,7 +45,7 @@ async function main() {
       const deployer = new Deployer({ deployWallet: wallet });
       const bridgehub = deployer.bridgehubContract(wallet);
 
-      const publishL2ERC20BridgeTx = await bridgehub.requestL2Transaction(
+      const publishL2ERC20BridgeTx = await bridgehub.requestL2TransactionDirect(
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,

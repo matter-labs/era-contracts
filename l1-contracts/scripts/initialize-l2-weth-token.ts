@@ -46,7 +46,8 @@ async function getL1TxInfo(
   gasPrice: ethers.BigNumber
 ) {
   const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2Transaction", [
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
+  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
     {
       chainId,
       l2Contract: to,
@@ -55,6 +56,7 @@ async function getL1TxInfo(
       l2Calldata,
       l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
       l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+      l1GasPriceConverted: l1GasPriceConverted,
       factoryDeps: [], // It is assumed that the target has already been deployed
       refundRecipient,
     },
@@ -171,8 +173,9 @@ async function main() {
         SYSTEM_CONFIG.requiredL2GasPricePerPubdata
       );
       const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
+      const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
-      const tx = await bridgehub.requestL2Transaction(
+      const tx = await bridgehub.requestL2TransactionDirect(
         {
           chainId,
           l2Contract: l2WethTokenProxyAddress,
@@ -181,6 +184,7 @@ async function main() {
           l2Calldata: calldata,
           l2GasLimit: DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+          l1GasPriceConverted: l1GasPriceConverted,
           factoryDeps: [],
           refundRecipient: deployWallet.address,
         },

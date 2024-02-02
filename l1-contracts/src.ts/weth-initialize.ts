@@ -106,7 +106,7 @@ export async function startWethBridgeInitOnChain(
   nonce = await deployWallet.getTransactionCount();
   const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
-  const tx1 = await bridgehub.requestL2Transaction(
+  const tx1 = await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: ethers.constants.AddressZero,

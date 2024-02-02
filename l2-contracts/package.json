@@ -37,10 +37,16 @@
     "test": "hardhat test",
     "verify": "hardhat run src/verify.ts",
     "deploy-testnet-paymaster": "ts-node src/deployTestnetPaymaster.ts",
+    "deploy-testnet-paymaster-from-l1": "ts-node src/deployTestnetPaymasteFromL1.ts",
     "deploy-force-deploy-upgrader": "ts-node src/deployForceDeployUpgrader.ts",
+    "deploy-force-deploy-upgrader-from-l1": "ts-node src/deployForceDeployUpgraderFromL1.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
     "deploy-l2-weth": "ts-node src/deployL2Weth.ts",
-    "upgrade-bridge-contracts": "ts-node src/upgradeBridgeImpl.ts"
+    "upgrade-bridge-contracts": "ts-node src/upgradeBridgeImpl.ts",
+    "erc20-deploy-on-chain": "ts-node scripts/erc20-deploy-on-chain.ts",
+    "weth-deploy-on-chain": "ts-node scripts/weth-deploy-on-chain.ts",
+    "erc20-deploy-on-chain-from-l1": "ts-node scripts/erc20-deploy-on-chain-from-l1.ts",
+    "weth-deploy-on-chain-from-l1": "ts-node scripts/weth-deploy-on-chain-from-l1.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

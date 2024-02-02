@@ -32,13 +32,15 @@ export async function initializeErc20Bridge(
 
   const l1GovernorAddress = deployer.addresses.Governance;
 
+  const l1WethAddress = process.env.CONTRACTS_L1_WETH_ADDR!; //kl todo is this right?
   // Governor should always be smart contract (except for unit tests)
-  const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
+  // const l2GovernorAddress = applyL1ToL2Alias(l1GovernorAddress);
 
-  const l2TokenProxyBytecodeHash = ethers.utils.keccak256(L2_STANDARD_ERC20_PROXY_BYTECODE);
+  // const l2TokenProxyBytecodeHash = ethers.utils.keccak256(L2_STANDARD_ERC20_PROXY_BYTECODE);
 
   const tx1 = await erc20Bridge.initialize();
   const tx2 = await erc20Bridge.initializeV2(
+    l1WethAddress,
     l1GovernorAddress,
     { nonce: nonce + 1, gasPrice }
   );
@@ -118,7 +120,7 @@ export async function startErc20BridgeInitOnChain(
   }
   nonce = await deployWallet.getTransactionCount();
   const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
-  const tx1 = await bridgehub.requestL2Transaction(
+  const tx1 = await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: ethers.constants.AddressZero,

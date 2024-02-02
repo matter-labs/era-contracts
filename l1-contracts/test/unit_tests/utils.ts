@@ -158,7 +158,7 @@ export async function requestExecute(
   }
   const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
-  return await bridgehub.requestL2Transaction(
+  return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: to,

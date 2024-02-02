@@ -46,7 +46,7 @@ export async function create2DeployFromL1(
   );
   const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
-  await bridgehub.requestL2Transaction(
+  await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,

@@ -112,7 +112,7 @@ export async function create2DeployFromL1(
     await tx.wait();
   }
 
-  return await bridgehub.requestL2Transaction(
+  return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,

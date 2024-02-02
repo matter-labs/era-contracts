@@ -71,7 +71,7 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
 
         vm.expectRevert(revertMessage);
         vm.startPrank(msgSender);
-        bridgehub.requestL2Transaction{value: msgValue}(
+        bridgehub.requestL2TransactionDirect{value: msgValue}(
             chainId,
             contractL2,
             l2Value,
@@ -120,7 +120,7 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
         );
 
         vm.startPrank(msgSender);
-        bytes32 canonicalTxHash = bridgehub.requestL2Transaction{value: msgValue}(
+        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: msgValue}(
             chainId,
             contractL2,
             l2Value,
