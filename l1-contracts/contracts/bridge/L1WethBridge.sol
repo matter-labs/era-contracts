@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ERA_CHAIN_ID, ETH_TOKEN_ADDRESS, ERA_WETH_ADDRESS, ERA_WETH_BRIDGE_ADDRESS, ERA_DIAMOND_PROXY, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IL1BridgeDeprecated} from "./interfaces/IL1BridgeDeprecated.sol";
+import {IL1BridgeLegacy} from "./interfaces/IL1BridgeLegacy.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
@@ -526,8 +526,8 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
                 // Parse additional data
                 (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
             }
-        } else if (bytes4(functionSignature) == IL1BridgeDeprecated.finalizeWithdrawal.selector) {
-            // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+        } else if (bytes4(functionSignature) == IL1BridgeLegacy.finalizeWithdrawal.selector) {
+            // note we use the IL1BridgeLegacy only to send L1<>L2 messages,
             // and we use this interface so that when the switch happened the old messages could be processed
 
             // this message is a token withdrawal
