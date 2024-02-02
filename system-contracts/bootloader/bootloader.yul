@@ -399,7 +399,7 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 24000000 / 32 VM words.
+            /// @dev The memory page consists of 30000000 / 32 VM words.
             /// Each execution result is a single boolean, but 
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 

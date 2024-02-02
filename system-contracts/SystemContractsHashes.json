@@ -150,35 +150,35 @@
     "contractName": "bootloader_test",
     "bytecodePath": "bootloader/build/artifacts/bootloader_test.yul.zbin",
     "sourceCodePath": "bootloader/build/bootloader_test.yul",
-    "bytecodeHash": "0x01000345ae45a836844d584f5d26905aac98cacf382b2e051ab28e7ad58fdcaf",
-    "sourceCodeHash": "0x8f349f199ab498adba424f7437c45e8b79c33fc29d8bea2af8c497bdd19d572d"
+    "bytecodeHash": "0x010003477bcebf1174c8495e4fa7c483e78795933770984775ee52d894523435",
+    "sourceCodeHash": "0x0121cbb5ff285c1a99fba6fe4de061d4ad9b3e417b16c4a11bb744f6c1010dd9"
   },
   {
     "contractName": "fee_estimate",
     "bytecodePath": "bootloader/build/artifacts/fee_estimate.yul.zbin",
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
-    "bytecodeHash": "0x0100080b5c03aa064590c702d8ef6558c6759f134360193cf0dbc5f0ba1c5dc9",
-    "sourceCodeHash": "0xe8e894c783b516eaaa89e55e6d0ec5599e4b9833162a1ad2df60503024a27d88"
+    "bytecodeHash": "0x0100080b492292a1292be552c082ff4735604f3203cc1ca203313dc840f1a8c6",
+    "sourceCodeHash": "0x47f7f938969a0a54574f87988bf97b377465845e9035b5a40a741ccced801cca"
   },
   {
     "contractName": "gas_test",
     "bytecodePath": "bootloader/build/artifacts/gas_test.yul.zbin",
     "sourceCodePath": "bootloader/build/gas_test.yul",
-    "bytecodeHash": "0x010007dbdce667f4a1f6ce406bf48573a920ca9dbddb233aa050705bdd2dfe40",
-    "sourceCodeHash": "0x3cd8c18d339b4f3391b6ccf0cacf20d8d926d9d2ec2569f1c5c78ffbe517ef21"
+    "bytecodeHash": "0x010007db3fc4e44bb6f970846ed830bab40fb2e2c67f44f44103d7bbd6f3b490",
+    "sourceCodeHash": "0xf7ccb0d17e36d0919ae4b61ff7b5360a131fbf14746e4576c06c1637792eae4a"
   },
   {
     "contractName": "playground_batch",
     "bytecodePath": "bootloader/build/artifacts/playground_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x01000813333f1224fc6e29015f9c00a3552f66c0ecf7609de3818acfbb94c2e7",
-    "sourceCodeHash": "0x1f1ac299129d4827a5caa5e072af17ef213c603e5ef1363200afd6a6c18a0722"
+    "bytecodeHash": "0x01000813b9b292e39eefb299724f8829a8165b80bc9158ec1203b28be8f792f4",
+    "sourceCodeHash": "0xdb6d1c995663b62a2dabe0c0d52feefa6f34b2702808dc947d9915bb764a3a98"
   },
   {
     "contractName": "proved_batch",
     "bytecodePath": "bootloader/build/artifacts/proved_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/proved_batch.yul",
-    "bytecodeHash": "0x010007edca2bc0b90075573410970e82f2a4f9be59e6c7997583b22079b2d440",
-    "sourceCodeHash": "0xa21a8bc637f430d0227c1e694ec0294351420be0b12b5590f53c46c4f001ae4c"
+    "bytecodeHash": "0x010007ed46646238449b45fdd6bab5a32e5b160a33b23d75367b28deb08fa033",
+    "sourceCodeHash": "0xde6260f1265da9ddbba72de158685fa452fac02ef8183313038f83562a1d98c7"
   }
 ]
