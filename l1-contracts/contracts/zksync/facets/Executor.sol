@@ -527,8 +527,7 @@ contract ExecutorFacet is Base, IExecutor {
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
-            bytes32 blobVersionedHash;
-            blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
+            bytes32 blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
 
             require(blobVersionedHash != bytes32(0), "vh");
 
