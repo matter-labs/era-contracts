@@ -494,24 +494,23 @@ contract EvmInterpreter {
                 )
 
                 rtsz := returndatasize()
-
-                if lt(rtsz, 32) {
-                    // no returndata, it is only possible if there was a panic
-                    _gasLeft := _calleeGas
-                }
-                
-
-                returndatacopy(0, 0, 32)
-                _gasLeft := mload(0)
-
-                returndatacopy(_outputOffset, 32, _outputLen)
             }
-            SystemContractHelper.loadReturndataIntoActivePtr();
 
             if(rtsz > 0) {
+                SystemContractHelper.loadReturndataIntoActivePtr();
+                
+                assembly {
+                    returndatacopy(0, 0, 32)
+                    _gasLeft := mload(0)
+
+                    returndatacopy(_outputOffset, 32, _outputLen)
+
+                }
                 // Skipping the returndata data
                 SystemContractHelper.ptrAddIntoActive(32);
                 SystemContractHelper.ptrShrinkIntoActive(32);
+            } else {
+                _gasLeft = 0;
             }
 
             _popEVMFrame();
@@ -534,8 +533,12 @@ contract EvmInterpreter {
             SystemContractHelper.loadReturndataIntoActivePtr();
 
             uint256 gasUsed = _calcEVMGas(tmp - gasleft());
-            _gasLeft = _calleeGas - gasUsed;
-
+            
+            if (_calleeGas > gasUsed) {
+                _gasLeft = _calleeGas - gasUsed;
+            } else {
+                _gasLeft = 0;
+            }
         }
     }
 
@@ -547,7 +550,7 @@ contract EvmInterpreter {
         uint256 _inputLen,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal returns (bool success, uint256 _gasUsed) {
+    ) internal returns (bool success, uint256 _gasLeft) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
         /*
@@ -556,8 +559,6 @@ contract EvmInterpreter {
         
         if(_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
-            // Performing the conversion
-            _calleeGas = _getZkEVMGas(_calleeGas);
 
             uint256 rtsz;
             assembly {
@@ -572,23 +573,23 @@ contract EvmInterpreter {
                 )
 
                 rtsz := returndatasize()
-
-                if lt(rtsz, 32) {
-                    // no returndata, it is only possible if there was a panic
-                    _gasUsed := _calleeGas
-                }
-                
-
-                returndatacopy(0, 0, 32)
-                _gasUsed := mload(0)
-
-                returndatacopy(_outputOffset, 32, _outputLen)
             }
 
             if(rtsz > 0) {
                 SystemContractHelper.loadReturndataIntoActivePtr();
+                
+                assembly {
+                    returndatacopy(0, 0, 32)
+                    _gasLeft := mload(0)
+
+                    returndatacopy(_outputOffset, 32, _outputLen)
+
+                }
                 // Skipping the returndata data
                 SystemContractHelper.ptrAddIntoActive(32);
+                SystemContractHelper.ptrShrinkIntoActive(32);
+            } else {
+                _gasLeft = 0;
             }
 
             _popEVMFrame();
@@ -606,21 +607,16 @@ contract EvmInterpreter {
         uint256 _inputLen,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal returns (bool success, uint256 _gasUsed) {
+    ) internal returns (bool success, uint256 _gasLeft) {
         uint256 memOffset = MEM_OFFSET_INNER;
-        // Performing the conversion
-        _calleeGas = _getZkEVMGas(_calleeGas);
-
         /*
             TODO Please do not overwrite the returndata
         */
         
         if(_calleeIsEVM) {
-            uint256 rtsz;
             _pushEVMFrame(_calleeGas);
-            // Performing the conversion
-            _calleeGas = _getZkEVMGas(_calleeGas);
 
+            uint256 rtsz;
             assembly {
                success := staticcall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -633,28 +629,31 @@ contract EvmInterpreter {
                 )
 
                 rtsz := returndatasize()
-
-                if lt(rtsz, 32) {
-                    // no returndata, it is only possible if there was a panic
-                    _gasUsed := _calleeGas
-                }
-                
-
-                returndatacopy(0, 0, 32)
-                _gasUsed := mload(0)
-
-                returndatacopy(_outputOffset, 32, _outputLen)
             }
+
 
             if(rtsz > 0) {
                 SystemContractHelper.loadReturndataIntoActivePtr();
+                
+                assembly {
+                    returndatacopy(0, 0, 32)
+                    _gasLeft := mload(0)
+
+                    returndatacopy(_outputOffset, 32, _outputLen)
+
+                }
                 // Skipping the returndata data
                 SystemContractHelper.ptrAddIntoActive(32);
                 SystemContractHelper.ptrShrinkIntoActive(32);
+            } else {
+                _gasLeft = 0;
             }
 
             _popEVMFrame();
         } else {
+            // Performing the conversion
+            _calleeGas = _getZkEVMGas(_calleeGas);
+
             uint256 tmp = gasleft();
             assembly {
                 success := staticcall(
@@ -666,10 +665,15 @@ contract EvmInterpreter {
                     _outputLen
                 )
             }
-
-            _gasUsed = _calcEVMGas(tmp - gasleft());
-
             SystemContractHelper.loadReturndataIntoActivePtr();
+
+            uint256 gasUsed = _calcEVMGas(tmp - gasleft());
+
+            if (_calleeGas > gasUsed) {
+                _gasLeft = _calleeGas - gasUsed;
+            } else {
+                _gasLeft = 0;
+            }
         }
     }
 
@@ -779,7 +783,9 @@ contract EvmInterpreter {
 
                 // TODO: we potentially might need to perform this after each opcode
                 if (int256(gasLeft) < 0) {
-                    revert("interpreter: out of gas");
+                    assembly {
+                        revert(0,0)
+                    }
                 }
 
                 {
