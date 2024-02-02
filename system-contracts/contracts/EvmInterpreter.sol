@@ -469,7 +469,7 @@ contract EvmInterpreter {
         uint256 _inputLen,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal paddWithGasAndReturn(_calleeIsEVM, _calleeGas, _inputOffset) returns (bool success, uint256 _gasUsed) {
+    ) internal returns (bool success, uint256 _gasLeft) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
         /*
@@ -479,13 +479,8 @@ contract EvmInterpreter {
         if(_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
     
-            // Performing the conversion
-            _calleeGas = _getZkEVMGas(_calleeGas);
-
-            // Includes gas
-            _inputOffset -= 32;
-            _inputLen += 32;
-
+            uint256 rtsz;
+            
             assembly {
                success := call(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -498,23 +493,26 @@ contract EvmInterpreter {
                     0
                 )
 
-                let rtsz := returndatasize()
+                rtsz := returndatasize()
 
                 if lt(rtsz, 32) {
                     // no returndata, it is only possible if there was a panic
-                    _gasUsed := _calleeGas
+                    _gasLeft := _calleeGas
                 }
                 
 
                 returndatacopy(0, 0, 32)
-                _gasUsed := mload(0)
+                _gasLeft := mload(0)
 
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
-
             SystemContractHelper.loadReturndataIntoActivePtr();
-            // Skipping the returndata data
-            SystemContractHelper.ptrAddIntoActive(32);
+
+            if(rtsz > 0) {
+                // Skipping the returndata data
+                SystemContractHelper.ptrAddIntoActive(32);
+                SystemContractHelper.ptrShrinkIntoActive(32);
+            }
 
             _popEVMFrame();
         } else {
@@ -533,10 +531,11 @@ contract EvmInterpreter {
                     _outputLen
                 )
             }
-
-            _gasUsed = _calcEVMGas(tmp - gasleft());
-
             SystemContractHelper.loadReturndataIntoActivePtr();
+
+            uint256 gasUsed = _calcEVMGas(tmp - gasleft());
+            _gasLeft = _calleeGas - gasUsed;
+
         }
     }
 
@@ -548,7 +547,7 @@ contract EvmInterpreter {
         uint256 _inputLen,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal paddWithGasAndReturn(_calleeIsEVM, _calleeGas, _inputOffset) returns (bool success, uint256 _gasUsed) {
+    ) internal returns (bool success, uint256 _gasUsed) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
         /*
@@ -560,11 +559,7 @@ contract EvmInterpreter {
             // Performing the conversion
             _calleeGas = _getZkEVMGas(_calleeGas);
 
-
-            // Includes gas
-            _inputOffset -= 32;
-            _inputLen += 32;
-
+            uint256 rtsz;
             assembly {
                success := delegatecall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -576,7 +571,7 @@ contract EvmInterpreter {
                     0
                 )
 
-                let rtsz := returndatasize()
+                rtsz := returndatasize()
 
                 if lt(rtsz, 32) {
                     // no returndata, it is only possible if there was a panic
@@ -589,9 +584,12 @@ contract EvmInterpreter {
 
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
-            SystemContractHelper.loadReturndataIntoActivePtr();
-            // Skipping the returndata data
-            SystemContractHelper.ptrAddIntoActive(32);
+
+            if(rtsz > 0) {
+                SystemContractHelper.loadReturndataIntoActivePtr();
+                // Skipping the returndata data
+                SystemContractHelper.ptrAddIntoActive(32);
+            }
 
             _popEVMFrame();
         } else {
@@ -608,7 +606,7 @@ contract EvmInterpreter {
         uint256 _inputLen,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal paddWithGasAndReturn(_calleeIsEVM, _calleeGas, _inputOffset) returns (bool success, uint256 _gasUsed) {
+    ) internal returns (bool success, uint256 _gasUsed) {
         uint256 memOffset = MEM_OFFSET_INNER;
         // Performing the conversion
         _calleeGas = _getZkEVMGas(_calleeGas);
@@ -618,13 +616,10 @@ contract EvmInterpreter {
         */
         
         if(_calleeIsEVM) {
+            uint256 rtsz;
             _pushEVMFrame(_calleeGas);
             // Performing the conversion
             _calleeGas = _getZkEVMGas(_calleeGas);
-
-            // Includes gas
-            _inputOffset -= 32;
-            _inputLen += 32;
 
             assembly {
                success := staticcall(
@@ -637,7 +632,7 @@ contract EvmInterpreter {
                     0
                 )
 
-                let rtsz := returndatasize()
+                rtsz := returndatasize()
 
                 if lt(rtsz, 32) {
                     // no returndata, it is only possible if there was a panic
@@ -651,9 +646,12 @@ contract EvmInterpreter {
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
 
-            SystemContractHelper.loadReturndataIntoActivePtr();
-            // Skipping the returndata data
-            SystemContractHelper.ptrAddIntoActive(32);
+            if(rtsz > 0) {
+                SystemContractHelper.loadReturndataIntoActivePtr();
+                // Skipping the returndata data
+                SystemContractHelper.ptrAddIntoActive(32);
+                SystemContractHelper.ptrShrinkIntoActive(32);
+            }
 
             _popEVMFrame();
         } else {
@@ -733,15 +731,6 @@ contract EvmInterpreter {
     This slice may include any mem size
 
     */
-
-    // function dbg(uint256 _tos, uint256 _ip) internal {
-    //     uint256 offset = DEBUG_SLOT_OFFSET;
-    //     assembly {
-    //         mstore(add(offset, 0x20), _ip)
-    //         mstore(add(offset, 0x40), _tos)
-    //         mstore(offset, 0x4a15830341869caa1e99840c97043a1ea15d2444da366efff5c43b4bef299681)
-    //     }
-    // }
 
     function _simulate(bool isCallerEVM, bytes calldata input, uint256 gasLeft) internal returns (uint256, uint256, uint256) {
         uint256 memOffset = MEM_OFFSET_INNER;
@@ -1649,7 +1638,8 @@ contract EvmInterpreter {
 
                     gas = _maxCallGas(gas, gasLeft);
 
-                    (bool success ,uint256 frameGasUsed) = _performCall(
+                    gasLeft -= gas;
+                    (bool success ,uint256 frameGasLeft) = _performCall(
                         _isEVM(address(uint160(addr))),
                         gas,
                         address(uint160(addr)),
@@ -1660,7 +1650,11 @@ contract EvmInterpreter {
                         retLen
                     );
 
-                    gasLeft -= frameGasUsed;
+                    tos = pushStackItem(tos, success ? 1 : 0);
+
+                    gasLeft += frameGasLeft;
+
+                    continue;
                 }
 
                 if(opcode == OP_DELEGATECALL) {
@@ -1684,8 +1678,9 @@ contract EvmInterpreter {
                     }
                     
                     gas = _maxCallGas(gas, gasLeft);
-                    
-                    (bool success ,uint256 frameGasUsed) = _performDelegateCall(
+
+                    gasLeft -= gas;
+                    (bool success ,uint256 frameGasLeft) = _performDelegateCall(
                         _isEVM(address(uint160(addr))),
                         gas,
                         address(uint160(addr)),
@@ -1695,7 +1690,11 @@ contract EvmInterpreter {
                         retLen
                     );
 
-                    gasLeft -= frameGasUsed;
+                    tos = pushStackItem(tos, success ? 1 : 0);
+
+                    gasLeft += frameGasLeft;
+
+                    continue;
                 }
 
                 if(opcode == OP_DELEGATECALL) {
@@ -1719,8 +1718,8 @@ contract EvmInterpreter {
                     }
                     
                     gas = _maxCallGas(gas, gasLeft);
-                    
-                    (bool success ,uint256 frameGasUsed) = _performStaticCall(
+                    gasLeft -= gas;
+                    (bool success ,uint256 frameGasLeft) = _performStaticCall(
                         _isEVM(address(uint160(addr))),
                         gas,
                         address(uint160(addr)),
@@ -1730,7 +1729,11 @@ contract EvmInterpreter {
                         retLen
                     );
 
-                    gasLeft -= frameGasUsed;
+                    tos = pushStackItem(tos, success ? 1 : 0);
+
+                    gasLeft += frameGasLeft;
+
+                    continue;
                 }
 
                 if(opcode == OP_REVERT) {
@@ -1987,7 +1990,7 @@ contract EvmInterpreter {
         warmAccount(address(uint160(address(this))));
         (uint256 retOffset, uint256 retLen, uint256 gasLeft) = _simulate(isCallerEVM, input, evmGas);
 
-        _performReturnOrRevert(false, _isEVM(msg.sender), gasLeft, retOffset, retLen);
+        _performReturnOrRevert(false, isCallerEVM, gasLeft, retOffset, retLen);
 
         // revert("interpreter: unreachable");
     }
