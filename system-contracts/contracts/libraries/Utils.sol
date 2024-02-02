@@ -37,7 +37,18 @@ library Utils {
 
     /// @return codeLength The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
-        codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
+        // TODO: use constants for that
+
+        if(uint8(_bytecodeHash[0]) == 1) {
+            codeLength = bytecodeLenInWords(_bytecodeHash) << 5; // _bytecodeHash * 32
+        } else if (uint8(_bytecodeHash[0]) == 2) {
+            // TODO: maybe rename the function
+            codeLength = bytecodeLenInWords(_bytecodeHash);
+        } else {
+            codeLength = 0;
+        }
+
+        
     }
 
     /// @return codeLengthInWords The bytecode length in machine words

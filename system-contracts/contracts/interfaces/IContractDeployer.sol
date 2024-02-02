@@ -117,4 +117,14 @@ interface IContractDeployer {
     function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
 
     function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
+
+
+    function evmCode(address) external view returns (bytes memory);
+    function evmCodeHash(address) external view returns (bytes32);
+
+    // TODO: this is a hack before rewriting to assembly. 
+    // This is the only reliable way to pass gas into constructor
+    function constructorGas(address) external view returns (uint256);
+
+    function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
 }

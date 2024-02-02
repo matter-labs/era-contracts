@@ -78,7 +78,7 @@ contract EvmInterpreter {
     } 
 
     function _getConstructorEVMGas() internal returns (uint256 _evmGas) {
-        bytes4 selector = bytes4(keccak256("constructorGas(address)"));
+        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.constructorGas.selector;
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
 
         assembly {
@@ -110,7 +110,7 @@ contract EvmInterpreter {
     }
 
     function _getBytecode() internal {
-        bytes4 selector = bytes4(keccak256("evmCode(address)"));
+        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
         uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
         uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
@@ -142,27 +142,83 @@ contract EvmInterpreter {
         }
     }
 
+
+    function _extcodecopy(address _addr, uint256 dest, uint256 offset, uint256 len) internal view {
+        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
+        address to = address(DEPLOYER_SYSTEM_CONTRACT);
+
+        // TODO: This is not very efficient
+
+        // Firstly, we zero out everything.
+        unchecked {
+            uint256 _lastByte = dest + len;
+            for(uint i = dest; i < _lastByte; i++) {
+                assembly {
+                    mstore8(i, 0)
+                }
+            }
+        }
+
+        // Secondly, we get the actual bytecode
+        assembly {
+            mstore(0, selector)
+            mstore(4, _addr)
+
+            // TODO: test how it behaves on corner cases
+            let success := staticcall(
+                gas(),
+                to,
+                0,
+                36,
+                0,
+                0
+            )
+
+            // Note that it is not 'actual' bytecode size as the returndata might've been padded
+            // to be divisible by 32, but for the purposes here it is enough, since padded bytes are zeroes
+            let bytecodeSize := sub(returndatasize(), 64)    
+
+            let rtOffset := add(offset, 64)
+
+            if lt(returndatasize(), rtOffset) {
+                rtOffset := returndatasize()
+            }
+
+            if gt(add(rtOffset, len), returndatasize()) {
+                len := sub(returndatasize(), rtOffset)
+            }
+
+            returndatacopy(
+                dest,
+                rtOffset,
+                len
+            )
+        }
+    }
+
     function _setDeployedCode(
+        uint256 gasLeft,
         uint256 offset,
         uint256 len
     ) internal { 
         // This error should never be triggered
-        require(offset > 96, "Offset too small");
+        require(offset > 100, "Offset too small");
 
-        bytes4 selector = bytes4(keccak256("setDeployedCode(bytes)"));
+        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.setDeployedCode.selector;
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
 
         assembly {
+            mstore(sub(offset, 100), selector)
+            mstore(sub(offset, 96), gasLeft)
+            mstore(sub(offset, 64), 0x40)
             mstore(sub(offset, 32), len)
-            mstore(sub(offset, 64), 0x20)
-            mstore(sub(offset, 96), selector)
 
             let success := call(
                 gas(),
                 to,
                 0,
-                sub(offset, 96),
-                add(len, 64),
+                sub(offset, 100),
+                add(len, 100),
                 0,
                 0
             )
@@ -339,9 +395,10 @@ contract EvmInterpreter {
             mstore(0, selector)
             mstore(4, _addr)
 
-            let success := staticcall(
+            let success := call(
                 gas(),
                 addr,
+                0,
                 0,
                 36,
                 0,
@@ -364,9 +421,10 @@ contract EvmInterpreter {
             mstore(0, selector)
             mstore(4, key)
 
-            let success := staticcall(
+            let success := call(
                 gas(),
                 addr,
+                0,
                 0,
                 36,
                 0,
@@ -450,6 +508,10 @@ contract EvmInterpreter {
 
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
+
+            SystemContractHelper.loadReturndataIntoActivePtr();
+            // Skipping the returndata data
+            SystemContractHelper.ptrAddIntoActive(32);
         } else {
             uint256 tmp = gasleft();
             assembly {
@@ -465,6 +527,8 @@ contract EvmInterpreter {
             }
 
             _gasUsed = _calcEVMGas(tmp - gasleft());
+
+            SystemContractHelper.loadReturndataIntoActivePtr();
         }
     }
 
@@ -514,6 +578,9 @@ contract EvmInterpreter {
 
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
+            SystemContractHelper.loadReturndataIntoActivePtr();
+            // Skipping the returndata data
+            SystemContractHelper.ptrAddIntoActive(32);
         } else {
             // ToDO: remove this error for compatibility
             revert("delegatecall to zkevm unallowed");
@@ -566,6 +633,10 @@ contract EvmInterpreter {
 
                 returndatacopy(_outputOffset, 32, _outputLen)
             }
+
+            SystemContractHelper.loadReturndataIntoActivePtr();
+            // Skipping the returndata data
+            SystemContractHelper.ptrAddIntoActive(32);
         } else {
             uint256 tmp = gasleft();
             assembly {
@@ -580,6 +651,8 @@ contract EvmInterpreter {
             }
 
             _gasUsed = _calcEVMGas(tmp - gasleft());
+
+            SystemContractHelper.loadReturndataIntoActivePtr();
         }
     }
 
@@ -589,7 +662,7 @@ contract EvmInterpreter {
         uint256 _gasLeft,
         uint256 _outputOffset,
         uint256 _outputLen
-    ) internal paddWithGasAndReturn(_callerIsEVM, _gasLeft, _outputLen){
+    ) internal paddWithGasAndReturn(_callerIsEVM, _gasLeft, _outputOffset){
         uint256 memOffset = MEM_OFFSET_INNER;
 
         if(_callerIsEVM) {
@@ -625,7 +698,7 @@ contract EvmInterpreter {
 
         (uint256 offset, uint256 len, uint256 gasToReturn) = _simulate(msg.data[0:0], evmGas);
 
-        _setDeployedCode(offset, len);
+        _setDeployedCode(gasToReturn, offset, len);
     }
 
 
@@ -642,6 +715,16 @@ contract EvmInterpreter {
     This slice may include any mem size
 
     */
+
+    // function dbg(uint256 _tos, uint256 _ip) internal {
+    //     uint256 offset = DEBUG_SLOT_OFFSET;
+    //     assembly {
+    //         mstore(add(offset, 0x20), _ip)
+    //         mstore(add(offset, 0x40), _tos)
+    //         mstore(offset, 0x4a15830341869caa1e99840c97043a1ea15d2444da366efff5c43b4bef299681)
+    //     }
+    // }
+
     function _simulate(bytes calldata input, uint256 gasLeft) internal returns (uint256, uint256, uint256) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
@@ -653,7 +736,6 @@ contract EvmInterpreter {
             }
         }
 
-        return (BYTECODE_OFFSET + 32, _bytecodeLen, gasLeft);
         unchecked {
             uint256 _ergTracking = gasleft();
 
@@ -698,10 +780,9 @@ contract EvmInterpreter {
                 if (opcode < GRP_ALU1) {
                     // optimization: STOP is part of group ALU 1
                     if (opcode == OP_STOP) {
-                        return (0, 0, gasLeft);
+                        return (memOffset, 0, gasLeft);
                     }
 
-                    require(tos > STACK_OFFSET, "interpreter: stack underflow");
                     uint256 a;
                     uint256 b;
 
@@ -781,6 +862,12 @@ contract EvmInterpreter {
                     } else if (opcode == OP_ISZERO) {
                         uint256 a;
                         (a, tos) = _popStackItem(tos);
+
+                        if(a == 0) {
+                            tmp = 1;
+                        } else {
+                            tmp = 0;
+                        }
 
                     } else {
                         uint256 a;
@@ -969,7 +1056,7 @@ contract EvmInterpreter {
                         (len, tos) = _popStackItem(tos);
 
                         // TODO: double check whether the require below is needed
-                        require(ost + len < _bytecodeLen, "codecopy: bytecode too long");
+                        // require(ost + len <= _bytecodeLen, "codecopy: bytecode too long");
                         
                         gasLeft -=
                             3 + // base cost
@@ -977,12 +1064,14 @@ contract EvmInterpreter {
                             _words(len) + // word copy cost
                             expandMemory(dstOst + len); // memory expansion
 
-                        uint256 bytecodeOffsetInner = BYTECODE_OFFSET + 32;
+                        // basically BYTECODE_OFFSET + 32 - 31, since
+                        // we always need to read one byte
+                        uint256 bytecodeOffsetInner = BYTECODE_OFFSET + 1;
                         // TODO: optimize this
                         for (uint256 i = 0; i < len; i++) {
                             if (ost + i < _bytecodeLen) {
                                 assembly {
-                                    mstore8(add(add(memOffset, dstOst), i), mload(add(add(bytecodeOffsetInner, ost), i)))
+                                    mstore8(add(add(memOffset, dstOst), i), and(mload(add(add(bytecodeOffsetInner, ost), i)), 0xff))
                                 }
                             } else {
                                 assembly {
@@ -1002,57 +1091,54 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_EXTCODESIZE) {
-                        // TODO: resolve this function by using pointers
+                        uint256 addr;
+                        (addr, tos) = _popStackItem(tos);
 
+                        uint256 res;
+                        assembly {
+                            res := extcodesize(addr)
+                        }
 
-                        // TODO: need to return 0 if addr is currently in constructor
+                        tos = pushStackItem(tos, res);
 
-                        // address addr = address(uint160(stack[tos]));
-                        // stack[tos] = DEPLOYER_SYSTEM_CONTRACT.getCodeSize(addr);
-
-                        // // extra cost if account is cold
-                        // if (EVM_GAS_MANAGER.warmAccount(addr)) {
-                        //     gasLeft -= 100;
-                        // } else {
-                        //     gasLeft -= 2600;
-                        // }
+                        // extra cost if account is cold
+                        if (warmAccount(address(uint160(addr)))) {
+                            gasLeft -= 100;
+                        } else {
+                            gasLeft -= 2600;
+                        }
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_EXTCODECOPY) {
-                        // TODO: support this function
-                        revert("OP_EXTCODECOPY");
-                        // address addr = address(uint160(stack[tos--]));
-                        // uint256 dstOst = stack[tos--];
-                        // uint256 ost = stack[tos--];
-                        // uint256 len = stack[tos--];
-                        // DEPLOYER_SYSTEM_CONTRACT.getCode(addr);
-                        // assembly ("memory-safe") {
-                        //     returndatacopy(add(add(bmem, 0x20), dstOst), add(ost, 0x20), len)
-                        // }
+                        uint256 addr;
+                        uint256 destOffset;
+                        uint256 offset;
+                        uint256 size;
 
-                        // // extra cost if account is cold
-                        // if (EVM_GAS_MANAGER.warmAccount(addr)) {
-                        //     gasLeft -= 100;
-                        // } else {
-                        //     gasLeft -= 2600;
-                        // }
+                        (addr, destOffset, offset, size, tos) = _pop4StackItems(tos);
 
-                        // gasLeft -=
-                        //     3 *
-                        //     _words(len) + // word copy cost
-                        //     bmem.expand(dstOst + len); // memory expansion
+                        // extra cost if account is cold
+                        if (warmAccount(address(uint160(addr)))) {
+                            gasLeft -= 100;
+                        } else {
+                            gasLeft -= 2600;
+                        }
+
+                        gasLeft -=
+                            3 *
+                            _words(size) + // word copy cost
+                            expandMemory(destOffset + size); // memory expansion
+
+                        _extcodecopy(address(uint160(addr)), destOffset, offset, size);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_RETURNDATASIZE) {
-                        uint256 rsz;
-                        assembly ("memory-safe") {
-                            rsz := returndatasize()
-                        }
+                        uint256 rsz = SystemContractHelper.getActivePtrDataSize();
 
                         tos = pushStackItem(tos, rsz);
                         gasLeft -= 2;
@@ -1061,42 +1147,37 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_RETURNDATACOPY) {
-                        // TODO: support this function
-                        // uint256 dstOst;
-                        // uint256 ost;
-                        // uint256 len;
+                        uint256 dstOst;
+                        uint256 ost;
+                        uint256 len;
 
-                        // (dstOst, tos) = _popStackItem(tos);
-                        // (ost, tos) = _popStackItem(tos);
-                        // (len, tos) = _popStackItem(tos);
+                        (dstOst, ost, len, tos) = _pop3StackItems(tos);
 
-                        // expandMemory(dstOst + len);
+                        gasLeft -= expandMemory(dstOst + len);
 
-                        // // TODO: bound check on memOst
-                        // assembly ("memory-safe") {
-                        //     returndatacopy(
-                        //         add(memOffset, dstOst),
-                        //         add(ost, 0x20),
-                        //         len
-                        //     )
-                        // }
+                        SystemContractHelper.copyActivePtrData(dstOst, ost, len);
 
-                        // gasLeft -= 3 + bmem.expand(dstOst + len);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_EXTCODEHASH) {
-                        // TODO: support this function
-                        // address addr = address(uint160(stack[tos]));
-                        // stack[tos] = uint256(DEPLOYER_SYSTEM_CONTRACT.getCodeHash(addr));
+                        uint256 addr;
+                        (addr, tos) = _popStackItem(tos);
 
-                        // // extra cost if account is cold
-                        // if (EVM_GAS_MANAGER.warmAccount(addr)) {
-                        //     gasLeft -= 100;
-                        // } else {
-                        //     gasLeft -= 2600;
-                        // }
+                        uint256 result;
+                        assembly {
+                            result := extcodehash(addr)
+                        }
+
+                        // extra cost if account is cold
+                        if (warmAccount(address(uint160(addr)))) {
+                            gasLeft -= 100;
+                        } else {
+                            gasLeft -= 2600;
+                        }
+
+                        tos = pushStackItem(tos, result);
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1260,7 +1341,7 @@ contract EvmInterpreter {
 
                         // TODO: those are not the *exact* same rules
                         // extra cost if account is cold
-                        if (EVM_GAS_MANAGER.warmSlot(key)) {
+                        if (warmSlot(key)) {
                             gasLeft -= 100;
                             // } else if (val == 0) {
                             //     gasLeft -= 5000; // 2900 + 2100
@@ -1375,10 +1456,8 @@ contract EvmInterpreter {
 
                     if (opcode < GRP_DUP) {
                         // DUPx
-                        uint256 ost = opcode - 0x7F;
+                        uint256 ost = opcode - 0x80;//0x7F;
                         gasLeft -= 3;
-                        require(ost <= tos, "interpreter: stack underflow");
-
                         tos = dupStack(tos, ost);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1659,7 +1738,6 @@ contract EvmInterpreter {
 
                     (ost, len, tos) = _pop2StackItems(tos);
 
-                    // TODO: check whether it is correctly charged (the constant part)
                     gasLeft -= expandMemory(ost + len);
 
                     return (ost + memOffset, len, gasLeft);
@@ -1722,7 +1800,7 @@ contract EvmInterpreter {
     }
 
     // Each evm gas is 200 zkEVM one
-    uint256 constant GAS_DIVISOR = 200;
+    uint256 constant GAS_DIVISOR = 20;
     uint256 constant EVM_GAS_STIPEND = (1 << 30);
     uint256 constant OVERHEAD = 2000;
 
@@ -1765,9 +1843,9 @@ contract EvmInterpreter {
         warmAccount(address(uint160(address(this))));
         (uint256 retOffset, uint256 retLen, uint256 gasLeft) = _simulate(input, evmGas);
 
-        _performReturnOrRevert(false, _isEVM(msg.sender), gasLeft, retOffset, retLen);
+        // _performReturnOrRevert(false, _isEVM(msg.sender), gasLeft, retOffset, retLen);
 
-        revert("interpreter: unreachable");
+        // revert("interpreter: unreachable");
     }
 }
 
@@ -1794,5 +1872,13 @@ return/revert:
 - caller is zkEVM -> plain return
 - caller is EVM -> gas + return
 - panic -> return with no data
+
+*/
+
+/*
+
+0x
+60
+80604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea264697066735822122064c70c33b791f6d7904ea1cf78deb1ceea5057f756d52084f914dd5391a14dec64736f6c63430008100033
 
 */
