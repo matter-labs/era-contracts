@@ -11,7 +11,4 @@ import {ConfirmL2TxStatus} from "./IL1Bridge.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1ERC20Bridge is IL1BridgeLegacy, IL1Bridge {
-    function l2TokenAddressSharedBridge(uint256 _chainId, address _l1Token) external view returns (address);
-
-    function l2TokenBeaconAddress(uint256 _chainId) external view returns (address);
 }

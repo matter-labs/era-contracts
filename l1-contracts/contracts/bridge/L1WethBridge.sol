@@ -9,7 +9,6 @@ import {IL1WethBridge, ConfirmL2TxStatus} from "./interfaces/IL1WethBridge.sol";
 import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
-import {ConfirmL2TxStatus} from "./interfaces/IL1Bridge.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";

@@ -13,8 +13,6 @@ import {ConfirmL2TxStatus} from "./IL1Bridge.sol";
 interface IL1WethBridge is IL1Bridge {
     function l1WethAddress() external view returns (address payable);
 
-    function l2WethAddress(uint256 _chainId) external view returns (address);
-
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);
 
