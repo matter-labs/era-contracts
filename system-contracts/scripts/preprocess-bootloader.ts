@@ -1,3 +1,4 @@
+// hardhat import should be the first import in the file
 import * as hre from "hardhat";
 
 import { ethers } from "ethers";
@@ -126,7 +127,7 @@ function createTestFramework(tests: string[]): string {
   let testFramework = `
     let test_id:= mload(0)
 
-    switch test_id 
+    switch test_id
     case 0 {
         testing_totalTests(${tests.length})
     }
