@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice legacy before bridgehub, only used for Era
+/// @notice Legacy Bridge interface before hyperchain migration, used for backward compatibility with zkSync Era
 interface IL1BridgeLegacy {
     event DepositInitiated(
         bytes32 indexed l2DepositTxHash,
@@ -18,6 +18,8 @@ interface IL1BridgeLegacy {
     event WithdrawalFinalized(address indexed to, address indexed l1Token, uint256 amount);
 
     event ClaimedFailedDeposit(address indexed to, address indexed l1Token, uint256 amount);
+
+    function isWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     function deposit(
         address _l2Receiver,
@@ -43,6 +45,14 @@ interface IL1BridgeLegacy {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
+
+    function finalizeWithdrawal(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
 
