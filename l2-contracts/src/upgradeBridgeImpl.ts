@@ -1,8 +1,10 @@
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
 import * as fs from "fs";
-import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
