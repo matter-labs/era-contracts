@@ -93,7 +93,7 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
-    function requestL2Transaction(
+    function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 

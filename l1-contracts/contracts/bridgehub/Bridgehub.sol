@@ -206,7 +206,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// this assumes that either ether is the base token or
     /// the msg.sender has approved mintValue allowance for the baseTokenBridge.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
-    function requestL2Transaction(
+    function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {

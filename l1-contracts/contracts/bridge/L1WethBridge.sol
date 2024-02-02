@@ -45,9 +45,6 @@ import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2Step {
     using SafeERC20 for IERC20;
 
-    /// @dev Event emitted when ETH is received by the contract.
-    event EthReceived(uint256 amount);
-
     /// @dev The address of the WETH token on L1
     address payable public immutable override l1WethAddress;
 
@@ -62,9 +59,6 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 => address) public override l2BridgeAddress;
-
-    /// @dev A mapping chainId => WethProxy. Used to store the weth proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 => address) public override l2WethAddress;
 
     /// @dev A mapping chainId =>  L2 deposit transaction hash =>  keccak256(account, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail
@@ -81,11 +75,6 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
 
     /// @dev have we enabled hyperbridging for chain yet
     mapping(uint256 => bool) internal hyperbridgingEnabled;
-
-    /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
-    /// @param to The address to which the funds were sent
-    /// @param amount The amount of funds that were sent
-    event EthWithdrawalFinalized(uint256 chainId, address indexed to, uint256 amount);
 
     /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
     modifier onlyBridgehub() {
@@ -124,7 +113,6 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
 
         eraIsWithdrawalFinalizedStorageSwitchBatchNumber = _eraIsWithdrawalFinalizedStorageSwitchBatchNumber;
 
-        l2WethAddress[ERA_CHAIN_ID] = ERA_WETH_ADDRESS;
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_WETH_BRIDGE_ADDRESS;
 
         // #if !EOA_GOVERNOR
@@ -136,11 +124,9 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
     /// these bridges can be custom bridges, so this is only allowed for the owner
     function initializeChainGovernance(
         uint256 _chainId,
-        address _l2BridgeAddress,
-        address _l2WethAddress
+        address _l2BridgeAddress
     ) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
-        l2WethAddress[_chainId] = _l2WethAddress;
     }
 
     /// @notice Initiates a WETH deposit by depositing WETH into the L1 bridge contract, unwrapping it to ETH
@@ -247,7 +233,7 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
             factoryDeps: new bytes[](0),
             refundRecipient: _refundRecipient
         });
-        txHash = bridgehub.requestL2Transaction{value: _mintValue}(request);
+        txHash = bridgehub.requestL2TransactionDirect{value: _mintValue}(request);
     }
 
     /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
@@ -284,7 +270,7 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
         {
             require(l2BridgeAddress[_chainId] != address(0), "L1WB: bridge not deployed");
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
-            require(!ethIsBaseToken, "L1WB: bridgehub deposit not allowed when eth is base token");
+            require(!ethIsBaseToken, "L1WB: bridgehub deposit not allowed when eth is base token"); // because we cannot change mintValue on tx
             require((_l1Token == l1WethAddress) || (_l1Token == ETH_TOKEN_ADDRESS), "L1WB: Invalid L1 token address");
         }
         if (_amount > 0) {
@@ -547,7 +533,7 @@ contract L1WethBridge is IL1WethBridge, ReentrancyGuard, Initializable, Ownable2
 
     /// @dev The receive function is called when ETH is sent directly to the contract.
     receive() external payable {
-        // Expected to receive ether in two cases:
+        // Expected to receive ether in cases:
         // 1. l1 WETH sends ether on `withdraw`
         require(msg.sender == l1WethAddress, "pn");
         emit EthReceived(msg.value);

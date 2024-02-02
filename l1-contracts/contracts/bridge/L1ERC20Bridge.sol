@@ -30,7 +30,10 @@ import {Ownable2StepRandomStorage} from "../common/random-storage/Ownable2StepRa
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomStorage, Ownable2StepRandomStorage {
     using SafeERC20 for IERC20;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2s via asynchronous L2 <-> L1 communication.
+    /// @dev The address of the WETH token on L1
+    address payable public immutable override l1WethAddress;
+
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
     IBridgehub public immutable override bridgehub;
 
     /// @dev A mapping L2 batch number => message number => flag.
@@ -49,12 +52,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     /// Note, it is deprecated in favour of `l2BridgeAddress` mapping.
     address internal __DEPRECATED_l2Bridge;
 
-    /// @dev The address that was used as a beacon for L2 tokens in zkSync Era.
-    /// Note, it is deprecated in favour of `l2TokenBeaconAddress` mapping.
-    address internal __DEPRECATED_l2TokenBeacon;
+    /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
+    address internal l2TokenBeacon;
 
     /// @notice Stores the hash of the L2 token proxy contract's bytecode. 
     /// @dev L2 token proxy bytecode is the same for all hyperchains and the owner can NOT override this value for a custom hyperchain.
+    /// kl todo this is wrong Vlad. L2TokenProxy is just used for Era, for the l2TokenAddressLegacy function.
     bytes32 public l2TokenProxyBytecodeHash;
 
     /// @dev Deprecated storage variable related to withdrawal limitations.
@@ -65,27 +68,47 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
 
     /// @dev Deprecated storage variable related to deposit limitations.
     mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
+    
+    /// new fields from here
+
+    /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
+    /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
+    /// this number is the first batch number that is settled on Era ST Diamond  before we update the Mailbox,
+    /// as withdrawals from batches older than this might already be finalized
+    uint256 internal eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
-
-    /// @dev A mapping chainId => l2TokenBeacon. Used to store the token beacon proxy's address, and to see if it has been deployed yet.
-    mapping(uint256 chainId => address l2TokenBeacon) public override l2TokenBeaconAddress;
-
-    /// @dev A mapping L2 _chainId => Batch number => message number => flag
-    /// @dev Used to indicate that L2 -> L1 message was already processed
-    mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))) public isWithdrawalFinalizedShared;
 
     /// @dev A mapping chainId => L2 deposit transaction hash  => keccak256(account, tokenAddress, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail.
     /// @dev the l2TxHash is unique, as it is determined by the contracts, while dataHash is not, so we that is the output.
     mapping(uint256 chainId => mapping(bytes32 l2DepositTxHash => bytes32 depositDataHash)) public override depositHappened;
 
+    /// @dev A mapping L2 _chainId => Batch number => message number => flag
+    /// @dev Used to indicate that L2 -> L1 message was already processed
+    mapping(uint256 chainId=> mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
+    public isWithdrawalFinalizedShared;
+
     /// @dev Used for extra security until hyperbridging is implemented.
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) internal chainBalance;
+    mapping(uint256 chainId=> mapping(address l1Token => uint256 balance)) internal chainBalance;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
+
+    /// @return The L2 token address that would be minted for deposit of the given L1 token
+    function l2TokenAddress(address _l1Token) public view returns (address) {
+        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
+        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
+
+        return
+            L2ContractHelper.computeCreate2Address(
+                l2BridgeAddress[ERA_CHAIN_ID],
+                salt,
+                l2TokenProxyBytecodeHash,
+                constructorInputHash
+            );
+    }
 
     /// @notice Checks that the message sender is the governor
     modifier onlyBridgehub() {
@@ -93,9 +116,21 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
+    modifier onlyBridgehubOrEthChain(uint256 _chainId) {
+        require(
+            (msg.sender == address(bridgehub)) ||
+                ((bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS) &&
+                    msg.sender == bridgehub.getStateTransition(_chainId)),
+            "L1WETHBridge: not bridgehub or eth chain"
+        );
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub) reentrancyGuardInitializer {
+    constructor(address payable _l1WethAddress, IBridgehub _bridgehub) reentrancyGuardInitializer {
+        l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
     }
 
@@ -108,13 +143,16 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge
     function initializeV2(
-        address _owner
+        address _owner,
+        uint256 _eraIsWithdrawalFinalizedStorageSwitchBatchNumber
     ) external reinitializer(2) {
-        require(_owner != address(0), "EB owner 0");
         _transferOwnership(_owner);
+        require(_owner != address(0), "EB owner 0");
 
-        l2TokenBeaconAddress[ERA_CHAIN_ID] = ERA_TOKEN_BEACON_ADDRESS;
+        eraIsWithdrawalFinalizedStorageSwitchBatchNumber = _eraIsWithdrawalFinalizedStorageSwitchBatchNumber;
+
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
+        l2TokenBeacon = ERA_TOKEN_BEACON_ADDRESS;
     }
 
     /// @dev Initializes governance settings for a specific chain by setting the addresses of the L2 bridge and the L2 token beacon. 
@@ -122,11 +160,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     /// It opens the integration of unique bridging solutions across different chains.
     function initializeChainGovernance(
         uint256 _chainId,
-        address _l2BridgeAddress,
-        address _l2TokenBeaconAddress
+        address _l2BridgeAddress
     ) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
-        l2TokenBeaconAddress[_chainId] = _l2TokenBeaconAddress;
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -166,18 +202,28 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
         require(l2BridgeAddress[_chainId] != address(0), "EB b. n dep");
+        uint256 l2Value;
         {
             bool ethIsBaseToken = (bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS);
             require(ethIsBaseToken, "EB d.it n E chain");
-            require(_mintValue == msg.value, "EB w mintV");
+            if (_l1Token == l1WethAddress) {
+                require(msg.value + _amount == _mintValue, "EB wrong ETH sent weth d.it");
+                l2Value =  _amount;
+                // we don't increase chainBalance in this case since we do it in bridgehubDepositBaseToken
+            } else {
+                require(_mintValue == msg.value, "EB w mintV");
+                l2Value = 0;
+
+                if (!hyperbridgingEnabled[_chainId]) {
+                    chainBalance[_chainId][_l1Token] += _amount;
+                }
+            }
 
             require(_amount != 0, "2T"); // empty deposit amount
-            uint256 amount = _depositFunds(msg.sender, IERC20(_l1Token), _amount);
+            uint256 amount = _depositFunds(msg.sender, _l1Token, _amount);
             require(amount == _amount, "1T"); // The token has non-standard transfer logic
 
-            if (!hyperbridgingEnabled[_chainId]) {
-                chainBalance[_chainId][_l1Token] += _amount;
-            }
+
         }
         bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
         // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -191,15 +237,19 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         l2TxHash = _depositSendTx(
             _chainId,
             _mintValue,
+            l2Value,
             l2TxCalldata,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
             refundRecipient
         );
 
-        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-        bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
-        depositHappened[_chainId][l2TxHash] = txDataHash;
+        // for weth we don't save the depositHappened, since funds are sent to refundRecipient on L2 if the tx fails
+        if (_l1Token != l1WethAddress) {
+            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+            bytes32 txDataHash = keccak256(abi.encode(msg.sender, _l1Token, _amount));
+            depositHappened[_chainId][l2TxHash] = txDataHash;
+        }
 
         emit DepositInitiatedSharedBridge(_chainId, txDataHash, msg.sender, _l2Receiver, _l1Token, _amount);
         if (_chainId == ERA_CHAIN_ID) {
@@ -207,10 +257,11 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         }
     }
 
-    /// @dev internal to avoid stack too deep error
+    /// @dev internal to avoid stack too deep error. Only used for eth based chains
     function _depositSendTx(
         uint256 _chainId,
         uint256 _mintValue,
+        uint256 _l2Value,
         bytes memory _l2TxCalldata,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
@@ -222,7 +273,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
             mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+            l2Value: _l2Value, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -231,7 +282,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             refundRecipient: _refundRecipient
         });
 
-        l2TxHash = bridgehub.requestL2Transaction{value: msg.value}(request);
+        l2TxHash = bridgehub.requestL2TransactionDirect{value: _mintValue}(request);
     }
 
     /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
@@ -241,19 +292,24 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) public payable onlyBridgehub {
-        require(msg.value == 0, "EB m.v > 0 b d.it"); // this bridge does not hold eth, the weth bridge does
+    ) public payable onlyBridgehubOrEthChain(_chainId) {
         require(_amount != 0, "4T"); // empty deposit amount
-        // #if ERC20_BRIDGE_IS_BASETOKEN_BRIDGE
-        if (_prevMsgSender != address(this)) {
-            // the bridge might be calling itself, in which case the funds are already in the contract. This only happens in testing, as we will not support the ERC20 contract as a base token bridge
-            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
+
+        if (_l1Token == ETH_TOKEN_ADDRESS){
+            require(msg.value == _amount, "L1WETHBridge: msg.value not equal to amount");
+        } else {
+            /// This breaks the _depositeFunds function, it returns 0, as our balance doesn't increase 
+            /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken
+            require(_prevMsgSender != address(this), "EB calling itself"); 
+            
+            // The Bridgehub also checks this, but we want to be sure
+            require(msg.value == 0, "EB m.v > 0 b d.it"); 
+
+        
+            uint256 amount = _depositFunds(_prevMsgSender, _l1Token, _amount);
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
-        // #else
-        uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
-        // #endif
+
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
@@ -262,12 +318,24 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(this));
-        _token.safeTransferFrom(_from, address(this), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(this));
+    function _depositFunds(address _from, address _token, uint256 _amount) internal returns (uint256) {
+        if (_token = l1WethAddress){
+            // Deposit WETH tokens from the depositor address to the smart contract address
+            uint256 balanceBefore = address(this).balance;
+            IERC20(l1WethAddress).safeTransferFrom(msg.sender, address(this), _amount);
+            // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
+            IWETH9(l1WethAddress).withdraw(_amount);
+            uint256 balanceAfter = address(this).balance;
 
-        return balanceAfter - balanceBefore;
+            return balanceAfter - balanceBefore;
+        } else {
+            IERC20 token = IERC20(_token);
+            uint256 balanceBefore = token.balanceOf(address(this));
+            _token.safeTransferFrom(_from, address(this), _amount);
+            uint256 balanceAfter = token.balanceOf(address(this));
+
+            return balanceAfter - balanceBefore;
+        }
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
@@ -278,23 +346,35 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         address _prevMsgSender,
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
-        (address _l1Token, uint256 _amount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
-        require(msg.value == 0, "EB m.v > 0 for BH dep");
         require(l2BridgeAddress[_chainId] != address(0), "EB b. n dep");
-        require(bridgehub.baseToken(_chainId) != _l1Token, "EB base d.it");
+        require(bridgehub.baseToken(_chainId) != _l1Token, "EB base d.it"); // because we cannot change mintValue
+        // currently depositing a token to a chain where it is the baseToken, and receiving a wrapped version of it is only supported for ether/weth
+        // if we want to implement this then we need to change the deposit function and use requestL2TransactionDirect
+        // until then we can requestL2TransactionDirect and receive the non-wrapped token on L2
 
-        require(_amount != 0, "6T"); // empty deposit amount
-        uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount);
-        require(amount == _amount, "5T"); // The token has non-standard transfer logic
+        (address _l1Token, uint256 _withdrawAmount, address _l2Receiver) = abi.decode(_data, (address, uint256, address));
+        if (_withdrawAmount != 0) {
+            uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _withdrawAmount);
+            require(withdrawAmount == _withdrawAmount, "5T"); // The token has non-standard transfer logic
+        }
+
+        uint256 amount;
+        if ((_l1Token == ETH_TOKEN_ADDRESS) && (_l1Token == l1WethAddress)){
+            amount = _withdrawAmount + msg.value;
+        } else {
+            require(msg.value == 0, "EB m.v > 0 for BH dep");
+            amount = _withdrawAmount;
+        }
+        require(amount != 0, "6T"); // empty deposit amount
 
         if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][_l1Token] += _amount;
+            chainBalance[_chainId][_l1Token] += amount;
         }
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
 
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(msg.sender, _l2Receiver, _l1Token, _amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, _l1Token, amount);
 
             request = L2TransactionRequestTwoBridgesInner({
                 magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -310,12 +390,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             _prevMsgSender,
             _l2Receiver,
             _l1Token,
-            _amount
+            amount
         );
-        if (_chainId == ERA_CHAIN_ID) {
-            // kl todo. Should emit this event here? Should we not allow this method for era?
-            emit DepositInitiated(0, _prevMsgSender, _l2Receiver, _l1Token, _amount);
-        }
+        // kl todo. We are breaking the previous events here, as we don't have the txHash, so we can't emit a DepositInitiated event
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
@@ -348,6 +425,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory data) {
+        if ((_token == ETH_TOKEN_ADDRESS) || (_token == l1WethAddress)) {
+            return new bytes(0);
+        }
+
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
         (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
         (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
@@ -397,18 +478,30 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             _amount
         );
 
-        if ((_chainId == ERA_CHAIN_ID) && usingLegacyDepositAmountStorageVar) {
-            delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
-        } else {
-            delete depositHappened[_chainId][_l2TxHash];
-        }
         if (!hyperbridgingEnabled[_chainId]) {
             // check that the chain has sufficient balance
             require(chainBalance[_chainId][_l1Token] >= _amount, "EB n funds");
             chainBalance[_chainId][_l1Token] -= _amount;
         }
+
+        if (usingLegacyDepositAmountStorageVar) {
+            delete depositAmountEra[_depositSender][_l1Token][_l2TxHash];
+        } else {
+            delete depositHappened[_chainId][_l2TxHash];
+        }
+
         // Withdraw funds
-        IERC20(_l1Token).safeTransfer(_depositSender, _amount);
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            payable(_depositSender).transfer(_amount);
+        } else if (_l1Token == l1WethAddress) {
+            // Wrap ETH to WETH tokens (smart contract address receives the equivalent _amount of WETH)
+            IWETH9(l1WethAddress).deposit{value: _amount}();
+            // Transfer WETH tokens from the smart contract address to the withdrawal receiver
+            IERC20(l1WethAddress).safeTransfer(_depositSender, _amount);
+        }
+        else {
+            IERC20(_l1Token).safeTransfer(_depositSender, _amount);
+        }
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
         if (_chainId == ERA_CHAIN_ID) {
@@ -460,7 +553,18 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         }
 
-        (address l1Receiver, address l1Token, uint256 amount) = _checkWithdrawal(
+        if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsWithdrawalFinalizedStorageSwitchBatchNumber))) {
+            // in this case we have to check we don't double withdraw ether
+            // we are not fully finalized if eth has not been withdrawn
+            // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
+            bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(
+                _l2BatchNumber,
+                _l2MessageIndex
+            );
+            require(!alreadyFinalized, "Withdrawal is already finalized");
+        }
+
+        (address l1Receiver, address l1Token, uint256 amount, bool wrapToWeth) = _checkWithdrawal(
             _chainId,
             _l2BatchNumber,
             _l2MessageIndex,
@@ -481,13 +585,30 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
         }
 
-        // Withdraw funds
-        IERC20(l1Token).safeTransfer(l1Receiver, amount);
+        if (wrapToWeth) {
+            // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
+            IWETH9(l1WethAddress).deposit{value: amount}();
+            // Transfer WETH tokens from the smart contract address to the withdrawal receiver
+            IERC20(l1WethAddress).safeTransfer(l1WithdrawReceiver, amount);
 
-        if (_chainId == ERA_CHAIN_ID) {
-            emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+            emit EthWithdrawalFinalized(_chainId, l1WithdrawReceiver, amount);
+        } else if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)) {
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), l1WithdrawReceiver, amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "L1WB: withdraw failed");
+            emit EthWithdrawalFinalized(_chainId, l1WithdrawReceiver, amount);
+        } else {
+            // Withdraw funds
+            IERC20(l1Token).safeTransfer(l1Receiver, amount);
+
+            if (_chainId == ERA_CHAIN_ID) {
+                emit WithdrawalFinalized(l1Receiver, l1Token, amount);
+            }
+            emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
         }
-        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
     }
 
     /// @dev check that the withdrawal is valid
@@ -498,20 +619,20 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
-        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
-        address l2Sender;
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount, bool wrapToWeth) {
+        (l1Receiver, l1Token, amount, wrapToWeth) = _parseL2WithdrawalMessage(_chainId, _message);
+        L2Message memory l2ToL1Message;
         {
             bool thisIsBaseTokenBridge = (bridgehub.baseTokenBridge(_chainId) == address(this)) &&
                 (l1Token == bridgehub.baseToken(_chainId));
-            l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
+            address l2Sender = thisIsBaseTokenBridge ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
+            
+            l2ToL1Message = L2Message({
+                txNumberInBatch: _l2TxNumberInBatch,
+                sender: l2Sender,
+                data: _message
+            });
         }
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: _l2TxNumberInBatch,
-            sender: l2Sender,
-            data: _message
-        });
-
         // Preventing the stack too deep error
         {
             bool success = bridgehub.proveL2MessageInclusion(
@@ -528,7 +649,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount, bool wrapToWeth) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
@@ -547,6 +668,25 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
+
+            if (l1Receiver == address(this)) {
+                // the user either specified a wrong receiver (so the withdrawal cannot be finished), or the withdrawal is a weth withdrawal
+                require((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress), "EB w eth w");
+                wrapToWeth = true;
+
+                // Check that the message length is correct.
+                // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
+                // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
+                // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
+                require(_message.length == 96, "Incorrect ETH message with additional data length 2");
+
+                address l2Sender;
+                (l2Sender, offset) = UnsafeBytes.readAddress(_message, offset);
+                require(l2Sender == l2BridgeAddress[_chainId], "The withdrawal was not initiated by L2 bridge");
+
+                // Parse additional data
+                (l1Receiver, offset) = UnsafeBytes.readAddress(_message, offset);
+            }
         } else if (bytes4(functionSignature) == IL1BridgeLegacy.finalizeWithdrawal.selector) {
             // We use the IL1BridgeLegacy for backward compatibility with old withdrawals.
 
@@ -564,22 +704,14 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
         }
     }
 
-    /// @return The address of the L2 token that would be minted for the deposit of the given L1 token on the hyperchain with specified chain ID. 
-    /// Note, Returns zero address if the hyperchain with specified chain ID isn't supported by the bridge.
-    function l2TokenAddressSharedBridge(uint256 _chainId, address _l1Token) public view returns (address) {
-        address l2TokenBeaconAddr = l2TokenBeaconAddress[_chainId];
-        address l2BridgeAddr = l2BridgeAddress[_chainId];
-
-        // Returns early if the L2 bridge or L2 beacon hasn't been set by the owner.
-        if (l2TokenBeaconAddr == address(0) || l2BridgeAddr == address(0)) {
-            return address(0);
-        }
-
-        bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeaconAddr), ""));
-        bytes32 salt = bytes32(uint256(uint160(_l1Token)));
-
-        return L2ContractHelper.computeCreate2Address(l2BridgeAddr, salt, l2TokenProxyBytecodeHash, constructorInputHash);
+    /// @dev The receive function is called when ETH is sent directly to the contract.
+    receive() external payable {
+        // Expected to receive ether in cases:
+        // 1. l1 WETH sends ether on `withdraw`
+        require(msg.sender == l1WethAddress, "pn");
+        emit EthReceived(msg.value);
     }
+
 
     /*//////////////////////////////////////////////////////////////
                             ERA LEGACY GETTERS
@@ -588,11 +720,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard, InitializableRandomSt
     /// @dev Legacy function gives the l2Bridge address on Era.
     function l2Bridge() external view override returns (address) {
         return l2BridgeAddress[ERA_CHAIN_ID];
-    }
-
-    /// @dev Legacy getter function gives the l2TokenBeacon address on Era.
-    function l2TokenBeacon() external view override returns (address) {
-        return l2TokenBeaconAddress[ERA_CHAIN_ID];
     }
 
     /// @return The L2 token address that would be minted for deposit of the given L1 token on zkSync Era.
