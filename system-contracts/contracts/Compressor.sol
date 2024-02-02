@@ -28,6 +28,7 @@ contract Compressor is ICompressor, ISystemContract {
     ///    - 2 bytes: the length of the dictionary
     ///    - N bytes: the dictionary
     ///    - M bytes: the encoded data
+    /// @return bytecodeHash The hash of the original bytecode.
     /// @dev The dictionary is a sequence of 8-byte chunks, each of them has the associated index.
     /// @dev The encoded data is a sequence of 2-byte chunks, each of them is an index of the dictionary.
     /// @dev The compression algorithm works as follows:
@@ -37,34 +38,62 @@ contract Compressor is ICompressor, ISystemContract {
     ///         * If the chunk is not already in the dictionary, it is added to the dictionary array.
     ///         * If the dictionary becomes overcrowded (2^16 + 1 elements), the compression process will fail.
     ///         * The 2-byte index of the chunk in the dictionary is added to the encoded data.
+    /// @dev Note: The functions reverts the execution if:
+    ///     - The bytecode has non expected format:
+    ///         * Bytecode bytes length is not a multiple of 32.
+    ///         * Bytecode bytes length is not less than 2^21 bytes (2^16 words).
+    ///         * Bytecode words length is not odd.
+    ///     - The encoded data is incorrect:
+    ///         * The encoded data bytes length is not 4 times shorter than the original bytecode bytes length.
+    ///         * There are more dictionary entries than encoded data entries.
+    ///         * The encoded data contains an index that is out of bounds of the dictionary.
+    ///         * Any encoded chunk does not match the original bytecode
+    ///         * The dictionary contains unused entries.
     /// @dev Currently, the method may be called only from the bootloader because the server is not ready to publish bytecodes
     /// in internal transactions. However, in the future, we will allow everyone to publish compressed bytecodes.
+    /// @dev Read more about the compression: https://github.com/matter-labs/zksync-era/blob/main/docs/guides/advanced/compression.md
     function publishCompressedBytecode(
         bytes calldata _bytecode,
         bytes calldata _rawCompressedData
     ) external payable onlyCallFromBootloader returns (bytes32 bytecodeHash) {
         unchecked {
+            // Validate and hash the bytecode, ensuring its length is a multiple of 32 bytes
+            bytecodeHash = Utils.hashL2Bytecode(_bytecode);
+
+            // The dictionary length is a multiple of 8
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
-            require(dictionary.length % 8 == 0, "Dictionary length should be a multiple of 8");
-            require(dictionary.length <= 2 ** 16 * 8, "Dictionary is too big");
+            // This also ensures that the encodedData length is a multiple of 2
             require(
-                encodedData.length * 4 == _bytecode.length,
+                _bytecode.length / 4 == encodedData.length,
                 "Encoded data length should be 4 times shorter than the original bytecode"
             );
 
+            // The dictionary entries are 8 bytes long and the encoded data entries are 2 bytes long
+            require(
+                dictionary.length / 8 <= encodedData.length / 2,
+                "Dictionary should have at most the same number of entries as the encoded data"
+            );
+
+            bool[] memory isDictionaryEntryUsed = new bool[](dictionary.length / 8);
             for (uint256 encodedDataPointer = 0; encodedDataPointer < encodedData.length; encodedDataPointer += 2) {
-                uint256 indexOfEncodedChunk = uint256(encodedData.readUint16(encodedDataPointer)) * 8;
+                uint16 dictionaryIndex = encodedData.readUint16(encodedDataPointer);
+                uint256 indexOfEncodedChunk = dictionaryIndex * 8;
                 require(indexOfEncodedChunk < dictionary.length, "Encoded chunk index is out of bounds");
 
                 uint64 encodedChunk = dictionary.readUint64(indexOfEncodedChunk);
                 uint64 realChunk = _bytecode.readUint64(encodedDataPointer * 4);
 
                 require(encodedChunk == realChunk, "Encoded chunk does not match the original bytecode");
+
+                isDictionaryEntryUsed[dictionaryIndex] = true;
+            }
+
+            for (uint256 i = 0; i < isDictionaryEntryUsed.length; i++) {
+                require(isDictionaryEntryUsed[i], "Dictionary should have no unused entries");
             }
         }
 
-        bytecodeHash = Utils.hashL2Bytecode(_bytecode);
         L1_MESSENGER_CONTRACT.sendToL1(_rawCompressedData);
         KNOWN_CODE_STORAGE_CONTRACT.markBytecodeAsPublished(bytecodeHash);
     }
@@ -189,14 +218,32 @@ contract Compressor is ICompressor, ISystemContract {
     ///    - 2 bytes: the bytes length of the dictionary
     ///    - N bytes: the dictionary
     ///    - M bytes: the encoded data
+    /// @return dictionary The dictionary data in bytes
+    /// @return encodedData The encoded data in bytes
+    /// @dev It is verified that the dictionary length is within the bounds of the raw compressed data, and there is encoded data provided.
+    /// @dev The function reverts if the dictionary length is not within the bounds of the raw compressed data, or there is no encoded data provided.
     function _decodeRawBytecode(
         bytes calldata _rawCompressedData
     ) internal pure returns (bytes calldata dictionary, bytes calldata encodedData) {
         unchecked {
-            // The dictionary length can't be more than 2^16, so it fits into 2 bytes.
-            uint256 dictionaryLen = uint256(_rawCompressedData.readUint16(0));
-            dictionary = _rawCompressedData[2:2 + dictionaryLen * 8];
-            encodedData = _rawCompressedData[2 + dictionaryLen * 8:];
+            // The dictionary length is stored in the first 2 bytes
+            uint16 dictionaryLen = _rawCompressedData.readUint16(0);
+            // The dictionary has 8 bytes per entry
+            uint256 dictionarySize = 8 * dictionaryLen;
+            // The dictionary starts after the dictionary length (first 2 bytes)
+            uint256 dictionaryStart = 2;
+            // The encoded data starts after the dictionary
+            uint256 encodedDataStart = dictionaryStart + dictionarySize;
+
+            // Ensure the dictionary and encoded data are within the bounds of the raw compressed data
+            require(
+                encodedDataStart < _rawCompressedData.length,
+                "Dictionary length mismatch or no encoded data provided"
+            );
+
+            // Slice the dictionary and encoded data from the raw compressed data
+            dictionary = _rawCompressedData[dictionaryStart:encodedDataStart];
+            encodedData = _rawCompressedData[encodedDataStart:];
         }
     }
 

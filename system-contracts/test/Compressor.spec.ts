@@ -45,54 +45,117 @@ describe("Compressor tests", function () {
   });
 
   describe("publishCompressedBytecode", function () {
-    it("non-bootloader failed to call", async () => {
+    it("should revert when it's a non-bootloader call", async () => {
       await expect(compressor.publishCompressedBytecode("0x", "0x0000")).to.be.revertedWith(
         "Callable only by the bootloader"
       );
     });
 
-    it("invalid encoded length", async () => {
-      const BYTECODE = "0xdeadbeefdeadbeef";
-      const COMPRESSED_BYTECODE = "0x0001deadbeefdeadbeef00000000";
+    it("should revert when the dictionary length is incorrect", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Dictionary has only 1 entry, but the dictionary length is 2
+      const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "0000" + "0000" + "0000" + "0000";
+      await expect(
+        compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
+      ).to.be.revertedWith("Dictionary length mismatch or no encoded data provided");
+    });
+
+    it("should revert when there is no encoded data", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Dictionary has 2 entries, but there is no encoded data
+      const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      await expect(
+        compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
+      ).to.be.revertedWith("Dictionary length mismatch or no encoded data provided");
+    });
+
+    it("should revert when the encoded data length is invalid", async () => {
+      // Bytecode length is 32 bytes (4 chunks)
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Compressed bytecode is 14 bytes
+      // Dictionary length is 2 bytes
+      // Dictionary is 8 bytes (1 entry)
+      // Encoded data is 4 bytes
+      const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "00000000";
+      // The length of the encodedData should be 32 / 4 = 8 bytes
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
     });
 
-    it("chunk index is out of bounds", async () => {
-      const BYTECODE = "0xdeadbeefdeadbeef";
-      const COMPRESSED_BYTECODE = "0x0001deadbeefdeadbeef0001";
+    it("should revert when the dictionary has too many entries", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Dictionary has 5 entries
+      // Encoded data has 4 entries
+      const COMPRESSED_BYTECODE =
+        "0x0005" +
+        "deadbeefdeadbeef" +
+        "deadbeefdeadbeef" +
+        "deadbeefdeadbeef" +
+        "deadbeefdeadbeef" +
+        "deadbeefdeadbeef" +
+        "0000" +
+        "0000" +
+        "0000" +
+        "0000";
+      // The dictionary should have at most encode data length entries
+      await expect(
+        compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
+      ).to.be.revertedWith("Dictionary should have at most the same number of entries as the encoded data");
+    });
+
+    it("should revert when dictionary has unused entries", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Dictionary has 2 entries, but the first one is unused
+      const COMPRESSED_BYTECODE =
+        "0x0002" + "0000000000000000" + "deadbeefdeadbeef" + "0001" + "0001" + "0001" + "0001";
+      await expect(
+        compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
+      ).to.be.revertedWith("Dictionary should have no unused entries");
+    });
+
+    it("should revert when the encoded data has chunks where index is out of bounds", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      // Dictionary has 1 entry
+      // Encoded data has 4 entries, three 0000 and one 0001
+      const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "0000" + "0000" + "0000" + "0001";
+      // The dictionary has only 1 entry, so at the last entry of the encoded data the chunk index is out of bounds
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("Encoded chunk index is out of bounds");
     });
 
-    it("chunk does not match the original bytecode", async () => {
-      const BYTECODE = "0xdeadbeefdeadbeef1111111111111111";
-      const COMPRESSED_BYTECODE = "0x0002deadbeefdeadbeef111111111111111100000000";
+    it("should revert when the encoded data has chunks that does not match the original bytecode", async () => {
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "1111111111111111";
+      // Encoded data has 4 entries, but the first one points to the wrong chunk of the dictionary
+      const COMPRESSED_BYTECODE =
+        "0x0002" + "deadbeefdeadbeef" + "1111111111111111" + "0001" + "0000" + "0000" + "0001";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("Encoded chunk does not match the original bytecode");
     });
 
-    it("invalid bytecode length in bytes", async () => {
-      const BYTECODE = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
-      const COMPRESSED_BYTECODE = "0x0001deadbeefdeadbeef000000000000";
+    it("should revert when the bytecode length in bytes is invalid", async () => {
+      // Bytecode length is 24 bytes (3 chunks), which is invalid because it's not a multiple of 32
+      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
+      const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "0000" + "0000" + "0000";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("po");
     });
 
-    // Test case with too big bytecode is unrealistic because API cannot accept so much data.
-    it("invalid bytecode length in words", async () => {
+    it("should revert when the bytecode length in words is odd", async () => {
+      // Bytecode length is 2 words (64 bytes), which is invalid because it's odd
       const BYTECODE = "0x" + "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef".repeat(2);
-      const COMPRESSED_BYTECODE = "0x0001deadbeefdeadbeef" + "0000".repeat(4 * 2);
+      const COMPRESSED_BYTECODE = "0x0001" + "deadbeefdeadbeef" + "0000".repeat(4 * 2);
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("pr");
     });
 
-    it("successfully published", async () => {
+    // Test case with too big bytecode is unrealistic because API cannot accept so much data.
+
+    it("should successfully publish the bytecode", async () => {
       const BYTECODE =
         "0x000200000000000200010000000103550000006001100270000000150010019d0000000101200190000000080000c13d0000000001000019004e00160000040f0000000101000039004e00160000040f0000001504000041000000150510009c000000000104801900000040011002100000000001310019000000150320009c0000000002048019000000600220021000000000012100190000004f0001042e000000000100001900000050000104300000008002000039000000400020043f0000000002000416000000000110004c000000240000613d000000000120004c0000004d0000c13d000000200100003900000100001004430000012000000443000001000100003900000040020000390000001d03000041004e000a0000040f000000000120004c0000004d0000c13d0000000001000031000000030110008c0000004d0000a13d0000000101000367000000000101043b0000001601100197000000170110009c0000004d0000c13d0000000101000039000000000101041a0000000202000039000000000202041a000000400300043d00000040043000390000001805200197000000000600041a0000000000540435000000180110019700000020043000390000000000140435000000a0012002700000001901100197000000600430003900000000001404350000001a012001980000001b010000410000000001006019000000b8022002700000001c02200197000000000121019f0000008002300039000000000012043500000018016001970000000000130435000000400100043d0000000002130049000000a0022000390000000003000019004e000a0000040f004e00140000040f0000004e000004320000004f0001042e000000500001043000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffff000000000000000000000000000000000000000000000000000000008903573000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000ffffff0000000000008000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80000000000000000000000000000000000000000000000000000000000000007fffff00000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
       const COMPRESSED_BYTECODE =
