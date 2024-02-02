@@ -45,7 +45,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     // TODO: this is a hack before rewriting to assembly. 
     // This is the only reliable way to pass gas into constructor
-    mapping(address => uint256) public constructorGas;
+    // mapping(address => uint256) public constructorGas;
 
     uint256 public constructorReturnGas;
 
@@ -60,7 +60,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         evmCode[msg.sender] = newDeployedCode;
         evmCodeHash[msg.sender] = keccak256(newDeployedCode);
-        constructorGas[msg.sender] = 0;
+        // constructorGas[msg.sender] = 0;
         constructorReturnGas = constructorGasLeft;
     }
 
@@ -557,10 +557,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         // Temporary: remember the constructor code.
 
-        if(isEVM(_sender)) {
-            _input = _input[32:];
-            constructorGas[_newAddress] = uint256(bytes32(_input[0:32]));
-        }
         evmCode[_newAddress] = _input;
         
         uint256 value = msg.value;

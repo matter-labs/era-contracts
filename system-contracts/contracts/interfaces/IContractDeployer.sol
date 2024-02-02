@@ -124,7 +124,7 @@ interface IContractDeployer {
 
     // TODO: this is a hack before rewriting to assembly. 
     // This is the only reliable way to pass gas into constructor
-    function constructorGas(address) external view returns (uint256);
+    // function constructorGas(address) external view returns (uint256);
 
     function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
 
