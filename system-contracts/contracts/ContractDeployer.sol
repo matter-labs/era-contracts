@@ -49,6 +49,11 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
     uint256 public constructorReturnGas;
 
+    /// TODO: use a formula that depends on code hash and constructor status
+    function isEVM(address addr) public view returns (bool) {
+        return evmCode[addr].length > 0;
+    }
+
     function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external {
         // FIXME: check the correct behavior when deploying empty bytecode.
         require(evmCode[msg.sender].length > 0, "Only EVM contracts can call it");
@@ -248,11 +253,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes calldata _input
     ) external payable override returns (address) {
         return createAccount(_salt, _bytecodeHash, _input, AccountAbstractionVersion.None);
-    }
-
-    function isEVM(address addr) internal view returns (bool) {
-        // TODO
-        return false;
     }
 
     function createEVM(bytes calldata _initCode) external payable override returns (address) {

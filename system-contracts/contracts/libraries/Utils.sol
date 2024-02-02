@@ -35,6 +35,11 @@ library Utils {
         return uint24(_x);
     }
 
+    function isCodeHashEVM(bytes32 _bytecodeHash) {
+        // TODO: use constants for that
+        return (_bytecodeHash[0] == 2);
+    }
+
     /// @return codeLength The bytecode length in bytes
     function bytecodeLenInBytes(bytes32 _bytecodeHash) internal pure returns (uint256 codeLength) {
         // TODO: use constants for that

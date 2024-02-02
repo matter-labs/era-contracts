@@ -1794,9 +1794,29 @@ contract EvmInterpreter {
         return gasLimit;
     }
 
-    // todo: move to a separate lib
     function _isEVM(address _addr) internal pure returns (bool) {
-        return false;
+        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.isEVM.selector;
+        address addr = address(DEPLOYER_SYSTEM_CONTRACT); 
+        assembly {
+            mstore(0, selector)
+            mstore(4, _addr)
+
+            let success := staticcall(
+                gas(),
+                addr,
+                0,
+                36,
+                0,
+                32
+            )
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+            
+            isWarm := mload(0)
+        }
     }
 
     // Each evm gas is 200 zkEVM one
@@ -1824,6 +1844,13 @@ contract EvmInterpreter {
             TODO: refine the formula, especially with regard to decommitment costs
         */
         return _evmGas * GAS_DIVISOR;
+    }
+ 
+    function isSenderEVM() internal view returns (bool) {
+        address codeAddress = SystemContractHelper.getCodeAddress();
+
+        // codeAddress != this means that we are in delegatecall
+        return (codeAddress != address(this)) || _isEVM(msg.sender);
     }
 
     fallback() external payable {
