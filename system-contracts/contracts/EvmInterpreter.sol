@@ -32,8 +32,8 @@ contract EvmInterpreter {
         We must avoid polluting the memory of the contract, so we have to do raw calls
     */
 
-
-    uint256 constant STACK_OFFSET = 32 * 32;
+    uint256 constant DEBUG_SLOT_OFFSET = 32 * 32;
+    uint256 constant STACK_OFFSET = DEBUG_SLOT_OFFSET + 5 * 32;
     uint256 constant BYTECODE_OFFSET = 1024 + STACK_OFFSET; 
     // Slightly higher just in case
     uint256 constant MAX_POSSIBLE_BYTECODE = 32000;
@@ -723,6 +723,16 @@ contract EvmInterpreter {
     // event OverheadTrace(uint256 gasUsage);
     // event OpcodeTrace(uint256 opcode, uint256 gasUsage);
 
+    function dbg(uint256 _tos, uint256 _ip, uint256 _opcode, uint256 _gasleft) internal {
+        uint256 offset = DEBUG_SLOT_OFFSET;
+        assembly {
+            mstore(add(offset, 0x20), _ip)
+            mstore(add(offset, 0x40), _tos)
+            mstore(add(offset, 0x60), _gasleft)
+            mstore(add(offset, 0x80), _opcode)
+            mstore(offset, 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+        }
+    }
 
     /*
 
@@ -780,6 +790,8 @@ contract EvmInterpreter {
                         opcode = OP_STOP;
                     }
                 }
+
+                dbg(tos, ip, opcode, gasLeft);
             
                 ip++;
 
@@ -1275,6 +1287,8 @@ contract EvmInterpreter {
                             val := mload(add(memOffset, ost))
                         }
                         gasLeft -= 3 + expandMemory(ost + 32);
+
+                        tos = pushStackItem(tos, val);
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
