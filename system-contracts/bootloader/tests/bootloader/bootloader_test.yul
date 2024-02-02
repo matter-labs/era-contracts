@@ -98,3 +98,14 @@ function TEST_getFeeParams_LowPubdataPrice() {
     testing_assertEq(baseFee, l2GasPrice, "Invalid base fee")
     testing_assertEq(gasPricePerPubdata, div(veryLowL1GasPrice, l2GasPrice), "Invalid gasPricePerPubdata")
 }
+
+function TEST_systemLogKeys() {
+    // Test that the values for various system log keys are correct
+    let chainedPriorityTxnHashLogKey := chainedPriorityTxnHashLogKey()
+    let numberOfLayer1TxsLogKey := numberOfLayer1TxsLogKey()
+    let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
+
+    testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
+    testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
+    testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
+}
