@@ -33,6 +33,7 @@ async function getReinitializeTokenCalldata(
     ignoreSymbol: ignoreSymbolGetter,
     ignoreDecimals: ignoreDecimalsGetter,
   };
+
   console.log("Using the following arguments:");
   console.log(`availableGetters = ${JSON.stringify(availableGetters, null, 4)}`);
   console.log(`newName = "${newName}"`);
