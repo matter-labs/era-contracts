@@ -687,7 +687,7 @@ object "Bootloader" {
             /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
             /// @param addr The address of the account to get the code hash of.
             /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
-            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failer is user providing not
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
             /// enough gas.
             function getRawCodeHash(addr, assertSuccess) -> ret {
                 mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})

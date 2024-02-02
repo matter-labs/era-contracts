@@ -1,7 +1,7 @@
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The contract used to interact with 4844 blob versioned hashes before official solidity support.
+ * @notice The contract used to interact with EIP-4844 blob versioned hashes before official solidity support.
  * @dev It only should receive 1 uint256 as calldata representing the index of the blob versioned hash to return.
  * @dev If index >= len(versioned_hashes) then bytes32(0) is returned.
  */
