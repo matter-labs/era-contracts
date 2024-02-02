@@ -63,6 +63,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Sends L2ToL1Log.
+    /// @param _isService The `isService` flag.
+    /// @param _key The `key` part of the L2Log.
+    /// @param _value The `value` part of the L2Log.
     /// @dev Can be called only by a system contract.
     function sendL2ToL1Log(
         bool _isService,
@@ -109,6 +112,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Public functionality to send messages to L1.
+    /// @param _message The message intended to be sent to L1.
     function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         uint256 gasBeforeMessageHashing = gasleft();
         hash = EfficientCall.keccak(_message);
@@ -156,6 +160,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @dev Can be called only by KnownCodesStorage system contract.
+    /// @param _bytecodeHash Hash of bytecode being published to L1.
     function requestBytecodeL1Publication(
         bytes32 _bytecodeHash
     ) external override onlyCallFrom(address(KNOWN_CODE_STORAGE_CONTRACT)) {
