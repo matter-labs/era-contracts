@@ -111,7 +111,7 @@ export async function create2DeployFromL1(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-
+  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
   return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
@@ -121,6 +121,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      l1GasPriceConverted: l1GasPriceConverted,
       factoryDeps: [bytecode],
       refundRecipient: wallet.address,
     },

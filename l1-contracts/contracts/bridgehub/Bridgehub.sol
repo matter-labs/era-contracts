@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import "./IBridgehub.sol";
-import "../bridge/interfaces/IL1Bridge.sol";
+import "../bridge/interfaces/IL1SharedBridge.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
@@ -25,7 +25,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     mapping(uint256 => ChainData) public chainData;
 
     /// @notice all the ether is held by the weth bridge
-    IL1Bridge public wethBridge;
+    IL1SharedBridge public sharedBridge;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -87,14 +87,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         tokenBridgeIsRegistered[_tokenBridge] = true;
     }
 
-    /// @notice To set main Weth bridge, only Owner. Not done in initialize, as
-    /// the order of deployment is Bridgehub, L1WethBridge, and then we call this
-    function setWethBridge(address _wethBridge) external onlyOwner {
-        wethBridge = IL1Bridge(_wethBridge);
+    /// @notice To set shared bridge, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setSharedBridge(address _sharedBridge) external onlyOwner {
+        sharedBridge = IL1SharedBridge(_sharedBridge);
     }
 
     /// @notice register new chain
-    /// @notice for Eth the baseToken address is 1, and the baseTokenBridge is the wethBridge is required
+    /// @notice for Eth the baseToken address is 1, and the baseTokenBridge is the sharedBridge is required
     function createNewChain(
         uint256 _chainId,
         address _stateTransitionManager,
@@ -112,12 +112,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             "Bridgehub: state transition not registered"
         );
         require(tokenIsRegistered[_baseToken], "Bridgehub: token not registered");
-        if (_baseToken == ETH_TOKEN_ADDRESS) {
-            require(address(wethBridge) == _baseTokenBridge, "Bridgehub: baseTokenBridge has to be weth bridge");
-            require(address(_baseTokenBridge) != address(0), "Bridgehub: weth bridge not set");
-        } else {
-            require(address(wethBridge) != _baseTokenBridge, "Bridgehub: baseTokenBridge cannot be weth bridge");
-        }
+        require(address(sharedBridge) == _baseTokenBridge, "Bridgehub: baseTokenBridge has to be shared bridge");
+        require(address(_baseTokenBridge) != address(0), "Bridgehub: weth bridge not set");
         require(tokenBridgeIsRegistered[_baseTokenBridge], "Bridgehub: token bridge not registered");
 
         require(chainData[_chainId].stateTransitionManager == address(0), "Bridgehub: chainId already registered");
@@ -215,13 +211,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{
+                IL1SharedBridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{
                     value: _request.mintValue
                 }(_request.chainId, msg.sender, token, _request.mintValue);
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
+                IL1SharedBridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -265,13 +261,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{
+                IL1SharedBridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken{
                     value: _request.mintValue
                 }(_request.chainId, msg.sender, token, _request.mintValue);
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
                 // note we have to pass token, as a bridge might have multiple tokens.
-                IL1Bridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
+                IL1SharedBridge(chainData[_request.chainId].baseTokenBridge).bridgehubDepositBaseToken(
                     _request.chainId,
                     msg.sender,
                     token,
@@ -282,7 +278,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address stateTransition = getStateTransition(_request.chainId);
 
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1Bridge(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -315,7 +311,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             })
         );
 
-        IL1Bridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1SharedBridge(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash

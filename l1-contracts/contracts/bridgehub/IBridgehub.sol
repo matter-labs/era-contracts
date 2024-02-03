@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IL1Bridge} from "../bridge/interfaces/IL1Bridge.sol";
+import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import "../common/Messaging.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../state-transition/libraries/Diamond.sol";
@@ -57,7 +57,7 @@ interface IBridgehub {
 
     function baseToken(uint256 _chainId) external view returns (address);
 
-    function wethBridge() external view returns (IL1Bridge);
+    function sharedBridge() external view returns (IL1SharedBridge);
 
     function tokenBridgeIsRegistered(address _baseTokenBridge) external view returns (bool);
 
@@ -128,7 +128,7 @@ interface IBridgehub {
 
     function addTokenBridge(address _tokenBridge) external;
 
-    function setWethBridge(address _wethBridge) external;
+    function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 }

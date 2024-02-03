@@ -19,7 +19,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_T
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IL1Bridge} from "../../../bridge/interfaces/IL1Bridge.sol";
+import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IBase.sol";
@@ -172,7 +172,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "finalizeEthWithdrawal only available for Era on mailbox");
-        IL1Bridge(s.baseTokenBridge).finalizeWithdrawal(
+        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal(
             ERA_CHAIN_ID,
             _l2BatchNumber,
             _l2MessageIndex,
@@ -182,7 +182,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
     }
 
-    // legacy for era
+    ///  @inheritdoc IMailbox
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,
@@ -209,7 +209,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             _calldata,
             _factoryDeps
         );
-        IL1Bridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
+        IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             msg.sender,
             ETH_TOKEN_ADDRESS,

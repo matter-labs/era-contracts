@@ -6,7 +6,8 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1Bridge, IL1BridgeDeprecated} from "./interfaces/IL1Bridge.sol";
+import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
+import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
@@ -126,9 +127,9 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         address _l1Token,
         uint256 _amount
     ) internal pure returns (bytes memory) {
-        // note we use the IL1BridgeDeprecated only to send L1<>L2 messages,
+        // note we use the IL1ERC20Bridge.finalizeWithdrawal function selector to specify the selector for L1<>L2 messages,
         // and we use this interface so that when the switch happened the old messages could be processed
-        return abi.encodePacked(IL1BridgeDeprecated.finalizeWithdrawal.selector, _to, _l1Token, _amount);
+        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _to, _l1Token, _amount);
     }
 
     /// @return Address of an L2 token counterpart
