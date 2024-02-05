@@ -350,8 +350,8 @@ library SystemContractHelper {
     }
 
     function mimicCall(
-        uint32 gasLimit, 
-        address to, 
+        uint32 gasLimit,
+        address to,
         address whoToMimic,
         bytes memory data,
         bool isConstructorCall,
@@ -406,5 +406,4 @@ library SystemContractHelper {
             pop(staticcall(0, callAddr, 0, 0xFFFF, 0, 0))
         }
     }
-
 }

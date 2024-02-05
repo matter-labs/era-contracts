@@ -43,7 +43,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     mapping(address => bytes) public evmCode;
     mapping(address => bytes32) public evmCodeHash;
 
-    // TODO: this is a hack before rewriting to assembly. 
+    // TODO: this is a hack before rewriting to assembly.
     // This is the only reliable way to pass gas into constructor
     // mapping(address => uint256) public constructorGas;
 
@@ -384,12 +384,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // anyway the "hash" of the original code does not have to be preserved anywhere.
 
         // _initCode is set into evmCode, hence empty calldata is passed here (msg.data[0:0])
-        _performDeployOnAddressEVM(
-             _newAddress, 
-             AccountAbstractionVersion.None, 
-             _initCode, 
-             false
-        );
+        _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode, false);
     }
 
     /// @notice Deploy a certain bytecode on the address.
@@ -449,7 +444,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // Accounts have sequential nonces by default.
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
-        
+
         // When constructing they just get the intrepeter bytecode hash in consutrcting mode
         _constructEVMContract(msg.sender, _newAddress, evmInterpreterHash, _input);
     }
@@ -518,7 +513,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 _bytecodeHash,
         bytes calldata _input
     ) internal {
-        // FIXME: this is a temporary limitation. 
+        // FIXME: this is a temporary limitation.
         // To be removed in the future
         require(_input.length > 0, "The input must be non-empty");
 
@@ -526,7 +521,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         evmCode[_newAddress] = _input;
         constructorReturnGas = 0;
-        
+
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.
         if (value > 0) {
@@ -544,22 +539,15 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // bytes memory input2;
 
         // In case of EVM contracts returnData is the new deployed code
-        bool success = SystemContractHelper.mimicCall(
-            uint32(gasleft()),
-            _newAddress,
-            msg.sender,
-            _input,
-            true,
-            false
-        );
+        bool success = SystemContractHelper.mimicCall(uint32(gasleft()), _newAddress, msg.sender, _input, true, false);
 
         if (!success) {
             // TODO: double check the behavior on EVM
             assembly {
                 // Just propagate the error back
                 // TODO: treat deployment nonce correctly
-                returndatacopy(0,0,returndatasize())
-                revert(0,returndatasize())
+                returndatacopy(0, 0, returndatasize())
+                revert(0, returndatasize())
             }
         }
 
