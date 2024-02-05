@@ -9,15 +9,14 @@ import { getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { getL1TxInfo } from "./utils";
 
-// From openzeppelin Initializable contract implementation.
-const INITIALIZABLE_STORAGE_SLOT = "0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00";
+// From openzeppelin-upgradable v4.9.5 Initializable contract implementation.
+const INITIALIZED_STORAGE_SLOT = 0;
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function getReinitializeTokenCalldata(
-  tokenAddress: string,
   newName: string,
   newSymbol: string,
   ignoreNameGetter: boolean,
@@ -61,7 +60,6 @@ async function getReinitializeTokenTxInfo(
   version: ethers.BigNumberish
 ) {
   const l2Calldata = await getReinitializeTokenCalldata(
-    tokenAddress,
     newName,
     newSymbol,
     ignoreNameGetter,
@@ -126,11 +124,11 @@ async function main() {
       if (cmd.reinitializationVersion === undefined) {
         const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
         const initializableStorageValue = BigNumber.from(
-          await provider.getStorageAt(tokenAddress, INITIALIZABLE_STORAGE_SLOT)
+          await provider.getStorageAt(tokenAddress, INITIALIZED_STORAGE_SLOT)
         );
 
-        // currently it's saved in the first `uint64` struct field
-        const initializedValue = initializableStorageValue.mod(BigNumber.from(2).pow(64));
+        // currently, it's saved in the first `uint8` variable, so should be stored in the lowest byte
+        const initializedValue = initializableStorageValue.mod(BigNumber.from(2).pow(8));
         version = initializedValue.add(1);
       } else {
         version = parseInt(cmd.reinitializationVersion);
