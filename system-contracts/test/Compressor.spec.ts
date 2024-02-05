@@ -171,6 +171,24 @@ describe("Compressor tests", function () {
           await encodeCalldata("KnownCodesStorage", "markBytecodeAsPublished", [zksync.utils.hashBytecode(BYTECODE)])
         );
     });
+
+    // documentation example from https://github.com/matter-labs/zksync-era/blob/main/docs/guides/advanced/compression.md
+    it("documentation example", async () => {
+      const BYTECODE =
+        "0x000000000000000A000000000000000D000000000000000A000000000000000C000000000000000B000000000000000A000000000000000D000000000000000A000000000000000D000000000000000A000000000000000B000000000000000B";
+      const COMPRESSED_BYTECODE =
+        "0x0004000000000000000A000000000000000D000000000000000B000000000000000C000000010000000300020000000100000001000000020002";
+      await setResult("L1Messenger", "sendToL1", [COMPRESSED_BYTECODE], {
+        failure: false,
+        returnData: ethers.constants.HashZero,
+      });
+      await expect(compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE))
+        .to.emit(getMock("KnownCodesStorage"), "Called")
+        .withArgs(
+          0,
+          await encodeCalldata("KnownCodesStorage", "markBytecodeAsPublished", [zksync.utils.hashBytecode(BYTECODE)])
+        );
+    });
   });
 
   describe("verifyCompressedStateDiffs", function () {
