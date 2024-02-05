@@ -59,7 +59,7 @@ interface IStateTransitionManager {
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
-        address _baseTokenBridge,
+        address _sharedBridge,
         address _governor,
         bytes calldata _diamondCut
     ) external;

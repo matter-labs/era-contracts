@@ -202,7 +202,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
-        address _baseTokenBridge,
+        address _sharedBridge,
         address _governor,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
@@ -225,7 +225,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(uint256(uint160(_governor))),
             bytes32(uint256(uint160(validatorTimelock))),
             bytes32(uint256(uint160(_baseToken))),
-            bytes32(uint256(uint160(_baseTokenBridge))),
+            bytes32(uint256(uint160(_sharedBridge))),
             bytes32(storedBatchZero),
             diamondCut.initCalldata
         );

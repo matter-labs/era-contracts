@@ -42,11 +42,6 @@ struct L2TransactionRequestTwoBridgesInner {
 }
 
 interface IBridgehub {
-    struct ChainData {
-        address stateTransitionManager;
-        address baseToken;
-        address baseTokenBridge;
-    }
 
     /// Getters
     function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
@@ -58,10 +53,6 @@ interface IBridgehub {
     function baseToken(uint256 _chainId) external view returns (address);
 
     function sharedBridge() external view returns (IL1SharedBridge);
-
-    function tokenBridgeIsRegistered(address _baseTokenBridge) external view returns (bool);
-
-    function baseTokenBridge(uint256 _chainId) external view returns (address);
 
     function getStateTransition(uint256 _chainId) external view returns (address);
 
@@ -114,7 +105,6 @@ interface IBridgehub {
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-        address _baseTokenBridge,
         uint256 _salt,
         address _governor,
         bytes calldata _initData
@@ -125,8 +115,6 @@ interface IBridgehub {
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
     function addToken(address _token) external;
-
-    function addTokenBridge(address _tokenBridge) external;
 
     function setSharedBridge(address _sharedBridge) external;
 
