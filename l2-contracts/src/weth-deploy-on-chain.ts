@@ -2,7 +2,6 @@ import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { startWethBridgeInitOnChain } from "../../l1-contracts/src.ts/weth-initialize";
 import { GAS_MULTIPLIER, deployedAddressesFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
 
 import * as fs from "fs";
@@ -23,7 +22,7 @@ async function main() {
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .action(async (cmd) => {
-      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      // const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
@@ -45,6 +44,7 @@ async function main() {
         addresses: deployedAddressesFromEnv(),
         verbose: true,
       });
+      deployer;
     });
 
   await program.parseAsync(process.argv);
