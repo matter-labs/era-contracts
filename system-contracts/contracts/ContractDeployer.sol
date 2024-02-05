@@ -125,33 +125,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         emit AccountNonceOrderingUpdated(msg.sender, _nonceOrdering);
     }
 
-    // function prepareEvmExecution(address codeAddress) external returns (bool isConstructor, bytes memory bytecode) {
-    //     EvmContractState state = evmState[codeAddress];
-    //     require(state != EvmContractState.None, "not EVM proxy contract");
-    //     if (state == EvmContractState.ConstructorPending) {
-    //         evmState[codeAddress] = EvmContractState.ConstructorCalled;
-    //         isConstructor = true;
-    //         bytecode = evmCode[codeAddress];
-    //         evmCode[codeAddress] = hex"";
-    //     } else if (state == EvmContractState.Deployed) {
-    //         isConstructor = false;
-    //         bytecode = evmCode[codeAddress];
-    //     } else {
-    //         // EvmContractState.ConstructorCalled
-    //         revert("attempt to re-initialize EVM contract");
-    //     }
-    // }
-
-    // /// @notice Updates the EVMProxy hash to use for new EVM accounts
-    // function updateEVMProxyHash(bytes32 _codeHash) external {
-    //     require(msg.sender == FORCE_DEPLOYER, "Can only be called by FORCE_DEPLOYER_CONTRACT");
-
-    //     bytes32 _oldHash = evmProxyHash;
-    //     evmProxyHash = _codeHash;
-
-    //     emit EVMProxyHashUpdated(_oldHash, _codeHash);
-    // }
-
     /// @notice Calculates the address of a deployed contract via create2
     /// @param _sender The account that deploys the contract.
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
@@ -272,13 +245,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable override returns (address) {
-        bytes calldata _initCodeForDerivation;
-        if (isEVM(msg.sender)) {
-            _initCodeForDerivation = _initCode[32:];
-        } else {
-            _initCodeForDerivation = _initCode;
-        }
-        address newAddress = getNewAddressCreate2EVM(msg.sender, _salt, _initCodeForDerivation);
+        address newAddress = getNewAddressCreate2EVM(msg.sender, _salt, _initCode);
 
         _evmDeployOnAddress(newAddress, _initCode);
 
@@ -558,6 +525,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // Temporary: remember the constructor code.
 
         evmCode[_newAddress] = _input;
+        constructorReturnGas = 0;
         
         uint256 value = msg.value;
         // 1. Transfer the balance to the new address on the constructor call.

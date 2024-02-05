@@ -41,6 +41,10 @@ contract EvmInterpreter {
 
     uint256 constant MEM_OFFSET_INNER = MEM_OFFSET + 32;
 
+    // We can not just pass `gas()`, because it would overflow the gas counter in EVM contracts,
+    // but we can pass a limited value, ensuring that the total ergsLeft will never exceed 2bln.
+    uint256 constant TO_PASS_INF_GAS = 1e9;
+
     function memCost(uint256 memSize) internal pure returns (uint256 gasCost) {
         gasCost = (memSize * memSize) / 512 + (3 * memSize);
     }
@@ -553,10 +557,6 @@ contract EvmInterpreter {
     ) internal returns (bool success, uint256 _gasLeft) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
-        /*
-            TODO Please do not overwrite the returndata
-        */
-        
         if(_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
 
@@ -702,6 +702,189 @@ contract EvmInterpreter {
             }
         }
     }
+
+    function _fetchConstructorReturnGas() internal returns (uint256 _constructorGas) {
+        bytes4 constructorReturnGasSelector = DEPLOYER_SYSTEM_CONTRACT.constructorReturnGas.selector;
+        address to = address(DEPLOYER_SYSTEM_CONTRACT);
+
+        assembly {
+            mstore(0, constructorReturnGasSelector)
+            let success := staticcall(
+                gas(),
+                to,
+                0,
+                4,
+                0,
+                32
+            )
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            _constructorGas := mload(0)
+        }
+    }
+
+    // Should be called after create/create2EVM call
+    function _processCreateResult(bool success) internal returns (address addr, uint256 gasLeft) {
+        // If success, the returndata should be set to 0 + address was returned
+        if(success) {
+            assembly {
+                returndatacopy(0,0,32)
+                addr := mload(0)
+            }
+
+            // reseting the returndata
+            uint256 previousRtSz = SystemContractHelper.getActivePtrDataSize();
+            SystemContractHelper.ptrShrinkIntoActive(uint32(previousRtSz));
+
+            gasLeft = _fetchConstructorReturnGas();
+        } else {
+            SystemContractHelper.loadReturndataIntoActivePtr();
+            
+            uint256 rtsz;
+            assembly {
+                rtsz := returndatasize()
+            }
+
+            if(rtsz > 0) {
+                assembly {
+                    returndatacopy(0, 0, 32)
+                    gasLeft := mload(0)
+                }
+                // Skipping the gas data
+                SystemContractHelper.ptrAddIntoActive(32);
+                SystemContractHelper.ptrShrinkIntoActive(32);
+            }
+        }
+    }
+
+    modifier store3TmpVars(uint256 lastPos, uint256 a, uint256 b, uint256 c) {
+        uint256 pos = lastPos - 96;
+
+        uint256 prev1;
+        uint256 prev2;
+        uint256 prev3;
+
+        assembly {
+            prev1 := mload(pos)
+            prev2 := mload(add(pos, 0x20))
+            prev3 := mload(add(pos, 0x40))
+            
+            mstore(pos, a)
+            mstore(add(pos, 0x20), b)
+            mstore(add(pos, 0x40), c)
+        }
+
+        _;
+
+        assembly {
+            mstore(pos, prev1)
+            mstore(add(pos, 0x20), prev2)
+            mstore(add(pos, 0x40), prev3)
+        }
+    }
+
+    modifier store4TmpVars(uint256 lastPos, uint256 a, uint256 b, uint256 c, uint256 d) {
+        uint256 pos = lastPos - 128;
+
+        uint256 prev1;
+        uint256 prev2;
+        uint256 prev3;
+        uint256 prev4;
+
+        assembly {
+            prev1 := mload(pos)
+            prev2 := mload(add(pos, 0x20))
+            prev3 := mload(add(pos, 0x40))
+            prev4 := mload(add(pos, 0x60))
+            
+            mstore(pos, a)
+            mstore(add(pos, 0x20), b)
+            mstore(add(pos, 0x40), c)
+            mstore(add(pos, 0x60), d)
+        }
+
+        _;
+
+        assembly {
+            mstore(pos, prev1)
+            mstore(add(pos, 0x20), prev2)
+            mstore(add(pos, 0x40), prev3)
+            mstore(add(pos, 0x40), prev4)
+        }
+    }
+
+
+    uint32 constant CREATE_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.createEVM.selector);
+    uint32 constant CREATE2_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.create2EVM.selector);
+
+    function _performCreate(
+        uint256 _calleeGas,
+        uint256 _value,
+        uint256 _inputOffset,
+        uint256 _inputLen
+    ) internal store3TmpVars(_inputOffset, CREATE_SELECTOR, 32, _inputLen) returns (address addr, uint256 gasLeft) {
+        _pushEVMFrame(_calleeGas);
+        
+        address to = address(DEPLOYER_SYSTEM_CONTRACT);
+        bool success;
+
+        uint256 _addr;
+
+        uint256 zkevmGas = TO_PASS_INF_GAS;
+
+        assembly {
+            success := call(
+                zkevmGas,
+                to,
+                _value,
+                sub(_inputOffset, 68),
+                add(_inputLen, 68),
+                0,
+                0
+            )
+        }
+
+        (addr, gasLeft) = _processCreateResult(success);
+
+        _popEVMFrame();
+    } 
+
+    function _performCreate2(
+        uint256 _calleeGas,
+        uint256 _value,
+        uint256 _inputOffset,
+        uint256 _inputLen,
+        uint256 _salt
+    ) internal store4TmpVars(_inputOffset, CREATE2_SELECTOR, _salt, 64, _inputLen) returns (address addr, uint256 gasLeft) { 
+        _pushEVMFrame(_calleeGas);      
+        address to = address(DEPLOYER_SYSTEM_CONTRACT);
+
+        bool success;
+
+        uint256 _addr;
+
+        uint256 zkevmGas = TO_PASS_INF_GAS;
+
+        assembly {
+            success := call(
+                zkevmGas,
+                to,
+                _value,
+                sub(_inputOffset, 100),
+                add(_inputLen, 100),
+                0,
+                32
+            )
+        }
+
+        (addr, gasLeft) = _processCreateResult(success);
+
+        _popEVMFrame();
+    } 
 
 
     // TODO: make sure it also supplies the gas left for the EVM caller
@@ -1180,7 +1363,7 @@ contract EvmInterpreter {
 
                         gasLeft -= expandMemory(dstOst + len);
 
-                        SystemContractHelper.copyActivePtrData(dstOst, ost, len);
+                        SystemContractHelper.copyActivePtrData(memOffset + dstOst, ost, len);
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1468,7 +1651,9 @@ contract EvmInterpreter {
                             (uint256 opcode, bool overflow) = readIP(ip + i);
 
                             if(overflow) {
-                                revert("");
+                                assembly {
+                                    revert(0,0)
+                                }
                             }
 
                             num = (num << 8) | opcode;
@@ -1784,39 +1969,43 @@ contract EvmInterpreter {
                     return (ost + memOffset, len, gasLeft);
                 }
 
-                // create contract opcodes
-                if (opcode == OP_CREATE || opcode == OP_CREATE2) {
-                    // TODO: support this opcode
-                    // uint256 val;
-                    // uint256 ost;
-                    // uint256 len;
+                if(opcode == OP_CREATE) {
+                    uint256 val;    
+                    uint256 ost;
+                    uint256 len;
 
-                    // (val, ost, len, tos) = _pop3StackItems(tos);
+                    // TODO: dobule check whether the 63/64 is applicable here
+                    (val, ost, len, tos) = _pop3StackItems(tos);
 
-                    // if (opcode == OP_CREATE2) {
-                    //     uint256 salt = stack[--tos];
-                    //     stack[tos] = uint256(
-                    //         uint160(DEPLOYER_SYSTEM_CONTRACT.create2EVM{value: val}(bytes32(salt), create_code))
-                    //     );
-                    // } else {
-                    //     stack[tos] = uint256(uint160(DEPLOYER_SYSTEM_CONTRACT.createEVM{value: val}(create_code)));
-                    // }
+                    // todo: whatchout for gas overflows
+                    gasLeft -= 32000 + 200 * len + expandMemory(ost + len);
 
-                    // assembly ("memory-safe") {
-                    //     // restore len
-                    //     mstore(create_code, tmp)
-                    // }
 
-                    // // gasLeft is *before* the create, popGasLeft() is *after* the create
-                    // uint256 frameGasUsed = gasLeft - EVM_GAS_MANAGER.popGasLeft();
-                    // if (frameGasUsed == 0) {
-                    //     // if call used 0 gas means it's non-evm so guesstimate a multiple of ergs used
-                    //     // (`tmp` is re-used here to avoid stack too deep)
-                    //     frameGasUsed = (tmp - gasleft()) / GAS_DIVISOR;
-                    // }
+                    (address addr, uint256 _frameGasLeft) = _performCreate(gasLeft, val, memOffset + ost, len);
 
-                    // gasLeft -= 32000 + 200 * len + frameGasUsed;
-                    // // emit OpcodeTrace(opcode, _ergTracking - gasleft());
+                    gasLeft = _frameGasLeft;
+
+                    tos = pushStackItem(tos, uint256(uint160(addr)));
+                    
+                    continue;
+                }
+
+                if(opcode == OP_CREATE2) {
+                    uint256 val;    
+                    uint256 ost;
+                    uint256 len;
+                    uint256 salt;
+
+                    (val, ost, len, salt, tos) = _pop4StackItems(tos);
+
+                    gasLeft -= 32000 + 200 * len + expandMemory(ost + len);
+
+                    (address addr, uint256 _frameGasLeft) = _performCreate2(gasLeft, val, memOffset + ost, len, salt);
+
+                    tos = pushStackItem(tos, uint256(uint160(addr)));
+
+                    gasLeft = _frameGasLeft;
+                    
                     continue;
                 }
 
@@ -1883,29 +2072,6 @@ contract EvmInterpreter {
             }
         }
     }
-
-    // function _setReturnGas(uint256 _returnGas) internal view {
-    //     bytes4 selector = EVM_GAS_MANAGER.setReturnGas.selector;
-    //     address addr = address(EVM_GAS_MANAGER); 
-    //     assembly {
-    //         mstore(0, selector)
-    //         mstore(4, _returnGas)
-
-    //         let success := call(
-    //             gas(),
-    //             addr,
-    //             0,
-    //             36,
-    //             0,
-    //             0
-    //         )
-
-    //         if iszero(success) {
-    //             // This error should never happen
-    //             revert(0, 0)
-    //         }
-    //     }
-    // }
 
     function _popEVMFrame() internal {
         bytes4 selector = EVM_GAS_MANAGER.popEVMFrame.selector;
@@ -1986,13 +2152,6 @@ contract EvmInterpreter {
         return _evmGas * GAS_DIVISOR;
     }
  
-    // function isSenderEVM() internal view returns (bool) {
-    //     address codeAddress = SystemContractHelper.getCodeAddress();
-
-    //     // codeAddress != this means that we are in delegatecall
-    //     return (codeAddress != address(this)) || _isEVM(msg.sender);
-    // }
-
     fallback() external payable {
         bytes calldata input;
         uint256 evmGas;

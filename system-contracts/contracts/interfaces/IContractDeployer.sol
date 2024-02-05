@@ -128,5 +128,7 @@ interface IContractDeployer {
 
     function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external;
 
+    function constructorReturnGas() external view returns (uint256);
+
     function isEVM(address addr) external view returns (bool);
 }
