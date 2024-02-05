@@ -41,7 +41,6 @@ contract ExecutorFacet is Base, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        // TODO: Adapt to handle dynamic number of blobs
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
@@ -185,11 +184,10 @@ contract ExecutorFacet is Base, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) external nonReentrant onlyValidator {
-        // With the new changes for 4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         require(_newBatchesData.length == 1, "e4");
         // Check that we commit batches after last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
-        require(_newBatchesData.length > 0, "No batches to commit");
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
@@ -520,16 +518,12 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 versionedHashIndex = 0;
 
         require(_pubdataCommitments.length > 0, "pl");
-        require(
-            _pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS &&
-                _pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0,
-            "bs"
-        );
+        require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS, "bd");
+        require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
-            bytes32 blobVersionedHash;
-            blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
+            bytes32 blobVersionedHash = _getBlobVersionedHash(versionedHashIndex);
 
             require(blobVersionedHash != bytes32(0), "vh");
 
@@ -552,12 +546,12 @@ contract ExecutorFacet is Base, IExecutor {
             versionedHashIndex += 1;
         }
 
-        // This check is required because we want to ensure that there arent any extra blobs trying to be published.
+        // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
         bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
         require(versionedHash == bytes32(0), "lh");
 
-        // We verify that for each set of blobHah/blobCommitment are either both empty
+        // We verify that for each set of blobHash/blobCommitment are either both empty
         // or there are values for both.
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             require(

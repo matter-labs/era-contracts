@@ -11,7 +11,7 @@ import {SystemLogKey} from "./Constants.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Smart contract for chunking pubdata into the appropriate size for 4844 blobs.
+ * @notice Smart contract for chunking pubdata into the appropriate size for EIP-4844 blobs.
  */
 contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @notice Chunks pubdata into pieces that can fit into blobs.
@@ -20,11 +20,11 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
     /// @dev We always publish 2 system logs even if our pubdata fits into a single blob. This makes processing logs on L1 easier.
     function chunkAndPublishPubdata(bytes calldata _pubdata) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) {
         require(_pubdata.length <= BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, "pubdata should fit in 2 blobs");
-        // TODO: Update for dynamic number of blobs
+
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         // We allocate to the full size of MAX_NUMBER_OF_BLOBS * BLOB_SIZE_BYTES because we need to pad
-        // the data on the right with 0s if it doesnt take up the full blob
+        // the data on the right with 0s if it doesn't take up the full blob
         bytes memory totalBlobs = new bytes(BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS);
 
         assembly {
@@ -36,8 +36,8 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             uint256 start = BLOB_SIZE_BYTES * i;
 
-            // We break if the pubdata isnt enough to cover 2 blobs. On L1 it is expected that the hash
-            // will be bytes32(0) if a blob isnt going to be used.
+            // We break if the pubdata isn't enough to cover 2 blobs. On L1 it is expected that the hash
+            // will be bytes32(0) if a blob isn't going to be used.
             if (start >= _pubdata.length) {
                 break;
             }

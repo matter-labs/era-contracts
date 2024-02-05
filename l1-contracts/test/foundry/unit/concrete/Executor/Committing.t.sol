@@ -552,7 +552,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bs"));
+        vm.expectRevert(bytes("bd"));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
