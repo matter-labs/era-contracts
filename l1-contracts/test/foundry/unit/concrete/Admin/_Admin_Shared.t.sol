@@ -80,7 +80,8 @@ contract AdminTest is Test {
                 maxL2GasPerBatch: 80_000_000,
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
-            })
+            }),
+            blobVersionedHashGetter: address(0)
         });
 
         adminFacet = new AdminFacet();

@@ -84,6 +84,7 @@ describe("Diamond proxy tests", function () {
         priorityTxMaxGasLimit: 500000,
         initialProtocolVersion: 0,
         feeParams: defaultFeeParams(),
+        blobVersionedHashGetter: ethers.constants.AddressZero
       },
     ]);
 

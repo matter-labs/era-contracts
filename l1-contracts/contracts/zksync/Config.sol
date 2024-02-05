@@ -84,9 +84,6 @@ uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffff
 /// @dev Address of the point evaluation precompile used for 4844 blob verification.
 address constant POINT_EVALUATION_PRECOMPILE_ADDR = address(0x0A);
 
-/// @dev Address of the contracts that functions like HASH_OPCODE_BYTE from EIP 4844
-address constant BLOB_VERSIONED_HASH_GETTER_ADDR = $(BLOB_VERSIONED_HASH_GETTER_ADDR);
-
 /// @dev The overhead for a transaction slot in L2 gas.
 /// It is roughly equal to 80kk/MAX_TRANSACTIONS_IN_BATCH, i.e. how many gas would an L1->L2 transaction
 /// need to pay to compensate for the batch being closed.

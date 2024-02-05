@@ -55,3 +55,48 @@ export async function deployViaCreate2(
 
   return [expectedAddress, tx.hash];
 }
+
+export async function deployBytecodeViaCreate2(
+  deployWallet: ethers.Wallet,
+  contractName: string,
+  bytecode: ethers.BytesLike,
+  create2Salt: string,
+  ethTxOptions: ethers.providers.TransactionRequest,
+  create2FactoryAddress: string,
+  verbose: boolean = true,
+): Promise<[string, string]> {
+  // [address, txHash]
+
+  const log = (msg: string) => {
+    if (verbose) {
+      console.log(msg);
+    }
+  };
+  log(`Deploying ${contractName}`);
+
+  const create2Factory = SingletonFactoryFactory.connect(create2FactoryAddress, deployWallet);
+  const expectedAddress = ethers.utils.getCreate2Address(
+    create2Factory.address,
+    create2Salt,
+    ethers.utils.keccak256(bytecode)
+  );
+
+  const deployedBytecodeBefore = await deployWallet.provider.getCode(expectedAddress);
+  if (ethers.utils.hexDataLength(deployedBytecodeBefore) > 0) {
+    log(`Contract ${contractName} already deployed`);
+    return [expectedAddress, ethers.constants.HashZero];
+  }
+
+  const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
+  const receipt = await tx.wait();
+
+  const gasUsed = receipt.gasUsed;
+  log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
+
+  const deployedBytecodeAfter = await deployWallet.provider.getCode(expectedAddress);
+  if (ethers.utils.hexDataLength(deployedBytecodeAfter) == 0) {
+    throw new Error("Failed to deploy bytecode via create2 factory");
+  }
+
+  return [expectedAddress, tx.hash];
+}
