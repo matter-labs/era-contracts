@@ -6,21 +6,21 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
+import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
+import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ETH_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2ERC20Bridge is IL2Bridge, Initializable {
+contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev The address of the L1 bridge counterpart.
     address public override l1Bridge;
 
@@ -33,6 +33,12 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
 
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
+
+    /// @dev WETH token address on L2.
+    address public l2WrappedBaseTokenAddress;
+
+    /// @dev isEthBaseToken
+    address internal l1BaseTokenAddress;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -47,13 +53,21 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     function initialize(
         address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
+        address _l2WrappedBaseTokenAddress,
+        address _l1BaseTokenAddress,
         address _aliasedOwner
-    ) external initializer {
+    ) external reinitializer(2) {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
+        require(_l2WrappedBaseTokenAddress != address(0), "L2 ShB wrong weth address");
+        require(_l1BaseTokenAddress != address(0), "L2 ShB wrong l1 base token address");
+        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
+
 
         l1Bridge = _l1Bridge;
+        l2WrappedBaseTokenAddress = _l2WrappedBaseTokenAddress;
+        l1BaseTokenAddress = _l1BaseTokenAddress;
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -76,22 +90,28 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     ) external payable override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge, "mq");
-        // The passed value should be 0 for ERC20 bridge.
-        require(msg.value == 0, "Value should be 0 for ERC20 bridge");
+        if (_l1Token == l1BaseTokenAddress) {
+            require(msg.value == _amount, "Amount mismatch");
+            // Deposit WETH to L2 receiver.
+            IL2WrappedBaseToken(l2WrappedBaseTokenAddress).depositTo{value: msg.value}(_l2Receiver);
+            emit FinalizeDeposit(_l1Sender, _l2Receiver, l2WrappedBaseTokenAddress, _amount);
 
-        address expectedL2Token = l2TokenAddress(_l1Token);
-        address currentL1Token = l1TokenAddress[expectedL2Token];
-        if (currentL1Token == address(0)) {
-            address deployedToken = _deployL2Token(_l1Token, _data);
-            require(deployedToken == expectedL2Token, "mt");
-            l1TokenAddress[expectedL2Token] = _l1Token;
         } else {
-            require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
+            require(msg.value == 0, "Value should be 0 for ERC20 bridge");
+    
+            address expectedL2Token = l2TokenAddress(_l1Token);
+            address currentL1Token = l1TokenAddress[expectedL2Token];
+            if (currentL1Token == address(0)) {
+                address deployedToken = _deployL2Token(_l1Token, _data);
+                require(deployedToken == expectedL2Token, "mt");
+                l1TokenAddress[expectedL2Token] = _l1Token;
+            } else {
+                require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
+            }
+
+            IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
+            emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
         }
-
-        IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
-
-        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -110,13 +130,23 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
+        require(_amount > 0, "Amount cannot be zero");
+
         IL2StandardToken(_l2Token).bridgeBurn(msg.sender, _amount);
 
         address l1Token = l1TokenAddress[_l2Token];
         require(l1Token != address(0), "yh");
 
-        bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
-        L2ContractHelper.sendMessageToL1(message);
+        if (_l2Token == l2WrappedBaseTokenAddress){
+            // WETH withdrawal message.
+            bytes memory wethMessage = abi.encodePacked(_l1Receiver);
+
+            // Withdraw ETH to L1 bridge.
+            L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
+        } else {
+            bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
+            L2ContractHelper.sendMessageToL1(message);
+        }
 
         emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, _amount);
     }
@@ -134,6 +164,9 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
+        if (_l1Token == l1BaseTokenAddress) {
+            return l2WrappedBaseTokenAddress;
+        }
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
 
@@ -163,5 +196,10 @@ contract L2ERC20Bridge is IL2Bridge, Initializable {
         // The deployment should be successful and return the address of the proxy
         require(success, "mk");
         proxy = BeaconProxy(abi.decode(returndata, (address)));
+    }
+
+    receive() external payable {
+        require(msg.sender == l2WrappedBaseTokenAddress, "pd");
+        emit BaseTokenReceived(msg.value);
     }
 }

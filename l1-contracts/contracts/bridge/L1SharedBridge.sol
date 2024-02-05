@@ -300,10 +300,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         } else { 
             gettersData = _getERC20Getters(_l1Token);
         }
-
+        address l1Token = _l1Token == l1WethAddress ? ETH_TOKEN_ADDRESS : _l1Token;
         txCalldata = abi.encodeCall(
             IL2Bridge.finalizeDeposit,
-            (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData)
+            (_l1Sender, _l2Receiver, l1Token, _amount, gettersData)
         );
     }
 

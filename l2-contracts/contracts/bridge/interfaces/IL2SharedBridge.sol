@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 /// @author Matter Labs
-interface IL2Bridge {
+interface IL2SharedBridge {
     event FinalizeDeposit(
         address indexed l1Sender,
         address indexed l2Receiver,
@@ -17,6 +17,9 @@ interface IL2Bridge {
         address indexed l2Token,
         uint256 amount
     );
+
+    /// @dev Event emitted when baseToken is received by the contract.
+    event BaseTokenReceived(uint256 amount);
 
     function finalizeDeposit(
         address _l1Sender,
