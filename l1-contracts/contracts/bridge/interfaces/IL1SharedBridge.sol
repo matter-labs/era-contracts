@@ -103,7 +103,7 @@ interface IL1SharedBridge {
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external ;
+    ) external;
 
     function bridgehub() external view returns (IBridgehub);
 

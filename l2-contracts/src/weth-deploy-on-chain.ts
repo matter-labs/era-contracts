@@ -45,8 +45,6 @@ async function main() {
         addresses: deployedAddressesFromEnv(),
         verbose: true,
       });
-
-      
     });
 
   await program.parseAsync(process.argv);

@@ -39,11 +39,7 @@ export async function initializeErc20Bridge(
   // const l2TokenProxyBytecodeHash = ethers.utils.keccak256(L2_STANDARD_ERC20_PROXY_BYTECODE);
 
   const tx1 = await erc20Bridge.initialize();
-  const tx2 = await erc20Bridge.initializeV2(
-    l1WethAddress,
-    l1GovernorAddress,
-    { nonce: nonce + 1, gasPrice }
-  );
+  const tx2 = await erc20Bridge.initializeV2(l1WethAddress, l1GovernorAddress, { nonce: nonce + 1, gasPrice });
 
   const txs = [tx1, tx2];
   if (deployer.verbose) {

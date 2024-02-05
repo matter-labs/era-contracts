@@ -64,7 +64,6 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(_l1BaseTokenAddress != address(0), "L2 ShB wrong l1 base token address");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
 
-
         l1Bridge = _l1Bridge;
         l2WrappedBaseTokenAddress = _l2WrappedBaseTokenAddress;
         l1BaseTokenAddress = _l1BaseTokenAddress;
@@ -95,10 +94,9 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             // Deposit WETH to L2 receiver.
             IL2WrappedBaseToken(l2WrappedBaseTokenAddress).depositTo{value: msg.value}(_l2Receiver);
             emit FinalizeDeposit(_l1Sender, _l2Receiver, l2WrappedBaseTokenAddress, _amount);
-
         } else {
             require(msg.value == 0, "Value should be 0 for ERC20 bridge");
-    
+
             address expectedL2Token = l2TokenAddress(_l1Token);
             address currentL1Token = l1TokenAddress[expectedL2Token];
             if (currentL1Token == address(0)) {
@@ -137,7 +135,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address l1Token = l1TokenAddress[_l2Token];
         require(l1Token != address(0), "yh");
 
-        if (_l2Token == l2WrappedBaseTokenAddress){
+        if (_l2Token == l2WrappedBaseTokenAddress) {
             // WETH withdrawal message.
             bytes memory wethMessage = abi.encodePacked(_l1Receiver);
 

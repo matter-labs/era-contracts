@@ -82,7 +82,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-        uint256 , //_salt
+        uint256, //_salt
         address _l2Governor,
         bytes calldata _initData
     ) external onlyOwner nonReentrant returns (uint256 chainId) {
@@ -190,18 +190,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                sharedBridge.bridgehubDepositBaseToken{
-                    value: _request.mintValue
-                }(_request.chainId, msg.sender, token, _request.mintValue);
-            } else {
-                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
-                // note we have to pass token, as a bridge might have multiple tokens.
-                sharedBridge.bridgehubDepositBaseToken(
+                sharedBridge.bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
                     msg.sender,
                     token,
                     _request.mintValue
                 );
+            } else {
+                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+                // note we have to pass token, as a bridge might have multiple tokens.
+                sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
             }
         }
 
@@ -240,18 +238,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                sharedBridge.bridgehubDepositBaseToken{
-                    value: _request.mintValue
-                }(_request.chainId, msg.sender, token, _request.mintValue);
-            } else {
-                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
-                // note we have to pass token, as a bridge might have multiple tokens.
-                sharedBridge.bridgehubDepositBaseToken(
+                sharedBridge.bridgehubDepositBaseToken{value: _request.mintValue}(
                     _request.chainId,
                     msg.sender,
                     token,
                     _request.mintValue
                 );
+            } else {
+                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
+                // note we have to pass token, as a bridge might have multiple tokens.
+                sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
             }
         }
 

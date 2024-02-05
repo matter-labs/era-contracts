@@ -73,13 +73,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = bytes32(uint256(uint160(_l1Token)));
 
-        return
-            L2ContractHelper.computeCreate2Address(
-                l2Bridge,
-                salt,
-                l2TokenProxyBytecodeHash,
-                constructorInputHash
-            );
+        return L2ContractHelper.computeCreate2Address(l2Bridge, salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -143,7 +137,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable returns (bytes32 l2TxHash) {
-
         uint256 amount = _depositFundsToSharedBridge(msg.sender, _l1Token, _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
@@ -163,7 +156,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
-        /// @dev Transfers tokens from the depositor address to the smart contract address
+    /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
     function _depositFundsToSharedBridge(address _from, address _token, uint256 _amount) internal returns (uint256) {
         IERC20 token = IERC20(_token);
@@ -208,7 +201,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
     }
 
-    /// @dev We should only call this 
+    /// @dev We should only call this
     function finalizeWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,

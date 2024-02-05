@@ -42,7 +42,6 @@ struct L2TransactionRequestTwoBridgesInner {
 }
 
 interface IBridgehub {
-
     /// Getters
     function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
 

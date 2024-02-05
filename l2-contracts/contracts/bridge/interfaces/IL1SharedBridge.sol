@@ -15,4 +15,3 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 }
-
