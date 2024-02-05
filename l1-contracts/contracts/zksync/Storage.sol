@@ -125,7 +125,6 @@ struct AppStorage {
     mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
     PriorityQueue.Queue priorityQueue;
-    //20
     /// @dev The smart contract that manages the list with permission to call contract functions
     address __DEPRECATED_allowList;
     /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
@@ -145,7 +144,6 @@ struct AppStorage {
     uint256 priorityTxMaxGasLimit;
     /// @dev Storage of variables needed for upgrade facet
     UpgradeStorage __DEPRECATED_upgrades;
-    //34
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
@@ -172,7 +170,6 @@ struct AppStorage {
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
-    /// @notice Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
+    /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
     address blobVersionedHashGetter;
-    //50 
 }
