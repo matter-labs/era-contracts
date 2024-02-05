@@ -8,7 +8,6 @@ import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract Upgrade_4844 is BaseZkSyncUpgrade {
-
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
