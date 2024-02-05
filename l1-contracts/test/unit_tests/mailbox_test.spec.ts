@@ -70,7 +70,7 @@ describe("Mailbox tests", function () {
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
         feeParams: defaultFeeParams(),
-        blobVersionedHashGetter: ethers.constants.AddressZero
+        blobVersionedHashGetter: ethers.constants.AddressZero,
       },
     ]);
 

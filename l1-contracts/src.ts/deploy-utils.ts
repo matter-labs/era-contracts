@@ -63,7 +63,7 @@ export async function deployBytecodeViaCreate2(
   create2Salt: string,
   ethTxOptions: ethers.providers.TransactionRequest,
   create2FactoryAddress: string,
-  verbose: boolean = true,
+  verbose: boolean = true
 ): Promise<[string, string]> {
   // [address, txHash]
 
