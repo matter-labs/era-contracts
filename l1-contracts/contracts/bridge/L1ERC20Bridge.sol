@@ -96,7 +96,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-       return deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        return deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
     }
 
     /// @notice Legacy deposit method with no chainId, use another `deposit` method instead.
@@ -145,7 +145,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 balanceAfter = _token.balanceOf(address(sharedBridge));
 
         return balanceAfter - balanceBefore;
-        
     }
 
     /// @notice Legacy method

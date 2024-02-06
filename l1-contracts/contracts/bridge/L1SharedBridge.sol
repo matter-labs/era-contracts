@@ -208,17 +208,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         if (bridgehub.baseToken(_chainId) == _l1Token) {
             // we are depositing wrapped baseToken
             amount = _l2Value;
-            require(msg.value == 0, "EB m.v > 0 for BH d.it 1"); 
+            require(msg.value == 0, "EB m.v > 0 for BH d.it 1");
             require(_withdrawAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
             txDataHash = 0x00; // we don't save for baseToken deposits, as the refundRecipient will receive the funds if the tx fails
         } else if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
             amount = _withdrawAmount + msg.value;
-            txDataHash =  keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
-
+            txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         } else {
             require(msg.value == 0, "EB m.v > 0 for BH d.it 2");
             amount = _withdrawAmount;
-            txDataHash =  keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+            txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         }
 
         require(amount != 0, "6T"); // empty deposit amount
@@ -226,7 +225,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += amount;
         }
-        
 
         {
             // Request the finalization of the deposit on the L2 side
@@ -252,7 +250,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        if (_txDataHash != 0x00){
+        if (_txDataHash != 0x00) {
             require(depositHappened[_chainId][_txHash] == 0x00, "EB tx hap");
             depositHappened[_chainId][_txHash] = _txDataHash;
             emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
