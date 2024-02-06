@@ -36,18 +36,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
-        BridgehubL2TransactionRequest calldata _request
+        BridgehubL2TransactionRequest memory _request
     ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = _requestL2TransactionSender(BridgehubL2TransactionRequestInner({
-            sender: _request.sender,
-            contractL2: _request.contractL2,
-            mintValue: _request.mintValue,
-            l2Value: _request.l2Value,
-            l2GasLimit: _request.l2GasLimit,
-            l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-            l1GasPriceConverted: _request.l1GasPriceConverted,
-            refundRecipient: _request.refundRecipient
-        }), _request.l2Calldata, _request.factoryDeps);
+        canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
     /// @inheritdoc IMailbox
@@ -203,18 +194,18 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     ) external payable returns (bytes32 canonicalTxHash) {
         require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
-            BridgehubL2TransactionRequestInner({
+            BridgehubL2TransactionRequest({
                 sender: msg.sender,
                 contractL2: _contractL2,
                 mintValue: msg.value,
                 l2Value: _l2Value,
                 l2GasLimit: _l2GasLimit,
+                l2Calldata: _calldata,
                 l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
                 l1GasPriceConverted: tx.gasprice,
+                factoryDeps: _factoryDeps,
                 refundRecipient: _refundRecipient
-            }),
-            _calldata,
-            _factoryDeps
+            })
         );
         IL1SharedBridge(s.baseTokenBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
@@ -225,9 +216,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     function _requestL2TransactionSender(
-        BridgehubL2TransactionRequestInner memory _request,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps
+        BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
@@ -254,14 +243,14 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         params.l1GasPriceConverted = _request.l1GasPriceConverted;
         params.refundRecipient = _request.refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _calldata, _factoryDeps, false);
+        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _request.l2Calldata, _request.factoryDeps, false);
     }
 
     function _requestL2Transaction(
         uint256 _mintValue,
         WritePriorityOpParams memory _params,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps,
+        bytes memory _calldata,
+        bytes[] memory _factoryDeps,
         bool _isFree
     ) internal returns (bytes32 canonicalTxHash) {
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
@@ -291,8 +280,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     function _serializeL2Transaction(
         WritePriorityOpParams memory _priorityOpParams,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps
+        bytes memory _calldata,
+        bytes[] memory _factoryDeps
     ) internal pure returns (L2CanonicalTransaction memory transaction) {
         transaction = L2CanonicalTransaction({
             txType: PRIORITY_OPERATION_L2_TX_TYPE,
@@ -318,8 +307,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @notice Stores a transaction record in storage & send event about that
     function _writePriorityOp(
         WritePriorityOpParams memory _priorityOpParams,
-        bytes calldata _calldata,
-        bytes[] calldata _factoryDeps
+        bytes memory _calldata,
+        bytes[] memory _factoryDeps
     ) internal returns (bytes32 canonicalTxHash) {
         L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams, _calldata, _factoryDeps);
 
@@ -354,7 +343,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
     function _hashFactoryDeps(
-        bytes[] calldata _factoryDeps
+        bytes[] memory _factoryDeps
     ) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);

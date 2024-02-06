@@ -51,7 +51,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1Bridge The address of the L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
-    /// @param _l2WrappedBaseTokenAddress, the address of the deployed L2 Wrapped Base Token contract, an instance of WETH9
+    /// @param _l2WrappedBaseTokenAddress, the address of L2 Wrapped Base Token contract, an instance of WETH9. Has to be deployed separately.
     /// @param _l1BaseTokenAddress, the address of the base token on L1, if ether, this will be ETH_TOKEN_ADDRESS = address(1)
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
