@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
-vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "ad-update-sc-paths" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
+vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "sb-short-term-fee-model-1-4-1" }
 
 colored = "2.0"
 hex = "0.4"

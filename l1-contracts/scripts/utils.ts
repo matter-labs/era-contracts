@@ -8,8 +8,26 @@ const warning = chalk.bold.yellow;
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
+interface SystemConfig {
+  requiredL2GasPricePerPubdata: number;
+  priorityTxMinimalGasPrice: number;
+  priorityTxMaxGasPerBatch: number;
+  priorityTxPubdataPerBatch: number;
+  priorityTxBatchOverheadL1Gas: number;
+  priorityTxMaxPubdata: number;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+const SYSTEM_CONFIG_JSON = require("../../SystemConfig.json");
+
+export const SYSTEM_CONFIG: SystemConfig = {
+  requiredL2GasPricePerPubdata: SYSTEM_CONFIG_JSON.REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMinimalGasPrice: SYSTEM_CONFIG_JSON.PRIORITY_TX_MINIMAL_GAS_PRICE,
+  priorityTxMaxGasPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_GAS_PER_BATCH,
+  priorityTxPubdataPerBatch: SYSTEM_CONFIG_JSON.PRIORITY_TX_PUBDATA_PER_BATCH,
+  priorityTxBatchOverheadL1Gas: SYSTEM_CONFIG_JSON.PRIORITY_TX_BATCH_OVERHEAD_L1_GAS,
+  priorityTxMaxPubdata: SYSTEM_CONFIG_JSON.PRIORITY_TX_MAX_PUBDATA,
+};
 
 export function web3Url() {
   return process.env.ETH_CLIENT_WEB3_URL.split(",")[0] as string;
@@ -150,4 +168,57 @@ export function getTokens(network: string): L1Token[] {
       encoding: "utf-8",
     })
   );
+}
+
+export interface DeployedAddresses {
+  ZkSync: {
+    MailboxFacet: string;
+    AdminFacet: string;
+    ExecutorFacet: string;
+    GettersFacet: string;
+    Verifier: string;
+    DiamondInit: string;
+    DiamondUpgradeInit: string;
+    DefaultUpgrade: string;
+    DiamondProxy: string;
+  };
+  Bridges: {
+    ERC20BridgeImplementation: string;
+    ERC20BridgeProxy: string;
+    WethBridgeImplementation: string;
+    WethBridgeProxy: string;
+  };
+  Governance: string;
+  ValidatorTimeLock: string;
+  Create2Factory: string;
+}
+
+export function deployedAddressesFromEnv(): DeployedAddresses {
+  return {
+    ZkSync: {
+      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
+      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
+      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
+      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
+      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
+      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
+      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
+      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
+      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
+    },
+    Bridges: {
+      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
+      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
+      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
+      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
+    },
+    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
+    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+  };
+}
+
+export enum PubdataPricingMode {
+  Rollup = 0,
+  Porter = 1,
 }

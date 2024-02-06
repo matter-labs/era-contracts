@@ -5,10 +5,15 @@ pragma solidity 0.8.20;
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 
-/// @dev Solidity does not allow exporting modifiers via libraries, so
-/// the only way to do reuse modifiers is to have a base contract
-/// @dev Never add storage variables into this contract as some
-/// system contracts rely on this abstract contract as on interface!
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice An abstract contract that is used to reuse modifiers across the system contracts.
+ * @dev Solidity does not allow exporting modifiers via libraries, so
+ * the only way to do reuse modifiers is to have a base contract
+ * @dev Never add storage variables into this contract as some
+ * system contracts rely on this abstract contract as on interface!
+ */
 abstract contract ISystemContract {
     /// @notice Modifier that makes sure that the method
     /// can only be called via a system call.

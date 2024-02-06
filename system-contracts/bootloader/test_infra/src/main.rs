@@ -5,6 +5,7 @@ use multivm::interface::{
 };
 use multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
 use once_cell::sync::OnceCell;
+use zksync_types::fee_model::BatchFeeInput;
 use std::process;
 
 use multivm::interface::{ExecutionResult, Halt};
@@ -20,7 +21,7 @@ use zksync_state::{
     InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
-use zksync_types::{block::legacy_miniblock_hash, Address, L1BatchNumber, MiniblockNumber, U256};
+use zksync_types::{block::MiniblockHasher, Address, L1BatchNumber, MiniblockNumber, U256};
 use zksync_types::{L2ChainId, Transaction};
 use zksync_utils::bytecode::hash_bytecode;
 use zksync_utils::{bytes_to_be_words, u256_to_h256};
@@ -72,15 +73,14 @@ fn execute_internal_bootloader_test() {
         previous_batch_hash: None,
         number: L1BatchNumber::from(1),
         timestamp: 14,
-        l1_gas_price: 250_000_000,
-        fair_l2_gas_price: 250_000_000,
+        fee_input: BatchFeeInput::sensible_l1_pegged_default(),
         fee_account: Address::default(),
 
         enforced_base_fee: None,
         first_l2_block: L2BlockEnv {
             number: 1,
             timestamp: 15,
-            prev_block_hash: legacy_miniblock_hash(MiniblockNumber(0)),
+            prev_block_hash: MiniblockHasher::legacy_hash(MiniblockNumber(0)),
             max_virtual_blocks_to_create: 1,
         },
     };
