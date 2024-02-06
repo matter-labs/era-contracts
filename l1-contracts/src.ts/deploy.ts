@@ -437,7 +437,7 @@ export class Deployer {
     }
   }
 
-  public async deployblobVersionedHashRetriever(
+  public async deployBlobVersionedHashRetriever(
     create2Salt: string,
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
