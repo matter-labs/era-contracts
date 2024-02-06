@@ -38,7 +38,16 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = _requestL2TransactionSender(_request, _request.l2Calldata, _request.factoryDeps);
+        canonicalTxHash = _requestL2TransactionSender(BridgehubL2TransactionRequestInner({
+            sender: _request.sender,
+            contractL2: _request.contractL2,
+            mintValue: _request.mintValue,
+            l2Value: _request.l2Value,
+            l2GasLimit: _request.l2GasLimit,
+            l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
+            l1GasPriceConverted: _request.l1GasPriceConverted,
+            refundRecipient: _request.refundRecipient
+        }), _request.l2Calldata, _request.factoryDeps);
     }
 
     /// @inheritdoc IMailbox
@@ -194,16 +203,14 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     ) external payable returns (bytes32 canonicalTxHash) {
         require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for eth base token");
         canonicalTxHash = _requestL2TransactionSender(
-            BridgehubL2TransactionRequest({
+            BridgehubL2TransactionRequestInner({
                 sender: msg.sender,
                 contractL2: _contractL2,
                 mintValue: msg.value,
                 l2Value: _l2Value,
-                l2Calldata: new bytes(0),
                 l2GasLimit: _l2GasLimit,
                 l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
                 l1GasPriceConverted: tx.gasprice,
-                factoryDeps: new bytes[](0),
                 refundRecipient: _refundRecipient
             }),
             _calldata,
@@ -218,7 +225,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     function _requestL2TransactionSender(
-        BridgehubL2TransactionRequest memory _request,
+        BridgehubL2TransactionRequestInner memory _request,
         bytes calldata _calldata,
         bytes[] calldata _factoryDeps
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {

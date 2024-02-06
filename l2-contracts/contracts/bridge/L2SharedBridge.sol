@@ -15,6 +15,8 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ETH_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
+import {L2WrappedBaseToken} from "./L2WrappedBaseToken.sol";
+import {ERA_CHAIN_ID, ERA_WETH_ADDRESS} from "../Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -49,6 +51,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1Bridge The address of the L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @param _l2WrappedBaseTokenAddress, the address of the deployed L2 Wrapped Base Token contract, an instance of WETH9
+    /// @param _l1BaseTokenAddress, the address of the base token on L1, if ether, this will be ETH_TOKEN_ADDRESS = address(1)
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1Bridge,
@@ -69,9 +73,14 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         l1BaseTokenAddress = _l1BaseTokenAddress;
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
-        address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
-        l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-        l2TokenBeacon.transferOwnership(_aliasedOwner);
+
+        if (block.chainid != ERA_CHAIN_ID) {
+            address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
+            l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            l2TokenBeacon.transferOwnership(_aliasedOwner);
+        } else {
+            // l2StandardToken and l2TokenBeacon are already deployed on ERA
+        }
     }
 
     /// @notice Finalize the deposit and mint funds

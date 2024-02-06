@@ -9,6 +9,17 @@ import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2Transacti
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailbox is IZkSyncStateTransitionBase {
+    struct BridgehubL2TransactionRequestInner {
+        address sender;
+        address contractL2;
+        uint256 mintValue;
+        uint256 l2Value;
+        uint256 l2GasLimit;
+        uint256 l2GasPerPubdataByteLimit;
+        uint256 l1GasPriceConverted;
+        address refundRecipient;
+    }
+
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
