@@ -195,7 +195,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             (address, uint256, address)
         );
         if (_withdrawAmount != 0) {
-            /// This breaks the _depositeFunds function, it returns 0, as our balance doesn't increase
+            /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
             /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
             require(_prevMsgSender != address(this), "EB calling itself");
 
@@ -203,16 +203,22 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             require(withdrawAmount == _withdrawAmount, "5T"); // The token has non-standard transfer logic
         }
         uint256 amount;
+        bytes32 txDataHash;
 
-        if (bridgehub.baseToken(_chainId) != _l1Token) {
+        if (bridgehub.baseToken(_chainId) == _l1Token) {
             // we are depositing wrapped baseToken
             amount = _l2Value;
+            require(msg.value == 0, "EB m.v > 0 for BH d.it 1"); 
             require(_withdrawAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
+            txDataHash = 0x00;
         } else if ((_l1Token == ETH_TOKEN_ADDRESS) && (_l1Token == l1WethAddress)) {
             amount = _withdrawAmount + msg.value;
+            txDataHash =  keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+
         } else {
-            require(msg.value == 0, "EB m.v > 0 for BH dep");
+            require(msg.value == 0, "EB m.v > 0 for BH d.it 2");
             amount = _withdrawAmount;
+            txDataHash =  keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         }
 
         require(amount != 0, "6T"); // empty deposit amount
@@ -220,7 +226,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += amount;
         }
-        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+        
 
         {
             // Request the finalization of the deposit on the L2 side
@@ -246,9 +252,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        require(depositHappened[_chainId][_txHash] == 0x00, "EB tx hap");
-        depositHappened[_chainId][_txHash] = _txDataHash;
-        emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
+        if (_txDataHash != 0x00){
+            require(depositHappened[_chainId][_txHash] == 0x00, "EB tx hap");
+            depositHappened[_chainId][_txHash] = _txDataHash;
+            emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
+        }
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
@@ -463,7 +471,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
-        if ((_chainId == ERA_CHAIN_ID) && ((_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber))) {
+        if ((_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber)) {
             // in this case we have to check we don't double withdraw ether
             // we are not fully finalized if eth has not been withdrawn
             // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
@@ -605,8 +613,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            // this is for legacy withdrawals started before the upgrade
-            // this condition should not be needed in the next version
+            // this is for withdrawals from weth bridged to Era via the legacy ERC20Bridge.
             if (l1Token == l1WethAddress) {
                 wrapToWeth = true;
             }
@@ -717,7 +724,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         emit DepositInitiatedSharedBridge(ERA_CHAIN_ID, l2TxHash, _msgSender, _l2Receiver, _l1Token, _amount);
     }
 
-    /// @dev internal to avoid stack too deep error. Only used for eth based chains
+    /// @dev internal to avoid stack too deep error. Only used for Era legacy bridge deposits
     function _depositSendTx(
         uint256 _chainId,
         uint256 _mintValue,
