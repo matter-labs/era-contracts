@@ -190,17 +190,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(l2BridgeAddress[_chainId] != address(0), "EB b. n dep");
 
-        (address _l1Token, uint256 _withdrawAmount, address _l2Receiver) = abi.decode(
+        (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
         );
-        if (_withdrawAmount != 0) {
+        if (_depositAmount != 0) {
             /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
             /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
             require(_prevMsgSender != address(this), "EB calling itself");
 
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _withdrawAmount);
-            require(withdrawAmount == _withdrawAmount, "5T"); // The token has non-standard transfer logic
+            uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _depositAmount);
+            require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
         uint256 amount;
         bytes32 txDataHash;
@@ -209,14 +209,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // we are depositing wrapped baseToken
             amount = _l2Value;
             require(msg.value == 0, "EB m.v > 0 for BH d.it 1");
-            require(_withdrawAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
+            require(_depositAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
             txDataHash = 0x00; // we don't save for baseToken deposits, as the refundRecipient will receive the funds if the tx fails
         } else if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
-            amount = _withdrawAmount + msg.value;
+            amount = _depositAmount + msg.value;
             txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         } else {
             require(msg.value == 0, "EB m.v > 0 for BH d.it 2");
-            amount = _withdrawAmount;
+            amount = _depositAmount;
             txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         }
 
