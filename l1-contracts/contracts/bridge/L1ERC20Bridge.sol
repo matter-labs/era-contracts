@@ -8,8 +8,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 
-import {IWETH9} from "./interfaces/IWETH9.sol";
-
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
@@ -142,20 +140,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
     function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        address l1WethAddress = sharedBridge.l1WethAddress();
-        if (_token == l1WethAddress){
-            uint256 balanceBefore = address(this).balance;
-            // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
-            IWETH9(l1WethAddress).withdraw(_amount);
-            uint256 balanceAfter = address(this).balance;
-            require(balanceAfter - balanceBefore == _amount, "EB: w eth w");
-        } else {}
-            uint256 balanceBefore = _token.balanceOf(address(sharedBridge));
-            _token.safeTransferFrom(_from, address(sharedBridge), _amount);
-            uint256 balanceAfter = _token.balanceOf(address(sharedBridge));
+        uint256 balanceBefore = _token.balanceOf(address(sharedBridge));
+        _token.safeTransferFrom(_from, address(sharedBridge), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(sharedBridge));
 
-            return balanceAfter - balanceBefore;
-        }
+        return balanceAfter - balanceBefore;
+        
     }
 
     /// @notice Legacy method

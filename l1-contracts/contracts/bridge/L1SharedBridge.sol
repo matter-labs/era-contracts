@@ -689,6 +689,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             }
 
             /// we don't deposit the funds here, as we did that in the legacy bridge
+            /// we do need to unwrap weth though
+            if (_l1Token == l1WethAddress) {
+                uint256 balanceBefore = address(this).balance;
+                // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
+                IWETH9(l1WethAddress).withdraw(_amount);
+                uint256 balanceAfter = address(this).balance;
+                require(balanceAfter - balanceBefore == _amount, "EB: w eth w");
+            }
         }
         bytes memory l2TxCalldata = _getDepositL2Calldata(ERA_CHAIN_ID, _msgSender, _l2Receiver, _l1Token, _amount);
 
