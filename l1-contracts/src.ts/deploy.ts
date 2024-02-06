@@ -437,7 +437,10 @@ export class Deployer {
     }
   }
 
-  public async deployblobVersionedHashRetriever(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployblobVersionedHashRetriever(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
     // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
     const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
