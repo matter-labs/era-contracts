@@ -4,12 +4,11 @@ import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { render, renderFile } from "template-file";
 import { utils } from "zksync-web3";
-import { SYSTEM_CONTRACTS, getRevertSelector, getTransactionUtils } from "./constants";
-import type { ForceDeployment } from "./utils";
+import { getRevertSelector, getTransactionUtils } from "./constants";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const preprocess = require("preprocess");
-const SYSTEM_PARAMS = require("../SystemConfig.json");
+const SYSTEM_PARAMS = require("../../SystemConfig.json");
 /* eslint-enable@typescript-eslint/no-var-requires */
 
 const OUTPUT_DIR = "bootloader/build";
@@ -39,50 +38,9 @@ function getPaddedSelector(contractName: string, method: string): string {
   return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-function getSystemContextExpectedHash() {
-  const artifact = hre.artifacts.readArtifactSync("SystemContext");
-  return ethers.utils.hexlify(utils.hashBytecode(artifact.bytecode));
-}
-
-function upgradeSystemContextCalldata() {
-  // Here we need to encode the force deployment for the system context contract as well as transform
-  // it into writing of the calldata into the bootloader memory.
-
-  const newHash = getSystemContextExpectedHash();
-  const artifact = new ethers.utils.Interface(hre.artifacts.readArtifactSync("ContractDeployer").abi);
-
-  const forceDeplyment: ForceDeployment = {
-    bytecodeHash: newHash,
-    newAddress: SYSTEM_CONTRACTS.systemContext.address,
-    callConstructor: false,
-    value: 0,
-    input: "0x",
-  };
-
-  let calldata = artifact.encodeFunctionData("forceDeployOnAddresses", [[forceDeplyment]]);
-  const originalLength = (calldata.length - 2) / 2;
-
-  // Padding calldata from the right. We really need to do it, since Yul would "implicitly" pad it from the left and it
-  // it is not what we want.
-  while ((calldata.length - 2) % 64 != 0) {
-    calldata += "0";
-  }
-
-  // We will apply tabulation to make the compiled bootloader code more readable
-  const TABULATION = "\t\t\t\t\t";
-  // In the first slot we need to store the calldata's length
-  let data = `mstore(0x00, ${originalLength})\n`;
-
-  const slices = (calldata.length - 2) / 64;
-
-  for (let slice = 0; slice < slices; slice++) {
-    const offset = slice * 32;
-    const sliceHex = calldata.slice(2 + offset * 2, 2 + offset * 2 + 64);
-
-    data += `${TABULATION}mstore(${offset + 32}, 0x${sliceHex})\n`;
-  }
-
-  return data;
+function getKeccak256ExpectedHash() {
+  const bytecode = readFileSync("contracts-preprocessed/precompiles/artifacts/Keccak256.yul.zbin");
+  return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
 
 // Maybe in the future some of these params will be passed
@@ -130,8 +88,8 @@ const params = {
   COMPRESSED_BYTECODES_SLOTS: 32768,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
-  SYSTEM_CONTEXT_EXPECTED_CODE_HASH: getSystemContextExpectedHash(),
-  UPGRADE_SYSTEM_CONTEXT_CALLDATA: upgradeSystemContextCalldata(),
+  KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
+  PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployKeccak256"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 120kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 120k / 5 = 24k. This means that they will have
   // accoomdate 6528000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with

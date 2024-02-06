@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use multivm::interface::dyn_tracers::vm_1_4_0::DynTracer;
+use multivm::interface::dyn_tracers::vm_1_4_1::DynTracer;
 use multivm::vm_latest::{HistoryMode, SimpleMemory, VmTracer};
-use multivm::zk_evm_1_4_0::tracing::{BeforeExecutionData, VmLocalStateData};
+use multivm::zk_evm_1_4_1::tracing::{BeforeExecutionData, VmLocalStateData};
 use once_cell::sync::OnceCell;
 use zksync_state::{StoragePtr, WriteStorage};
 

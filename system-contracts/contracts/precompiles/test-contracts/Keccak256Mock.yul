@@ -1,34 +1,22 @@
 /**
  * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
  * @notice The contract used to emulate EVM's keccak256 opcode.
- * @dev It accepts the data to be hashed in the calldata, propagates it to the zkEVM built-in circuit precompile via `precompileCall`, and burns the gas.
+ * @dev It accepts the data to be hashed in the calldata, propagate it to the zkEVM built-in circuit precompile via `precompileCall` and burn .
  */
-object "Keccak256" {
-    code {
-        return(0, 0)
-    }
+ object "Keccak256" {
+    code { }
     object "Keccak256_deployed" {
         code {
             ////////////////////////////////////////////////////////////////
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @dev Returns the block size used by the keccak256 hashing function.
-            /// The value 136 bytes corresponds to the size of the input data block that the keccak256 
-            /// algorithm processes in each round, as defined in the keccak256 specification. This is derived 
-            /// from the formula (1600 - 2 * bit length of the digest) / 8, where the bit length for keccak256
-            /// is 256 bits. For more details, refer to the Keccak specification at
-            /// https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf#page=30
+            /// @dev The size of the processing keccak256 block in bytes.
             function BLOCK_SIZE() -> ret {
                 ret := 136
             }
 
             /// @dev The gas cost of processing one keccak256 round.
-            /// @dev This constant is made equal to the corresponding constant in
-            /// https://github.com/matter-labs/era-zkevm_opcode_defs/blob/v1.4.1/src/circuit_prices.rs,
-            /// which was automatically generated depending on the capacity of rounds for a 
-            /// single Keccak256 circuit.
             function KECCAK_ROUND_GAS_COST() -> ret {
                 ret := 40
             }
@@ -97,8 +85,8 @@ object "Keccak256" {
                 0                                 // per precompile interpreted value (0 since circuit doesn't react on this value anyway)
             )
             // 4. Calculate number of required hash rounds per calldata
-            let numRounds := add(div(ptrLength, BLOCK_SIZE()), 1)
-            let gasToPay := mul(KECCAK_ROUND_GAS_COST(), numRounds)
+            let numRounds := div(add(ptrLength, sub(BLOCK_SIZE(), 1)), BLOCK_SIZE())
+            let gasToPay := 0
 
             // 5. Call precompile
             let success := precompileCall(precompileParams, gasToPay)

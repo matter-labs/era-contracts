@@ -20,8 +20,11 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build artifacts
+      - name: Build L2 artifacts
         run: yarn l2 build
+
+      - name: Build L1 artifacts
+        run: yarn l1 build
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -31,6 +34,9 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
 
   lint:
     runs-on: ubuntu-latest
@@ -79,6 +85,9 @@ jobs:
             l2-contracts/artifacts-zk
             l2-contracts/cache-zk
             l2-contracts/typechain
+            l1-contracts/artifacts
+            l1-contracts/cache
+            l1-contracts/typechain
 
       - name: Run Era test node
         uses: dutterbutter/era-test-node-action@v0.1.3

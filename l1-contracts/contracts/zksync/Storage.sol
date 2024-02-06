@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "./../zksync/interfaces/IVerifier.sol";
-import "./libraries/PriorityQueue.sol";
+import {IVerifier} from "./../zksync/interfaces/IVerifier.sol";
+import {PriorityQueue} from "./libraries/PriorityQueue.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -70,6 +70,31 @@ struct VerifierParams {
     bytes32 recursionCircuitsSetVksHash;
 }
 
+/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
+/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
+/// @param Validium The pubdata is considered free with regard to the L1 gas price.
+enum PubdataPricingMode {
+    Rollup,
+    Validium
+}
+
+/// @notice The fee params for L1->L2 transactions for the network.
+/// @param pubdataPricingMode How the users will charged for pubdata in L1->L2 transactions.
+/// @param batchOverheadL1Gas The amount of L1 gas required to process the batch (except for the calldata).
+/// @param maxPubdataPerBatch The maximal number of pubdata that can be emitted per batch.
+/// @param priorityTxMaxPubdata The maximal amount of pubdata a priority transaction is allowed to publish.
+/// It can be slightly less than maxPubdataPerBatch in order to have some margin for the bootloader execution.
+/// @param minimalL2GasPrice The minimal L2 gas price to be used by L1->L2 transactions. It should represent
+/// the price that a single unit of compute costs.
+struct FeeParams {
+    PubdataPricingMode pubdataPricingMode;
+    uint32 batchOverheadL1Gas;
+    uint32 maxPubdataPerBatch;
+    uint32 maxL2GasPerBatch;
+    uint32 priorityTxMaxPubdata;
+    uint64 minimalL2GasPrice;
+}
+
 /// @dev storing all storage variables for zkSync facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -83,7 +108,7 @@ struct AppStorage {
     /// @notice Address that the governor proposed as one that will replace it
     address pendingGovernor;
     /// @notice List of permitted validators
-    mapping(address => bool) validators;
+    mapping(address validatorAddress => bool isValidator) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
     IVerifier verifier;
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
@@ -95,9 +120,9 @@ struct AppStorage {
     /// batch
     uint256 totalBatchesCommitted;
     /// @dev Stored hashed StoredBatch for batch number
-    mapping(uint256 => bytes32) storedBatchHashes;
+    mapping(uint256 batchNumber => bytes32 batchHash) storedBatchHashes;
     /// @dev Stored root hashes of L2 -> L1 logs
-    mapping(uint256 => bytes32) l2LogsRootHashes;
+    mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
     PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
@@ -123,13 +148,13 @@ struct AppStorage {
     /// @dev The L2 -> L1 log is sent for every withdrawal, so this mapping is serving as
     /// a flag to indicate that the message was already processed.
     /// @dev Used to indicate that eth withdrawal was already processed
-    mapping(uint256 => mapping(uint256 => bool)) isEthWithdrawalFinalized;
+    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)) isEthWithdrawalFinalized;
     /// @dev The most recent withdrawal time and amount reset
     uint256 __DEPRECATED_lastWithdrawalLimitReset;
     /// @dev The accumulated withdrawn amount during the withdrawal limit window
     uint256 __DEPRECATED_withdrawnAmountInWindow;
     /// @dev A mapping user address => the total deposited amount by the user
-    mapping(address => uint256) totalDepositedAmountPerUser;
+    mapping(address => uint256) __DEPRECATED_totalDepositedAmountPerUser;
     /// @dev Stores the protocol version. Note, that the protocol version may not only encompass changes to the
     /// smart contracts, but also to the node behavior.
     uint256 protocolVersion;
@@ -142,4 +167,7 @@ struct AppStorage {
     address admin;
     /// @notice Address that the governor or admin proposed as one that will replace admin role
     address pendingAdmin;
+    /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
+    /// the bootloader gives enough freedom to the operator.
+    FeeParams feeParams;
 }

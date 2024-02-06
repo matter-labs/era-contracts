@@ -9,11 +9,11 @@ object "Bootloader" {
             //                      Function Declarations
             ////////////////////////////////////////////////////////////////////////////
 
-            // While we definitely cannot control the gas price on L1,
+            // While we definitely cannot control the pubdata price on L1,
             // we need to check the operator does not provide any absurd numbers there
-            function MAX_ALLOWED_L1_GAS_PRICE() -> ret {
-                // 100k gwei
-                ret := 100000000000000
+            function MAX_ALLOWED_FAIR_PUBDATA_PRICE() -> ret {
+                // 1M gwei
+                ret := 1000000000000000
             }
 
             function MAX_ALLOWED_FAIR_L2_GAS_PRICE() -> ret {
@@ -23,9 +23,10 @@ object "Bootloader" {
 
             /// @dev This method ensures that the prices provided by the operator
             /// are not absurdly high
-            function validateOperatorProvidedPrices(l1GasPrice, fairL2GasPrice) {
-                if gt(l1GasPrice, MAX_ALLOWED_L1_GAS_PRICE()) {
-                    assertionError("L1 gas price too high")
+            function validateOperatorProvidedPrices(fairL2GasPrice, pubdataPrice) {
+                // The limit is the same for pubdata price and L1 gas price
+                if gt(pubdataPrice, MAX_ALLOWED_FAIR_PUBDATA_PRICE()) {
+                    assertionError("Fair pubdata price too high")
                 }
 
                 if gt(fairL2GasPrice, MAX_ALLOWED_FAIR_L2_GAS_PRICE()) {
@@ -33,21 +34,44 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Returns the baseFee for this batch based on the
-            /// L1 gas price and the fair L2 gas price.
-            function getBaseFee(l1GasPrice, fairL2GasPrice) -> baseFee, gasPricePerPubdata {
-                // By default, we want to provide the fair L2 gas price.
-                // That it means that the operator controls
-                // what the value of the baseFee will be. In the future, 
-                // a better system, aided by EIP1559 should be added. 
+            /// @dev The overhead for a transaction slot in L2 gas. 
+            /// It is roughly equal to 80kk/MAX_TRANSACTIONS_IN_BATCH, i.e. how many gas would an L1->L2 transaction
+            /// need to pay to compensate for the batch being closed.
+            /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is 
+            /// compensated enough in case the batch might be prematurely sealed because of the transaction slots being filled up.
+            function TX_SLOT_OVERHEAD_GAS() -> ret {
+                ret := 10000
+            }
 
-                let pubdataBytePriceETH := safeMul(l1GasPrice, L1_GAS_PER_PUBDATA_BYTE(), "aoa")
+            /// @dev The overhead for each byte of the bootloader memory that the encoding of the transaction.
+            /// It is roughly equal to 80kk/BOOTLOADER_MEMORY_FOR_TXS, i.e. how many gas would an L1->L2 transaction
+            /// need to pay to compensate for the batch being closed.
+            /// @dev It is expected of the operator to set the "fair L2 gas price" appropriately to ensure that it is
+            /// compensated enough in case the batch might be prematurely sealed because of the memory being filled up.
+            function MEMORY_OVERHEAD_GAS() -> ret {
+                ret := 10
+            }
 
+            /// @dev Returns the base fee and gas per pubdata based on the fair pubdata price and L2 gas price provided by the operator
+            /// @param pubdataPrice The price of a single byte of pubdata in Wei
+            /// @param fairL2GasPrice The price of an L2 gas in Wei
+            /// @return baseFee and gasPerPubdata The base fee and the gas per pubdata to be used by L2 transactions in this batch.
+            function getFeeParams(
+                fairPubdataPrice,
+                fairL2GasPrice,
+            ) -> baseFee, gasPerPubdata {
                 baseFee := max(
                     fairL2GasPrice,
-                    ceilDiv(pubdataBytePriceETH, MAX_L2_GAS_PER_PUBDATA())
+                    ceilDiv(fairPubdataPrice, MAX_L2_GAS_PER_PUBDATA())
                 )
-                gasPricePerPubdata := ceilDiv(pubdataBytePriceETH, baseFee)
+
+                gasPerPubdata := gasPerPubdataFromBaseFee(baseFee, fairPubdataPrice)
+            }
+
+            /// @dev Calculates the gas per pubdata based on the pubdata price provided by the operator
+            /// as well the the fixed baseFee.
+            function gasPerPubdataFromBaseFee(baseFee, pubdataPrice) -> ret {
+                ret := ceilDiv(pubdataPrice, baseFee)
             }
 
             /// @dev It should be always possible to submit a transaction 
@@ -60,14 +84,6 @@ object "Bootloader" {
             /// able to send `GUARANTEED_PUBDATA_PER_TX` onchain.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
                 ret := div(MAX_GAS_PER_TRANSACTION(), GUARANTEED_PUBDATA_PER_TX())
-            }
-
-            /// @dev The computational overhead for a batch.
-            /// It includes the combined price for 1 instance of all the circuits 
-            /// (since they might be partially filled), the price for running
-            /// the common parts of the bootloader as well as general maintainance of the system.
-            function BATCH_OVERHEAD_L2_GAS() -> ret {
-                ret := {{BATCH_OVERHEAD_L2_GAS}}
             }
 
             /// @dev The overhead for the interaction with L1.
@@ -90,12 +106,6 @@ object "Bootloader" {
                 ret := 17
             }
 
-            /// @dev The size of the bootloader memory that is to spent by the transaction's
-            /// encodings.
-            function BOOTLOADER_MEMORY_FOR_TXS() -> ret {
-                ret := {{BOOTLOADER_MEMORY_FOR_TXS}}
-            }
-
             /// @dev Whether the batch is allowed to accept transactions with
             /// gasPerPubdataByteLimit = 0. On mainnet, this is forbidden for safety reasons.
             function FORBID_ZERO_GAS_PER_PUBDATA() -> ret {
@@ -108,7 +118,7 @@ object "Bootloader" {
             }
 
             /// @dev The slot from which the scratch space starts.
-            /// Scatch space is used for various temporary values
+            /// Scratch space is used for various temporary values
             function SCRATCH_SPACE_BEGIN_SLOT() -> ret {
                 ret := 8
             }
@@ -343,7 +353,7 @@ object "Bootloader" {
 
             /// @dev Slots needed to store L1 Messenger pubdata.
             /// @dev Note that are many more these than the maximal pubdata in batch, since 
-            /// it needs to also accomodate uncompressed state diffs that are required for the state diff
+            /// it needs to also accommodate uncompressed state diffs that are required for the state diff
             /// compression verification.
             function OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS() -> ret {
                 ret := {{OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS}}
@@ -389,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 2^19 VM words.
+            /// @dev The memory page consists of 24000000 / 32 VM words.
             /// Each execution result is a single boolean, but 
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 
             function MAX_MEM_SIZE() -> ret {
-                ret := 0x1000000 // 2^24 bytes
+                ret := 24000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -444,10 +454,6 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000008001
             }
 
-            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000000ffff
-            }
-
             function ACCOUNT_CODE_STORAGE_ADDR() -> ret {
                 ret := 0x0000000000000000000000000000000000008002
             }
@@ -466,6 +472,10 @@ object "Bootloader" {
             
             function FORCE_DEPLOYER() -> ret {
                 ret := 0x0000000000000000000000000000000000008007
+            }
+
+            function L1_MESSENGER_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008008
             }
 
             function MSG_VALUE_SIMULATOR_ADDR() -> ret {
@@ -488,8 +498,12 @@ object "Bootloader" {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
-            function L1_MESSENGER_ADDR() -> ret {
-                ret := 0x0000000000000000000000000000000000008008
+            function KECCAK256_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008010
+            }
+
+            function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000000ffff
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -634,17 +648,21 @@ object "Bootloader" {
                     }
             }
 
-            /// @dev Checks whether the code hash of the system context contract is correct and updates it if needed.
-            /// @dev The L1 contracts expect all the system logs to be present in the first boojum upgrade batch already. 
-            /// However, the old system context did not send the same system logs. Usually we upgrade system context
-            /// via an upgrade transaction, but in this case the transaction won't be even processed, because of failure to create an L2 block.
-            function upgradeSystemContextIfNeeded() {
-                let expectedCodeHash := {{SYSTEM_CONTEXT_EXPECTED_CODE_HASH}}
+            /// @dev The function that is temporarily needed to upgrade the Keccak256 precompile. This function and `ContractDeployer:forceDeployKeccak256`
+            /// are to be removed once the upgrade is complete.
+            /// @dev Checks whether the code hash of the Keccak256 precompile contract is correct and updates it if needed.
+            /// @dev When we upgrade to the new version of the Keccak256 precompile contract, the keccak precompile will not work correctly 
+            /// and so the upgrade it should be done before any `keccak` calls. 
+            function upgradeKeccakIfNeeded() {
+                let expectedCodeHash := {{KECCAK256_EXPECTED_CODE_HASH}}
                 
-                let actualCodeHash := extcodehash(SYSTEM_CONTEXT_ADDR())
+                let actualCodeHash := getRawCodeHash(KECCAK256_ADDR(), true)
                 if iszero(eq(expectedCodeHash, actualCodeHash)) {
-                    // Preparing the calldata to upgrade the SystemContext contract
-                    {{UPGRADE_SYSTEM_CONTEXT_CALLDATA}}
+                    // The `mimicCallOnlyResult` requires that the first word of the data
+                    // contains its length. Here is 36 bytes, i.e. 4 byte selector + 32 byte hash.
+                    mstore(0, 36)
+                    mstore(32, {{PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR}})
+                    mstore(36, expectedCodeHash)
                     
                     // We'll use a mimicCall to simulate the correct sender.
                     let success := mimicCallOnlyResult(
@@ -659,9 +677,46 @@ object "Bootloader" {
                     )
 
                     if iszero(success) {
-                        assertionError("system context upgrade fail")
+                        assertionError("keccak256 upgrade fail")
                     }
                 }
+            }
+
+            /// @notice Returns "raw" code hash of the address. "Raw" means that it returns exactly the value
+            /// that is stored in the AccountCodeStorage system contract for that address, without applying any
+            /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
+            /// @param addr The address of the account to get the code hash of.
+            /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failer is user providing not
+            /// enough gas.
+            function getRawCodeHash(addr, assertSuccess) -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                let success := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails, 
+                // it most likely means that the caller did not provide enough gas for
+                // the call. 
+                // In case the caller is certain that the amount of gas provided is enough, i.e. 
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    if assertSuccess {
+                        // The call must've succeeded, but it didn't. So we revert the bootloader.
+                        assertionError("getRawCodeHash failed")
+                    }
+                    
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
             }
 
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
@@ -908,10 +963,10 @@ object "Bootloader" {
                 let innerTxDataOffset := add(txDataOffset, 32)
 
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
-                    innerTxDataOffset, 
+                    innerTxDataOffset,
                     transactionIndex, 
-                    gasPerPubdata, 
-                    L1_TX_INTRINSIC_L2_GAS(), 
+                    gasPerPubdata,
+                    L1_TX_INTRINSIC_L2_GAS(),
                     L1_TX_INTRINSIC_PUBDATA()
                 )
 
@@ -956,9 +1011,6 @@ object "Bootloader" {
 
                 let payToOperator := safeMul(gasPrice, safeSub(gasLimit, refundGas, "lpah"), "mnk")
 
-                // Note, that for now, the L1->L2 transactions are free, i.e. the gasPrice
-                // for such transactions is always zero, so the `refundGas` is not used anywhere
-                // except for notifications for the operator for API purposes. 
                 notifyAboutRefund(refundGas)
 
                 // Paying the fee to the operator
@@ -1103,8 +1155,14 @@ object "Bootloader" {
 
                 // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
                 // bytecodes usually form the bulk of the L2 gas prices.
-                
-                let gasLimitForTx, reservedGas := getGasLimitForTx(innerTxDataOffset, transactionIndex, gasPerPubdata, L2_TX_INTRINSIC_GAS(), L2_TX_INTRINSIC_PUBDATA())
+
+                let gasLimitForTx, reservedGas := getGasLimitForTx(
+                    innerTxDataOffset, 
+                    transactionIndex, 
+                    gasPerPubdata,
+                    L2_TX_INTRINSIC_GAS(), 
+                    L2_TX_INTRINSIC_PUBDATA()
+                )
 
                 let gasPrice := getGasPrice(getMaxFeePerGas(innerTxDataOffset), getMaxPriorityFeePerGas(innerTxDataOffset))
 
@@ -1185,7 +1243,6 @@ object "Bootloader" {
                 let operatorOverheadForTransaction := getVerifiedOperatorOverheadForTx(
                     transactionIndex,
                     totalGasLimit,
-                    gasPerPubdata,
                     txEncodingLen
                 )
                 gasLimitForTx := safeSub(totalGasLimit, operatorOverheadForTransaction, "qr")
@@ -1633,20 +1690,14 @@ object "Bootloader" {
             function getVerifiedOperatorOverheadForTx(
                 transactionIndex,
                 txTotalGasLimit,
-                gasPerPubdataByte,
                 txEncodeLen
             ) -> ret {
                 let operatorOverheadForTransaction := getOperatorOverheadForTx(transactionIndex)
                 if gt(operatorOverheadForTransaction, txTotalGasLimit) {
                     assertionError("Overhead higher than gasLimit")
                 }
-                let txGasLimit := min(safeSub(txTotalGasLimit, operatorOverheadForTransaction, "www"), MAX_GAS_PER_TRANSACTION())
 
-                let requiredOverhead := getTransactionUpfrontOverhead(
-                    txGasLimit,
-                    gasPerPubdataByte,
-                    txEncodeLen
-                )
+                let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
 
                 debugLog("txTotalGasLimit", txTotalGasLimit)
                 debugLog("requiredOverhead", requiredOverhead)
@@ -1855,82 +1906,24 @@ object "Bootloader" {
                 }
             }
 
-            /// Returns the batch overhead to be paid, assuming a certain value of gasPerPubdata
-            function getBatchOverheadGas(gasPerPubdata) -> ret {
-                let computationOverhead := BATCH_OVERHEAD_L2_GAS()
-                let l1GasOverhead := BATCH_OVERHEAD_L1_GAS()
-                let l1GasPerPubdata := L1_GAS_PER_PUBDATA_BYTE()
-
-                // Since the user specifies the amount of gas he is willing to pay for a *byte of pubdata*,
-                // we need to convert the number of L1 gas needed to process the batch into the equivalent number of 
-                // pubdata to pay for.
-                // The difference between ceil and floor division here is negligible,
-                // so we prefer doing the cheaper operation for the end user
-                let pubdataEquivalentForL1Gas := safeDiv(l1GasOverhead, l1GasPerPubdata, "dd")
-                
-                ret := safeAdd(
-                    computationOverhead, 
-                    safeMul(gasPerPubdata, pubdataEquivalentForL1Gas, "aa"),
-                    "ab"
-                )
-            }
-
             /// @dev This method returns the overhead that should be paid upfront by a transaction.
             /// The goal of this overhead is to cover the possibility that this transaction may use up a certain
             /// limited resource per batch: a single-instance circuit, etc.
             /// The transaction needs to be able to pay the same % of the costs for publishing & proving the batch
             /// as the % of the batch's limited resources that it can consume.
-            /// @param txGasLimit The gasLimit for the transaction (note, that this limit should not include the overhead).
-            /// @param gasPerPubdataByte The price for pubdata byte in gas.
             /// @param txEncodeLen The length of the ABI-encoding of the transaction
-            /// @dev The % following 3 resources is taken into account when calculating the % of the batch's overhead to pay.
-            /// 1. The % of the maximal gas per transaction. It is assumed that `MAX_GAS_PER_TRANSACTION` gas is enough to consume all
-            /// the single-instance circuits. Meaning that the transaction should pay at least txGasLimit/MAX_GAS_PER_TRANSACTION part 
-            /// of the overhead.
-            /// 2. Overhead for taking up the bootloader memory. The bootloader memory has a cap on its length, mainly enforced to keep the RAM requirements
+            /// @dev The % following 2 resources is taken into account when calculating the % of the batch's overhead to pay.
+            /// 1. Overhead for taking up the bootloader memory. The bootloader memory has a cap on its length, mainly enforced to keep the RAM requirements
             /// for the node smaller. That is, the user needs to pay a share proportional to the length of the ABI encoding of the transaction.
-            /// 3. Overhead for taking up a slot for the transaction. Since each batch has the limited number of transactions in it, the user must pay 
+            /// 2. Overhead for taking up a slot for the transaction. Since each batch has the limited number of transactions in it, the user must pay 
             /// at least 1/MAX_TRANSACTIONS_IN_BATCH part of the overhead.
             function getTransactionUpfrontOverhead(
-                txGasLimit,
-                gasPerPubdataByte,
                 txEncodeLen
             ) -> ret {
-                ret := 0
-                let totalBatchOverhead := getBatchOverheadGas(gasPerPubdataByte)
-                debugLog("totalBatchOverhead", totalBatchOverhead)
-
-                let overheadForCircuits := ceilDiv(
-                    safeMul(totalBatchOverhead, txGasLimit, "ac"),
-                    MAX_GAS_PER_TRANSACTION()
+                ret := max(
+                    safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"),
+                    TX_SLOT_OVERHEAD_GAS()
                 )
-                ret := max(ret, overheadForCircuits)
-                debugLog("overheadForCircuits", overheadForCircuits)
-
-                
-                let overheadForLength := ceilDiv(
-                    safeMul(txEncodeLen, totalBatchOverhead, "ad"),
-                    BOOTLOADER_MEMORY_FOR_TXS()
-                )
-                ret := max(ret, overheadForLength)
-                debugLog("overheadForLength", overheadForLength)
-
-                
-                let overheadForSlot := ceilDiv(
-                    totalBatchOverhead,
-                    MAX_TRANSACTIONS_IN_BATCH()
-                )
-                ret := max(ret, overheadForSlot)
-                debugLog("overheadForSlot", overheadForSlot)
-            
-                // In the proved batch we ensure that the gasPerPubdataByte is not zero
-                // to avoid the potential edge case of division by zero. In Yul, division by 
-                // zero does not panic, but returns zero.
-                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                if and(iszero(gasPerPubdataByte), FORBID_ZERO_GAS_PER_PUBDATA()) {
-                    assertionError("zero gasPerPubdataByte")
-                }
-                <!-- @endif --> 
             }
 
             /// @dev A method where all panics in the nearCalls get to.
@@ -2020,26 +2013,11 @@ object "Bootloader" {
             /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
-                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
-                mstore(4, addr)
-                let success := call(
-                    gas(),
-                    ACCOUNT_CODE_STORAGE_ADDR(),
-                    0,
-                    0,
-                    36,
-                    0,
-                    32
-                )
+                ret := 0
 
-                if iszero(success) {
-                    // The call to the account code storage should always succeed
-                    nearCallPanic()
+                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                    ret := iszero(getRawCodeHash(addr, false))
                 }
-
-                let rawCodeHash := mload(0)
-
-                ret := iszero(rawCodeHash)
             }
 
             /// @dev Calls the `payForTransaction` method of an account
@@ -2744,7 +2722,7 @@ object "Bootloader" {
                         )
                     }
                     default {
-                        // For L2 transactions, we use near call panic, it will triger the validation 
+                        // For L2 transactions, we use near call panic, it will trigger the validation 
                         // step of the transaction to fail, returning a consistent error message. 
                         nearCallPanic()
                     }
@@ -3701,12 +3679,15 @@ object "Bootloader" {
                 /// of the VM and the state of the operator.
                 let NEW_BATCH_NUMBER := mload(96)
 
-                /// @notice The gas price on L1 for ETH. In the future, a trustless value will be enforced.
+                /// @notice The minimal price per pubdata byte in ETH that the operator agrees on. 
+                /// In the future, a trustless value will be enforced.
                 /// For now, this value is trusted to be fairly provided by the operator.
-                let L1_GAS_PRICE := mload(128)
+                /// It is expected of the operator to already include the L1 batch overhead costs into the value.
+                let FAIR_PUBDATA_PRICE := mload(128)
 
                 /// @notice The minimal gas price that the operator agrees upon. 
                 /// In the future, it will have an EIP1559-like lower bound.
+                /// It is expected of the operator to already include the L1 batch overhead costs into the value.
                 let FAIR_L2_GAS_PRICE := mload(160)
 
                 /// @notice The expected base fee by the operator.
@@ -3714,21 +3695,27 @@ object "Bootloader" {
                 /// the operator still provides it to make sure that its data is in sync. 
                 let EXPECTED_BASE_FEE := mload(192)
 
-                validateOperatorProvidedPrices(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
+                // When the 1.4.1 VM launches, the old Keccak precompile will stop working. 
+                // Thus, the first thing we need to do before any transaction starts is to upgrade
+                // keccak precompile to the new version.
+                upgradeKeccakIfNeeded()
 
-                let baseFee := 0
+                validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
+
+
 
                 <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
 
-                // This implementation of the bootloader relies on the correct version of the SystemContext
-                // and it can not be upgraded via a standard upgrade transaction, but needs to ensure 
-                // correctness itself before any transaction is executed. 
-                upgradeSystemContextIfNeeded()
+                let baseFee := 0
+
+                baseFee, GAS_PRICE_PER_PUBDATA := getFeeParams(
+                    FAIR_PUBDATA_PRICE,
+                    FAIR_L2_GAS_PRICE
+                )
 
                 // Only for the proved batch we enforce that the baseFee proposed 
                 // by the operator is equal to the expected one. For the playground batch, we allow
                 // the operator to provide any baseFee the operator wants.
-                baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
                 if iszero(eq(baseFee, EXPECTED_BASE_FEE)) {
                     debugLog("baseFee", baseFee)
                     debugLog("EXPECTED_BASE_FEE", EXPECTED_BASE_FEE)
@@ -3741,12 +3728,8 @@ object "Bootloader" {
 
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
 
-                baseFee, GAS_PRICE_PER_PUBDATA := getBaseFee(L1_GAS_PRICE, FAIR_L2_GAS_PRICE)
-
                 let SHOULD_SET_NEW_BATCH := mload(224)
                 
-                upgradeSystemContextIfNeeded()
-
                 switch SHOULD_SET_NEW_BATCH 
                 case 0 {    
                     unsafeOverrideBatch(NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
@@ -3754,6 +3737,8 @@ object "Bootloader" {
                 default {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
+
+                GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
             }
@@ -3856,7 +3841,7 @@ object "Bootloader" {
             setTxOrigin(0)
             setGasPrice(0)
 
-            // Transfering all the ETH received in the block to the operator
+            // Transferring all the ETH received in the block to the operator
             directETHTransfer(
                 selfbalance(),
                 OPERATOR_ADDRESS
@@ -3869,7 +3854,7 @@ object "Bootloader" {
             // So we need to have this method to reflect it in the system contracts too.
             //
             // The reason is that as of now our node requires that each storage write (event, etc) belongs to a particular
-            // L2 block. In case a batch is sealed by timeout (i.e. the resources of the batch have not been exhaused, but we need
+            // L2 block. In case a batch is sealed by timeout (i.e. the resources of the batch have not been exhausted, but we need
             // to seal it to assure timely finality), we need to process sending funds to the operator *after* the last
             // non-empty L2 block has been already sealed. We can not override old L2 blocks, so we need to create a new empty "fictive" block for it.
             //

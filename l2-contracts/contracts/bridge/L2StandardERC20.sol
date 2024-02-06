@@ -2,13 +2,17 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
-import "./interfaces/IL2StandardToken.sol";
+import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {ERC1967Upgrade} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Upgrade.sol";
+
+import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge
-contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
+/// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge. Note, that it does not
+/// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upgrade {
     /// @dev Describes whether there is a specific getter in the token.
     /// @notice Used to explicitly separate which getters the token has and which it does not.
     /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
@@ -19,7 +23,7 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         bool ignoreDecimals;
     }
 
-    ERC20Getters availableGetters;
+    ERC20Getters private availableGetters;
 
     /// @dev The decimals of the token, that are used as a value for `decimals` getter function.
     /// @notice A private variable is used only for decimals, but not for `name` and `symbol`, because standard
@@ -97,8 +101,40 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken {
         emit BridgeInitialize(_l1Address, decodedName, decodedSymbol, decimals_);
     }
 
+    /// @notice A method to be called by the governor to update the token's metadata.
+    /// @param _availableGetters The getters that the token has.
+    /// @param _newName The new name of the token.
+    /// @param _newSymbol The new symbol of the token.
+    /// @param _version The version of the token that will be initialized.
+    /// @dev The _version must be exactly the version higher by 1 than the current version. This is needed
+    /// to ensure that the governor can not accidentally disable future reinitialization of the token.
+    function reinitializeToken(
+        ERC20Getters calldata _availableGetters,
+        string memory _newName,
+        string memory _newSymbol,
+        uint8 _version
+    ) external onlyNextVersion(_version) reinitializer(_version) {
+        // It is expected that this token is deployed as a beacon proxy, so we'll
+        // allow the governor of the beacon to reinitialize the token.
+        address beaconAddress = _getBeacon();
+        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), "tt");
+
+        __ERC20_init_unchained(_newName, _newSymbol);
+        __ERC20Permit_init(_newName);
+        availableGetters = _availableGetters;
+
+        emit BridgeInitialize(l1Address, _newName, _newSymbol, decimals_);
+    }
+
     modifier onlyBridge() {
         require(msg.sender == l2Bridge, "xnt"); // Only L2 bridge can call this method
+        _;
+    }
+
+    modifier onlyNextVersion(uint8 _version) {
+        // The version should be incremented by 1. Otherwise, the governor risks disabling
+        // future reinitialization of the token by providing too large a version.
+        require(_version == _getInitializedVersion() + 1, "v");
         _;
     }
 
