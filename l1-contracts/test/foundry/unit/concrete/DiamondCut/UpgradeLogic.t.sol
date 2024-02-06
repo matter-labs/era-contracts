@@ -90,7 +90,7 @@ contract UpgradeLogicTest is DiamondCutTest {
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
             }),
-            blobVersionedHashGetter: address(0)
+            blobVersionedHashRetriever: address(0)
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);

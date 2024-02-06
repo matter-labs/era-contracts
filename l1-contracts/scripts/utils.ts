@@ -54,9 +54,9 @@ export function web3Provider() {
 
 export function getAddressFromEnv(envName: string): string {
   const address = process.env[envName];
-  // if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-  //   throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
-  // }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
+  }
   return address;
 }
 
@@ -191,7 +191,7 @@ export interface DeployedAddresses {
   Governance: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
-  BlobVersionedHash: string;
+  BlobVersionedHashRetriever: string;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -216,7 +216,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-    BlobVersionedHash: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_ADDR"),
+    BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
   };
 }
 

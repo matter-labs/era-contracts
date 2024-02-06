@@ -171,5 +171,5 @@ struct AppStorage {
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
-    address blobVersionedHashGetter;
+    address blobVersionedHashRetriever;
 }

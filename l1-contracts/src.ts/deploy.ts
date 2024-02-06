@@ -437,13 +437,13 @@ export class Deployer {
     }
   }
 
-  public async deployBlobVersionedHash(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployblobVersionedHashRetriever(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    // solc contracts/zksync/utils/BlobVersionedHash.yul --strict-assembly --bin
+    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
     const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
 
     const contractAddress = await this.deployBytecodeViaCreate2(
-      "BlobVersionedHash",
+      "BlobVersionedHashRetriever",
       bytecode,
       create2Salt,
       ethTxOptions
@@ -453,7 +453,7 @@ export class Deployer {
       console.log(`CONTRACTS_BLOB_VERSIONED_HASH=${contractAddress}`);
     }
 
-    this.addresses.BlobVersionedHash = contractAddress;
+    this.addresses.BlobVersionedHashRetriever = contractAddress;
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {

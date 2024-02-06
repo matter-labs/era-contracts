@@ -20,7 +20,7 @@ contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
-    address internal blobVersionedHashGetter;
+    address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
     ExecutorFacet internal executor;
     GettersFacet internal getters;
@@ -117,7 +117,7 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        blobVersionedHashGetter = makeAddr("blobVersionedHashGetter");
+        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
         executor = new ExecutorFacet();
         admin = new AdminFacet();
@@ -147,7 +147,7 @@ contract ExecutorTest is Test {
             priorityTxMaxGasLimit: 1000000,
             initialProtocolVersion: 0,
             feeParams: defaultFeeParams(),
-            blobVersionedHashGetter: blobVersionedHashGetter
+            blobVersionedHashRetriever: blobVersionedHashRetriever
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);

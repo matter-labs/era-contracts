@@ -14,7 +14,7 @@ contract Upgrade_4844 is BaseZkSyncUpgrade {
         // Check to make sure that the new blob versioned hash address is not the zero address.
         require($(BLOB_VERSIONED_HASH_GETTER_ADDR) != address(0), "b9");
 
-        s.blobVersionedHashGetter = $(BLOB_VERSIONED_HASH_GETTER_ADDR);
+        s.blobVersionedHashRetriever = $(BLOB_VERSIONED_HASH_GETTER_ADDR);
 
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

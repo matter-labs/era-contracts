@@ -346,9 +346,9 @@ contract CommittingTest is ExecutorTest {
             memory pubdataCommitment = "\x01\xf4\x3d\x53\x8d\x91\xd4\x77\xb0\xf8\xf7\x7e\x19\x52\x48\x7f\x00\xb8\xdf\x41\xda\x90\x5c\x08\x75\xc5\xc9\x9b\xa1\x92\x26\x84\x0d\x0d\x0a\x25\x26\xee\x22\xc7\x96\x60\x65\x7c\xbe\x01\x95\x33\x5b\x44\x69\xbd\x92\x94\x6f\x7f\x74\xae\xc5\xce\xef\x31\xf4\x32\x53\xd4\x08\x96\x72\x65\xfa\x85\x5a\xc8\xa0\x0a\x19\x52\x93\x6e\x0f\xe9\x97\x01\xc0\xa4\x32\xa1\x32\x2c\x45\x67\x24\xf7\xad\xd8\xa5\xb4\x7a\x51\xda\x52\x17\x06\x06\x95\x34\x61\xab\xd7\x5b\x91\x49\xc7\xc7\x91\xf4\x07\xfd\xbc\xf8\x39\x53\x2c\xb1\x08\xe8\xa5\x00\x64\x40\xcf\x21\xbf\x68\x87\x20\x5a\xcf\x44\x3b\x66\x3a\x57\xf2";
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(bytes32(0)));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(bytes32(0)));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,
@@ -402,13 +402,13 @@ contract CommittingTest is ExecutorTest {
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
         bytes32 versionedHash2 = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(versionedHash2));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(versionedHash2));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(2)), abi.encode(bytes32(0)));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(2)), abi.encode(bytes32(0)));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,
@@ -562,9 +562,9 @@ contract CommittingTest is ExecutorTest {
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
         bytes32 versionedHash2 = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(versionedHash2));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(versionedHash2));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,
@@ -607,7 +607,7 @@ contract CommittingTest is ExecutorTest {
             memory pubdataCommitment = "\x01\xf4\x3d\x53\x8d\x91\xd4\x77\xb0\xf8\xf7\x7e\x19\x52\x48\x7f\x00\xb8\xdf\x41\xda\x90\x5c\x08\x75\xc5\xc9\x9b\xa1\x92\x26\x84\x0d\x0d\x0a\x25\x26\xee\x22\xc7\x96\x60\x65\x7c\xbe\x01\x95\x33\x5b\x44\x69\xbd\x92\x94\x6f\x7f\x74\xae\xc5\xce\xef\x31\xf4\x32\x53\xd4\x08\x96\x72\x65\xfa\x85\x5a\xc8\xa0\x0a\x19\x52\x93\x6e\x0f\xe9\x97\x01\xc0\xa4\x32\xa1\x32\x2c\x45\x67\x24\xf7\xad\xd8\xa5\xb4\x7a\x51\xda\x52\x17\x06\x06\x95\x34\x61\xab\xd7\x5b\x91\x49\xc7\xc7\x91\xf4\x07\xfd\xbc\xf8\x39\x53\x2c\xb1\x08\xe8\xa5\x00\x64\x40\xcf\x21\xbf\x68\x87\x20\x5a\xcf\x44\x3b\x66\x3a\x57\xf2";
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(bytes32(0)));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(bytes32(0)));
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -644,9 +644,9 @@ contract CommittingTest is ExecutorTest {
             memory pubdataCommitment = "\x01\xf4\x3d\x53\x8d\x91\xd4\x77\xb0\xf8\xf7\x7e\x19\x52\x48\x7f\x00\xb8\xdf\x41\xda\x90\x5c\x08\x75\xc5\xc9\x9b\xa1\x92\x26\x84\x0d\x0d\x0a\x25\x26\xee\x22\xc7\x96\x60\x65\x7c\xbe\x01\x95\x33\x5b\x44\x69\xbd\x92\x94\x6f\x7f\x74\xae\xc5\xce\xef\x31\xf4\x32\x53\xd4\x08\x96\x72\x65\xfa\x85\x5a\xc8\xa0\x0a\x19\x52\x93\x6e\x0f\xe9\x97\x01\xc0\xa4\x32\xa1\x32\x2c\x45\x67\x24\xf7\xad\xd8\xa5\xb4\x7a\x51\xda\x52\x17\x06\x06\x95\x34\x61\xab\xd7\x5b\x91\x49\xc7\xc7\x91\xf4\x07\xfd\xbc\xf8\x39\x53\x2c\xb1\x08\xe8\xa5\x00\x64\x40\xcf\x21\xbf\x68\x87\x20\x5a\xcf\x44\x3b\x66\x3a\x57\xf2";
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(versionedHash1));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,
@@ -690,13 +690,13 @@ contract CommittingTest is ExecutorTest {
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
         bytes32 versionedHash2 = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(versionedHash2));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(versionedHash2));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(2)), abi.encode(bytes32(0)));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(2)), abi.encode(bytes32(0)));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,
@@ -750,9 +750,9 @@ contract CommittingTest is ExecutorTest {
             memory pubdataCommitment = "\x01\xf4\x3d\x53\x8d\x91\xd4\x77\xb0\xf8\xf7\x7e\x19\x52\x48\x7f\x00\xb8\xdf\x41\xda\x90\x5c\x08\x75\xc5\xc9\x9b\xa1\x92\x26\x84\x0d\x0d\x0a\x25\x26\xee\x22\xc7\x96\x60\x65\x7c\xbe\x01\x95\x33\x5b\x44\x69\xbd\x92\x94\x6f\x7f\x74\xae\xc5\xce\xef\x31\xf4\x32\x53\xd4\x08\x96\x72\x65\xfa\x85\x5a\xc8\xa0\x0a\x19\x52\x93\x6e\x0f\xe9\x97\x01\xc0\xa4\x32\xa1\x32\x2c\x45\x67\x24\xf7\xad\xd8\xa5\xb4\x7a\x51\xda\x52\x17\x06\x06\x95\x34\x61\xab\xd7\x5b\x91\x49\xc7\xc7\x91\xf4\x07\xfd\xbc\xf8\x39\x53\x2c\xb1\x08\xe8\xa5\x00\x64\x40\xcf\x21\xbf\x68\x87\x20\x5a\xcf\x44\x3b\x66\x3a\x57\xf2";
         bytes32 versionedHash1 = 0xf39a869f62e75cf5f0bf914688a6b289caf2049435d8e68c5c5e6d05e44913f3;
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(0)), abi.encode(versionedHash1));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(versionedHash1));
 
-        vm.mockCall(blobVersionedHashGetter, abi.encode(uint256(1)), abi.encode(bytes32(0)));
+        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(1)), abi.encode(bytes32(0)));
 
         vm.mockCall(
             POINT_EVALUATION_PRECOMPILE_ADDR,

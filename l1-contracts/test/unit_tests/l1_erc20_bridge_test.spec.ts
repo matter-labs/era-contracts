@@ -62,7 +62,7 @@ describe("L1ERC20Bridge tests", function () {
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
         feeParams: defaultFeeParams(),
-        blobVersionedHashGetter: ethers.constants.AddressZero,
+        blobVersionedHashRetriever: ethers.constants.AddressZero,
       },
     ]);
 

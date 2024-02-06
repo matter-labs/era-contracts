@@ -566,7 +566,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
     /// new opcode.
     function _getBlobVersionedHash(uint256 _index) internal view returns (bytes32 versionedHash) {
-        (bool success, bytes memory data) = s.blobVersionedHashGetter.staticcall(abi.encode(_index));
+        (bool success, bytes memory data) = s.blobVersionedHashRetriever.staticcall(abi.encode(_index));
         require(success, "vc");
         versionedHash = abi.decode(data, (bytes32));
     }

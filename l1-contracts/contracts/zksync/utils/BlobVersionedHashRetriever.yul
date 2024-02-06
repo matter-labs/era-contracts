@@ -5,7 +5,7 @@
  * @dev It only should receive 1 uint256 as calldata representing the index of the blob versioned hash to return.
  * @dev If index >= len(versioned_hashes) then bytes32(0) is returned.
  */
- object "BlobVersionedHash" {
+ object "blobVersionedHashRetriever" {
     code {
         // Deploy the contract
         datacopy(0, dataoffset("runtime"), datasize("runtime"))
