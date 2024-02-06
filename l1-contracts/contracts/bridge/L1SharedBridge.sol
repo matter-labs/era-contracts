@@ -210,8 +210,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             amount = _l2Value;
             require(msg.value == 0, "EB m.v > 0 for BH d.it 1"); 
             require(_withdrawAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
-            txDataHash = 0x00;
-        } else if ((_l1Token == ETH_TOKEN_ADDRESS) && (_l1Token == l1WethAddress)) {
+            txDataHash = 0x00; // we don't save for baseToken deposits, as the refundRecipient will receive the funds if the tx fails
+        } else if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
             amount = _withdrawAmount + msg.value;
             txDataHash =  keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
 
