@@ -211,20 +211,19 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             require(msg.value == 0, "EB m.v > 0 for BH d.it 1");
             require(_depositAmount == 0, "EB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
             txDataHash = 0x00; // we don't save for baseToken deposits, as the refundRecipient will receive the funds if the tx fails
-        } else if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
-            amount = _depositAmount + msg.value;
-            txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
         } else {
-            require(msg.value == 0, "EB m.v > 0 for BH d.it 2");
-            amount = _depositAmount;
+            if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
+                amount = _depositAmount + msg.value;
+            } else {
+                require(msg.value == 0, "EB m.v > 0 for BH d.it 2");
+                amount = _depositAmount;
+            }
             txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+            if (!hyperbridgingEnabled[_chainId]) {
+                chainBalance[_chainId][_l1Token] += amount;
+            }
         }
-
         require(amount != 0, "6T"); // empty deposit amount
-
-        if (!hyperbridgingEnabled[_chainId]) {
-            chainBalance[_chainId][_l1Token] += amount;
-        }
 
         {
             // Request the finalization of the deposit on the L2 side
