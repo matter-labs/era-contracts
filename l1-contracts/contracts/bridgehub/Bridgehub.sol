@@ -28,12 +28,20 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice chainID => baseToken contract address, storing baseToken
     mapping(uint256 _chainId => address) public baseToken;
 
+    /// @notice used as an alternative to deployChains
+    address public deployer;
+
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
 
     /// @notice used to initialize the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+    }
+
+    modifier onlyOwnerOrDeployer() {
+        require(msg.sender == deployer || msg.sender == owner(), "Bridgehub: not owner or deployer");
+        _;
     }
 
     ///// Getters
@@ -44,6 +52,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     //// Registry
+
+    /// @notice used to change deployer
+    function setDeployer(address _newDeployer) external onlyOwner {
+        deployer = _newDeployer;
+    }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
@@ -85,7 +98,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256, //_salt
         address _l2Governor,
         bytes calldata _initData
-    ) external onlyOwner nonReentrant returns (uint256 chainId) {
+    ) external onlyOwnerOrDeployer nonReentrant returns (uint256 chainId) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 

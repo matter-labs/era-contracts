@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-interface IL2WethBridge {
+interface IL2SharedBridge {
     function initialize(
         address _l1Bridge,
         address _l1WethAddress,

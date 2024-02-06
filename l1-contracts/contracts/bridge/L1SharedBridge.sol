@@ -41,39 +41,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Legacy bridge smart contract that used to hold the tokens
     IL1ERC20Bridge public immutable override legacyBridge;
 
-    /// @dev A mapping L2 batch number => message number => flag.
-    /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
-    /// @dev Please note, this mapping is used only for Era withdrawals, while `isWithdrawalFinalizedShared` is used for every other hyperchains.
-    // mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
-    //     internal isWithdrawalFinalizedEra;
-
-    /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount.
-    /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail in zkSync Era.
-    /// @dev Please note, this mapping is used only for Era deposits, while `depositHappened` is used for every other hyperchains.
-    // mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
-    //     internal depositAmountEra;
-
-    /// @dev The address that was used as a L2 bridge counterpart in zkSync Era.
-    /// Note, it is deprecated in favour of `l2BridgeAddress` mapping.
-    // address internal __DEPRECATED_l2Bridge;
-
-    /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
-    // address public l2TokenBeacon;
-
-    /// @notice Stores the hash of the L2 token proxy contract's bytecode.
-    /// @dev L2 token proxy bytecode is the same for all hyperchains and the owner can NOT override this value for a custom hyperchain.
-    /// kl todo this is wrong Vlad. L2TokenProxy is just used for Era, for the l2TokenAddressLegacy function.
-    // bytes32 public l2TokenProxyBytecodeHash;
-
-    /// @dev Deprecated storage variable related to withdrawal limitations.
-    // mapping(address => uint256) private __DEPRECATED_lastWithdrawalLimitReset;
-
-    /// @dev Deprecated storage variable related to withdrawal limitations.
-    // mapping(address => uint256) private __DEPRECATED_withdrawnAmountInWindow;
-
-    /// @dev Deprecated storage variable related to deposit limitations.
-    // mapping(address => mapping(address => uint256)) private __DEPRECATED_totalDepositedAmountPerUser;
-
     /// new fields from here
 
     /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
@@ -122,7 +89,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
     /// @notice Checks that the message sender is the legacy bridge
     modifier onlyLegacyBridge() {
-        require(msg.sender == address(legacyBridge), "EB not BH");
+        require(msg.sender == address(legacyBridge), "EB not legacy bridge");
         _;
     }
 
@@ -492,7 +459,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) internal nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
         require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
