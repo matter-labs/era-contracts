@@ -102,6 +102,7 @@ export class Deployer {
         priorityTxMaxGasLimit,
         initialProtocolVersion,
         feeParams,
+        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
       },
     ]);
 
@@ -453,7 +454,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_BLOB_VERSIONED_HASH=${contractAddress}`);
+      console.log(`BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
     }
 
     this.addresses.BlobVersionedHashRetriever = contractAddress;
