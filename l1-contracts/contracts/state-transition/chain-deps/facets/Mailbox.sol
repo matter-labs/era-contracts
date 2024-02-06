@@ -243,7 +243,13 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         params.l1GasPriceConverted = _request.l1GasPriceConverted;
         params.refundRecipient = _request.refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _request.l2Calldata, _request.factoryDeps, false);
+        canonicalTxHash = _requestL2Transaction(
+            _request.mintValue,
+            params,
+            _request.l2Calldata,
+            _request.factoryDeps,
+            false
+        );
     }
 
     function _requestL2Transaction(
@@ -342,9 +348,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     /// @notice Hashes the L2 bytecodes and returns them in the format in which they are processed by the bootloader
-    function _hashFactoryDeps(
-        bytes[] memory _factoryDeps
-    ) internal pure returns (uint256[] memory hashedFactoryDeps) {
+    function _hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
