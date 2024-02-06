@@ -2,25 +2,21 @@
 
 pragma solidity 0.8.20;
 
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1Bridge} from "./interfaces/IL1Bridge.sol";
-import {IL2WethBridge} from "./interfaces/IL2WethBridge.sol";
-import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IWETH9} from "./interfaces/IWETH9.sol";
-import {IZkSync} from "../zksync/interfaces/IZkSync.sol";
+import "./interfaces/IL1Bridge.sol";
+import "./interfaces/IL2WethBridge.sol";
+import "./interfaces/IL2Bridge.sol";
+import "./interfaces/IWETH9.sol";
+import "../zksync/interfaces/IZkSync.sol";
 
-import {BridgeInitializationHelper} from "./libraries/BridgeInitializationHelper.sol";
+import "./libraries/BridgeInitializationHelper.sol";
 
-import {IMailbox} from "../zksync/interfaces/IMailbox.sol";
-import {L2Message} from "../zksync/Storage.sol";
-
-import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import "../common/libraries/UnsafeBytes.sol";
+import "../common/ReentrancyGuard.sol";
+import "../common/libraries/L2ContractHelper.sol";
 import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import "../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -56,8 +52,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag
     /// @dev Used to indicate that zkSync L2 -> L1 WETH message was already processed
-    mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
-        public isWithdrawalFinalized;
+    mapping(uint256 => mapping(uint256 => bool)) public isWithdrawalFinalized;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -73,9 +68,9 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
     /// @notice _factoryDeps[1] == a raw bytecode of proxy that is used as L2 WETH bridge
     /// @param _l2WethAddress Pre-calculated address of L2 WETH token
     /// @param _governor Address which can change L2 WETH token implementation and upgrade the bridge
-    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2
+    /// @param _deployBridgeImplementationFee The fee that will be paid for the L1 -> L2 transaction for deploying L2
     /// bridge implementation
-    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying the L2 bridge
+    /// @param _deployBridgeProxyFee The fee that will be paid for the L1 -> L2 transaction for deploying L2 bridge
     /// proxy
     function initialize(
         bytes[] calldata _factoryDeps,
@@ -127,7 +122,7 @@ contract L1WethBridge is IL1Bridge, ReentrancyGuard {
             _deployBridgeProxyFee,
             l2WethBridgeProxyBytecodeHash,
             l2WethBridgeProxyConstructorData,
-            // No factory deps are needed for the L2 bridge proxy, because it is already passed in the previous step
+            // No factory deps are needed for L2 bridge proxy, because it is already passed in the previous step
             new bytes[](0)
         );
     }

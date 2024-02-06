@@ -21,7 +21,6 @@ import {
   SYSTEM_LOG_KEYS,
   constructL2Log,
   packBatchTimestampAndBatchTimestamp,
-  defaultFeeParams,
 } from "./utils";
 import * as ethers from "ethers";
 import type { BigNumberish, BytesLike } from "ethers";
@@ -87,7 +86,6 @@ describe("L2 upgrade test", function () {
         l2DefaultAccountBytecodeHash: dummyHash,
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
-        feeParams: defaultFeeParams(),
       },
     ]);
 

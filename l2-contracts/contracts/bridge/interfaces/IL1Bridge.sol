@@ -2,9 +2,7 @@
 
 pragma solidity 0.8.20;
 
-/// @title L1 Bridge contract interface
 /// @author Matter Labs
-/// @custom:security-contact security@matterlabs.dev
 interface IL1Bridge {
     function finalizeWithdrawal(
         uint256 _l2BatchNumber,
