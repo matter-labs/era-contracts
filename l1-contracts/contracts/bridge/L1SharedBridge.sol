@@ -605,6 +605,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            // this is for legacy withdrawals started before the upgrade
+            // this condition should not be needed in the next version
+            if (l1Token == l1WethAddress) {
+                wrapToWeth = true;
+            }
         } else {
             revert("W msg f slctr");
         }

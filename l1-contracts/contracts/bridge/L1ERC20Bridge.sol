@@ -8,7 +8,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 
-import {L2Message} from "../common/Messaging.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
@@ -20,23 +19,22 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
+    /// @dev Main shared bridge smart contract that is an upgrade of this contract.
     IL1SharedBridge public immutable override sharedBridge;
 
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
-    /// @dev Please note, this mapping is used only for Era withdrawals, while `isWithdrawalFinalizedShared` is used for every other hyperchains.
+    /// @dev Please note, this mapping is used only for Era withdrawals, while `isWithdrawalFinalizedShared` is used for every other hyperchain in the shared Bridge
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
         public isWithdrawalFinalized;
 
     /// @dev A mapping account => L1 token address => L2 deposit transaction hash => amount.
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail in zkSync Era.
-    /// @dev Please note, this mapping is used only for Era deposits, while `depositHappened` is used for every other hyperchains.
+    /// @dev Please note, this mapping is used only for Era deposits, while `depositHappened` is used for every other hyperchain in the shared Bridge
     mapping(address account => mapping(address l1Token => mapping(bytes32 depositL2TxHash => uint256 amount)))
         public depositAmount;
 
     /// @dev The address that was used as a L2 bridge counterpart in zkSync Era.
-    /// Note, it is deprecated in favour of `l2BridgeAddress` mapping.
     address public l2Bridge;
 
     /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
@@ -98,23 +96,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        // we need to deposit and set allowance, as the sender set the allowance to this contract
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, _l1Token, _amount);
-        require(amount == _amount, "3T"); // The token has non-standard transfer logic
-
-        uint256 mintValue = _l1Token == sharedBridge.l1WethAddress() ? msg.value + _amount : msg.value;
-        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}(
-            msg.sender,
-            _l2Receiver,
-            _l1Token,
-            mintValue,
-            _amount,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
-            address(0)
-        );
-        depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
-        emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
+       return deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
     }
 
     /// @notice Legacy deposit method with no chainId, use another `deposit` method instead.
@@ -135,8 +117,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) external payable returns (bytes32 l2TxHash) {
-        uint256 amount = _depositFundsToSharedBridge(msg.sender, _l1Token, _amount);
+    ) public payable nonReentrant returns (bytes32 l2TxHash) {
+        uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
         uint256 mintValue = _l1Token == sharedBridge.l1WethAddress() ? msg.value + _amount : msg.value;
@@ -157,11 +139,10 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFundsToSharedBridge(address _from, address _token, uint256 _amount) internal returns (uint256) {
-        IERC20 token = IERC20(_token);
-        uint256 balanceBefore = token.balanceOf(address(sharedBridge));
-        token.safeTransferFrom(_from, address(sharedBridge), _amount);
-        uint256 balanceAfter = token.balanceOf(address(sharedBridge));
+    function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(sharedBridge));
+        _token.safeTransferFrom(_from, address(sharedBridge), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(sharedBridge));
 
         return balanceAfter - balanceBefore;
     }

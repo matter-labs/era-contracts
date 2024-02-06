@@ -37,8 +37,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev WETH token address on L2.
     address public l2WrappedBaseTokenAddress;
 
-    /// @dev isEthBaseToken
+    /// @dev the address of L1 base token
     address internal l1BaseTokenAddress;
+
+    /// @dev legacy wethStandardToken address. Needed as we had two weth tokens on Era
+    address internal l2WethStandardToken;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -55,6 +58,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         bytes32 _l2TokenProxyBytecodeHash,
         address _l2WrappedBaseTokenAddress,
         address _l1BaseTokenAddress,
+        address _l2WethStandardToken,
         address _aliasedOwner
     ) external reinitializer(2) {
         require(_l1Bridge != address(0), "bf");
@@ -67,6 +71,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         l1Bridge = _l1Bridge;
         l2WrappedBaseTokenAddress = _l2WrappedBaseTokenAddress;
         l1BaseTokenAddress = _l1BaseTokenAddress;
+        l2WethStandardToken = _l2WethStandardToken;
 
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -141,6 +146,12 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
             // Withdraw ETH to L1 bridge.
             L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
+        } else if (_l2Token == l2WethStandardToken) {
+            // WETH withdrawal message.
+            bytes memory wethMessage = abi.encodePacked(_l1Receiver);
+
+            // Withdraw ETH to L1 bridge.
+            L2_ETH_ADDRESS.withdrawWithMessage(l1Bridge, wethMessage);
         } else {
             bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
             L2ContractHelper.sendMessageToL1(message);
