@@ -61,7 +61,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     }
 
     /// @dev Initializes the reentrancy guard for new blockchain deployments.
-    /// @dev For the proper initialization one should use `initializeV2` after calling this.
     function initialize() external reentrancyGuardInitializer {}
 
     /*//////////////////////////////////////////////////////////////
