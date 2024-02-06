@@ -2,9 +2,7 @@
 
 pragma solidity 0.8.20;
 
-/// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
-/// @custom:security-contact security@matterlabs.dev
 interface IL1BridgeLegacy {
     function deposit(
         address _l2Receiver,

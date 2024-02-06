@@ -25,7 +25,7 @@ library PriorityQueue {
     /// @param head The pointer to the first unprocessed priority operation, equal to the tail if the queue is empty
     /// @param tail The pointer to the free slot
     struct Queue {
-        mapping(uint256 priorityOpId => PriorityOperation priorityOp) data;
+        mapping(uint256 => PriorityOperation) data;
         uint256 tail;
         uint256 head;
     }

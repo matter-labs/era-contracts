@@ -7,7 +7,7 @@ import {
   computeL2Create2Address,
   getNumberFromEnv,
   hashL2Bytecode,
-  SYSTEM_CONFIG,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   web3Provider,
 } from "./utils";
 
@@ -134,13 +134,13 @@ async function main() {
       const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        SYSTEM_CONFIG.requiredL2GasPricePerPubdata
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
       );
 
       const requiredValueToPublishBytecodes = await zkSync.l2TransactionBaseCost(
         gasPrice,
         priorityTxMaxGasLimit,
-        SYSTEM_CONFIG.requiredL2GasPricePerPubdata
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
       );
 
       const independentInitialization = [
@@ -149,7 +149,7 @@ async function main() {
           0,
           "0x",
           priorityTxMaxGasLimit,
-          SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
+          REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
           deployWallet.address,
           { gasPrice, nonce, value: requiredValueToPublishBytecodes }

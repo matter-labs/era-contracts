@@ -13,7 +13,7 @@ Please put bootloader unittests in `bootloader/bootloader_test.yul` file, and an
 To execute tests, you should first run yarn to prepare the source code:
 
 ```shell
-yarn build-yul
+yarn preprocess && yarn compile-yul
 ```
 
 And then run the test framework:

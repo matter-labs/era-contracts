@@ -1,8 +1,8 @@
-import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
 import * as fs from "fs";
+import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
@@ -80,7 +80,7 @@ async function getWETHAddress() {
 }
 
 async function getTransparentProxyUpgradeCalldata(target: string) {
-  const proxyArtifact = await hre.artifacts.readArtifact("ITransparentUpgradeableProxy");
+  const proxyArtifact = await hre.artifacts.readArtifact("TransparentUpgradeableProxy");
   const proxyInterface = new ethers.utils.Interface(proxyArtifact.abi);
 
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
