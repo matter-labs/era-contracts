@@ -277,7 +277,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory data) {
         if ((_token == ETH_TOKEN_ADDRESS) || (_token == l1WethAddress)) {
-            return new bytes(0);
+            return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain
         }
 
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
@@ -465,7 +465,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
-        require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "pw2");
+        require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         if ((_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber)) {
@@ -476,7 +476,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 _l2BatchNumber,
                 _l2MessageIndex
             );
-            require(!alreadyFinalized, "Withdrawal is already finalized");
+            require(!alreadyFinalized, "Withdrawal is already finalized 2");
         }
 
         bool wrapToWeth;
@@ -498,7 +498,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
         if (!hyperbridgingEnabled[_chainId]) {
             // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "EB n funds 2"); // not enought funds
+            require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enought funds
             chainBalance[_chainId][l1Token] -= amount;
         }
 
@@ -515,7 +515,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             assembly {
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
-            require(callSuccess, "L1WB: withdraw failed");
+            require(callSuccess, "ShB: withdraw failed");
             emit EthWithdrawalFinalized(_chainId, l1Receiver, amount);
         } else {
             // Withdraw funds
@@ -553,7 +553,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 l2ToL1Message,
                 _merkleProof
             );
-            require(success, "EB withd w pf"); // withdrawal wrong proof
+            require(success, "EB withd w proof"); // withdrawal wrong proof
         }
     }
 
@@ -571,7 +571,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
 
         // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "EB w msg len"); // wrong messsage length
+        require(_l2ToL1message.length >= 56, "EB wrong msg len"); // wrong messsage length
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
@@ -582,7 +582,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
             if (l1Receiver == address(this)) {
                 // the user either specified a wrong receiver (so the withdrawal cannot be finished), or the withdrawal is a weth withdrawal
-                require((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress), "EB w eth w");
+                require((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress), "EB wrong eth withdrawal address");
                 wrapToWeth = true;
 
                 // Check that the message length is correct.
@@ -615,7 +615,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 wrapToWeth = true;
             }
         } else {
-            revert("W msg f slctr");
+            revert("ShB Incorrect message function selector");
         }
     }
 
