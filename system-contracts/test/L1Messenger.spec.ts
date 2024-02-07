@@ -94,11 +94,11 @@ describe("L1Messenger tests", () => {
     });
 
     it("should revert Too many L2->L1 logs", async () => {
-      // set numberOfLogsBytes to 0x900 to trigger the revert (max value is 0x800)
+      // set numberOfLogsBytes to 0x1100 to trigger the revert (max value is 0x1000)
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x900 }))
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x1100 }))
       ).to.be.rejectedWith("Too many L2->L1 logs");
     });
 
