@@ -507,7 +507,7 @@ contract ExecutorFacet is Base, IExecutor {
         require(result == BLS_MODULUS, "precompile unexpected output");
     }
 
-    /// Verifies that the blobs contain the correct data by calling the point evaluation precompile. For the precompile we need:
+    /// @dev Verifies that the blobs contain the correct data by calling the point evaluation precompile. For the precompile we need:
     /// versioned hash || opening point || opening value || commitment || proof
     /// the _pubdataCommitments will contain the last 4 values, the versioned hash is pulled from the BLOBHASH opcode
     /// pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
@@ -562,7 +562,7 @@ contract ExecutorFacet is Base, IExecutor {
         }
     }
 
-    /// Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
+    /// @dev Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
     /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
     /// new opcode.
     function _getBlobVersionedHash(uint256 _index) internal view returns (bytes32 versionedHash) {
