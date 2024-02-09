@@ -44,7 +44,7 @@ export async function create2DeployFromL1(
     l2GasLimit,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
+  // const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   await bridgehub.requestL2TransactionDirect(
     {
@@ -55,7 +55,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted,
+      l1GasPriceConverted: 0,
       factoryDeps: [bytecode],
       refundRecipient: walletAddress,
     },
@@ -138,7 +138,7 @@ describe("Shared Bridge tests", () => {
           l2Value: 0,
           l2GasLimit: 0,
           l2GasPerPubdataByteLimit: 0,
-          l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+          l1GasPriceConverted: 0,
           refundRecipient: ethers.constants.AddressZero,
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
@@ -164,7 +164,7 @@ describe("Shared Bridge tests", () => {
           l2Value: 0,
           l2GasLimit: 0,
           l2GasPerPubdataByteLimit: 0,
-          l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+          l1GasPriceConverted: 0,
           refundRecipient: ethers.constants.AddressZero,
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
@@ -191,7 +191,7 @@ describe("Shared Bridge tests", () => {
         l2Value: amount,
         l2GasLimit: 1000000,
         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+        l1GasPriceConverted: 0,
         refundRecipient: ethers.constants.AddressZero,
         secondBridgeAddress: l1SharedBridge.address,
         secondBridgeValue: 0,
@@ -224,7 +224,7 @@ describe("Shared Bridge tests", () => {
           [ethers.constants.HashZero]
         )
     );
-    expect(revertReason).equal("Incorrect ETH message with additional data length 2");
+    expect(revertReason).equal("Incorrect BaseToken message with additional data length 2");
   });
 
   it("Should revert on finalizing a withdrawal that was not initiated", async () => {
@@ -283,7 +283,7 @@ describe("Shared Bridge tests", () => {
         l2Value: amount,
         l2GasLimit: 1000000,
         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+        l1GasPriceConverted: 0,
         refundRecipient: ethers.constants.AddressZero,
         secondBridgeAddress: l1SharedBridge.address,
         secondBridgeValue: 0,
