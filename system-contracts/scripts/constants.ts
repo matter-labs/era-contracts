@@ -106,9 +106,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "MsgValueSimulator",
     lang: Language.Solidity,
   },
-  l2EthToken: {
+  L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2EthToken",
+    codeName: "L2BaseToken",
     lang: Language.Solidity,
   },
   systemContext: {
