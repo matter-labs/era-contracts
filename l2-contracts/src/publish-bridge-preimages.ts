@@ -46,7 +46,7 @@ async function main() {
       const bridgehub = deployer.bridgehubContract(wallet);
       const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
-      const publishL2ERC20BridgeTx = await bridgehub.requestL2TransactionDirect(
+      const publishL2SharedBridgeTx = await bridgehub.requestL2TransactionDirect(
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
@@ -56,12 +56,12 @@ async function main() {
           l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           l1GasPriceConverted: l1GasPriceConverted,
-          factoryDeps: [getContractBytecode("L2ERC20Bridge")],
+          factoryDeps: [getContractBytecode("L2SharedBridge")],
           refundRecipient: wallet.address,
         },
         { nonce, gasPrice }
       );
-      await publishL2ERC20BridgeTx.wait();
+      await publishL2SharedBridgeTx.wait();
     });
 
   await program.parseAsync(process.argv);

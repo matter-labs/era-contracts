@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { initializeErc20Bridge } from "../src.ts/erc20-initialize";
+import { initializeErc20Bridge } from "../src.ts/shared-bridge-initialize";
 import { GAS_MULTIPLIER, deployedAddressesFromEnv, web3Provider } from "./utils";
 
 import * as fs from "fs";

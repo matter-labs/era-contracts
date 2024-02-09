@@ -1,18 +1,18 @@
 import type { BigNumberish, BytesLike, Wallet } from "ethers";
 import { BigNumber, ethers } from "ethers";
+import * as hardhat from "hardhat";
 import type { Address } from "zksync-ethers/build/src/types";
 import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
 import { deployTokens } from "../../src.ts/deploy-token";
-import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
-import { initializeWethBridge } from "../../src.ts/weth-initialize";
 
 import { GovernanceFactory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { IL1Bridge } from "../../typechain/IL1Bridge";
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import type { IMailbox } from "../../typechain/IMailbox";
+import { Interface } from "ethers/lib/utils";
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
@@ -36,7 +36,7 @@ export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000
 export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
 export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
-export const L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
+export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 
 const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -106,31 +106,6 @@ export async function getCallRevertReason(promise) {
     }
   }
   return revertReason;
-}
-
-export async function executeUpgrade(
-  deployer: Deployer,
-  deployWallet: Wallet,
-  targetAddress: string,
-  value: BigNumberish,
-  callData: string
-) {
-  const governance = GovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
-  const operation = {
-    calls: [{ target: targetAddress, value: value, data: callData }],
-    predecessor: ethers.constants.HashZero,
-    salt: ethers.constants.HashZero,
-  };
-  await governance.scheduleTransparent(operation, 0);
-  await governance.execute(operation);
-  if (deployer.verbose) {
-    console.log(
-      "Upgrade with target ",
-      targetAddress,
-      "executed: ",
-      await governance.isOperationDone(await governance.hashOperation(operation))
-    );
-  }
 }
 
 export async function requestExecute(
@@ -362,8 +337,8 @@ export async function initialDeployment(
   await deployer.deployCreate2Factory({ gasPrice, nonce });
   nonce++;
 
-  // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
-  // nonce++;
+  await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+  nonce++;
 
   process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
   process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
@@ -382,11 +357,11 @@ export async function initialDeployment(
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
   await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-  await deployer.deployBridgeContracts(create2Salt, gasPrice);
-  await initializeErc20Bridge(deployer, deployWallet, gasPrice, null);
-
-  await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-  await initializeWethBridge(deployer, deployWallet, gasPrice);
+  /// not the weird order is in order, mimics historical deployment process
+  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+  await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
+  await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
+  await deployer.upgradeL1ERC20Bridge();
 
   if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
     await deployer.registerToken(baseTokenAddress);
@@ -432,7 +407,7 @@ export interface CommitBatchInfo {
 }
 
 export async function depositERC20(
-  bridge: IL1Bridge,
+  bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
   l2Receiver: string,
@@ -446,11 +421,9 @@ export async function depositERC20(
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
-  await bridge.deposit(
-    chainId,
+  await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
     l2Receiver,
     l1Token,
-    neededValue,
     amount,
     l2GasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,

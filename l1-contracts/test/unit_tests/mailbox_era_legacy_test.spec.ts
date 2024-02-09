@@ -6,7 +6,7 @@ import type { IMailbox } from "../../typechain/IMailbox";
 
 import {
   CONTRACTS_LATEST_PROTOCOL_VERSION,
-  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
+  L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
   ethTestConfig,
   getCallRevertReason,
@@ -95,7 +95,7 @@ describe("Mailbox Era's legacy functions tests", function () {
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
     const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
-    const key = ethers.utils.hexZeroPad(L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
+    const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
       [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
@@ -129,7 +129,7 @@ describe("Mailbox Era's legacy functions tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("vq");
+      expect(revertReason).equal("ShB withd w proof");
     });
 
     it("Successful deposit", async () => {

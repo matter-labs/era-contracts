@@ -25,15 +25,15 @@ function readInterface(path: string, fileName: string, solFileName?: string) {
 }
 
 const DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = getNumberFromEnv("CONTRACTS_DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT");
-const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2Weth");
+const L2_WETH_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2WrappedBaseToken");
 const TRANSPARENT_UPGRADEABLE_PROXY = readInterface(
   openzeppelinTransparentProxyArtifactsPath,
   "ITransparentUpgradeableProxy",
   "TransparentUpgradeableProxy"
 );
 
-function getL2Calldata(l2WethBridgeAddress: string, l1WethTokenAddress: string, l2WethTokenImplAddress: string) {
-  const upgradeData = L2_WETH_INTERFACE.encodeFunctionData("initializeV2", [l2WethBridgeAddress, l1WethTokenAddress]);
+function getL2Calldata(l2SharedBridgeAddress: string, l1WethTokenAddress: string, l2WethTokenImplAddress: string) {
+  const upgradeData = L2_WETH_INTERFACE.encodeFunctionData("initializeV2", [l2SharedBridgeAddress, l1WethTokenAddress]);
   return TRANSPARENT_UPGRADEABLE_PROXY.encodeFunctionData("upgradeToAndCall", [l2WethTokenImplAddress, upgradeData]);
 }
 
@@ -82,7 +82,7 @@ async function main() {
 
   program.version("0.1.0").name("initialize-l2-weth-token");
 
-  const l2WethBridgeAddress = process.env.CONTRACTS_L2_WETH_BRIDGE_ADDR;
+  const l2SharedBridgeAddress = process.env.CONTRACTS_L2_WETH_BRIDGE_ADDR;
   const l2WethTokenProxyAddress = process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR;
   const l2WethTokenImplAddress = process.env.CONTRACTS_L2_WETH_TOKEN_IMPL_ADDR;
   const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
@@ -118,7 +118,7 @@ async function main() {
         verbose: true,
       });
 
-      const l2Calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
+      const l2Calldata = getL2Calldata(l2SharedBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
       const l1TxInfo = await getL1TxInfo(
         deployer,
         chainId,
@@ -172,7 +172,7 @@ async function main() {
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
         SYSTEM_CONFIG.requiredL2GasPricePerPubdata
       );
-      const calldata = getL2Calldata(l2WethBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
+      const calldata = getL2Calldata(l2SharedBridgeAddress, l1WethTokenAddress, l2WethTokenImplAddress);
       const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
       const tx = await bridgehub.requestL2TransactionDirect(

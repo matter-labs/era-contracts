@@ -13,7 +13,7 @@ import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_ETH_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_BASE_TOKEN_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 import {L2WrappedBaseToken} from "./L2WrappedBaseToken.sol";
 import {ERA_CHAIN_ID, ERA_WETH_ADDRESS} from "../Config.sol";
@@ -149,7 +149,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             bytes memory wethMessage = abi.encodePacked(_l1Receiver);
 
             // Withdraw ETH to L1 bridge.
-            L2_ETH_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
+            L2_BASE_TOKEN_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
         } else {
             bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
             L2ContractHelper.sendMessageToL1(message);

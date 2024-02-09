@@ -10,7 +10,7 @@ import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-cont
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
 
-const SupportedL2Contracts = ["L2ERC20Bridge", "L2StandardERC20", "L2WethBridge", "L2Weth"] as const;
+const SupportedL2Contracts = ["L2SharedBridge", "L2StandardERC20", "L2WrappedBaseToken"] as const;
 
 // For L1 contracts we can not read bytecodes, but we can still produce the upgrade calldata
 const SupportedL1Contracts = ["L1ERC20Bridge"] as const;
@@ -56,8 +56,8 @@ function validateUpgradeInfo(info: UpgradeInfo) {
 }
 
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
-const l2Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
-const l1Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR");
+const l2SharedBridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
+const l1Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 const provider = web3Provider();
@@ -67,7 +67,7 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 async function getERC20BeaconAddress() {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
   const bridge = (await provider.getDefaultBridgeAddresses()).erc20L2;
-  const artifact = await hre.artifacts.readArtifact("L2ERC20Bridge");
+  const artifact = await hre.artifacts.readArtifact("L2SharedBridge");
   const contract = new ethers.Contract(bridge, artifact.abi, provider);
 
   return await contract.l2TokenBeacon();
@@ -140,11 +140,11 @@ async function getTxInfo(
   contract: SupportedContract,
   l2ProxyAddress?: string
 ) {
-  if (contract === "L2ERC20Bridge") {
-    return getTransparentProxyUpgradeTxInfo(deployer, target, l2Erc20BridgeProxyAddress, refundRecipient, gasPrice);
-  } else if (contract == "L2Weth") {
+  if (contract === "L2SharedBridge") {
+    return getTransparentProxyUpgradeTxInfo(deployer, target, l2SharedBridgeProxyAddress, refundRecipient, gasPrice);
+  } else if (contract == "L2WrappedBaseToken") {
     throw new Error(
-      "The latest L2Weth implementation requires L2WethBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed."
+      "The latest L2WrappedBaseToken implementation requires L2SharedBridge to be deployed in order to be correctly initialized, which is not the case on the majority of networks. Remove this error once the bridge is deployed."
     );
   } else if (contract == "L2StandardERC20") {
     if (!l2ProxyAddress) {
@@ -194,16 +194,16 @@ async function main() {
       console.log("Salt: ", salt);
 
       const bridgeImplBytecode = getContractBytecode(cmd.contract);
-      const l2ERC20BridgeImplAddr = computeL2Create2Address(deployWallet, bridgeImplBytecode, "0x", salt);
-      console.log("Bridge implemenation address: ", l2ERC20BridgeImplAddr);
+      const l2SharedBridgeImplAddr = computeL2Create2Address(deployWallet, bridgeImplBytecode, "0x", salt);
+      console.log("Bridge implemenation address: ", l2SharedBridgeImplAddr);
 
       if (cmd.l2DoubleCheck !== false) {
         // If the bytecode has already been deployed there is no need to deploy it again.
         const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-        const deployedBytecode = await zksProvider.getCode(l2ERC20BridgeImplAddr);
+        const deployedBytecode = await zksProvider.getCode(l2SharedBridgeImplAddr);
         if (deployedBytecode === bridgeImplBytecode) {
           console.log("The bytecode has been already deployed!");
-          console.log("Address:", l2ERC20BridgeImplAddr);
+          console.log("Address:", l2SharedBridgeImplAddr);
           return;
         } else if (ethers.utils.arrayify(deployedBytecode).length > 0) {
           console.log("CREATE2 DERIVATION: A different bytecode has been deployed on that address");
@@ -238,7 +238,7 @@ async function main() {
         await awaitPriorityOps(zksProvider, receipt, deployer.bridgehubContract(deployWallet).interface);
 
         // Double checking that the bridge implementation has been deployed
-        const deployedBytecode = await zksProvider.getCode(l2ERC20BridgeImplAddr);
+        const deployedBytecode = await zksProvider.getCode(l2SharedBridgeImplAddr);
         if (deployedBytecode != bridgeImplBytecode) {
           console.error("Bridge implementation has not been deployed");
           process.exit(1);
@@ -249,7 +249,7 @@ async function main() {
 
       console.log("\n");
       console.log("Bridge implementation has been successfuly deployed!");
-      console.log("Address:", l2ERC20BridgeImplAddr);
+      console.log("Address:", l2SharedBridgeImplAddr);
     });
 
   program

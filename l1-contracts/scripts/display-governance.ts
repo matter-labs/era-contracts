@@ -10,17 +10,17 @@ import * as fs from "fs";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
 import { Provider } from "zksync-web3";
 
-const L2ERC20BridgeABI = JSON.parse(
+const l2SharedBridgeABI = JSON.parse(
   fs
     .readFileSync(
-      "../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json"
+      "../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
     )
     .toString()
 ).abi;
 
-async function getERC20BeaconAddress(l2Erc20BridgeAddress: string) {
+async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-  const contract = new ethers.Contract(l2Erc20BridgeAddress, L2ERC20BridgeABI, provider);
+  const contract = new ethers.Contract(l2SharedBridgeAddress, l2SharedBridgeABI, provider);
   return await contract.l2TokenBeacon();
 }
 
@@ -77,11 +77,11 @@ async function main() {
       new ethers.providers.JsonRpcProvider(process.env.API_WEB3_JSON_RPC_HTTP_URL)
     );
 
-    const l2ERC20Bridge = deployer.transparentUpgradableProxyContract(
+    const l2SharedBridge = deployer.transparentUpgradableProxyContract(
       process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
       deployWallet2
     );
-    console.log("l2ERC20Bridge governor: ", await proxyGov(l2ERC20Bridge.address, deployWallet2.provider));
+    console.log("L2SharedBridge governor: ", await proxyGov(l2SharedBridge.address, deployWallet2.provider));
 
     const l2wethToken = deployer.transparentUpgradableProxyContract(
       process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR!,
@@ -90,7 +90,7 @@ async function main() {
     console.log("l2wethToken governor: ", await proxyGov(l2wethToken.address, deployWallet2.provider));
 
     // L2 Tokens are BeaconProxies
-    const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2ERC20Bridge.address);
+    const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2SharedBridge.address);
     const l2Erc20TokenBeacon = UpgradeableBeaconFactory.connect(l2Erc20BeaconAddress, deployWallet2);
 
     console.log("l2Erc20TokenBeacon governor: ", await l2Erc20TokenBeacon.owner());

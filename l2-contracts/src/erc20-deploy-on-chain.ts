@@ -6,7 +6,7 @@ import { GAS_MULTIPLIER, web3Provider } from "../../l1-contracts/scripts/utils";
 
 import * as fs from "fs";
 import * as path from "path";
-import { startErc20BridgeInitOnChain } from "../../l1-contracts/src.ts/erc20-initialize";
+import { startErc20BridgeInitOnChain } from "../../l1-contracts/src.ts/shared-bridge-initialize";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");

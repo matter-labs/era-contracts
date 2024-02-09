@@ -1,22 +1,16 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
-import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
+import { Interface } from "ethers/lib/utils";
 
 import * as fs from "fs";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import type { Deployer } from "../../src.ts/deploy";
-import type { Bridgehub } from "../../typechain";
-import { BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
-import type { IL1Bridge } from "../../typechain/IL1Bridge";
-import { IL1BridgeFactory } from "../../typechain/IL1BridgeFactory";
-import {
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
-  depositERC20,
-  executeUpgrade,
-  getCallRevertReason,
-  initialDeployment,
-} from "./utils";
+import type { Bridgehub, L1SharedBridge } from "../../typechain";
+import {L1SharedBridgeFactory,  BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
+import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
+import { CONTRACTS_LATEST_PROTOCOL_VERSION, depositERC20, getCallRevertReason, initialDeployment } from "./utils";
 
 const testConfigPath = "./test/test_config/constant";
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -29,10 +23,11 @@ describe("L1ERC20Bridge tests", function () {
   let deployWallet: Wallet;
   let deployer: Deployer;
   let l1ERC20BridgeAddress: string;
-  let l1ERC20Bridge: IL1Bridge;
+  let l1ERC20Bridge: IL1ERC20Bridge;
+  let sharedBridgeProxy: L1SharedBridge;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
-  let chainId = "0";
+  let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
 
   before(async () => {
@@ -55,6 +50,7 @@ describe("L1ERC20Bridge tests", function () {
 
     await owner.sendTransaction(tx);
 
+    process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = "9"; // the legacy functions work only for ERA, which has a specific chainId
     deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
     chainId = deployer.chainId.toString();
 
@@ -62,7 +58,9 @@ describe("L1ERC20Bridge tests", function () {
 
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
-    l1ERC20Bridge = IL1BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
+    l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
+    sharedBridgeProxy = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+
 
     const tokens = getTokens("hardhat");
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
@@ -73,31 +71,23 @@ describe("L1ERC20Bridge tests", function () {
   });
 
   it("Check should initialize through governance", async () => {
-    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const upgradeCall = l1ERC20BridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address,address)",
-      [chainId, ADDRESS_ONE, ADDRESS_ONE]
+    const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData(
+      "initializeChainGovernance(uint256,address)",
+      [chainId, ADDRESS_ONE]
     );
 
-    const txHash = await executeUpgrade(deployer, deployWallet, l1ERC20Bridge.address, 0, upgradeCall);
+    const txHash = await deployer.executeUpgrade(sharedBridgeProxy.address, 0, upgradeCall);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
   });
 
   it("Should not allow depositing zero amount", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge
-        .connect(randomSigner)
-        .deposit(
-          chainId,
-          await randomSigner.getAddress(),
-          erc20TestToken.address,
-          0,
-          0,
-          0,
-          0,
-          ethers.constants.AddressZero
-        )
+      l1ERC20Bridge.connect(randomSigner)[
+        // solhint-disable-next-line no-unexpected-multiline
+        "deposit(address,address,uint256,uint256,uint256,address)"
+      ](await randomSigner.getAddress(), erc20TestToken.address, 0, 0, 0, ethers.constants.AddressZero)
     );
     expect(revertReason).equal("2T");
   });
@@ -117,18 +107,18 @@ describe("L1ERC20Bridge tests", function () {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, "0x", [ethers.constants.HashZero])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, "0x", [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("EB w msg len");
+    expect(revertReason).equal("ShB wrong msg len");
   });
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
+        .finalizeWithdrawal(0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
-    expect(revertReason).equal("W msg f slctr");
+    expect(revertReason).equal("ShB Incorrect message function selector");
   });
 
   it("Should revert on finalizing a withdrawal with wrong batch number", async () => {
@@ -140,7 +130,7 @@ describe("L1ERC20Bridge tests", function () {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 10, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(10, 0, 0, l2ToL1message, [])
     );
     expect(revertReason).equal("xx");
   });
@@ -154,7 +144,7 @@ describe("L1ERC20Bridge tests", function () {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, [])
+      l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
     );
     expect(revertReason).equal("xc");
   });
@@ -170,8 +160,8 @@ describe("L1ERC20Bridge tests", function () {
     const revertReason = await getCallRevertReason(
       l1ERC20Bridge
         .connect(randomSigner)
-        .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
+        .finalizeWithdrawal(0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
-    expect(revertReason).equal("EB withd w pf");
+    expect(revertReason).equal("ShB withd w proof");
   });
 });

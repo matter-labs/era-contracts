@@ -17,9 +17,9 @@ import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/Upgradeab
 const provider = web3Provider();
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 
-const L2ERC20BridgeABI = JSON.parse(
+const l2SharedBridgeABI = JSON.parse(
   fs
-    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2ERC20Bridge.sol/L2ERC20Bridge.json")
+    .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2SharedBridge.sol/L2SharedBridge.json")
     .toString()
 ).abi;
 
@@ -29,9 +29,9 @@ interface TxInfo {
   value?: string;
 }
 
-async function getERC20BeaconAddress(l2Erc20BridgeAddress: string) {
+async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-  const contract = new ethers.Contract(l2Erc20BridgeAddress, L2ERC20BridgeABI, provider);
+  const contract = new ethers.Contract(l2SharedBridgeAddress, l2SharedBridgeABI, provider);
   return await contract.l2TokenBeacon();
 }
 
@@ -130,15 +130,15 @@ async function main() {
       const aliasedNewGovernor = applyL1ToL2Alias(governanceAddressFromEnv);
 
       // L2 ERC20 bridge as well as Weth token are a transparent upgradable proxy.
-      const l2ERC20Bridge = deployer.transparentUpgradableProxyContract(
+      const l2SharedBridge = deployer.transparentUpgradableProxyContract(
         process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
         deployWallet
       );
-      const l2Erc20BridgeCalldata = l2ERC20Bridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
+      const l2SharedBridgeCalldata = l2SharedBridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
       const l2TxForErc20Bridge = await getL1TxInfo(
         deployer,
-        l2ERC20Bridge.address,
-        l2Erc20BridgeCalldata,
+        l2SharedBridge.address,
+        l2SharedBridgeCalldata,
         refundRecipient,
         gasPrice,
         priorityTxMaxGasLimit,
@@ -163,7 +163,7 @@ async function main() {
       displayTx("L2 Weth upgrade: ", l2TxForWethUpgrade);
 
       // L2 Tokens are BeaconProxies
-      const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2ERC20Bridge.address);
+      const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2SharedBridge.address);
       const l2Erc20TokenBeacon = UpgradeableBeaconFactory.connect(l2Erc20BeaconAddress, deployWallet);
       const l2Erc20BeaconCalldata = l2Erc20TokenBeacon.interface.encodeFunctionData("transferOwnership", [
         aliasedNewGovernor,

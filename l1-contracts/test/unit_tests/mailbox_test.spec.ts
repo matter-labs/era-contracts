@@ -13,7 +13,7 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import {
   CONTRACTS_LATEST_PROTOCOL_VERSION,
   DEFAULT_REVERT_REASON,
-  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
+  L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
   PubdataPricingMode,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -136,7 +136,7 @@ describe("Mailbox tests", function () {
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
     const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
-    const key = ethers.utils.hexZeroPad(L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
+    const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
       [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
@@ -286,10 +286,10 @@ describe("Mailbox tests", function () {
     );
     const mintValue = await overrides.value;
     overrides.gasLimit = 10000000;
-    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
+    // const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
     const encodeRequest = (refundRecipient) =>
-      bridgehub.interface.encodeFunctionData("requestL2Transaction", [
+      bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
@@ -298,7 +298,7 @@ describe("Mailbox tests", function () {
           l2Calldata: "0x",
           l2GasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          l1GasPriceConverted,
+          l1GasPriceConverted:0,
           factoryDeps: [new Uint8Array(32)],
           refundRecipient,
         },

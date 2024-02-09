@@ -8,6 +8,7 @@ import type { DeployedAddresses } from "../scripts/utils";
 import {
   ADDRESS_ONE,
   deployedAddressesFromEnv,
+  GAS_MULTIPLIER,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
@@ -24,9 +25,8 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
 import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
-import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
+import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 
-import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { deployViaCreate2 } from "./deploy-utils";
@@ -383,7 +383,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "L1ERC20Bridge",
-      [this.addresses.Bridgehub.BridgehubProxy],
+      [this.addresses.Bridges.SharedBridgeProxy],
       create2Salt,
       ethTxOptions
     );
@@ -395,15 +395,54 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeImplementation = contractAddress;
   }
 
+  public async upgradeL1ERC20Bridge() {
+    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
+    const calldata = proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
+      this.addresses.Bridges.ERC20BridgeProxy,
+      this.addresses.Bridges.ERC20BridgeImplementation,
+      l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
+    ]);
+  
+    await this.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
+    if (this.verbose) {
+      console.log("L1ERC20Bridge upgrade sent");
+    }
+  }
+
+  public async executeUpgrade(
+    targetAddress: string,
+    value: BigNumberish,
+    callData: string
+  ) {
+    const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
+    const operation = {
+      calls: [{ target: targetAddress, value: value, data: callData }],
+      predecessor: ethers.constants.HashZero,
+      salt: ethers.constants.HashZero,
+    };
+    await governance.scheduleTransparent(operation, 0);
+    await governance.execute(operation);
+    if (this.verbose) {
+      console.log(
+        "Upgrade with target ",
+        targetAddress,
+        "executed: ",
+        await governance.isOperationDone(await governance.hashOperation(operation))
+      );
+    }
+  }
+
+  // used for testing, mimics deployment process. 
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, "0x"],
+      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.TransparentProxyAdmin, "0x"], // we have to use an  address where a contract is already deployed
       create2Salt,
       ethTxOptions
     );
-
+    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress;
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
@@ -411,68 +450,57 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeProxy = contractAddress;
   }
 
-  public async registerERC20Bridge(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deploySharedBridgeImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const bridgehub = this.bridgehubContract(this.deployWallet);
-
-    const tx = await bridgehub.addTokenBridge(this.addresses.Bridges.ERC20BridgeProxy);
-
-    const receipt = await tx.wait();
-    if (this.verbose) {
-      console.log(`ERC20 bridge was registered, gas used: ${receipt.gasUsed.toString()}`);
-    }
-  }
-
-  public async deployWethBridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
-      "L1WethBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy],
+      "L1SharedBridge",
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR], // we load from process.env, as normally L1_ERC20 bridge will already be deployed
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridges.WethBridgeImplementation = contractAddress;
+    this.addresses.Bridges.SharedBridgeImplementation = contractAddress;
   }
 
-  public async deployWethBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
+    const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData("initialize", [this.addresses.Governance, process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH])
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridges.WethBridgeImplementation, this.addresses.TransparentProxyAdmin, "0x"],
+      [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
     );
 
     if (this.verbose) {
-      console.log(`CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
 
-    this.addresses.Bridges.WethBridgeProxy = contractAddress;
+    this.addresses.Bridges.SharedBridgeProxy = contractAddress;
   }
 
-  public async registerWETHBridge(ethTxOptions: ethers.providers.TransactionRequest) {
+  public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
-    const tx = await bridgehub.addTokenBridge(this.addresses.Bridges.WethBridgeProxy);
-    const receipt = await tx.wait();
-
     /// registering ETH as a valid token, with address 1.
-    const tx2 = await bridgehub.addToken(ADDRESS_ONE);
+    const tx2 = await bridgehub.addToken(ADDRESS_ONE, 0);
     const receipt2 = await tx2.wait();
 
-    const tx3 = await bridgehub.setWethBridge(this.addresses.Bridges.WethBridgeProxy);
-    await tx3.wait();
+    const tx3 = await bridgehub.setSharedBridge(this.addresses.Bridges.SharedBridgeProxy);
+    const receipt3 = await tx3.wait();
     if (this.verbose) {
       console.log(
-        `WETH bridge was registered, gas used: ${receipt.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
+        `Shared bridge was registered, gas used: ${receipt3.gasUsed.toString()} and ${receipt2.gasUsed.toString()}`
       );
     }
   }
@@ -598,9 +626,6 @@ export class Deployer {
       inputChainId,
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
-      baseTokenAddress == ADDRESS_ONE
-        ? this.addresses.Bridges.WethBridgeProxy
-        : this.addresses.Bridges.ERC20BridgeProxy,
       Date.now(),
       governor,
       initialDiamondCut,
@@ -624,10 +649,7 @@ export class Deployer {
 
     this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
     this.addresses.BaseToken = baseTokenAddress;
-    this.addresses.Bridges.BaseTokenBridge =
-      baseTokenAddress == ADDRESS_ONE
-        ? this.addresses.Bridges.WethBridgeProxy
-        : this.addresses.Bridges.ERC20BridgeProxy;
+
     if (this.verbose) {
       console.log(`Hyperchain registered, gas used: ${receipt.gasUsed.toString()} and ${receipt.gasUsed.toString()}`);
       console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
@@ -635,13 +657,6 @@ export class Deployer {
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
       console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
-      console.log(
-        `CONTRACTS_BASE_TOKEN_BRIDGE_ADDR=${
-          baseTokenAddress == ADDRESS_ONE
-            ? this.addresses.Bridges.WethBridgeProxy
-            : this.addresses.Bridges.ERC20BridgeProxy
-        }`
-      );
     }
     this.chainId = parseInt(chainId, 16);
 
@@ -660,8 +675,8 @@ export class Deployer {
 
   public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-
-    const tx = await bridgehub.addToken(tokenAddress);
+    // kl todo change 1 to general variable. 
+    const tx = await bridgehub.addToken(tokenAddress, 1);
 
     const receipt = await tx.wait();
     if (this.verbose) {
@@ -669,20 +684,12 @@ export class Deployer {
     }
   }
 
-  public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deploySharedBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
-    await this.deployERC20BridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
-    await this.deployERC20BridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
-    await this.registerERC20Bridge({ gasPrice, nonce: nonce + 2 });
-  }
-
-  public async deployWethBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
-    nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
-
-    await this.deployWethBridgeImplementation(create2Salt, { gasPrice, nonce: nonce++ });
-    await this.deployWethBridgeProxy(create2Salt, { gasPrice, nonce: nonce++ });
-    await this.registerWETHBridge({ gasPrice, nonce: nonce++ });
+    await this.deploySharedBridgeImplementation(create2Salt, { gasPrice, nonce: nonce });
+    await this.deploySharedBridgeProxy(create2Salt, { gasPrice, nonce: nonce + 1 });
+    await this.registerSharedBridge({ gasPrice, nonce: nonce + 2 });
   }
 
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -753,12 +760,8 @@ export class Deployer {
     return ValidatorTimelockFactory.connect(this.addresses.ValidatorTimeLock, signerOrProvider);
   }
 
-  public defaultERC20Bridge(signerOrProvider: Signer | providers.Provider) {
-    return L1ERC20BridgeFactory.connect(this.addresses.Bridges.ERC20BridgeProxy, signerOrProvider);
-  }
-
-  public defaultWethBridge(signerOrProvider: Signer | providers.Provider) {
-    return L1WethBridgeFactory.connect(this.addresses.Bridges.WethBridgeProxy, signerOrProvider);
+  public defaultSharedBridge(signerOrProvider: Signer | providers.Provider) {
+    return L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, signerOrProvider);
   }
 
   public baseTokenContract(signerOrProvider: Signer | providers.Provider) {

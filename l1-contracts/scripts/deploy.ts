@@ -97,8 +97,7 @@ async function main() {
       await deployer.deployBridgehubContract(create2Salt, gasPrice);
       await deployer.deployStateTransitionContract(create2Salt, null, gasPrice); // Do not pass nonce, since it was increment after deploying factory contracts
       await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-      await deployer.deployBridgeContracts(create2Salt, gasPrice);
-      await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+      await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
     });
 
   await program.parseAsync(process.argv);

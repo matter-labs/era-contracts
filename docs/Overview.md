@@ -215,7 +215,16 @@ fee-on-transfer tokens or other custom logic for handling user balances.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
-##### L2ERC20Bridge
+##### L1Shared0Bridge
+
+The "standard" implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+fee-on-transfer tokens or other custom logic for handling user balances.
+
+- `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
+- `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
+- `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
+
+##### L2SharedBridge
 
 The L2 counterpart of the L1 ERC20 bridge.
 
@@ -233,7 +242,7 @@ it is wrapped back into WETH and delivered to the L2 recipient.
 
 Thus, the deposit is made in one transaction, and the user receives L2 WETH that can be unwrapped to ETH.
 
-##### L2WethBridge
+##### L2SharedBridge
 
 The L2 counterpart of the L1 WETH bridge.
 
