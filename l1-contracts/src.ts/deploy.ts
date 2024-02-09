@@ -8,7 +8,6 @@ import type { DeployedAddresses } from "../scripts/utils";
 import {
   ADDRESS_ONE,
   deployedAddressesFromEnv,
-  GAS_MULTIPLIER,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,

@@ -74,7 +74,7 @@ describe("Shared Bridge tests", () => {
   let l1Weth: WETH9;
   let erc20TestToken: ethers.Contract;
   const functionSignature = "0x6c0960f9";
-  const ERC20functionSignature = "0x11a2ccc1";
+  // const ERC20functionSignature = "0x11a2ccc1";
 
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -272,7 +272,6 @@ describe("Shared Bridge tests", () => {
   });
 
   it("Should deposit erc20 token successfully", async () => {
-    const depositorAddress = await randomSigner.getAddress();
     const amount = ethers.utils.parseEther("0.001");
     const mintValue = ethers.utils.parseEther("0.002");
     await l1Weth.connect(randomSigner).deposit({ value: amount });

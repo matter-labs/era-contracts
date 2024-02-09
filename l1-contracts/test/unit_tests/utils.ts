@@ -1,18 +1,14 @@
 import type { BigNumberish, BytesLike, Wallet } from "ethers";
 import { BigNumber, ethers } from "ethers";
-import * as hardhat from "hardhat";
 import type { Address } from "zksync-ethers/build/src/types";
 import type { FacetCut } from "../../src.ts/diamondCut";
 
 import { Deployer } from "../../src.ts/deploy";
 import { deployTokens } from "../../src.ts/deploy-token";
 
-import { GovernanceFactory } from "../../typechain";
-
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import type { IMailbox } from "../../typechain/IMailbox";
-import { Interface } from "ethers/lib/utils";
 
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
