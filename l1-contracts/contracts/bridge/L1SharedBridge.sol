@@ -22,7 +22,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ERA_CHAIN_ID, ERA_ERC20_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, ERA_DIAMOND_PROXY, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../bridgehub/IBridgehub.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -120,9 +120,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev Initializes governance settings for a specific chain by setting the addresses of the L2 bridge and the L2 token beacon.
-    /// @dev This function is designed to configure special or custom bridges that are not deployed through this contract.
-    /// It opens the integration of unique bridging solutions across different chains.
+    /// @dev Initializes the l2Bridge address by governance for a specific chain
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
@@ -536,7 +534,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         L2Message memory l2ToL1Message;
         {
             bool baseTokenWithdrawal = (l1Token == bridgehub.baseToken(_chainId));
-            address l2Sender = baseTokenWithdrawal ? L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
+            address l2Sender = baseTokenWithdrawal ? L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR : l2BridgeAddress[_chainId];
 
             l2ToL1Message = L2Message({
                 txNumberInBatch: _messageParams.l2TxNumberInBatch,
@@ -581,15 +579,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             l1Token = bridgehub.baseToken(_chainId);
 
             if (l1Receiver == address(this)) {
-                // the user either specified a wrong receiver (so the withdrawal cannot be finished), or the withdrawal is a weth withdrawal
-                require((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress), "ShB wrong eth withdrawal address");
-                wrapToWeth = true;
+                // the user either specified a wrong receiver (so the withdrawal cannot be finished),
+                // or the withdrawal is a wrapped base token withdrawal. We assume the later.
+                if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)){
+                    wrapToWeth = true;
+                }
 
                 // Check that the message length is correct.
                 // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
                 // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
                 // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
-                require(_l2ToL1message.length == 96, "Incorrect ETH message with additional data length 2");
+                require(_l2ToL1message.length == 96, "Incorrect BaseToken message with additional data length 2");
 
                 address l2Sender;
                 (l2Sender, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
@@ -748,7 +748,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-            l1GasPriceConverted: tx.gasprice,
+            l1GasPriceConverted: 0,
             factoryDeps: new bytes[](0),
             refundRecipient: _refundRecipient
         });

@@ -6,7 +6,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, ETH_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
+import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -43,8 +43,8 @@ contract MsgValueSimulator is ISystemContract {
         require(to != address(this), "MsgValueSimulator calls itself");
 
         if (value != 0) {
-            (bool success, ) = address(ETH_TOKEN_SYSTEM_CONTRACT).call(
-                abi.encodeCall(ETH_TOKEN_SYSTEM_CONTRACT.transferFromTo, (msg.sender, to, value))
+            (bool success, ) = address(BASE_TOKEN_SYSTEM_CONTRACT).call(
+                abi.encodeCall(BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo, (msg.sender, to, value))
             );
 
             // If the transfer of ETH fails, we do the most Ethereum-like behaviour in such situation: revert(0,0)

@@ -113,7 +113,7 @@ interface IBridgehub {
 
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
-    function addToken(address _token) external;
+    function addToken(address _token, uint256 _gasPriceMultiplier) external;
 
     function setSharedBridge(address _sharedBridge) external;
 

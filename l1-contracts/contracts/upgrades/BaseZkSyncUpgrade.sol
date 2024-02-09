@@ -245,6 +245,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
+        // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
             s.l2SystemContractsUpgradeBatchNumber == 0,

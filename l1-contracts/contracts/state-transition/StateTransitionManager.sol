@@ -142,6 +142,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
     }
 
+    /// @dev freezes the specified chain
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+    }
+
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId

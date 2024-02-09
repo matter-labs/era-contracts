@@ -40,4 +40,12 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         );
         _;
     }
+
+    modifier onlyValidatorOrStateTransitionManager() {
+        require(
+            s.validators[msg.sender] || msg.sender == s.stateTransitionManager,
+            "StateTransition Chain: Only by validator or state transition manager"
+        );
+        _;
+    }
 }

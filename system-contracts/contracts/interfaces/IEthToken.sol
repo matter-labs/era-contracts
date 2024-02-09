@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-interface IEthToken {
+interface IBaseToken {
     function balanceOf(uint256) external view returns (uint256);
 
     function transferFromTo(address _from, address _to, uint256 _amount) external;
