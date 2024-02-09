@@ -403,18 +403,14 @@ export class Deployer {
       this.addresses.Bridges.ERC20BridgeImplementation,
       l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
     ]);
-  
+
     await this.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
     if (this.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
     }
   }
 
-  public async executeUpgrade(
-    targetAddress: string,
-    value: BigNumberish,
-    callData: string
-  ) {
+  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
@@ -433,7 +429,7 @@ export class Deployer {
     }
   }
 
-  // used for testing, mimics deployment process. 
+  // used for testing, mimics deployment process.
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
@@ -473,7 +469,10 @@ export class Deployer {
 
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData("initialize", [this.addresses.Governance, process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH])
+    const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
+      "initialize",
+      [this.addresses.Governance, process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH]
+    );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
       [this.addresses.Bridges.SharedBridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
@@ -675,7 +674,7 @@ export class Deployer {
 
   public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    // kl todo change 1 to general variable. 
+    // kl todo change 1 to general variable.
     const tx = await bridgehub.addToken(tokenAddress, 1);
 
     const receipt = await tx.wait();

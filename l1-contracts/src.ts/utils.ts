@@ -70,5 +70,5 @@ export function computeL2Create2Address(
     ethers.utils.concat([CREATE2_PREFIX, senderBytes, create2Salt, bytecodeHash, constructorInputHash])
   );
 
-  return ethers.utils.hexDataSlice(data, 12);  
+  return ethers.utils.hexDataSlice(data, 12);
 }

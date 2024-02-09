@@ -7,7 +7,7 @@ import * as fs from "fs";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 import type { Bridgehub, L1SharedBridge } from "../../typechain";
-import {L1SharedBridgeFactory,  BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
+import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION, depositERC20, getCallRevertReason, initialDeployment } from "./utils";
@@ -61,7 +61,6 @@ describe("L1ERC20Bridge tests", function () {
     l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
     sharedBridgeProxy = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
 
-
     const tokens = getTokens("hardhat");
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
@@ -72,10 +71,10 @@ describe("L1ERC20Bridge tests", function () {
 
   it("Check should initialize through governance", async () => {
     const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address)",
-      [chainId, ADDRESS_ONE]
-    );
+    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
+      chainId,
+      ADDRESS_ONE,
+    ]);
 
     const txHash = await deployer.executeUpgrade(sharedBridgeProxy.address, 0, upgradeCall);
 

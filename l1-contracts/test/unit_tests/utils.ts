@@ -337,7 +337,7 @@ export async function initialDeployment(
   await deployer.deployCreate2Factory({ gasPrice, nonce });
   nonce++;
 
-  await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
+  await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
   nonce++;
 
   process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();

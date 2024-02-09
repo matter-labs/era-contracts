@@ -84,12 +84,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     function addToken(address _token, uint256 _gasPriceMultiplier) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
-        if (_token != ETH_TOKEN_ADDRESS){
+        if (_token != ETH_TOKEN_ADDRESS) {
             baseTokenGasPriceMinMultiplier[_token] = _gasPriceMultiplier;
         }
     }
 
-    /// @notice 
+    /// @notice
     function setTokenMultiplier(address _token, uint256 _gasPriceMultiplier) external onlyOwner {
         require(tokenIsRegistered[_token], "Bridgehub: token not registered");
         require(_token != ETH_TOKEN_ADDRESS, "Bridgehub: ether does not need multiplier");
@@ -211,7 +211,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         L2TransactionRequestDirect calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
         uint256 l1GasPriceConverted;
-        {   
+        {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
@@ -230,7 +230,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
 
                 l1GasPriceConverted = _request.l1GasPriceConverted;
-                require(_request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token], "Bridgehub: gasPriceConverted not sufficient");
+                require(
+                    _request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token],
+                    "Bridgehub: gasPriceConverted not sufficient"
+                );
             }
         }
 
@@ -285,7 +288,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
 
                 l1GasPriceConverted = _request.l1GasPriceConverted;
-                require(_request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token], "Bridgehub: gasPriceConverted not sufficient");
+                require(
+                    _request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token],
+                    "Bridgehub: gasPriceConverted not sufficient"
+                );
             }
         }
 

@@ -463,7 +463,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
-        require(!isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
+        require(
+            !isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex],
+            "Withdrawal is already finalized"
+        );
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         if ((_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber)) {
@@ -581,7 +584,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             if (l1Receiver == address(this)) {
                 // the user either specified a wrong receiver (so the withdrawal cannot be finished),
                 // or the withdrawal is a wrapped base token withdrawal. We assume the later.
-                if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)){
+                if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)) {
                     wrapToWeth = true;
                 }
 

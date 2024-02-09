@@ -3,8 +3,8 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
 import type { Deployer } from "../../src.ts/deploy";
-import type { L1SharedBridge,Bridgehub,  WETH9 } from "../../typechain";
-import { L1SharedBridgeFactory,BridgehubFactory, WETH9Factory , TestnetERC20TokenFactory} from "../../typechain";
+import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
+import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
 
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION, getCallRevertReason, initialDeployment } from "./utils";
@@ -119,10 +119,10 @@ describe("Shared Bridge tests", () => {
   });
 
   it("Check should initialize through governance", async () => {
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address)",
-      [chainId, ADDRESS_ONE]
-    );
+    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
+      chainId,
+      ADDRESS_ONE,
+    ]);
     const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
 
     expect(txHash).not.equal(ethers.constants.HashZero);
@@ -131,9 +131,8 @@ describe("Shared Bridge tests", () => {
   it("Should not allow depositing zero WETH", async () => {
     const mintValue = ethers.utils.parseEther("0.01");
     const revertReason = await getCallRevertReason(
-      bridgehub
-        .connect(randomSigner)
-        .requestL2TransactionTwoBridges({
+      bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+        {
           chainId,
           mintValue,
           l2Value: 0,
@@ -143,8 +142,13 @@ describe("Shared Bridge tests", () => {
           refundRecipient: ethers.constants.AddressZero,
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
-          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(["address", "uint256", "address"], [await l1SharedBridge.l1WethAddress(), 0, await randomSigner.getAddress()]),
-      }, { value: mintValue })
+          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+            ["address", "uint256", "address"],
+            [await l1SharedBridge.l1WethAddress(), 0, await randomSigner.getAddress()]
+          ),
+        },
+        { value: mintValue }
+      )
     );
 
     expect(revertReason).equal("6T");
@@ -153,9 +157,8 @@ describe("Shared Bridge tests", () => {
   it("Should not allow depositing zero erc20 amount", async () => {
     const mintValue = ethers.utils.parseEther("0.01");
     const revertReason = await getCallRevertReason(
-      bridgehub
-        .connect(randomSigner)
-        .requestL2TransactionTwoBridges({
+      bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+        {
           chainId,
           mintValue,
           l2Value: 0,
@@ -165,8 +168,13 @@ describe("Shared Bridge tests", () => {
           refundRecipient: ethers.constants.AddressZero,
           secondBridgeAddress: l1SharedBridge.address,
           secondBridgeValue: 0,
-          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(["address", "uint256", "address"], [erc20TestToken.address, 0, await randomSigner.getAddress()]),
-      }, { value: mintValue })
+          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+            ["address", "uint256", "address"],
+            [erc20TestToken.address, 0, await randomSigner.getAddress()]
+          ),
+        },
+        { value: mintValue }
+      )
     );
     expect(revertReason).equal("6T");
   });
@@ -176,20 +184,24 @@ describe("Shared Bridge tests", () => {
     const mintValue = ethers.utils.parseEther("2");
     await l1Weth.connect(randomSigner).deposit({ value: amount });
     await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub
-        .connect(randomSigner)
-        .requestL2TransactionTwoBridges({
-          chainId,
-          mintValue,
-          l2Value: amount,
-          l2GasLimit: 1000000,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
-          refundRecipient: ethers.constants.AddressZero,
-          secondBridgeAddress: l1SharedBridge.address,
-          secondBridgeValue: 0,
-          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(["address", "uint256", "address"], [l1Weth.address, amount, await randomSigner.getAddress()]),
-      }, { value: mintValue });
+    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+      {
+        chainId,
+        mintValue,
+        l2Value: amount,
+        l2GasLimit: 1000000,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+        refundRecipient: ethers.constants.AddressZero,
+        secondBridgeAddress: l1SharedBridge.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+          ["address", "uint256", "address"],
+          [l1Weth.address, amount, await randomSigner.getAddress()]
+        ),
+      },
+      { value: mintValue }
+    );
   });
 
   it("Should revert on finalizing a withdrawal with short message length", async () => {
@@ -201,18 +213,35 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.hexConcat([functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72 +4 )]), [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(
+          chainId,
+          0,
+          0,
+          0,
+          ethers.utils.hexConcat([functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72 + 4)]),
+          [ethers.constants.HashZero]
+        )
     );
     expect(revertReason).equal("Incorrect ETH message with additional data length 2");
   });
 
   it("Should revert on finalizing a withdrawal that was not initiated", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner).finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.hexConcat([functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]), [ethers.constants.HashZero])
+      l1SharedBridge
+        .connect(randomSigner)
+        .finalizeWithdrawal(
+          chainId,
+          0,
+          0,
+          0,
+          ethers.utils.hexConcat([functionSignature, l1SharedBridge.address, ethers.utils.randomBytes(72)]),
+          [ethers.constants.HashZero]
+        )
     );
     expect(revertReason).equal("The withdrawal was not initiated by L2 bridge");
   });
-
 
   it("Should revert on finalizing a withdrawal with wrong function selector", async () => {
     const revertReason = await getCallRevertReason(
@@ -241,27 +270,31 @@ describe("Shared Bridge tests", () => {
     );
     expect(revertReason).equal("The withdrawal was not initiated by L2 bridge");
   });
-      
+
   it("Should deposit erc20 token successfully", async () => {
     const depositorAddress = await randomSigner.getAddress();
     const amount = ethers.utils.parseEther("0.001");
     const mintValue = ethers.utils.parseEther("0.002");
     await l1Weth.connect(randomSigner).deposit({ value: amount });
     await (await l1Weth.connect(randomSigner).approve(l1SharedBridge.address, amount)).wait();
-    bridgehub
-        .connect(randomSigner)
-        .requestL2TransactionTwoBridges({
-          chainId,
-          mintValue,
-          l2Value: amount,
-          l2GasLimit: 1000000,
-          l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
-          refundRecipient: ethers.constants.AddressZero,
-          secondBridgeAddress: l1SharedBridge.address,
-          secondBridgeValue: 0,
-          secondBridgeCalldata: new ethers.utils.AbiCoder().encode(["address", "uint256", "address"], [l1Weth.address, amount, await randomSigner.getAddress()]),
-      }, { value: mintValue });
+    bridgehub.connect(randomSigner).requestL2TransactionTwoBridges(
+      {
+        chainId,
+        mintValue,
+        l2Value: amount,
+        l2GasLimit: 1000000,
+        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+        l1GasPriceConverted: await bridgehub.provider.getGasPrice(),
+        refundRecipient: ethers.constants.AddressZero,
+        secondBridgeAddress: l1SharedBridge.address,
+        secondBridgeValue: 0,
+        secondBridgeCalldata: new ethers.utils.AbiCoder().encode(
+          ["address", "uint256", "address"],
+          [l1Weth.address, amount, await randomSigner.getAddress()]
+        ),
+      },
+      { value: mintValue }
+    );
   });
 
   it("Should revert on finalizing a withdrawal with wrong message length", async () => {
@@ -273,7 +306,8 @@ describe("Shared Bridge tests", () => {
 
   it("Should revert on finalizing a withdrawal with wrong function signature", async () => {
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner)
+      l1SharedBridge
+        .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, ethers.utils.randomBytes(76), [ethers.constants.HashZero])
     );
     expect(revertReason).equal("ShB Incorrect message function selector");
@@ -316,10 +350,10 @@ describe("Shared Bridge tests", () => {
       ethers.constants.HashZero,
     ]);
     const revertReason = await getCallRevertReason(
-      l1SharedBridge.connect(randomSigner)
+      l1SharedBridge
+        .connect(randomSigner)
         .finalizeWithdrawal(chainId, 0, 0, 0, l2ToL1message, Array(9).fill(ethers.constants.HashZero))
     );
     expect(revertReason).equal("ShB withd w proof");
   });
 });
-

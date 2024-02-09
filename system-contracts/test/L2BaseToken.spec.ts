@@ -102,9 +102,11 @@ describe("L2BaseToken tests", () => {
       const amountToTransfer: BigNumber = ethers.utils.parseEther("20.0");
 
       await expect(
-        L2BaseToken
-          .connect(maliciousWallet)
-          .transferFromTo(maliciousWallet.address, wallets[1].address, amountToTransfer)
+        L2BaseToken.connect(maliciousWallet).transferFromTo(
+          maliciousWallet.address,
+          wallets[1].address,
+          amountToTransfer
+        )
       ).to.be.rejectedWith("Only system contracts with special access can call this method");
     });
   });

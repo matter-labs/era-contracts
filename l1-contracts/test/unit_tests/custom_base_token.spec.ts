@@ -125,10 +125,10 @@ describe("Custom base token chain and bridge tests", () => {
 
   it("Check should initialize through governance", async () => {
     const l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData(
-      "initializeChainGovernance(uint256,address)",
-      [chainId, ADDRESS_ONE]
-    );
+    const upgradeCall = l1SharedBridgeInterface.encodeFunctionData("initializeChainGovernance(uint256,address)", [
+      chainId,
+      ADDRESS_ONE,
+    ]);
 
     const txHash = await deployer.executeUpgrade(l1SharedBridge.address, 0, upgradeCall);
 
@@ -139,7 +139,16 @@ describe("Custom base token chain and bridge tests", () => {
     const revertReason = await getCallRevertReason(
       l1SharedBridge
         .connect(randomSigner)
-        .depositLegacyErc20Bridge(await randomSigner.getAddress(), await randomSigner.getAddress(), baseTokenAddress, 0, 0, 0, 0, ethers.constants.AddressZero)
+        .depositLegacyErc20Bridge(
+          await randomSigner.getAddress(),
+          await randomSigner.getAddress(),
+          baseTokenAddress,
+          0,
+          0,
+          0,
+          0,
+          ethers.constants.AddressZero
+        )
     );
 
     expect(revertReason).equal("ShB not legacy bridge");
