@@ -6,15 +6,17 @@ import * as fs from "fs";
 import * as path from "path";
 import * as hre from "hardhat";
 
+// Create a Web3 provider.
 const provider = web3Provider();
+// Define the path to the test configuration file.
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+// Load the Ethereum test configuration.
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
+// Retrieve the maximum gas limit for priority transactions from environment variables.
 const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
-// Script to deploy the force deploy upgrader contract and output its address.
-// Note, that this script expects that the L2 contracts have been compiled PRIOR
-// to running this script.
+// Script to deploy the force deploy upgrader contract to L2.
 async function main() {
   const program = new Command();
 
@@ -23,7 +25,8 @@ async function main() {
     .name("deploy-force-deploy-upgrader")
     .description("Deploys the force deploy upgrader contract to L2");
 
-  program.option("--private-key <private-key>").action(async (cmd) => {
+  program.option("--private-key <private-key>", "Deploy using the specified private key").action(async (cmd) => {
+    // Create the wallet using either the provided private key or the mnemonic from environment variables.
     const deployWallet = cmd.privateKey
       ? new Wallet(cmd.privateKey, provider)
       : Wallet.fromMnemonic(
@@ -32,7 +35,8 @@ async function main() {
         ).connect(provider);
     console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-    const forceDeployUpgraderBytecode = hre.artifacts.readArtifactSync("ForceDeployUpgrader").bytecode;
+    // Calculate the contract bytecode and address.
+    const forceDeployUpgraderBytecode = (await hre.artifacts.readArtifact("ForceDeployUpgrader")).bytecode;
     const create2Salt = ethers.constants.HashZero;
     const forceDeployUpgraderAddress = computeL2Create2Address(
       deployWallet,
@@ -41,7 +45,7 @@ async function main() {
       create2Salt
     );
 
-    // TODO: request from API how many L2 gas needs for the transaction.
+    // Deploy the contract to L2.
     await create2DeployFromL1(deployWallet, forceDeployUpgraderBytecode, "0x", create2Salt, priorityTxMaxGasLimit);
 
     console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
@@ -56,3 +60,4 @@ main()
     console.error("Error:", err);
     process.exit(1);
   });
+
