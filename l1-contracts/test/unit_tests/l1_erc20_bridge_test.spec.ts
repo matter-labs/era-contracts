@@ -3,19 +3,17 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { Interface } from "ethers/lib/utils";
 
-import * as fs from "fs";
-import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import type { Deployer } from "../../src.ts/deploy";
 import type { Bridgehub, L1SharedBridge } from "../../typechain";
 import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
-import { CONTRACTS_LATEST_PROTOCOL_VERSION, depositERC20, getCallRevertReason, initialDeployment } from "./utils";
 
-const testConfigPath = "./test/test_config/constant";
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { ADDRESS_ONE } from "../../src.ts/utils";
+import {  getTokens } from "../../src.ts/deploy-token";
+import type { Deployer } from "../../src.ts/deploy";
+import { initialTestnetDeploymentProcess,   ethTestConfig} from "../../src.ts/deploy-process";
 
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
+import { depositERC20, getCallRevertReason } from "./utils";
 
 describe("L1ERC20Bridge tests", function () {
   let owner: ethers.Signer;
@@ -51,7 +49,7 @@ describe("L1ERC20Bridge tests", function () {
     await owner.sendTransaction(tx);
 
     process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = "9"; // the legacy functions work only for ERA, which has a specific chainId
-    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
     chainId = deployer.chainId.toString();
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
@@ -61,7 +59,7 @@ describe("L1ERC20Bridge tests", function () {
     l1ERC20Bridge = IL1ERC20BridgeFactory.connect(l1ERC20BridgeAddress, deployWallet);
     sharedBridgeProxy = L1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
 
-    const tokens = getTokens("hardhat");
+    const tokens = getTokens();
     const tokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
     erc20TestToken = TestnetERC20TokenFactory.connect(tokenAddress, owner);
 

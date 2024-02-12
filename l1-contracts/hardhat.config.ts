@@ -8,7 +8,7 @@ import "hardhat-typechain";
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 import { task } from "hardhat/config";
 import "solidity-coverage";
-import { getNumberFromEnv } from "./scripts/utils";
+import { getNumberFromEnv } from "./src.ts/utils";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {

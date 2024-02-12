@@ -4,19 +4,23 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import type { DeployedAddresses } from "../scripts/utils";
-import {
-  ADDRESS_ONE,
+import { 
+  DeployedAddresses, 
   deployedAddressesFromEnv,
-  getAddressFromEnv,
-  getHashFromEnv,
-  getNumberFromEnv,
-  getTokens,
+} from "./deploy-utils";
+import {
   readBatchBootloaderBytecode,
   readSystemContractsBytecode,
   SYSTEM_CONFIG,
 } from "../scripts/utils";
-import { PubdataPricingMode } from "../test/unit_tests/utils";
+import { getTokens } from "./deploy-token";
+import { 
+  ADDRESS_ONE,
+  getAddressFromEnv,
+  getHashFromEnv,
+  getNumberFromEnv,
+  PubdataPricingMode
+} from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionManagerFactory";
@@ -52,7 +56,7 @@ export interface DeployerConfig {
 
 export class Deployer {
   public addresses: DeployedAddresses;
-  private deployWallet: Wallet;
+  public deployWallet: Wallet;
   public verbose: boolean;
   public chainId: number;
   private ownerAddress: string;
@@ -450,7 +454,7 @@ export class Deployer {
     ethTxOptions: ethers.providers.TransactionRequest
   ) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const tokens = getTokens(process.env.CHAIN_ETH_NETWORK || "localhost");
+    const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
@@ -566,7 +570,7 @@ export class Deployer {
     await this.deployBridgehubProxy(create2Salt, { gasPrice });
   }
 
-  public async deployStateTransitionContract(
+  public async deployStateTransitionManagerContract(
     create2Salt: string,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
@@ -577,7 +581,7 @@ export class Deployer {
     await this.deployStateTransitionDiamondFacets(create2Salt, gasPrice, nonce);
     await this.deployStateTransitionManagerImplementation(create2Salt, { gasPrice });
     await this.deployStateTransitionManagerProxy(create2Salt, { gasPrice }, extraFacets);
-    await this.registerStateTransition();
+    await this.registerStateTransitionManager();
   }
 
   public async deployStateTransitionDiamondFacets(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
@@ -591,7 +595,7 @@ export class Deployer {
     await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 });
   }
 
-  public async registerStateTransition() {
+  public async registerStateTransitionManager() {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     const tx = await bridgehub.addStateTransitionManager(this.addresses.StateTransition.StateTransitionProxy);

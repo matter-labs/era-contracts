@@ -1,5 +1,8 @@
 import { expect } from "chai";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
+
 import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
@@ -10,25 +13,19 @@ import {
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
+import {PubdataPricingMode} from "../../src.ts/utils"
+import { initialTestnetDeploymentProcess,   ethTestConfig} from "../../src.ts/deploy-process";
+import { Action, facetCut } from "../../src.ts/diamondCut";
+
 import {
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
   DEFAULT_REVERT_REASON,
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
-  PubdataPricingMode,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
-  ethTestConfig,
   getCallRevertReason,
-  initialDeployment,
   requestExecute,
 } from "./utils";
-
-import * as ethers from "ethers";
-import { Wallet } from "ethers";
-
-import { Action, facetCut } from "../../src.ts/diamondCut";
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
@@ -61,7 +58,7 @@ describe("Mailbox tests", function () {
     const mockExecutorContract = await mockExecutorFactory.deploy();
     const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
 
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
 

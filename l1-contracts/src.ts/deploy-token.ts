@@ -2,28 +2,42 @@ import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Wallet } from "ethers";
 import { parseEther } from "ethers/lib/utils";
+import * as fs from "fs";
 
 const DEFAULT_ERC20 = "TestnetERC20Token";
 
-export type Token = {
+export type L1Token = {
   address: string | null;
   name: string;
   symbol: string;
   decimals: number;
 };
 
-export type TokenDescription = Token & {
+export type TokenDescription = L1Token & {
   implementation?: string;
 };
 
+export function getTokens(): L1Token[] {
+  const network = process.env.CHAIN_ETH_NETWORK || "localhost";
+  const configPath =
+    network == "hardhat"
+      ? `./test/test_config/constant/${network}.json`
+      : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+  return JSON.parse(
+    fs.readFileSync(configPath, {
+      encoding: "utf-8",
+    })
+  );
+}
+
 export async function deployTokens(
-  tokens: Token[],
+  tokens: L1Token[],
   wallet: Wallet,
   mnemonic: string,
   mintTokens: boolean = false,
   verbose: boolean = false
-): Promise<Token[]> {
-  const result: Token[] = [];
+): Promise<L1Token[]> {
+  const result: L1Token[] = [];
   for (const token of tokens) {
     const implementation = token.symbol != "WETH" ? DEFAULT_ERC20 : "WETH9";
     const tokenFactory = await hardhat.ethers.getContractFactory(implementation, wallet);

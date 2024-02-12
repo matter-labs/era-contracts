@@ -1,8 +1,9 @@
 import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, deployedAddressesFromEnv } from "../../l1-contracts/scripts/utils";
+import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
+import { ADDRESS_ONE } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";

@@ -1,24 +1,22 @@
 import { expect } from "chai";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
+
 import type { GettersFacet, MockExecutorFacet } from "../../typechain";
 import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
+import { initialTestnetDeploymentProcess, ethTestConfig} from "../../src.ts/deploy-process";
+import { Action, facetCut } from "../../src.ts/diamondCut";
+
 import {
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
-  ethTestConfig,
   getCallRevertReason,
-  initialDeployment,
   requestExecuteDirect,
 } from "./utils";
 
-import * as ethers from "ethers";
-import { Wallet } from "ethers";
-
-import { Action, facetCut } from "../../src.ts/diamondCut";
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Mailbox Era's legacy functions tests", function () {
   let mailbox: IMailbox;
@@ -52,7 +50,7 @@ describe("Mailbox Era's legacy functions tests", function () {
     const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
 
     process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = (9).toString();
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
     // we want to reset the original for the rest of the tests (including test files)
     process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = (270).toString();
 

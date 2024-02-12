@@ -1,13 +1,11 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
+
 import type { AdminFacetTest } from "../../typechain";
 import { AdminFacetTestFactory, GovernanceFactory } from "../../typechain";
-import { getCallRevertReason } from "./utils";
 
-function randomAddress() {
-  return ethers.utils.hexlify(ethers.utils.randomBytes(20));
-}
+import { getCallRevertReason, randomAddress } from "./utils";
 
 describe("Admin facet tests", function () {
   let adminFacetTest: AdminFacetTest;

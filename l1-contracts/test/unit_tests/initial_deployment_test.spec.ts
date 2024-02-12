@@ -1,15 +1,13 @@
 import { expect } from "chai";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
+
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { CONTRACTS_LATEST_PROTOCOL_VERSION, ethTestConfig, initialDeployment } from "./utils";
-
-import * as ethers from "ethers";
-import { Wallet } from "ethers";
+import { ethTestConfig, initialTestnetDeploymentProcess} from "../../src.ts/deploy-process"
 import type { Deployer } from "../../src.ts/deploy";
-
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Initial Deployment", function () {
   let bridgehub: Bridgehub;
@@ -40,7 +38,7 @@ describe("Initial Deployment", function () {
 
     await owner.sendTransaction(tx);
 
-    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
 

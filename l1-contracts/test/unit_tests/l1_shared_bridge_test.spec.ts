@@ -1,67 +1,18 @@
 import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
+import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
-import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
-import type { Deployer } from "../../src.ts/deploy";
+;
 import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
 import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
 
-import type { IBridgehub } from "../../typechain/IBridgehub";
-import { CONTRACTS_LATEST_PROTOCOL_VERSION, getCallRevertReason, initialDeployment } from "./utils";
+import {  getTokens } from "../../src.ts/deploy-token";
+import { ADDRESS_ONE } from "../../src.ts/utils";
+import type { Deployer } from "../../src.ts/deploy"
+import { initialTestnetDeploymentProcess, ethTestConfig} from "../../src.ts/deploy-process";
 
-import * as fs from "fs";
-// import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
-import { hashL2Bytecode } from "../../src.ts/utils";
 
-import { Interface } from "ethers/lib/utils";
-import type { Address } from "zksync-ethers/build/src/types";
-
-const testConfigPath = "./test/test_config/constant";
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
-
-export async function create2DeployFromL1(
-  bridgehub: IBridgehub,
-  chainId: ethers.BigNumberish,
-  walletAddress: Address,
-  bytecode: ethers.BytesLike,
-  constructor: ethers.BytesLike,
-  create2Salt: ethers.BytesLike,
-  l2GasLimit: ethers.BigNumberish
-) {
-  const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync("IContractDeployer").abi);
-  const bytecodeHash = hashL2Bytecode(bytecode);
-  const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  const gasPrice = await bridgehub.provider.getGasPrice();
-  const expectedCost = await bridgehub.l2TransactionBaseCost(
-    chainId,
-    gasPrice,
-    l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-  );
-  // const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
-
-  await bridgehub.requestL2TransactionDirect(
-    {
-      chainId,
-      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-      mintValue: expectedCost,
-      l2Value: 0,
-      l2Calldata: calldata,
-      l2GasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted: 0,
-      factoryDeps: [bytecode],
-      refundRecipient: walletAddress,
-    },
-    { value: expectedCost, gasPrice }
-  );
-}
+import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
 describe("Shared Bridge tests", () => {
   let owner: ethers.Signer;
@@ -97,8 +48,8 @@ describe("Shared Bridge tests", () => {
 
     await owner.sendTransaction(tx);
 
-    // note we can use initialDeployment so we don't go into deployment details here
-    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    // note we can use initialTestnetDeploymentProcess so we don't go into deployment details here
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
     // prepare the bridge
@@ -107,7 +58,7 @@ describe("Shared Bridge tests", () => {
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     l1SharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
 
-    const tokens = getTokens("hardhat");
+    const tokens = getTokens();
     const l1WethTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     l1Weth = WETH9Factory.connect(l1WethTokenAddress, owner);
 

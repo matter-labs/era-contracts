@@ -1,69 +1,21 @@
 import { expect } from "chai";
-import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
-import { ADDRESS_ONE, getTokens } from "../../scripts/utils";
+import { ethers, Wallet } from "ethers";
+import { Interface } from "ethers/lib/utils";
+
 import type { TestnetERC20Token, WETH9 } from "../../typechain";
 import { TestnetERC20TokenFactory, WETH9Factory } from "../../typechain";
-
 import type { IBridgehub } from "../../typechain/IBridgehub";
 import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
-import { CONTRACTS_LATEST_PROTOCOL_VERSION, getCallRevertReason, initialDeployment } from "./utils";
-
-import * as fs from "fs";
-// import { EraLegacyChainId, EraLegacyDiamondProxyAddress } from "../../src.ts/deploy";
-import { hashL2Bytecode } from "../../src.ts/utils";
-import type { Deployer } from "../../src.ts/deploy";
-
-import { Interface } from "ethers/lib/utils";
 import type { IL1SharedBridge } from "../../typechain/IL1SharedBridge";
 import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
 
-const testConfigPath = "./test/test_config/constant";
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { getTokens } from "../../src.ts/deploy-token";
+import type { Deployer } from "../../src.ts/deploy";
+import {ADDRESS_ONE} from "../../src.ts/utils"
+import { initialTestnetDeploymentProcess,   ethTestConfig} from "../../src.ts/deploy-process";
 
-const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
-
-export async function create2DeployFromL1(
-  bridgehub: IBridgehub,
-  chainId: ethers.BigNumberish,
-  walletAddress: string,
-  bytecode: ethers.BytesLike,
-  constructor: ethers.BytesLike,
-  create2Salt: ethers.BytesLike,
-  l2GasLimit: ethers.BigNumberish
-) {
-  const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync("IContractDeployer").abi);
-  const bytecodeHash = hashL2Bytecode(bytecode);
-  const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  const gasPrice = await bridgehub.provider.getGasPrice();
-  const expectedCost = await bridgehub.l2TransactionBaseCost(
-    chainId,
-    gasPrice,
-    l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-  );
-  const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
-
-  await bridgehub.requestL2TransactionDirect(
-    {
-      chainId,
-      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-      mintValue: expectedCost,
-      l2Value: 0,
-      l2Calldata: calldata,
-      l2GasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted,
-      factoryDeps: [bytecode],
-      refundRecipient: walletAddress,
-    },
-    { value: expectedCost, gasPrice }
-  );
-}
+import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "./utils";
 
 describe("Custom base token chain and bridge tests", () => {
   let owner: ethers.Signer;
@@ -99,11 +51,11 @@ describe("Custom base token chain and bridge tests", () => {
 
     await owner.sendTransaction(tx);
     // note we can use initialDeployment so we don't go into deployment details here
-    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [], "BAT");
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [], "BAT");
     chainId = deployer.chainId;
     bridgehub = IBridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
 
-    const tokens = getTokens("hardhat");
+    const tokens = getTokens();
     baseTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "BAT")!.address;
     baseToken = TestnetERC20TokenFactory.connect(baseTokenAddress, owner);
 
