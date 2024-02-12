@@ -16,7 +16,12 @@ import {
   StateTransitionManagerFactory,
 } from "../../typechain";
 
-import { initialTestnetDeploymentProcess,   ethTestConfig, L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH} from "../../src.ts/deploy-process";
+import {
+  initialTestnetDeploymentProcess,
+  ethTestConfig,
+  L2_BOOTLOADER_BYTECODE_HASH,
+  L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+} from "../../src.ts/deploy-process";
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo } from "./utils";

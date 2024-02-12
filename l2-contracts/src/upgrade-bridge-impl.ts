@@ -6,7 +6,8 @@ import * as hre from "hardhat";
 import * as path from "path";
 import { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
-import { getAddressFromEnv, getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
+import {  web3Provider } from "../../l1-contracts/scripts/utils";
+import {getAddressFromEnv, getNumberFromEnv} from "../../l1-contracts/src.ts/utils"
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
 

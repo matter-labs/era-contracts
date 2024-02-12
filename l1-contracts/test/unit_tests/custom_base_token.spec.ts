@@ -12,10 +12,10 @@ import { IL1SharedBridgeFactory } from "../../typechain/IL1SharedBridgeFactory";
 
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import {ADDRESS_ONE} from "../../src.ts/utils"
-import { initialTestnetDeploymentProcess,   ethTestConfig} from "../../src.ts/deploy-process";
+import { ADDRESS_ONE } from "../../src.ts/utils";
+import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
 
-import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "./utils";
+import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
 describe("Custom base token chain and bridge tests", () => {
   let owner: ethers.Signer;

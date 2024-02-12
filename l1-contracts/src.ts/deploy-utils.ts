@@ -3,9 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
 import { SingletonFactoryFactory } from "../typechain";
 
-import {
-  getAddressFromEnv
-} from "./utils"
+import { getAddressFromEnv } from "./utils";
 
 export async function deployViaCreate2(
   deployWallet: ethers.Wallet,

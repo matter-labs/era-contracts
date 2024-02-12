@@ -3,7 +3,8 @@ import { Wallet, ethers } from "ethers";
 import * as fs from "fs";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import * as path from "path";
-import { getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
+import { web3Provider } from "../../l1-contracts/scripts/utils";
+import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import * as hre from "hardhat";
 import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 

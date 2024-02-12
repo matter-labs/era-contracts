@@ -74,7 +74,6 @@ export function computeL2Create2Address(
   return ethers.utils.hexDataSlice(data, 12);
 }
 
-
 export function getAddressFromEnv(envName: string): string {
   const address = process.env[envName];
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {

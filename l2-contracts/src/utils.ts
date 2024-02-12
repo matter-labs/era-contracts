@@ -130,14 +130,6 @@ export async function create2DeployFromL1(
   );
 }
 
-export function getNumberFromEnv(envName: string): string {
-  const number = process.env[envName];
-  if (!/^([1-9]\d*|0)$/.test(number)) {
-    throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
-  }
-  return number;
-}
-
 export async function awaitPriorityOps(
   zksProvider: Provider,
   l1TxReceipt: ethers.providers.TransactionReceipt,

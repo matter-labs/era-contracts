@@ -73,8 +73,3 @@ export function getLowerCaseAddress(address: string) {
   return ethers.utils.getAddress(address).toLowerCase();
 }
 
-
-export enum PubdataPricingMode {
-  Rollup = 0,
-  Porter = 1,
-}

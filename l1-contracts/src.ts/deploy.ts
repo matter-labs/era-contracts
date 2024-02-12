@@ -4,22 +4,17 @@ import "@nomiclabs/hardhat-ethers";
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
-import { 
-  DeployedAddresses, 
-  deployedAddressesFromEnv,
-} from "./deploy-utils";
-import {
-  readBatchBootloaderBytecode,
-  readSystemContractsBytecode,
-  SYSTEM_CONFIG,
-} from "../scripts/utils";
+import type { DeployedAddresses } from "./deploy-utils";
+import { deployedAddressesFromEnv, deployViaCreate2 } from "./deploy-utils";
+import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
-import { 
+import {
   ADDRESS_ONE,
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
-  PubdataPricingMode
+  PubdataPricingMode,
+  hashL2Bytecode,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -32,11 +27,8 @@ import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
-import { deployViaCreate2 } from "./deploy-utils";
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
-
-import { hashL2Bytecode } from "./utils";
 
 import { ERC20Factory } from "../typechain";
 

@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import * as ethers from "ethers";
+import type * as ethers from "ethers";
 import * as hardhat from "hardhat";
 
 import type { AdminFacetTest } from "../../typechain";

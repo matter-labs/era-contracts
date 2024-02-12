@@ -6,7 +6,7 @@ import * as hardhat from "hardhat";
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { ethTestConfig, initialTestnetDeploymentProcess} from "../../src.ts/deploy-process"
+import { ethTestConfig, initialTestnetDeploymentProcess } from "../../src.ts/deploy-process";
 import type { Deployer } from "../../src.ts/deploy";
 
 describe("Initial Deployment", function () {

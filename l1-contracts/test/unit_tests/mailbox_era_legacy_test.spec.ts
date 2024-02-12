@@ -7,7 +7,7 @@ import type { GettersFacet, MockExecutorFacet } from "../../typechain";
 import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { initialTestnetDeploymentProcess, ethTestConfig} from "../../src.ts/deploy-process";
+import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 
 import {
@@ -16,7 +16,6 @@ import {
   getCallRevertReason,
   requestExecuteDirect,
 } from "./utils";
-
 
 describe("Mailbox Era's legacy functions tests", function () {
   let mailbox: IMailbox;

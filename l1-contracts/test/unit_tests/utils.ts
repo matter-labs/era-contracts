@@ -7,7 +7,8 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ADDRESS_ONE, FeeParams, PubdataPricingMode } from "../../src.ts/utils";
+import type { FeeParams } from "../../src.ts/utils";
+import { ADDRESS_ONE, PubdataPricingMode } from "../../src.ts/utils";
 export const CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");

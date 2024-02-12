@@ -43,7 +43,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
       const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
@@ -55,7 +55,15 @@ async function main() {
         verbose: true,
       });
 
-      await initialSharedBridgeDeployment(deployer, [], gasPrice, cmd.onlyVerifier, cmd.diamondUpgradeInit, create2Salt, nonce);
+      await initialSharedBridgeDeployment(
+        deployer,
+        [],
+        gasPrice,
+        cmd.onlyVerifier,
+        cmd.diamondUpgradeInit,
+        create2Salt,
+        nonce
+      );
     });
 
   await program.parseAsync(process.argv);

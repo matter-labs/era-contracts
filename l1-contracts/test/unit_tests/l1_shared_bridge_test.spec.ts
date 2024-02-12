@@ -2,15 +2,13 @@ import { expect } from "chai";
 import { ethers, Wallet } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import * as hardhat from "hardhat";
-;
 import type { L1SharedBridge, Bridgehub, WETH9 } from "../../typechain";
 import { L1SharedBridgeFactory, BridgehubFactory, WETH9Factory, TestnetERC20TokenFactory } from "../../typechain";
 
-import {  getTokens } from "../../src.ts/deploy-token";
+import { getTokens } from "../../src.ts/deploy-token";
 import { ADDRESS_ONE } from "../../src.ts/utils";
-import type { Deployer } from "../../src.ts/deploy"
-import { initialTestnetDeploymentProcess, ethTestConfig} from "../../src.ts/deploy-process";
-
+import type { Deployer } from "../../src.ts/deploy";
+import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
 
