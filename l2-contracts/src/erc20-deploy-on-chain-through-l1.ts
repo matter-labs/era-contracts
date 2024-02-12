@@ -6,7 +6,7 @@ import { GAS_MULTIPLIER, web3Provider } from "../../l1-contracts/scripts/utils";
 
 import * as fs from "fs";
 import * as path from "path";
-// import { startErc20BridgeInitOnChain } from "../../l1-contracts/src.ts/shared-bridge-initialize";
+import { startErc20BridgeInitOnChain } from "../../l1-contracts/src.ts/shared-bridge-initialize";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -47,7 +47,7 @@ async function main() {
         verbose: true,
       });
 
-      // await startErc20BridgeInitOnChain(deployer, deployWallet, chainId, nonce, gasPrice, cmd.erc20Bridge);
+      await startErc20BridgeInitOnChain(deployer, deployWallet, chainId, nonce, gasPrice, cmd.erc20Bridge);
     });
 
   await program.parseAsync(process.argv);

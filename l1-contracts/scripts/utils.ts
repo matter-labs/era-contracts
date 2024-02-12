@@ -72,4 +72,3 @@ export function print(name: string, data: any) {
 export function getLowerCaseAddress(address: string) {
   return ethers.utils.getAddress(address).toLowerCase();
 }
-

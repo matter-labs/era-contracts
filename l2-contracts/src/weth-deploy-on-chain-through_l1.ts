@@ -3,7 +3,7 @@ import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "../../l1-contracts/scripts/utils";
-import {deployedAddressesFromEnv} from "../../l1-contracts/src.ts/deploy-utils"
+import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 
 import * as fs from "fs";
 import * as path from "path";
