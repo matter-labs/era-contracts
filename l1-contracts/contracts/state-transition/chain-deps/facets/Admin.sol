@@ -63,8 +63,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
     }
 
-    /// @notice Change the fee params for L1->L2 transactions
-    /// @param _newFeeParams The new fee params
+    /// @inheritdoc IAdmin
     function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernorOrStateTransitionManager {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
@@ -74,6 +73,18 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         s.feeParams = _newFeeParams;
 
         emit NewFeeParams(oldFeeParams, _newFeeParams);
+    }
+
+
+    /// @inheritdoc IAdmin
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyGovernorOrStateTransitionManager {
+        uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
+        uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
+
+        s.baseTokenGasPriceMultiplierNominator = _nominator;
+        s.baseTokenGasPriceMultiplierDenominator = _denominator;
+
+        emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
     }
 
     /*//////////////////////////////////////////////////////////////

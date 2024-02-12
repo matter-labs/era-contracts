@@ -141,18 +141,19 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     }
 
     /// @notice Derives the price for L2 gas in ETH to be paid.
-    /// @param _l1GasPriceConverted The gas price on L1 converted to base token
+    /// @param _l1GasPrice The gas price on L1
     /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in ETH
-    function _deriveL2GasPrice(uint256 _l1GasPriceConverted, uint256 _gasPerPubdata) internal view returns (uint256) {
+    function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
-
+        require(s.baseTokenGasPriceMultiplierDenominator > 0, "Mailbox: baseTokenGasPriceDenominator not set");
+        uint256 l1GasPriceConverted = _l1GasPrice * s.baseTokenGasPriceMultiplierNominator / s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * _l1GasPriceConverted;
+            pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
         }
 
-        uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * _l1GasPriceConverted;
+        uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
         uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
             batchOverheadBaseToken /
             uint256(feeParams.maxPubdataPerBatch);
@@ -202,7 +203,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
                 l2GasLimit: _l2GasLimit,
                 l2Calldata: _calldata,
                 l2GasPerPubdataByteLimit: _l2GasPerPubdataByteLimit,
-                l1GasPriceConverted: tx.gasprice,
                 factoryDeps: _factoryDeps,
                 refundRecipient: _refundRecipient
             })
@@ -240,7 +240,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         params.contractAddressL2 = _request.contractL2;
         params.l2GasLimit = _request.l2GasLimit;
         params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
-        params.l1GasPriceConverted = _request.l1GasPriceConverted;
         params.refundRecipient = _request.refundRecipient;
 
         canonicalTxHash = _requestL2Transaction(
@@ -265,7 +264,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
 
-        _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(_params.l1GasPriceConverted, _params.l2GasPricePerPubdata);
+        _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
         require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 

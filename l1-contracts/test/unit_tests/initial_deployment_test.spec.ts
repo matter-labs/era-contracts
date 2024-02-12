@@ -9,7 +9,7 @@ import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain
 import { ethTestConfig, initialTestnetDeploymentProcess } from "../../src.ts/deploy-process";
 import type { Deployer } from "../../src.ts/deploy";
 
-describe("Initial Deployment", function () {
+describe("Initial deployment", function () {
   let bridgehub: Bridgehub;
   let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;

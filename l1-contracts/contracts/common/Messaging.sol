@@ -63,7 +63,6 @@ struct WritePriorityOpParams {
     uint256 l2GasPricePerPubdata;
     uint256 valueToMint;
     address refundRecipient;
-    uint256 l1GasPriceConverted;
 }
 
 /// @dev Structure that includes all fields of the L2 transaction
@@ -133,7 +132,6 @@ struct BridgehubL2TransactionRequest {
     bytes l2Calldata;
     uint256 l2GasLimit;
     uint256 l2GasPerPubdataByteLimit;
-    uint256 l1GasPriceConverted;
     bytes[] factoryDeps;
     address refundRecipient;
 }

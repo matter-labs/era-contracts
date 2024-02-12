@@ -144,4 +144,8 @@ struct ZkSyncStateTransitionStorage {
     address baseToken;
     /// @dev The address of the baseTokenbridge. Eth uses the weth bridge.
     address baseTokenBridge;
+    /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
+    /// we multiply by the nominator, and divide by the denominator
+    uint128 baseTokenGasPriceMultiplierNominator;
+    uint128 baseTokenGasPriceMultiplierDenominator;
 }

@@ -487,7 +487,7 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
 
     /// registering ETH as a valid token, with address 1.
-    const tx2 = await bridgehub.addToken(ADDRESS_ONE, 0);
+    const tx2 = await bridgehub.addToken(ADDRESS_ONE);
     const receipt2 = await tx2.wait();
 
     const tx3 = await bridgehub.setSharedBridge(this.addresses.Bridges.SharedBridgeProxy);
@@ -665,12 +665,19 @@ export class Deployer {
     if (this.verbose) {
       console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
     }
+
+    const diamondProxy = this.stateTransitionContract(this.deployWallet);
+    const tx3 = await diamondProxy.setTokenMultiplier(1, 1);
+    const receipt3 = await tx3.wait();
+    if (this.verbose) {
+      console.log(`BaseTokenMultiplier set, gas used: ${receipt3.gasUsed.toString()}`);
+    }
   }
 
   public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // kl todo change 1 to general variable.
-    const tx = await bridgehub.addToken(tokenAddress, 1);
+    const tx = await bridgehub.addToken(tokenAddress);
 
     const receipt = await tx.wait();
     if (this.verbose) {

@@ -751,7 +751,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-            l1GasPriceConverted: 0,
             factoryDeps: new bytes[](0),
             refundRecipient: _refundRecipient
         });

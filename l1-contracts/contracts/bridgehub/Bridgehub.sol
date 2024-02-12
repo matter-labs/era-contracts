@@ -28,9 +28,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice chainID => baseToken contract address, storing baseToken
     mapping(uint256 _chainId => address) public baseToken;
 
-    /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
-    mapping(address _baseToken => uint256) public baseTokenGasPriceMinMultiplier;
-
     /// @notice used as an alternative to deployChains
     address public deployer;
 
@@ -81,19 +78,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
-    function addToken(address _token, uint256 _gasPriceMultiplier) external onlyOwner {
+    function addToken(address _token) external onlyOwner {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
-        if (_token != ETH_TOKEN_ADDRESS) {
-            baseTokenGasPriceMinMultiplier[_token] = _gasPriceMultiplier;
-        }
-    }
-
-    /// @notice
-    function setTokenMultiplier(address _token, uint256 _gasPriceMultiplier) external onlyOwner {
-        require(tokenIsRegistered[_token], "Bridgehub: token not registered");
-        require(_token != ETH_TOKEN_ADDRESS, "Bridgehub: ether does not need multiplier");
-        baseTokenGasPriceMinMultiplier[_token] = _gasPriceMultiplier;
     }
 
     /// @notice To set shared bridge, only Owner. Not done in initialize, as
@@ -210,7 +197,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
-        uint256 l1GasPriceConverted;
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
@@ -222,18 +208,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                     token,
                     _request.mintValue
                 );
-                l1GasPriceConverted = tx.gasprice;
-                require(_request.l1GasPriceConverted == 0, "Bridgehub: l1GasPriceConverted not 0 for ethBased chain");
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
                 // note we have to pass token, as a bridge might have multiple tokens.
                 sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
-
-                l1GasPriceConverted = _request.l1GasPriceConverted;
-                require(
-                    _request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token],
-                    "Bridgehub: gasPriceConverted not sufficient"
-                );
             }
         }
 
@@ -247,7 +225,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 l2Calldata: _request.l2Calldata,
                 l2GasLimit: _request.l2GasLimit,
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                l1GasPriceConverted: l1GasPriceConverted,
                 factoryDeps: _request.factoryDeps,
                 refundRecipient: _request.refundRecipient
             })
@@ -266,7 +243,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
-        uint256 l1GasPriceConverted;
         {
             address token = baseToken[_request.chainId];
 
@@ -279,19 +255,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                     token,
                     _request.mintValue
                 );
-
-                l1GasPriceConverted = tx.gasprice;
-                require(_request.l1GasPriceConverted == 0, "Bridgehub: l1GasPriceConverted not 0 for ethBased chain");
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
                 // note we have to pass token, as a bridge might have multiple tokens.
                 sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
-
-                l1GasPriceConverted = _request.l1GasPriceConverted;
-                require(
-                    _request.l1GasPriceConverted >= tx.gasprice * baseTokenGasPriceMinMultiplier[token],
-                    "Bridgehub: gasPriceConverted not sufficient"
-                );
             }
         }
 
@@ -325,7 +292,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 l2Calldata: outputRequest.l2Calldata,
                 l2GasLimit: _request.l2GasLimit,
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                l1GasPriceConverted: l1GasPriceConverted,
                 factoryDeps: outputRequest.factoryDeps,
                 refundRecipient: refundRecipient
             })

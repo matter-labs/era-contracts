@@ -32,6 +32,13 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the fee params for L1->L2 transactions
+    /// @param _newFeeParams The new fee params
+    function changeFeeParams(FeeParams calldata _newFeeParams) external;
+
+    /// @notice Change the token multiplier for L1->L2 transactions
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
+
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
@@ -65,6 +72,9 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
+
+    /// @notice BaseToken multiplier for L1->L2 transactions changed
+    event NewBaseTokenMultiplier(uint128 oldNominator, uint128 oldDenominator, uint128 newNominator, uint128 newDenominator);
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

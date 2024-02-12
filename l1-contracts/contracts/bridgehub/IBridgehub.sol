@@ -15,7 +15,6 @@ struct L2TransactionRequestDirect {
     bytes l2Calldata;
     uint256 l2GasLimit;
     uint256 l2GasPerPubdataByteLimit;
-    uint256 l1GasPriceConverted;
     bytes[] factoryDeps;
     address refundRecipient;
 }
@@ -26,7 +25,6 @@ struct L2TransactionRequestTwoBridgesOuter {
     uint256 l2Value;
     uint256 l2GasLimit;
     uint256 l2GasPerPubdataByteLimit;
-    uint256 l1GasPriceConverted;
     address refundRecipient;
     address secondBridgeAddress;
     uint256 secondBridgeValue;
@@ -113,7 +111,7 @@ interface IBridgehub {
 
     function removeStateTransitionManager(address _stateTransitionManager) external;
 
-    function addToken(address _token, uint256 _gasPriceMultiplier) external;
+    function addToken(address _token) external;
 
     function setSharedBridge(address _sharedBridge) external;
 
