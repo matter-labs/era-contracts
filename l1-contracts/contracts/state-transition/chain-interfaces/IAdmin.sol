@@ -74,7 +74,12 @@ interface IAdmin is IZkSyncStateTransitionBase {
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
-    event NewBaseTokenMultiplier(uint128 oldNominator, uint128 oldDenominator, uint128 newNominator, uint128 newDenominator);
+    event NewBaseTokenMultiplier(
+        uint128 oldNominator,
+        uint128 oldDenominator,
+        uint128 newNominator,
+        uint128 newDenominator
+    );
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

@@ -75,9 +75,11 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewFeeParams(oldFeeParams, _newFeeParams);
     }
 
-
     /// @inheritdoc IAdmin
-    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external onlyGovernorOrStateTransitionManager {
+    function setTokenMultiplier(
+        uint128 _nominator,
+        uint128 _denominator
+    ) external onlyGovernorOrStateTransitionManager {
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
 

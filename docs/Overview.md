@@ -209,7 +209,7 @@ L1 <-> L2 communication.
 ##### L1ERC20Bridge
 
 The legacy implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
-fee-on-transfer tokens or other custom logic for handling user balances. Only works for Era. 
+fee-on-transfer tokens or other custom logic for handling user balances. Only works for Era.
 
 - `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.

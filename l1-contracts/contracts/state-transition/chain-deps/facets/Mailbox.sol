@@ -147,7 +147,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     function _deriveL2GasPrice(uint256 _l1GasPrice, uint256 _gasPerPubdata) internal view returns (uint256) {
         FeeParams memory feeParams = s.feeParams;
         require(s.baseTokenGasPriceMultiplierDenominator > 0, "Mailbox: baseTokenGasPriceDenominator not set");
-        uint256 l1GasPriceConverted = _l1GasPrice * s.baseTokenGasPriceMultiplierNominator / s.baseTokenGasPriceMultiplierDenominator;
+        uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
+            s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
