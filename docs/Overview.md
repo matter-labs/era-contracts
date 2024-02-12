@@ -208,8 +208,8 @@ L1 <-> L2 communication.
 
 ##### L1ERC20Bridge
 
-The "standard" implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
-fee-on-transfer tokens or other custom logic for handling user balances.
+The legacy implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+fee-on-transfer tokens or other custom logic for handling user balances. Only works for Era. 
 
 - `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
@@ -217,23 +217,14 @@ fee-on-transfer tokens or other custom logic for handling user balances.
 
 ##### L1Shared0Bridge
 
-The "standard" implementation of the ERC20 token bridge. Works only with regular ERC20 tokens, i.e. not with
+The "standard" implementation of the ERC20 and WETH token bridge. Works only with regular ERC20 tokens, i.e. not with
 fee-on-transfer tokens or other custom logic for handling user balances.
 
 - `deposit` - lock funds inside the contract and send a request to mint bridged assets on L2.
 - `claimFailedDeposit` - unlock funds if the deposit was initiated but then failed on L2.
 - `finalizeWithdrawal` - unlock funds for the valid withdrawal request from L2.
 
-##### L2SharedBridge
-
-The L2 counterpart of the L1 ERC20 bridge.
-
-- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
-- `finalizeDeposit` - finalize the deposit and mint funds on L2.
-
-##### L1WethBridge
-
-The custom bridge exclusively handles transfers of WETH tokens between the two domains. It is designed to streamline and
+The bridge also handles WETH token deposits between the two domains. It is designed to streamline and
 enhance the user experience for bridging WETH tokens by minimizing the number of transactions required and reducing
 liquidity fragmentation thus improving efficiency and user experience.
 
@@ -244,9 +235,12 @@ Thus, the deposit is made in one transaction, and the user receives L2 WETH that
 
 ##### L2SharedBridge
 
-The L2 counterpart of the L1 WETH bridge.
+The L2 counterpart of the L1 Shared bridge.
 
-For withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
+- `withdraw` - initiate a withdrawal by burning funds on the contract and sending a corresponding message to L1.
+- `finalizeDeposit` - finalize the deposit and mint funds on L2.
+
+For WETH withdrawals, the contract receives ETH from the L2 WETH bridge contract, wraps it into WETH, and sends the WETH to
 the L1 recipient.
 
 #### ValidatorTimelock
