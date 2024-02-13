@@ -68,6 +68,7 @@ const hardhatConfig = {
 };
 const localConfig = {
   ...prodConfig,
+  UPGRADE_NOTICE_PERIOD: 0,
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 9,

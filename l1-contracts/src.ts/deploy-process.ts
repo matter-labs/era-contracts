@@ -44,7 +44,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
   });
 }
 
-export async function initialSharedBridgeDeployment(
+export async function initialBridgehubDeployment(
   deployer: Deployer,
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,
@@ -140,7 +140,7 @@ export async function initialTestnetDeploymentProcess(
   const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
-  await initialSharedBridgeDeployment(deployer, extraFacets, gasPrice, false, 1);
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
   await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }

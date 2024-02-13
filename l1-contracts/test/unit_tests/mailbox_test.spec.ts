@@ -283,7 +283,6 @@ describe("Mailbox tests", function () {
     );
     const mintValue = await overrides.value;
     overrides.gasLimit = 10000000;
-    // const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
     const encodeRequest = (refundRecipient) =>
       bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
@@ -295,7 +294,6 @@ describe("Mailbox tests", function () {
           l2Calldata: "0x",
           l2GasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          l1GasPriceConverted: 0,
           factoryDeps: [new Uint8Array(32)],
           refundRecipient,
         },

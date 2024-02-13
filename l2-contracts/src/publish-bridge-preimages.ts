@@ -45,7 +45,6 @@ async function main() {
 
       const deployer = new Deployer({ deployWallet: wallet });
       const bridgehub = deployer.bridgehubContract(wallet);
-      const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
       const publishL2SharedBridgeTx = await bridgehub.requestL2TransactionDirect(
         {
@@ -56,7 +55,6 @@ async function main() {
           l2Calldata: "0x",
           l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-          l1GasPriceConverted: l1GasPriceConverted,
           factoryDeps: [getContractBytecode("L2SharedBridge")],
           refundRecipient: wallet.address,
         },

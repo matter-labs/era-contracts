@@ -391,6 +391,10 @@ export class Deployer {
   }
 
   public async upgradeL1ERC20Bridge() {
+    if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+      // we need to wait here for a new block
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
     const calldata = proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
@@ -412,8 +416,13 @@ export class Deployer {
       predecessor: ethers.constants.HashZero,
       salt: ethers.constants.HashZero,
     };
-    await governance.scheduleTransparent(operation, 0);
-    await governance.execute(operation);
+    const scheduleTx = await governance.scheduleTransparent(operation, 0);
+    await scheduleTx.wait();
+    if (this.verbose) {
+      console.log("Upgrade scheduled");
+    }
+    const executeTX = await governance.execute(operation);
+    await executeTX.wait();
     if (this.verbose) {
       console.log(
         "Upgrade with target ",

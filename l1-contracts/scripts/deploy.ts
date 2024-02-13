@@ -6,7 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { initialSharedBridgeDeployment } from "../src.ts/deploy-process";
+import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -55,7 +55,7 @@ async function main() {
         verbose: true,
       });
 
-      await initialSharedBridgeDeployment(
+      await initialBridgehubDeployment(
         deployer,
         [],
         gasPrice,

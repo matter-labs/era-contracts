@@ -3,7 +3,8 @@ import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { initializeErc20Bridge } from "../src.ts/shared-bridge-initialize";
-import { GAS_MULTIPLIER, deployedAddressesFromEnv, web3Provider } from "./utils";
+import { GAS_MULTIPLIER, web3Provider } from "./utils";
+import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 
 import * as fs from "fs";
 import * as path from "path";

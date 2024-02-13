@@ -3,8 +3,7 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { getAddressFromEnv } from "./utils";
-import { applyL1ToL2Alias } from "../src.ts/utils";
+import { applyL1ToL2Alias, getAddressFromEnv } from "../src.ts/utils";
 import * as fs from "fs";
 
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";

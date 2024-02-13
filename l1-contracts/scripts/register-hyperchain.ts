@@ -4,7 +4,9 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
-import { GAS_MULTIPLIER, ADDRESS_ONE, getTokens, web3Provider } from "./utils";
+import { GAS_MULTIPLIER,  web3Provider } from "./utils";
+import { ADDRESS_ONE, } from "../src.ts/utils";
+import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -59,7 +61,7 @@ async function main() {
         }
         console.log(`Using base token at ${baseTokenAddress}`);
       } else if (cmd.baseTokenName) {
-        const tokens = getTokens(process.env.CHAIN_ETH_NETWORK);
+        const tokens = getTokens();
         const token = tokens.find((token: { symbol: string }) => token.symbol == cmd.baseTokenName);
         if (!token) {
           throw new Error(`Token ${cmd.baseTokenName} not found`);

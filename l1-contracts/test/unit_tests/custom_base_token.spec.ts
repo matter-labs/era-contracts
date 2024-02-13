@@ -111,7 +111,6 @@ describe("Custom base token chain and bridge tests", () => {
     await (
       await baseToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("800", 18))
     ).wait();
-    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
     await bridgehub.connect(randomSigner).requestL2TransactionDirect({
       chainId,
       l2Contract: await randomSigner.getAddress(),
@@ -120,7 +119,6 @@ describe("Custom base token chain and bridge tests", () => {
       l2Calldata: "0x",
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted,
       factoryDeps: [],
       refundRecipient: await randomSigner.getAddress(),
     });
@@ -135,14 +133,12 @@ describe("Custom base token chain and bridge tests", () => {
 
     await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount);
     await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
-    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
       mintValue: baseTokenAmount,
       l2Value: 1,
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted,
       refundRecipient: await randomSigner.getAddress(),
       secondBridgeAddress: l1SharedBridge.address,
       secondBridgeValue: 0,
@@ -162,7 +158,6 @@ describe("Custom base token chain and bridge tests", () => {
 
     await (await baseToken.connect(randomSigner).mint(await randomSigner.getAddress(), baseTokenAmount)).wait();
     await (await baseToken.connect(randomSigner).approve(l1SharedBridge.address, baseTokenAmount)).wait();
-    const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
     await bridgehub.connect(randomSigner).requestL2TransactionTwoBridges({
       chainId,
@@ -170,7 +165,6 @@ describe("Custom base token chain and bridge tests", () => {
       l2Value: 1,
       l2GasLimit: 10000000,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted,
       refundRecipient: await randomSigner.getAddress(),
       secondBridgeAddress: l1SharedBridge.address,
       secondBridgeValue: 0,

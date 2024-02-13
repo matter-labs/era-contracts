@@ -116,7 +116,6 @@ export async function requestExecute(
     );
     overrides.value = baseCost.add(l2Value);
   }
-  // const l1GasPriceConverted = await bridgehub.provider.getGasPrice();
 
   return await bridgehub.requestL2TransactionDirect(
     {
@@ -127,7 +126,6 @@ export async function requestExecute(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      l1GasPriceConverted: 0,
       factoryDeps,
       refundRecipient,
     },

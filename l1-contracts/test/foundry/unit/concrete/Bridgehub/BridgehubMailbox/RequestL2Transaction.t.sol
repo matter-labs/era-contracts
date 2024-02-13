@@ -78,7 +78,6 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
             calldataBytes,
             l2GasLimit,
             l2GasPerPubdataByteLimit,
-            // kl todo missing l1GasPriceConverted
             factoryDeps,
             refundRecipient
         );
@@ -128,7 +127,6 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
             calldataBytes,
             l2GasLimit,
             l2GasPerPubdataByteLimit,
-            // kl todo missing l1GasPriceConverted
             factoryDeps,
             refundRecipient
         );

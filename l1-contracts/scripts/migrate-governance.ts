@@ -7,9 +7,10 @@ import * as fs from "fs";
 import * as hre from "hardhat";
 import { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias } from "../src.ts/utils";
-import { GAS_MULTIPLIER, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
+import { GAS_MULTIPLIER,  web3Provider } from "./utils";
+import { getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
 
-import { getL1TxInfo } from "../../l2-contracts/src/utils";
+import { getL1TxInfo, TxInfo } from "../../l2-contracts/src/utils";
 
 import { Provider } from "zksync-ethers";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
@@ -22,12 +23,6 @@ const l2SharedBridgeABI = JSON.parse(
     .readFileSync("../l2-contracts/artifacts-zk/contracts-preprocessed/bridge/L2SharedBridge.sol/L2SharedBridge.json")
     .toString()
 ).abi;
-
-interface TxInfo {
-  data: string;
-  to: string;
-  value?: string;
-}
 
 async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {
   const provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
@@ -105,7 +100,7 @@ async function main() {
       const erc20MigrationTx = l1Erc20Bridge.interface.encodeFunctionData("changeAdmin", [governanceAddressFromEnv]);
       displayTx("L1 ERC20 bridge migration calldata:", {
         data: erc20MigrationTx,
-        to: l1Erc20Bridge.address,
+        target: l1Erc20Bridge.address,
       });
 
       const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingGovernor", [
@@ -113,7 +108,7 @@ async function main() {
       ]);
       displayTx("zkSync Diamond Proxy migration calldata:", {
         data: zkSyncSetPendingGovernor,
-        to: zkSync.address,
+        target: zkSync.address,
       });
 
       const validatorTimelockMigration = validatorTimelock.interface.encodeFunctionData("transferOwnership", [
@@ -121,7 +116,7 @@ async function main() {
       ]);
       displayTx("Validator timelock migration calldata:", {
         data: validatorTimelockMigration,
-        to: validatorTimelock.address,
+        target: validatorTimelock.address,
       });
 
       // Below, we prepare the transactions to migrate the L2 contracts.
@@ -216,13 +211,13 @@ async function main() {
       ]);
       displayTx("Schedule transparent calldata:\n", {
         data: scheduleTransparentCalldata,
-        to: governance.address,
+        target: governance.address,
       });
 
       const executeCalldata = governance.interface.encodeFunctionData("execute", [operation]);
       displayTx("Execute calldata:\n", {
         data: executeCalldata,
-        to: governance.address,
+        target: governance.address,
       });
     });
 
