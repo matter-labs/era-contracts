@@ -83,7 +83,7 @@ object "Sekp256r1" {
             let sIsInvalid := or(eq(s, 0), gt(s, sub(SECP256K1_GROUP_SIZE(), 1)))
             let rIsInvalid := or(eq(r, 0), gt(r, sub(SECP256K1_GROUP_SIZE(), 1)))
 
-            if or(or(sIsInvalid, rIsInvalid)) {
+            if or(sIsInvalid, rIsInvalid) {
                 return(0, 0)
             }
 
