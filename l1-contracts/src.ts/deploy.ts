@@ -393,7 +393,7 @@ export class Deployer {
   public async upgradeL1ERC20Bridge() {
     if (process.env.CHAIN_ETH_NETWORK === "localhost") {
       // we need to wait here for a new block
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);

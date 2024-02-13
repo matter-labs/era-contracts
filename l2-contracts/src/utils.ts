@@ -155,7 +155,7 @@ export type TxInfo = {
   data: string;
   target: string;
   value?: string;
-}
+};
 
 export async function getL1TxInfo(
   deployer: Deployer,
@@ -165,7 +165,7 @@ export async function getL1TxInfo(
   gasPrice: BigNumber,
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
-) : Promise<TxInfo>{
+): Promise<TxInfo> {
   const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
     to,

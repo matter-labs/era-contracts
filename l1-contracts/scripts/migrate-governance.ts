@@ -6,11 +6,11 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as hre from "hardhat";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias } from "../src.ts/utils";
-import { GAS_MULTIPLIER,  web3Provider } from "./utils";
-import { getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
+import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
+import { GAS_MULTIPLIER, web3Provider } from "./utils";
 
-import { getL1TxInfo, TxInfo } from "../../l2-contracts/src/utils";
+import type { TxInfo } from "../../l2-contracts/src/utils";
+import { getL1TxInfo } from "../../l2-contracts/src/utils";
 
 import { Provider } from "zksync-ethers";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";

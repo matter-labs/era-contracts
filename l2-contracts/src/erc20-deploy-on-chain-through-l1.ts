@@ -23,7 +23,7 @@ async function main() {
     .option("--nonce <nonce>")
     .option("--erc20-bridge <erc20-bridge>")
     .action(async (cmd) => {
-      const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
+      // const chainId: string = cmd.chainId ? cmd.chainId : process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID;
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(

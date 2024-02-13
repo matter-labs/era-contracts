@@ -4,8 +4,8 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
-import { GAS_MULTIPLIER,  web3Provider } from "./utils";
-import { ADDRESS_ONE, } from "../src.ts/utils";
+import { GAS_MULTIPLIER, web3Provider } from "./utils";
+import { ADDRESS_ONE } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
