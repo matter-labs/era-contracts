@@ -47,7 +47,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ///// Getters
 
     /// @notice return the state transition chain contract for a chainId
-    function getStateTransition(uint256 _chainId) external view returns (address) {
+    function getStateTransition(uint256 _chainId) public view returns (address) {
         return IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId);
     }
 

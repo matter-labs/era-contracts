@@ -74,13 +74,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or an Eth based Chain
-    modifier onlyBridgehubOrEthChain(uint256 _chainId) {
+    /// @notice Checks that the message sender is the bridgehub or Era
+    modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             (msg.sender == address(bridgehub)) ||
-                ((bridgehub.baseToken(_chainId) == ETH_TOKEN_ADDRESS) &&
-                    msg.sender == bridgehub.getStateTransition(_chainId)),
-            "L1WETHBridge: not bridgehub or eth chain"
+                ((_chainId == ERA_CHAIN_ID) && (msg.sender == bridgehub.getStateTransition(_chainId))),
+            "L1SharedBridge: not bridgehub or era chain"
         );
         _;
     }
@@ -130,11 +129,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable onlyBridgehubOrEthChain(_chainId) {
+    ) external payable onlyBridgehubOrEra(_chainId) {
         require(_amount != 0, "4T"); // empty deposit amount
 
         if (_l1Token == ETH_TOKEN_ADDRESS) {
-            require(msg.value == _amount, "L1WETHBridge: msg.value not equal to amount");
+            require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
             /// This breaks the _depositeFunds function, it returns 0, as our balance doesn't increase
             /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
@@ -156,23 +155,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Transfers tokens from the depositor address to the smart contract address
     /// @return The difference between the contract balance before and after the transferring of funds
     function _depositFunds(address _from, address _token, uint256 _amount) internal returns (uint256) {
-        if (_token == l1WethAddress) {
-            // Deposit WETH tokens from the depositor address to the smart contract address
-            uint256 balanceBefore = address(this).balance;
-            IERC20(l1WethAddress).safeTransferFrom(_from, address(this), _amount);
-            // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
-            IWETH9(l1WethAddress).withdraw(_amount);
-            uint256 balanceAfter = address(this).balance;
+        IERC20 token = IERC20(_token);
+        uint256 balanceBefore = token.balanceOf(address(this));
+        token.safeTransferFrom(_from, address(this), _amount);
+        uint256 balanceAfter = token.balanceOf(address(this));
 
-            return balanceAfter - balanceBefore;
-        } else {
-            IERC20 token = IERC20(_token);
-            uint256 balanceBefore = token.balanceOf(address(this));
-            token.safeTransferFrom(_from, address(this), _amount);
-            uint256 balanceAfter = token.balanceOf(address(this));
-
-            return balanceAfter - balanceBefore;
-        }
+        return balanceAfter - balanceBefore;
     }
 
     /// @notice used by requestL2TransactionTwoBridges in Bridgehub
@@ -184,12 +172,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _l2Value,
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
-        require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge n deployed");
+        require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
 
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
         );
+        require(_l1Token != l1WethAddress, "ShB: WETH deposit not supported");
+        require(bridgehub.baseToken(_chainId) != _l1Token);
+
         if (_depositAmount != 0) {
             /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
             /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
@@ -199,26 +190,19 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
         uint256 amount;
-        bytes32 txDataHash;
 
-        if (bridgehub.baseToken(_chainId) == _l1Token) {
-            // we are depositing wrapped baseToken
-            amount = _l2Value;
-            require(msg.value == 0, "ShB m.v > 0 for BH d.it 1");
-            require(_depositAmount == 0, "ShB wrong withdraw amount"); // there is no point in withdrawing now, the l2Value is already set
-            txDataHash = 0x00; // we don't save for baseToken deposits, as the refundRecipient will receive the funds if the tx fails
+        if (_l1Token == ETH_TOKEN_ADDRESS) {
+            amount = msg.value;
+            require(_depositAmount == 0, "ShB wrong withdraw amount");
         } else {
-            if ((_l1Token == ETH_TOKEN_ADDRESS) || (_l1Token == l1WethAddress)) {
-                amount = _depositAmount + msg.value;
-            } else {
-                require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
-                amount = _depositAmount;
-            }
-            txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
-            if (!hyperbridgingEnabled[_chainId]) {
-                chainBalance[_chainId][_l1Token] += amount;
-            }
+            require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
+            amount = _depositAmount;
         }
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, amount));
+        if (!hyperbridgingEnabled[_chainId]) {
+            chainBalance[_chainId][_l1Token] += amount;
+        }
+
         require(amount != 0, "6T"); // empty deposit amount
 
         {
@@ -260,20 +244,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _l1Token,
         uint256 _amount
     ) internal view returns (bytes memory txCalldata) {
-        bytes memory gettersData;
-        if (_l1Token == bridgehub.baseToken(_chainId)) {
-            gettersData = new bytes(0);
-        } else {
-            gettersData = _getERC20Getters(_l1Token);
-        }
-        address l1Token = _l1Token == l1WethAddress ? ETH_TOKEN_ADDRESS : _l1Token;
-        txCalldata = abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, l1Token, _amount, gettersData));
+        bytes memory gettersData = _getERC20Getters(_l1Token);
+        txCalldata = abi.encodeCall(
+            IL2Bridge.finalizeDeposit,
+            (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData)
+        );
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory data) {
-        if ((_token == ETH_TOKEN_ADDRESS) || (_token == l1WethAddress)) {
-            return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain
+        if ((_token == ETH_TOKEN_ADDRESS)) {
+            return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain it is an ERC20
         }
 
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
@@ -366,17 +347,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         require(_amount > 0, "y1");
 
         {
-            bool notCheckedInLegacyBridgeOrNewTransaction;
+            bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
             {
                 // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
-                bool weCanCheckDepositHere = ((_chainId != ERA_CHAIN_ID) ||
-                    (_l2BatchNumber >= eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber));
+                bool weCanCheckDepositHere = !_isLegacyWithdrawal(_chainId, _l2BatchNumber);
                 // Double claims are not possible, as we this check except for legacy bridge withdrawals
                 // Funds claimed before the update will still be recorded in the legacy bridge
                 // Note we double check NEW deposits if they are called from the legacy bridge
-                notCheckedInLegacyBridgeOrNewTransaction = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
+                notCheckedInLegacyBridgeOrWeCanCheckDeposit = (!_checkedInLegacyBridge) || weCanCheckDepositHere;
             }
-            if (notCheckedInLegacyBridgeOrNewTransaction) {
+            if (notCheckedInLegacyBridgeOrWeCanCheckDeposit) {
                 bytes32 dataHash = depositHappened[_chainId][_l2TxHash];
                 bytes32 txDataHash = keccak256(abi.encode(_depositSender, _l1Token, _amount));
                 require(dataHash == txDataHash, "ShB: d.it not hap");
@@ -392,17 +372,23 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
         // Withdraw funds
         if (_l1Token == ETH_TOKEN_ADDRESS) {
-            payable(_depositSender).transfer(_amount);
-        } else if (_l1Token == l1WethAddress) {
-            // Wrap ETH to WETH tokens (smart contract address receives the equivalent _amount of WETH)
-            IWETH9(l1WethAddress).deposit{value: _amount}();
-            // Transfer WETH tokens from the smart contract address to the withdrawal receiver
-            IERC20(l1WethAddress).safeTransfer(_depositSender, _amount);
+            bool callSuccess;
+            // Low-level assembly call, to avoid any memory copying (save gas)
+            assembly {
+                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
+            }
+            require(callSuccess, "ShB: claimFailedDeposit failed");
         } else {
             IERC20(_l1Token).safeTransfer(_depositSender, _amount);
+            // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
+            // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
         }
 
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
+    }
+
+    function _isLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal returns (bool) {
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber);
     }
 
     /// @notice Finalize the withdrawal and release funds
@@ -421,8 +407,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ) external override {
         // To avoid rewithdrawing txs that have already happened on the legacy bridge
         // note: new withdraws are all recorded here, so double withdrawing them is not possible
-        bool legacyWithdrawal = (_chainId == ERA_CHAIN_ID) &&
-            (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber);
+        bool legacyWithdrawal = _isLegacyWithdrawal(_chainId, _l2BatchNumber);
         if (legacyWithdrawal) {
             require(!legacyBridge.isWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex), "ShB: legacy withdrawal");
         }
@@ -467,7 +452,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         );
         isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
-        if ((_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber)) {
+        if (_isLegacyWithdrawal(_chainId, _l2BatchNumber)) {
             // in this case we have to check we don't double withdraw ether
             // we are not fully finalized if eth has not been withdrawn
             // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
@@ -501,14 +486,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             chainBalance[_chainId][l1Token] -= amount;
         }
 
-        if (wrapToWeth) {
-            // Wrap ETH to WETH tokens (smart contract address receives the equivalent amount of WETH)
-            IWETH9(l1WethAddress).deposit{value: amount}();
-            // Transfer WETH tokens from the smart contract address to the withdrawal receiver
-            IERC20(l1WethAddress).safeTransfer(l1Receiver, amount);
-
-            emit EthWithdrawalFinalized(_chainId, l1Receiver, amount);
-        } else if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)) {
+        if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
@@ -531,7 +509,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal view returns (address l1Receiver, address l1Token, uint256 amount, bool wrapToWeth) {
-        (l1Receiver, l1Token, amount, wrapToWeth) = _parseL2WithdrawalMessage(_chainId, _message);
+        (l1Receiver, l1Token, amount) = _parseL2WithdrawalMessage(_chainId, _message);
         L2Message memory l2ToL1Message;
         {
             bool baseTokenWithdrawal = (l1Token == bridgehub.baseToken(_chainId));
@@ -559,7 +537,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
-    ) internal view returns (address l1Receiver, address l1Token, uint256 amount, bool wrapToWeth) {
+    ) internal view returns (address l1Receiver, address l1Token, uint256 amount) {
         // We check that the message is long enough to read the data.
         // Please note that there are two versions of the message:
         // 1. The message that is sent by `withdraw(address _l1Receiver)`
@@ -578,27 +556,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
             l1Token = bridgehub.baseToken(_chainId);
-
-            if (l1Receiver == address(this)) {
-                // the user either specified a wrong receiver (so the withdrawal cannot be finished),
-                // or the withdrawal is a wrapped base token withdrawal. We assume the later.
-                if ((l1Token == ETH_TOKEN_ADDRESS) || (l1Token == l1WethAddress)) {
-                    wrapToWeth = true;
-                }
-
-                // Check that the message length is correct.
-                // additionalData (WETH withdrawal data): l2 sender address + weth receiver address = 20 + 20 = 40 (bytes)
-                // It should be equal to the length of the function signature + eth receiver address + uint256 amount +
-                // additionalData = 4 + 20 + 32 + 40 = 96 (bytes).
-                require(_l2ToL1message.length == 96, "Incorrect BaseToken message with additional data length 2");
-
-                address l2Sender;
-                (l2Sender, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-                require(l2Sender == l2BridgeAddress[_chainId], "The withdrawal was not initiated by L2 bridge");
-
-                // Parse additional data
-                (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            }
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
 
@@ -611,10 +568,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
-            // this is for withdrawals from weth bridged to Era via the legacy ERC20Bridge.
-            if (l1Token == l1WethAddress) {
-                wrapToWeth = true;
-            }
         } else {
             revert("ShB Incorrect message function selector");
         }
@@ -622,10 +575,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
     /// @dev The receive function is called when ETH is sent directly to the contract.
     receive() external payable {
-        // Expected to receive ether in cases:
-        // 1. l1 WETH sends ether on `withdraw`
-        require(msg.sender == l1WethAddress, "pn");
-        emit EthReceived(msg.value);
+        // Do not expect to receive Ether directly, (weth bridging diasbled)
+        revert("ShB: direct ether transfer not allowed");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -670,33 +621,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ) external payable override onlyLegacyBridge nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
-        uint256 l2Value;
-        {
-            bool ethIsBaseToken = (bridgehub.baseToken(ERA_CHAIN_ID) == ETH_TOKEN_ADDRESS);
-            require(ethIsBaseToken, "ShB d.it n E chain");
-            if (_l1Token == l1WethAddress) {
-                require(msg.value + _amount == _mintValue, "ShB wrong ETH sent weth d.it");
-                l2Value = _amount;
-                // we don't increase chainBalance in this case since we do it in bridgehubDepositBaseToken
-            } else {
-                require(_mintValue == msg.value, "ShB w mintV");
-                l2Value = 0;
+        uint256 l2Value = 0;
+        require(_l1Token != l1WethAddress, "ShB: WETH deposit not supported 2");
 
-                if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
-                    chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
-                }
-            }
+        require(_mintValue == msg.value, "ShB wrong mintValue");
 
-            /// we don't deposit the funds here, as we did that in the legacy bridge
-            /// we do need to unwrap weth though
-            if (_l1Token == l1WethAddress) {
-                uint256 balanceBefore = address(this).balance;
-                // Unwrap WETH tokens (smart contract address receives the equivalent amount of ETH)
-                IWETH9(l1WethAddress).withdraw(_amount);
-                uint256 balanceAfter = address(this).balance;
-                require(balanceAfter - balanceBefore == _amount, "ShB: w eth w");
-            }
+        if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
+            chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
         }
+
         bytes memory l2TxCalldata = _getDepositL2Calldata(ERA_CHAIN_ID, _msgSender, _l2Receiver, _l1Token, _amount);
 
         {
@@ -721,12 +654,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             );
         }
 
-        // for weth we don't save the depositHappened, since funds are sent to refundRecipient on L2 if the tx fails
-        if (_l1Token != l1WethAddress) {
-            bytes32 txDataHash = keccak256(abi.encode(_msgSender, _l1Token, _amount));
-            // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-            depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
-        }
+        bytes32 txDataHash = keccak256(abi.encode(_msgSender, _l1Token, _amount));
+        // Save the deposited amount to claim funds on L1 if the deposit failed on L2
+        depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
 
         emit DepositInitiatedSharedBridge(ERA_CHAIN_ID, l2TxHash, _msgSender, _l2Receiver, _l1Token, _amount);
     }

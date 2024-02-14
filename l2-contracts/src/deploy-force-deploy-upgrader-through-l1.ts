@@ -4,7 +4,6 @@ import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, et
 
 import * as hre from "hardhat";
 
-
 // Script to deploy the force deploy upgrader contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR
 // to running this script.

@@ -5,7 +5,7 @@ import { computeL2Create2Address, create2DeployFromL1, ethTestConfig, provider, 
 
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
- 
+
 async function main() {
   const program = new Command();
 
@@ -37,7 +37,7 @@ async function main() {
 
       const l2SharedBridgeBytecode = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
       const create2Salt = ethers.constants.HashZero;
-      /// contracts that need to be deployed: 
+      /// contracts that need to be deployed:
       /// - L2SharedBridge Implementation
       const forceDeployUpgraderAddress = computeL2Create2Address(
         deployWallet,
@@ -45,7 +45,7 @@ async function main() {
         "0x",
         create2Salt
       );
-  
+
       // TODO: request from API how many L2 gas needs for the transaction.
       await create2DeployFromL1(
         chainId,
@@ -64,10 +64,10 @@ async function main() {
 
       /// L2StandardToken Implementation
 
-      /// L2UpgradableBeacon 
+      /// L2UpgradableBeacon
 
       /// L2StandardToken Proxy bytecode. We need this bytecode to be accessible on the L2
-  
+
       console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
     });
 
