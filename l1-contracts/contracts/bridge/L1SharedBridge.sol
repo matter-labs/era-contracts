@@ -41,8 +41,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Legacy bridge smart contract that used to hold the tokens
     IL1ERC20Bridge public immutable override legacyBridge;
 
-    /// new fields from here
-
     /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
     /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
     /// this number is the first batch number that is settled on Era ST Diamond  before we update the Mailbox,
@@ -132,7 +130,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) public payable onlyBridgehubOrEthChain(_chainId) {
+    ) external payable onlyBridgehubOrEthChain(_chainId) {
         require(_amount != 0, "4T"); // empty deposit amount
 
         if (_l1Token == ETH_TOKEN_ADDRESS) {
@@ -302,7 +300,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) public override {
+    ) external override {
         _claimFailedDeposit(
             false,
             _chainId,
@@ -326,7 +324,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) public override onlyLegacyBridge {
+    ) external override onlyLegacyBridge {
         _claimFailedDeposit(
             true,
             ERA_CHAIN_ID,
@@ -420,7 +418,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public override {
+    ) external override {
         // To avoid rewithdrawing txs that have already happened on the legacy bridge
         // note: new withdraws are all recorded here, so double withdrawing them is not possible
         bool legacyWithdrawal = (_chainId == ERA_CHAIN_ID) &&
@@ -437,7 +435,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) public override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
         return
             _finalizeWithdrawal(
                 ERA_CHAIN_ID,
@@ -669,7 +667,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
-    ) public payable override onlyLegacyBridge nonReentrant returns (bytes32 l2TxHash) {
+    ) external payable override onlyLegacyBridge nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         uint256 l2Value;

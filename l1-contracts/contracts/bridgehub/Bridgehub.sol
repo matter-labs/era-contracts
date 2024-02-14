@@ -47,7 +47,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ///// Getters
 
     /// @notice return the state transition chain contract for a chainId
-    function getStateTransition(uint256 _chainId) public view returns (address) {
+    function getStateTransition(uint256 _chainId) external view returns (address) {
         return IStateTransitionManager(stateTransitionManager[_chainId]).stateTransition(_chainId);
     }
 
@@ -196,7 +196,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
@@ -242,7 +242,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) public payable override nonReentrant returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
 
