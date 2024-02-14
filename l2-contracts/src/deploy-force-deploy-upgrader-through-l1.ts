@@ -1,17 +1,9 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { computeL2Create2Address, create2DeployFromL1 } from "./utils";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
-import { web3Provider } from "../../l1-contracts/scripts/utils";
-import * as fs from "fs";
-import * as path from "path";
+import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, ethTestConfig, provider } from "./utils";
+
 import * as hre from "hardhat";
 
-const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
 // Script to deploy the force deploy upgrader contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR

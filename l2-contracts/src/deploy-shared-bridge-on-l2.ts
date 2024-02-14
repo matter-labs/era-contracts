@@ -2,14 +2,8 @@ import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { GAS_MULTIPLIER, web3Provider } from "../../l1-contracts/scripts/utils";
-
-import * as fs from "fs";
-import * as path from "path";
-
-const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
+import { ethTestConfig, provider } from "./utils";
 
 async function main() {
   const program = new Command();

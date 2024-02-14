@@ -1,17 +1,8 @@
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
-import * as fs from "fs";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import * as path from "path";
-import { web3Provider } from "../../l1-contracts/scripts/utils";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import * as hre from "hardhat";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
-
-const PRIORITY_TX_MAX_GAS_LIMIT = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
-const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, ethTestConfig, priorityTxMaxGasLimit } from "./utils";
 
 function getContractBytecode(contractName: string) {
   return hre.artifacts.readArtifactSync(contractName).bytecode;
@@ -53,7 +44,7 @@ async function main() {
           mintValue: 0,
           l2Value: 0,
           l2Calldata: "0x",
-          l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+          l2GasLimit: priorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           factoryDeps: [getContractBytecode("L2SharedBridge")],
           refundRecipient: wallet.address,
