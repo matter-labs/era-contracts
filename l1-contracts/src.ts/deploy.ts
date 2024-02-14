@@ -473,9 +473,10 @@ export class Deployer {
 
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
+    const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
       "initialize",
-      [this.addresses.Governance, process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH]
+      [this.addresses.Governance, storageSwitch]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
