@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "./Constants.sol";
 import "./EvmConstants.sol";
-import "./EvmContract.sol";
 import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
@@ -33,7 +32,8 @@ contract EvmInterpreter {
     */
 
     uint256 constant DEBUG_SLOT_OFFSET = 32 * 32;
-    uint256 constant STACK_OFFSET = DEBUG_SLOT_OFFSET + 5 * 32;
+    uint256 constant LAST_RETURNDATA_SIZE_LENGTH = DEBUG_SLOT_OFFSET + 5 * 32;
+    uint256 constant STACK_OFFSET = LAST_RETURNDATA_SIZE_LENGTH + 32;
     uint256 constant BYTECODE_OFFSET = 1024 + STACK_OFFSET;
     // Slightly higher just in case
     uint256 constant MAX_POSSIBLE_BYTECODE = 32000;
@@ -428,6 +428,54 @@ contract EvmInterpreter {
         }
     }
 
+    function _eraseRtPointer() internal {
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+
+        // Erase the active pointer + 
+        uint256 previousRtSz = SystemContractHelper.getActivePtrDataSize();
+        SystemContractHelper.ptrShrinkIntoActive(uint32(previousRtSz));
+        assembly {
+            mstore(lastRtSzOffset, 0)
+        }
+    }
+
+    function _saveReturnDataAfterEVMCall(
+        uint256 _outputOffset,
+        uint256 _outputLen
+    ) internal returns (uint256 _gasLeft) {
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+        uint256 rtsz;
+        assembly {
+            rtsz := returndatasize()
+        }
+
+        SystemContractHelper.loadReturndataIntoActivePtr();
+
+        if (rtsz > 31) {
+            assembly {
+                returndatacopy(0, 0, 32)
+                _gasLeft := mload(0)
+
+                returndatacopy(_outputOffset, 32, _outputLen)
+
+                mstore(lastRtSzOffset, sub(rtsz, 32))
+            }
+            // Skipping the returndata data
+            SystemContractHelper.ptrAddIntoActive(32);
+        } else {
+            _gasLeft = 0;
+            _eraseRtPointer();
+        }
+    }   
+
+    function _saveReturnDataAfterZkEVMCall() internal {
+        SystemContractHelper.loadReturndataIntoActivePtr();
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+        assembly {
+            mstore(lastRtSzOffset, returndatasize())
+        }
+    } 
+
     function _performCall(
         bool _calleeIsEVM,
         uint256 _calleeGas,
@@ -446,9 +494,6 @@ contract EvmInterpreter {
 
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
-
-            uint256 rtsz;
-
             assembly {
                 success := call(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -460,25 +505,9 @@ contract EvmInterpreter {
                     0,
                     0
                 )
-
-                rtsz := returndatasize()
             }
 
-            if (rtsz > 0) {
-                SystemContractHelper.loadReturndataIntoActivePtr();
-
-                assembly {
-                    returndatacopy(0, 0, 32)
-                    _gasLeft := mload(0)
-
-                    returndatacopy(_outputOffset, 32, _outputLen)
-                }
-                // Skipping the returndata data
-                SystemContractHelper.ptrAddIntoActive(32);
-                SystemContractHelper.ptrShrinkIntoActive(32);
-            } else {
-                _gasLeft = 0;
-            }
+            _gasLeft = _saveReturnDataAfterEVMCall(_outputOffset, _outputLen);
 
             _popEVMFrame();
         } else {
@@ -489,7 +518,8 @@ contract EvmInterpreter {
             assembly {
                 success := call(_calleeGas, _callee, _value, _inputOffset, _inputLen, _outputOffset, _outputLen)
             }
-            SystemContractHelper.loadReturndataIntoActivePtr();
+
+            _saveReturnDataAfterZkEVMCall();
 
             uint256 gasUsed = _calcEVMGas(tmp - gasleft());
 
@@ -514,8 +544,6 @@ contract EvmInterpreter {
 
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
-
-            uint256 rtsz;
             assembly {
                 success := delegatecall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -526,25 +554,9 @@ contract EvmInterpreter {
                     0,
                     0
                 )
-
-                rtsz := returndatasize()
             }
 
-            if (rtsz > 0) {
-                SystemContractHelper.loadReturndataIntoActivePtr();
-
-                assembly {
-                    returndatacopy(0, 0, 32)
-                    _gasLeft := mload(0)
-
-                    returndatacopy(_outputOffset, 32, _outputLen)
-                }
-                // Skipping the returndata data
-                SystemContractHelper.ptrAddIntoActive(32);
-                SystemContractHelper.ptrShrinkIntoActive(32);
-            } else {
-                _gasLeft = 0;
-            }
+            _gasLeft = _saveReturnDataAfterEVMCall(_outputOffset, _outputLen);
 
             _popEVMFrame();
         } else {
@@ -569,8 +581,6 @@ contract EvmInterpreter {
 
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
-
-            uint256 rtsz;
             assembly {
                 success := staticcall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -581,25 +591,9 @@ contract EvmInterpreter {
                     0,
                     0
                 )
-
-                rtsz := returndatasize()
             }
 
-            if (rtsz > 0) {
-                SystemContractHelper.loadReturndataIntoActivePtr();
-
-                assembly {
-                    returndatacopy(0, 0, 32)
-                    _gasLeft := mload(0)
-
-                    returndatacopy(_outputOffset, 32, _outputLen)
-                }
-                // Skipping the returndata data
-                SystemContractHelper.ptrAddIntoActive(32);
-                SystemContractHelper.ptrShrinkIntoActive(32);
-            } else {
-                _gasLeft = 0;
-            }
+            _gasLeft = _saveReturnDataAfterEVMCall(_outputOffset, _outputLen);
 
             _popEVMFrame();
         } else {
@@ -610,7 +604,7 @@ contract EvmInterpreter {
             assembly {
                 success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
             }
-            SystemContractHelper.loadReturndataIntoActivePtr();
+            _saveReturnDataAfterZkEVMCall();
 
             uint256 gasUsed = _calcEVMGas(tmp - gasleft());
 
@@ -675,27 +669,11 @@ contract EvmInterpreter {
             }
 
             // reseting the returndata
-            uint256 previousRtSz = SystemContractHelper.getActivePtrDataSize();
-            SystemContractHelper.ptrShrinkIntoActive(uint32(previousRtSz));
+            _eraseRtPointer();
 
             gasLeft = _fetchConstructorReturnGas();
         } else {
-            SystemContractHelper.loadReturndataIntoActivePtr();
-
-            uint256 rtsz;
-            assembly {
-                rtsz := returndatasize()
-            }
-
-            if (rtsz > 0) {
-                assembly {
-                    returndatacopy(0, 0, 32)
-                    gasLeft := mload(0)
-                }
-                // Skipping the gas data
-                SystemContractHelper.ptrAddIntoActive(32);
-                SystemContractHelper.ptrShrinkIntoActive(32);
-            }
+            gasLeft = _saveReturnDataAfterEVMCall(0,0);
         }
     }
 
@@ -1285,7 +1263,11 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_RETURNDATASIZE) {
-                        uint256 rsz = SystemContractHelper.getActivePtrDataSize();
+                        uint256 rsz;
+                        uint256 rszOffset = LAST_RETURNDATA_SIZE_LENGTH;
+                        assembly {
+                            rsz := mload(rszOffset)
+                        }
 
                         tos = pushStackItem(tos, rsz);
                         gasLeft -= 2;
@@ -1841,7 +1823,7 @@ contract EvmInterpreter {
                     continue;
                 }
 
-                if (opcode == OP_DELEGATECALL) {
+                if (opcode == OP_STATICCALL) {
                     uint256 gas;
                     uint256 addr;
                     uint256 argOst;
@@ -1897,6 +1879,7 @@ contract EvmInterpreter {
 
                     (ost, len, tos) = _pop2StackItems(tos);
 
+                    // FIXME: double check thaat we still have enough gas
                     gasLeft -= expandMemory(ost + len);
 
                     return (ost + memOffset, len, gasLeft);
