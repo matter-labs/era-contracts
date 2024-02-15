@@ -22,19 +22,18 @@ contract EvmInterpreter {
     /*
         Memory layout:
         - 32 words scratch space
+        - 5 words for debugging purposes
+        - 1 word for the last returndata size
         - 1024 words stack.
         - Bytecode. (First word is the length of the bytecode)
-        - Memory. (First word is the length of the bytecode)
-    */
-
-    /*
-        We must avoid polluting the memory of the contract, so we have to do raw calls
+        - Memory. (First word is the length of the memory)
     */
 
     uint256 constant DEBUG_SLOT_OFFSET = 32 * 32;
-    uint256 constant LAST_RETURNDATA_SIZE_LENGTH = DEBUG_SLOT_OFFSET + 5 * 32;
-    uint256 constant STACK_OFFSET = LAST_RETURNDATA_SIZE_LENGTH + 32;
-    uint256 constant BYTECODE_OFFSET = 32 * 1024 + STACK_OFFSET;
+    uint256 constant LAST_RETURNDATA_SIZE_OFFSET = DEBUG_SLOT_OFFSET + 5 * 32;
+    uint256 constant STACK_OFFSET = LAST_RETURNDATA_SIZE_OFFSET + 32;
+    uint256 constant BYTECODE_OFFSET =STACK_OFFSET + 1024 * 32;
+
     // Slightly higher just in case
     uint256 constant MAX_POSSIBLE_BYTECODE = 32000;
     uint256 constant MEM_OFFSET = BYTECODE_OFFSET + MAX_POSSIBLE_BYTECODE;
@@ -45,31 +44,37 @@ contract EvmInterpreter {
     // but we can pass a limited value, ensuring that the total ergsLeft will never exceed 2bln.
     uint256 constant TO_PASS_INF_GAS = 1e9;
 
-    function memCost(uint256 memSize) internal pure returns (uint256 gasCost) {
-        gasCost = (memSize * memSize) / 512 + (3 * memSize);
+    // Note, that this function can overflow, up to the caller to ensure that it does not. 
+    function memCost(uint256 memSizeWords) internal pure returns (uint256 gasCost) {
+        unchecked {
+            gasCost = (memSizeWords * memSizeWords) / 512 + (3 * memSizeWords);
+        }
     }
 
+    // To prevent overflows, we always keep memory below 1MB. If someone tries to allocate more, we just return inf.
+    uint256 constant MAX_ALLOWED_MEM_SIZE = 1e6;
     function expandMemory(uint256 newSize) internal pure returns (uint256 gasCost) {
         unchecked {
-            uint256 memOffset = MEM_OFFSET;
-            uint256 oldSize;
-            assembly {
-                oldSize := mload(memOffset)
+            // Ensuring no overflow
+            if(newSize > MAX_ALLOWED_MEM_SIZE) {
+                return uint256(int256(-1));
             }
 
-            if (newSize > oldSize) {
-                // old size should be aligned, but align just in case to be on the safe side
-                uint256 oldSizeWords = _words(oldSize);
-                uint256 newSizeWords = _words(newSize);
+            uint256 memOffset = MEM_OFFSET;
+            uint256 oldSizeWords;
+            assembly {
+                oldSizeWords := mload(memOffset)
+            }
 
-                uint256 oldCost = memCost(oldSizeWords);
-                uint256 newCost = memCost(newSizeWords);
+            uint256 newSizeWords = _words(newSize);
 
-                gasCost = newCost - oldCost;
-                assembly ("memory-safe") {
-                    let size := shl(5, newSizeWords)
-                    mstore(memOffset, size)
-                }
+            // old size should be aligned, but align just in case to be on the safe side
+            uint256 oldCost = memCost(oldSizeWords);
+            uint256 newCost = memCost(newSizeWords);
+
+            gasCost = newCost - oldCost;
+            assembly ("memory-safe") {
+                mstore(memOffset, newSizeWords)
             }
         }
     }
@@ -77,41 +82,9 @@ contract EvmInterpreter {
     function memSize() internal pure returns (uint256 memSize) {
         uint256 memOffset = MEM_OFFSET;
         assembly {
-            memSize := mload(memOffset)
+            memSize := shl(5, mload(memOffset))
         }
     }
-
-    // function _getConstructorEVMGas() internal returns (uint256 _evmGas) {
-    //     bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.constructorGas.selector;
-    //     address to = address(DEPLOYER_SYSTEM_CONTRACT);
-
-    //     assembly {
-    //         mstore(0, selector)
-    //         mstore(4, address())
-
-    //         let success := staticcall(
-    //             gas(),
-    //             to,
-    //             0,
-    //             36,
-    //             0,
-    //             0
-    //         )
-
-    //         if iszero(success) {
-    //             // This error should never happen
-    //             revert(0, 0)
-    //         }
-
-    //         returndatacopy(
-    //             0,
-    //             0,
-    //             32
-    //         )
-
-    //         _evmGas := mload(0)
-    //     }
-    // }
 
     function _getBytecode() internal {
         bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
@@ -132,7 +105,7 @@ contract EvmInterpreter {
 
             returndatacopy(
                 bytecodeLengthOffset,
-                // Skip 0x20
+                // Skip 0x20 in the ABI encoding of the `bytes` type
                 32,
                 sub(returndatasize(), 32)
             )
@@ -163,10 +136,6 @@ contract EvmInterpreter {
             // TODO: test how it behaves on corner cases
             let success := staticcall(gas(), to, 0, 36, 0, 0)
 
-            // Note that it is not 'actual' bytecode size as the returndata might've been padded
-            // to be divisible by 32, but for the purposes here it is enough, since padded bytes are zeroes
-            let bytecodeSize := sub(returndatasize(), 64)
-
             let rtOffset := add(offset, 64)
 
             if lt(returndatasize(), rtOffset) {
@@ -181,6 +150,8 @@ contract EvmInterpreter {
         }
     }
 
+    // Note that this function modifies EVM memory and does not restore it. It is expected that 
+    // it is the last called function during execution.
     function _setDeployedCode(uint256 gasLeft, uint256 offset, uint256 len) internal {
         // This error should never be triggered
         require(offset > 100, "Offset too small");
@@ -203,161 +174,176 @@ contract EvmInterpreter {
         }
     }
 
-    function _popStackItem(uint256 tos) internal returns (uint256 val, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET, "interpreter: stack underflow");
+    function _popStackItem(uint256 tos) internal returns (uint256 a, uint256 newTos) {
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET);
 
-        assembly {
-            val := mload(tos)
-            newTos := sub(tos, 0x20)
+            assembly {
+                a := mload(tos)
+                newTos := sub(tos, 0x20)
+            }
         }
     }
 
-    // a = stack[tos]
-    // b = stack[tos - 1]
     function _pop2StackItems(uint256 tos) internal returns (uint256 a, uint256 b, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 32, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 32);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
 
-            newTos := sub(tos, 64)
+                newTos := sub(tos, 0x40)
+            }
         }
     }
 
     function _pop3StackItems(uint256 tos) internal returns (uint256 a, uint256 b, uint256 c, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 64, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 64);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
-            c := mload(sub(tos, 0x40))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
+                c := mload(sub(tos, 0x40))
 
-            newTos := sub(tos, 0x60)
+                newTos := sub(tos, 0x60)
+            }
         }
     }
 
     function _pop4StackItems(
         uint256 tos
     ) internal returns (uint256 a, uint256 b, uint256 c, uint256 d, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 96, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 96);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
-            c := mload(sub(tos, 0x40))
-            d := mload(sub(tos, 0x60))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
+                c := mload(sub(tos, 0x40))
+                d := mload(sub(tos, 0x60))
 
-            newTos := sub(tos, 0x80)
+                newTos := sub(tos, 0x80)
+            }
         }
     }
 
     function _pop5StackItems(
         uint256 tos
     ) internal returns (uint256 a, uint256 b, uint256 c, uint256 d, uint256 e, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 96, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 128);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
-            c := mload(sub(tos, 0x40))
-            d := mload(sub(tos, 0x60))
-            e := mload(sub(tos, 0x80))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
+                c := mload(sub(tos, 0x40))
+                d := mload(sub(tos, 0x60))
+                e := mload(sub(tos, 0x80))
 
-            newTos := sub(tos, 0xa0)
+                newTos := sub(tos, 0xa0)
+            }
         }
     }
 
     function _pop6StackItems(
         uint256 tos
     ) internal returns (uint256 a, uint256 b, uint256 c, uint256 d, uint256 e, uint256 f, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 96, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 160);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
-            c := mload(sub(tos, 0x40))
-            d := mload(sub(tos, 0x60))
-            e := mload(sub(tos, 0x80))
-            f := mload(sub(tos, 0xa0))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
+                c := mload(sub(tos, 0x40))
+                d := mload(sub(tos, 0x60))
+                e := mload(sub(tos, 0x80))
+                f := mload(sub(tos, 0xa0))
 
-            newTos := sub(tos, 0xc0)
+                newTos := sub(tos, 0xc0)
+            }
         }
     }
 
     function _pop7StackItems(
         uint256 tos
     ) internal returns (uint256 a, uint256 b, uint256 c, uint256 d, uint256 e, uint256 f, uint256 h, uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos >= STACK_OFFSET + 96, "interpreter: stack underflow");
+        unchecked {
+            // We can not return any error here, because it would break compatibility
+            require(tos >= STACK_OFFSET + 192);
 
-        assembly {
-            a := mload(tos)
-            b := mload(sub(tos, 0x20))
-            c := mload(sub(tos, 0x40))
-            d := mload(sub(tos, 0x60))
-            e := mload(sub(tos, 0x80))
-            f := mload(sub(tos, 0xa0))
-            h := mload(sub(tos, 0xc0))
+            assembly {
+                a := mload(tos)
+                b := mload(sub(tos, 0x20))
+                c := mload(sub(tos, 0x40))
+                d := mload(sub(tos, 0x60))
+                e := mload(sub(tos, 0x80))
+                f := mload(sub(tos, 0xa0))
+                h := mload(sub(tos, 0xc0))
 
-            newTos := sub(tos, 0xe0)
+                newTos := sub(tos, 0xe0)
+            }
         }
     }
 
     function pushStackItem(uint256 tos, uint256 item) internal returns (uint256 newTos) {
-        // TODO: remove this error for more compatibility
-        require(tos < BYTECODE_OFFSET, "interpreter: stack overflow");
+        unchecked {
+            // TODO: remove this error for more compatibility
+            require(tos < BYTECODE_OFFSET, "interpreter: stack overflow");
 
-        assembly {
-            newTos := add(tos, 0x20)
-            mstore(newTos, item)
+            assembly {
+                newTos := add(tos, 0x20)
+                mstore(newTos, item)
+            }    
         }
     }
 
+    // Note, that if `x` is too large, this method can overflow
     function dupStack(uint256 tos, uint256 x) internal returns (uint256 newTos) {
-        uint256 elemPos = tos - x * 32;
-        // TODO: remove his error
-        require(elemPos >= STACK_OFFSET, "interpreter: stack underflow (dupStack)");
+        unchecked {
+            uint256 elemPos = tos - x * 32;
+            // We can not return any error here, because it would break compatibility
+            require(elemPos >= STACK_OFFSET);
 
-        uint256 elem;
-        assembly {
-            elem := mload(elemPos)
+            uint256 elem;
+            assembly {
+                elem := mload(elemPos)
+            }
+
+            newTos = pushStackItem(tos, elem);
         }
-
-        newTos = pushStackItem(tos, elem);
     }
 
+    // Note, that if `x` is too large, this method can overflow
     function swapStack(uint256 tos, uint256 x) internal {
-        uint256 elemPos = tos - x * 32;
+        unchecked {
+            uint256 elemPos = tos - x * 32;
 
-        require(elemPos >= STACK_OFFSET, "interpreter: stack underflow (swapStack)");
+            // We can not return any error here, because it would break compatibility
+            require(elemPos >= STACK_OFFSET);
 
-        assembly {
-            let elem1 := mload(elemPos)
-            let elem2 := mload(tos)
+            assembly {
+                let elem1 := mload(elemPos)
+                let elem2 := mload(tos)
 
-            mstore(elemPos, elem2)
-            mstore(tos, elem1)
+                mstore(elemPos, elem2)
+                mstore(tos, elem1)
+            }
         }
     }
 
-    function unsafeReadIP(uint256 ip) internal returns (uint256 opcode) {
-        assembly {
-            opcode := and(mload(sub(ip, 31)), 0xff)
-        }
-    }
-
+    // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
     function readIP(uint256 ip) internal returns (uint256 opcode, bool outOfBounds) {
         uint256 bytecodeOffset = BYTECODE_OFFSET;
-        uint256 bytecodeLen;
         assembly {
-            bytecodeLen := mload(bytecodeOffset)
+            let bytecodeLen := mload(bytecodeOffset)
 
             let maxAcceptablePos := add(add(bytecodeOffset, bytecodeLen), 31)
             if gt(ip, maxAcceptablePos) {
@@ -428,12 +414,11 @@ contract EvmInterpreter {
         }
     }
 
-    function _eraseRtPointer() internal {
-        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+    function _eraseReturndataPointer() internal {
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_OFFSET;
 
-        // Erase the active pointer +
-        uint256 previousRtSz = SystemContractHelper.getActivePtrDataSize();
-        SystemContractHelper.ptrShrinkIntoActive(uint32(previousRtSz));
+        uint256 activePtrSize = SystemContractHelper.getActivePtrDataSize();
+        SystemContractHelper.ptrShrinkIntoActive(uint32(activePtrSize));
         assembly {
             mstore(lastRtSzOffset, 0)
         }
@@ -443,7 +428,7 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal returns (uint256 _gasLeft) {
-        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_OFFSET;
         uint256 rtsz;
         assembly {
             rtsz := returndatasize()
@@ -452,6 +437,8 @@ contract EvmInterpreter {
         SystemContractHelper.loadReturndataIntoActivePtr();
 
         if (rtsz > 31) {
+            // There was a normal return. The first 32 bytes are the gasLeft.
+            
             assembly {
                 returndatacopy(0, 0, 32)
                 _gasLeft := mload(0)
@@ -463,14 +450,17 @@ contract EvmInterpreter {
             // Skipping the returndata data
             SystemContractHelper.ptrAddIntoActive(32);
         } else {
+            // Unexpected return data. It means that some fatal mistake has happenned to the callee, so
+            // no gas was returned.
+
             _gasLeft = 0;
-            _eraseRtPointer();
+            _eraseReturndataPointer();
         }
     }
 
     function _saveReturnDataAfterZkEVMCall() internal {
         SystemContractHelper.loadReturndataIntoActivePtr();
-        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
+        uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_OFFSET;
         assembly {
             mstore(lastRtSzOffset, returndatasize())
         }
@@ -486,12 +476,6 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
-        uint256 memOffset = MEM_OFFSET_INNER;
-
-        /*
-            TODO Please do not overwrite the returndata
-        */
-
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
             assembly {
@@ -540,8 +524,6 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
-        uint256 memOffset = MEM_OFFSET_INNER;
-
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
             assembly {
@@ -560,8 +542,8 @@ contract EvmInterpreter {
 
             _popEVMFrame();
         } else {
-            // ToDO: remove this error for compatibility
-            revert("delegatecall to zkevm unallowed");
+            // FIXME: decide on how to handle such error
+            revert();
         }
     }
 
@@ -574,11 +556,6 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
-        uint256 memOffset = MEM_OFFSET_INNER;
-        /*
-            TODO Please do not overwrite the returndata
-        */
-
         if (_calleeIsEVM) {
             _pushEVMFrame(_calleeGas);
             assembly {
@@ -623,8 +600,6 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal paddWithGasAndReturn(_callerIsEVM, _gasLeft, _outputOffset) {
-        uint256 memOffset = MEM_OFFSET_INNER;
-
         if (_callerIsEVM) {
             // Includes gas
             _outputOffset -= 32;
@@ -661,18 +636,19 @@ contract EvmInterpreter {
 
     // Should be called after create/create2EVM call
     function _processCreateResult(bool success) internal returns (address addr, uint256 gasLeft) {
-        // If success, the returndata should be set to 0 + address was returned
         if (success) {
+            // If success, the returndata should be set to 0 + address was returned
             assembly {
                 returndatacopy(0, 0, 32)
                 addr := mload(0)
             }
 
             // reseting the returndata
-            _eraseRtPointer();
+            _eraseReturndataPointer();
 
             gasLeft = _fetchConstructorReturnGas();
         } else {
+            // If failure, then EVM contract should've returned the gas in the first 32 bytes of the returndata
             gasLeft = _saveReturnDataAfterEVMCall(0, 0);
         }
     }
@@ -800,7 +776,6 @@ contract EvmInterpreter {
         _popEVMFrame();
     }
 
-    // TODO: make sure it also supplies the gas left for the EVM caller
     constructor() {
         uint256 evmGas;
         bool isCallerEVM;
@@ -817,11 +792,6 @@ contract EvmInterpreter {
         _setDeployedCode(gasToReturn, offset, len);
     }
 
-    // using EvmUtils for bytes;
-
-    // event OverheadTrace(uint256 gasUsage);
-    // event OpcodeTrace(uint256 opcode, uint256 gasUsage);
-
     function dbg(uint256 _tos, uint256 _ip, uint256 _opcode, uint256 _gasleft) internal {
         uint256 offset = DEBUG_SLOT_OFFSET;
         assembly {
@@ -833,14 +803,7 @@ contract EvmInterpreter {
         }
     }
 
-    /*
-
-    Should return (offset, len, gas) to return to the callee.
-
-    This slice may include any mem size
-
-    */
-
+    /// Executes the EVM bytecode and returns a triple of (offset, len, gas) to return to the caller.
     function _simulate(
         bool isCallerEVM,
         bytes calldata input,
@@ -873,7 +836,7 @@ contract EvmInterpreter {
 
             // emit OverheadTrace(_ergTracking - gasleft());
             while (true) {
-                _ergTracking = gasleft();
+                // _ergTracking = gasleft();
                 // optimization: opcode is uint256 instead of uint8 otherwise every op will trim bits every time
                 uint256 opcode;
 
@@ -1264,7 +1227,7 @@ contract EvmInterpreter {
 
                     if (opcode == OP_RETURNDATASIZE) {
                         uint256 rsz;
-                        uint256 rszOffset = LAST_RETURNDATA_SIZE_LENGTH;
+                        uint256 rszOffset = LAST_RETURNDATA_SIZE_OFFSET;
                         assembly {
                             rsz := mload(rszOffset)
                         }
