@@ -90,15 +90,15 @@ const params = {
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
   PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployKeccak256"),
-  // One of "worst case" scenarios for the number of state diffs in a batch is when 240kb of pubdata is spent
-  // on repeated writes, that are all zeroed out. In this case, the number of diffs is 240k / 5 = 48k. This means that they will have
-  // accoomdate 13056000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with
-  // roughly 13176000 bytes needed for calldata. 411750 slots are needed to accomodate this amount of data.
-  // We round up to 411900 slots just in case.
+  // One of "worst case" scenarios for the number of state diffs in a batch is when 260kb of pubdata is spent
+  // on repeated writes, that are all zeroed out. In this case, the number of diffs is 260kb / 5 = 52k. This means that they will have
+  // accoomdate 14144000 bytes of calldata for the uncompressed state diffs. Adding 260k on top leaves us with
+  // roughly 14404000 bytes needed for calldata. 450125 slots are needed to accomodate this amount of data.
+  // We round up to 451000 slots just in case.
   //
   // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
   // operator to ensure that it can form the correct calldata for the L1Messenger.
-  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 411900,
+  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 451000,
   ...SYSTEM_PARAMS,
 };
 
