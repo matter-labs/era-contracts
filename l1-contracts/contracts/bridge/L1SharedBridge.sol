@@ -567,7 +567,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     receive() external payable {
         // Do not expect to receive Ether directly, (weth bridging diasbled)
         revert("ShB: direct ether transfer not allowed");
-        emit EthReceived(msg.sender, msg.value);
     }
 
     /*//////////////////////////////////////////////////////////////
