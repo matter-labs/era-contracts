@@ -58,7 +58,6 @@ interface IL1SharedBridge {
         address _msgSender,
         address _l2Receiver,
         address _l1Token,
-        uint256 _mintValue,
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,

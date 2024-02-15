@@ -130,19 +130,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _l1Token,
         uint256 _amount
     ) external payable onlyBridgehubOrEra(_chainId) {
-        require(_amount != 0, "4T"); // empty deposit amount
-
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
-            /// This breaks the _depositeFunds function, it returns 0, as our balance doesn't increase
-            /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or (in the future for wrapped base token deposits)
-            require(_prevMsgSender != address(this), "ShB calling itself");
 
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
 
-            uint256 amount = _depositFunds(_prevMsgSender, _l1Token, _amount);
+            uint256 amount = _depositFunds(_prevMsgSender, _l1Token, _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
 
@@ -205,7 +200,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
         {
             // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = _getDepositL2Calldata(_chainId, _prevMsgSender, _l2Receiver, _l1Token, amount);
+            bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, _l1Token, amount);
 
             request = L2TransactionRequestTwoBridgesInner({
                 magicValue: TWO_BRIDGES_MAGIC_VALUE,
@@ -227,31 +222,28 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub {
-        if (_txDataHash != 0x00) {
-            require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
-            depositHappened[_chainId][_txHash] = _txDataHash;
-            emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
-        }
+        require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
+        depositHappened[_chainId][_txHash] = _txDataHash;
+        emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
     function _getDepositL2Calldata(
-        uint256 _chainId,
         address _l1Sender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount
-    ) internal view returns (bytes memory txCalldata) {
+    ) internal view returns (bytes memory) {
         bytes memory gettersData = _getERC20Getters(_l1Token);
-        txCalldata = abi.encodeCall(
+        return abi.encodeCall(
             IL2Bridge.finalizeDeposit,
             (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData)
         );
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
-    function _getERC20Getters(address _token) internal view returns (bytes memory data) {
-        if ((_token == ETH_TOKEN_ADDRESS)) {
+    function _getERC20Getters(address _token) internal view returns (bytes memory) {
+        if (_token == ETH_TOKEN_ADDRESS) {
             return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain it is an ERC20
         }
 
@@ -580,7 +572,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
     /// @param _l1Token The L1 token address which is deposited
-    /// @param _mintValue The amount of baseTokens to be minted on L2. In this case Eth
     /// @param _amount The total amount of tokens to be bridged
     /// @param _l2TxGasLimit The L2 gas limit to be used in the corresponding L2 transaction
     /// @param _l2TxGasPerPubdataByte The gasPerPubdataByteLimit to be used in the corresponding L2 transaction
@@ -603,7 +594,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _msgSender,
         address _l2Receiver,
         address _l1Token,
-        uint256 _mintValue,
         uint256 _amount,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
@@ -611,16 +601,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ) external payable override onlyLegacyBridge nonReentrant returns (bytes32 l2TxHash) {
         require(_amount != 0, "2T"); // empty deposit amount
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
-        uint256 l2Value = 0;
         require(_l1Token != l1WethAddress, "ShB: WETH deposit not supported 2");
-        require(_mintValue == msg.value, "ShB wrong mintValue");
 
         // note funds have been transferred to this contract in the legacy ERC20 bridge
         if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
             chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
         }
 
-        bytes memory l2TxCalldata = _getDepositL2Calldata(ERA_CHAIN_ID, _msgSender, _l2Receiver, _l1Token, _amount);
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_msgSender, _l2Receiver, _l1Token, _amount);
 
         {
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -635,8 +623,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
             l2TxHash = _depositSendTx(
                 ERA_CHAIN_ID,
-                _mintValue,
-                l2Value,
                 l2TxCalldata,
                 _l2TxGasLimit,
                 _l2TxGasPerPubdataByte,
@@ -654,8 +640,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev internal to avoid stack too deep error. Only used for Era legacy bridge deposits
     function _depositSendTx(
         uint256 _chainId,
-        uint256 _mintValue,
-        uint256 _l2Value,
         bytes memory _l2TxCalldata,
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte,
@@ -664,8 +648,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
             chainId: _chainId,
             l2Contract: l2BridgeAddress[_chainId],
-            mintValue: _mintValue, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: _l2Value, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+            mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
             l2Calldata: _l2TxCalldata,
             l2GasLimit: _l2TxGasLimit,
             l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
@@ -673,6 +657,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             refundRecipient: _refundRecipient
         });
 
-        l2TxHash = bridgehub.requestL2TransactionDirect{value: _mintValue}(request);
+        return bridgehub.requestL2TransactionDirect{value: msg.value}(request);
     }
 }

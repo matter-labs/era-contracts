@@ -137,7 +137,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             msg.sender,
             _l2Receiver,
             _l1Token,
-            msg.value,
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,

@@ -214,6 +214,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         }
 
         address stateTransition = getStateTransition(_request.chainId);
+        address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -224,7 +225,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 l2GasLimit: _request.l2GasLimit,
                 l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
                 factoryDeps: _request.factoryDeps,
-                refundRecipient: _request.refundRecipient
+                refundRecipient: refundRecipient
             })
         );
     }
@@ -243,21 +244,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ) external payable override nonReentrant returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
-
+            uint256 baseTokenMsgValue;
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
                 // kl todo it would be nice here to be able to deposit weth instead of eth
-                sharedBridge.bridgehubDepositBaseToken{value: _request.mintValue}(
-                    _request.chainId,
-                    msg.sender,
-                    token,
-                    _request.mintValue
-                );
+                baseTokenMsgValue = _request.mintValue;
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
-                // note we have to pass token, as a bridge might have multiple tokens.
-                sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
+                baseTokenMsgValue = 0;
             }
+            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(_request.chainId, msg.sender, token, _request.mintValue);
         }
 
         address stateTransition = getStateTransition(_request.chainId);
@@ -272,14 +268,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
 
-        address refundRecipient = _request.refundRecipient;
-        if (refundRecipient == address(0)) {
-            // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
-            refundRecipient = msg.sender == tx.origin ? msg.sender : AddressAliasHelper.applyL1ToL2Alias(msg.sender);
-        } else if (refundRecipient.code.length > 0) {
-            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
-            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(_request.refundRecipient);
-        }
+        address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
+
         require(_request.secondBridgeAddress > address(1000), "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
@@ -300,5 +290,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    function _actualRefundRecipient(address _refundRecipient) internal view returns (address _recipient) {
+        if (_refundRecipient == address(0)) {
+            // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
+            _recipient = msg.sender == tx.origin ? msg.sender : AddressAliasHelper.applyL1ToL2Alias(msg.sender);
+        } else if (_refundRecipient.code.length > 0) {
+            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+            _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
+        }
     }
 }
