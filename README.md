@@ -7,7 +7,7 @@ decentralization. Since it's EVM compatible (Solidity/Vyper), 99% of Ethereum pr
 or re-auditing a single line of code. zkSync Era also uses an LLVM-based compiler that will eventually let developers
 write smart contracts in C++, Rust and other popular languages.
 
-This repository contains both L1 and L2 zkSync smart contracts. For their description see the
+This repository contains both L1 and L2 zkSync smart contracts. For their descriptions see the
 [system overview](docs/Overview.md).
 
 ## Disclaimer
@@ -34,6 +34,6 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 ## Disclaimer
 
 zkSync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
-through more audits and bug bounties programs. We would love to hear our community's thoughts and suggestions about it!
+through more audits and bug bounty programs. We would love to hear our community's thoughts and suggestions about it!
 It is important to state that forking it now can potentially lead to missing important security updates, critical
 features, and performance improvements.
