@@ -258,7 +258,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));
         (, bytes memory data2) = _token.staticcall(abi.encodeCall(IERC20Metadata.symbol, ()));
         (, bytes memory data3) = _token.staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
-        data = abi.encode(data1, data2, data3);
+        return abi.encode(data1, data2, data3);
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
