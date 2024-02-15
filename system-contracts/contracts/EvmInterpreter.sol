@@ -468,6 +468,7 @@ contract EvmInterpreter {
 
     function _performCall(
         bool _calleeIsEVM,
+        bool _isStatic,
         uint256 _calleeGas,
         address _callee,
         uint256 _value,
@@ -476,8 +477,15 @@ contract EvmInterpreter {
         uint256 _outputOffset,
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
+        // Doing calls in static context is allowed. But we need to preserve the static context.
+        // In this case, the call becomes equivalent to staticcall.
+        // FIXME: decide on how to handle this in tracer
+        if (_isStatic) {
+            return _performStaticCall(_calleeIsEVM, _calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen);
+        }
+
         if (_calleeIsEVM) {
-            _pushEVMFrame(_calleeGas);
+            _pushEVMFrame(_calleeGas, _isStatic);
             assembly {
                 success := call(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -517,6 +525,7 @@ contract EvmInterpreter {
 
     function _performDelegateCall(
         bool _calleeIsEVM,
+        bool _isStatic,
         uint256 _calleeGas,
         address _callee,
         uint256 _inputOffset,
@@ -525,7 +534,7 @@ contract EvmInterpreter {
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
         if (_calleeIsEVM) {
-            _pushEVMFrame(_calleeGas);
+            _pushEVMFrame(_calleeGas, _isStatic);
             assembly {
                 success := delegatecall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -557,7 +566,7 @@ contract EvmInterpreter {
         uint256 _outputLen
     ) internal returns (bool success, uint256 _gasLeft) {
         if (_calleeIsEVM) {
-            _pushEVMFrame(_calleeGas);
+            _pushEVMFrame(_calleeGas, true);
             assembly {
                 success := staticcall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
@@ -729,7 +738,7 @@ contract EvmInterpreter {
         uint256 _inputOffset,
         uint256 _inputLen
     ) internal store3TmpVars(_inputOffset, CREATE_SELECTOR, 32, _inputLen) returns (address addr, uint256 gasLeft) {
-        _pushEVMFrame(_calleeGas);
+        _pushEVMFrame(_calleeGas, false);
 
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
         bool success;
@@ -758,7 +767,7 @@ contract EvmInterpreter {
         store4TmpVars(_inputOffset, CREATE2_SELECTOR, _salt, 64, _inputLen)
         returns (address addr, uint256 gasLeft)
     {
-        _pushEVMFrame(_calleeGas);
+        _pushEVMFrame(_calleeGas, false);
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
 
         bool success;
@@ -779,15 +788,21 @@ contract EvmInterpreter {
     constructor() {
         uint256 evmGas;
         bool isCallerEVM;
+        bool isStatic;
 
-        (evmGas, isCallerEVM) = _consumePassGas();
+        (evmGas, isStatic, isCallerEVM) = _consumeEvmFrame();
+
+        // This error should be never triggered. In any case, we return nothing just in case to preserve
+        // compatibility.
+        require(!isStatic);
+
         _getBytecode();
 
         if (!isCallerEVM) {
             evmGas = _getEVMGas();
         }
 
-        (uint256 offset, uint256 len, uint256 gasToReturn) = _simulate(isCallerEVM, msg.data[0:0], evmGas);
+        (uint256 offset, uint256 len, uint256 gasToReturn) = _simulate(isCallerEVM, msg.data[0:0], evmGas, false);
 
         _setDeployedCode(gasToReturn, offset, len);
     }
@@ -807,7 +822,8 @@ contract EvmInterpreter {
     function _simulate(
         bool isCallerEVM,
         bytes calldata input,
-        uint256 gasLeft
+        uint256 gasLeft,
+        bool isStatic
     ) internal returns (uint256, uint256, uint256) {
         uint256 memOffset = MEM_OFFSET_INNER;
 
@@ -1423,6 +1439,9 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_SSTORE) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+
                         uint256 key;
                         uint256 val;
 
@@ -1569,6 +1588,10 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_LOG0) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+
+
                         uint256 ost;
                         uint256 len;
                         (ost, len, tos) = _pop2StackItems(tos);
@@ -1588,6 +1611,9 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_LOG1) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1609,6 +1635,9 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_LOG2) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1631,6 +1660,9 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_LOG3) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+                        
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1654,6 +1686,9 @@ contract EvmInterpreter {
                     }
 
                     if (opcode == OP_LOG4) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+                        
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1690,6 +1725,9 @@ contract EvmInterpreter {
                     (gas, addr, value, argOst, argLen, retOst, retLen, tos) = _pop7StackItems(tos);
 
                     if (value != 0) {
+                        // We can not return a readable error to preserve compatibility
+                        require(!isStatic);
+                        
                         uint256 codeSize;
                         assembly {
                             codeSize := extcodesize(addr)
@@ -1730,6 +1768,7 @@ contract EvmInterpreter {
                     gasLeft -= gas;
                     (bool success, uint256 frameGasLeft) = _performCall(
                         _isEVM(address(uint160(addr))),
+                        isStatic,
                         gas,
                         address(uint160(addr)),
                         value,
@@ -1771,6 +1810,7 @@ contract EvmInterpreter {
                     gasLeft -= gas;
                     (bool success, uint256 frameGasLeft) = _performDelegateCall(
                         _isEVM(address(uint160(addr))),
+                        isStatic,
                         gas,
                         address(uint160(addr)),
                         argOst + memOffset,
@@ -1849,6 +1889,9 @@ contract EvmInterpreter {
                 }
 
                 if (opcode == OP_CREATE) {
+                    // We can not return a readable error to preserve compatibility
+                    require(!isStatic);
+
                     uint256 val;
                     uint256 ost;
                     uint256 len;
@@ -1869,6 +1912,9 @@ contract EvmInterpreter {
                 }
 
                 if (opcode == OP_CREATE2) {
+                    // We can not return a readable error to preserve compatibility
+                    require(!isStatic);
+
                     uint256 val;
                     uint256 ost;
                     uint256 len;
@@ -1920,14 +1966,18 @@ contract EvmInterpreter {
         }
     }
 
-    function _pushEVMFrame(uint256 _passGas) internal {
+    function _pushEVMFrame(
+        uint256 _passGas,
+        bool _isStatic
+    ) internal {
         bytes4 selector = EVM_GAS_MANAGER.pushEVMFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
         assembly {
             mstore(0, selector)
             mstore(4, _passGas)
+            mstore(36, _isStatic)
 
-            let success := call(gas(), addr, 0, 0, 36, 0, 0)
+            let success := call(gas(), addr, 0, 0, 68, 0, 0)
 
             if iszero(success) {
                 // This error should never happen
@@ -1951,13 +2001,13 @@ contract EvmInterpreter {
         }
     }
 
-    function _consumePassGas() internal returns (uint256 _passGas, bool callerEVM) {
-        bytes4 selector = EVM_GAS_MANAGER.consumePassGas.selector;
+    function _consumeEvmFrame() internal returns (uint256 _passGas, bool isStatic, bool callerEVM) {
+        bytes4 selector = EVM_GAS_MANAGER.consumeEvmFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
         assembly {
             mstore(0, selector)
 
-            let success := call(gas(), addr, 0, 0, 4, 0, 32)
+            let success := call(gas(), addr, 0, 0, 4, 0, 64)
 
             if iszero(success) {
                 // This error should never happen
@@ -1965,6 +2015,7 @@ contract EvmInterpreter {
             }
 
             _passGas := mload(0)
+            isStatic := mload(32)
         }
 
         if (_passGas != INF_PASS_GAS) {
@@ -1999,22 +2050,40 @@ contract EvmInterpreter {
         return _evmGas * GAS_DIVISOR;
     }
 
+    // If the caller is a zkEVM contract and 
+    function _getIsStaticFromCallFlags() internal view returns (bool) {
+        uint256 callFlags = SystemContractHelper.getCallFlags();
+        // TODO: make it a constnat
+        return (callFlags & 0x04) != 0;
+    }
+
+    function _ensureThisIsEVM() internal view {
+        // Here we return readable error as this error can be only triggered by zkEVM -> EVM delegatecall
+        require(_isEVM(address(this)), "interpreter: not an EVM contract");
+    }
+
     fallback() external payable {
+        // This is needed to avoid zkEVM contracts doing accidental delegatecalls
+        // to EVM contracts.
+        _ensureThisIsEVM();
+
         bytes calldata input;
         uint256 evmGas;
         bool isCallerEVM;
+        bool isStatic;
 
-        (evmGas, isCallerEVM) = _consumePassGas();
+        (evmGas, isStatic, isCallerEVM) = _consumeEvmFrame();
 
         if (!isCallerEVM) {
             evmGas = _getEVMGas();
+            isStatic = _getIsStaticFromCallFlags();    
         }
 
         input = msg.data;
         _getBytecode();
 
         warmAccount(address(uint160(address(this))));
-        (uint256 retOffset, uint256 retLen, uint256 gasLeft) = _simulate(isCallerEVM, input, evmGas);
+        (uint256 retOffset, uint256 retLen, uint256 gasLeft) = _simulate(isCallerEVM, input, evmGas, isStatic);
 
         _performReturnOrRevert(false, isCallerEVM, gasLeft, retOffset, retLen);
 

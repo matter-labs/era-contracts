@@ -39,6 +39,7 @@ contract EvmGasManager {
     // We dont care about the size, since none of it will be stored/pub;ushed anywya
     struct EVMStackFrameInfo {
         uint256 passGas;
+        bool isStatic;
         // uint256 returnGas;
     }
 
@@ -48,7 +49,7 @@ contract EvmGasManager {
 
     When conducting call:
         1. caller calls to an EVM contract pushEVMFrame with the corresponding gas
-        2. callee calls consumePassGas to get the gas & make sure that subsequent callee wont be able to read it.
+        2. callee calls consumeEvmFrame to get the gas & make sure that subsequent callee wont be able to read it.
         3. callee sets the return gas
         4. callee calls popEVMFrame to return the gas to the caller & remove the frame
 
@@ -56,30 +57,28 @@ contract EvmGasManager {
 
     EVMStackFrameInfo[] private evmStackFrames;
 
-    function pushEVMFrame(uint256 _passGas) external {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({
-            passGas: _passGas
-            // returnGas: 0
+            passGas: _passGas,
+            isStatic: _isStatic
         });
 
         evmStackFrames.push(frame);
     }
 
-    function consumePassGas() external returns (uint256 passGas) {
-        if (evmStackFrames.length == 0) return INF_PASS_GAS;
+    function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
+        if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
 
-        passGas = evmStackFrames[evmStackFrames.length - 1].passGas;
+        EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
 
+        passGas = frameInfo.passGas;
+        isStatic = frameInfo.isStatic;
+
+        // Mark as used
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    // function setReturnGas(uint256 _returnGas) external {
-    //     evmStackFrames[evmStackFrames.length - 1].returnGas = _returnGas;
-    // }
-
     function popEVMFrame() external {
-        // EVMStackFrameInfo memory frame = evmStackFrames[evmStackFrames.length - 1];
         evmStackFrames.pop();
-        // return frame.returnGas;
     }
 }
