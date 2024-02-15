@@ -41,7 +41,7 @@
     "deploy-force-deploy-upgrader": "ts-node src/deploy-force-deploy-upgrader.ts",
     "deploy-force-deploy-upgrader-through-l1": "ts-node src/deploy-force-deploy-upgrader-through-l1.ts",
     "deploy-shared-bridge-on-l2": "ts-node scripts/deploy-shared-bridge-on-l2.ts",
-    "deploy-shared-bridge-on-l2-through-l1": "ts-node scripts/deploy-shared-bridge-on-l2-through-l1.ts",
+    "deploy-shared-bridge-on-l2-through-l1": "ts-node src/deploy-shared-bridge-on-l2-through-l1.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
     "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts"
   },
