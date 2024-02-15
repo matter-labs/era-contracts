@@ -201,18 +201,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
-                // kl todo it would be nice here to be able to deposit weth instead of eth
-                sharedBridge.bridgehubDepositBaseToken{value: _request.mintValue}(
+            } else {
+                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
+            }
+            
+            sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                     _request.chainId,
                     msg.sender,
                     token,
                     _request.mintValue
                 );
-            } else {
-                require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
-                // note we have to pass token, as a bridge might have multiple tokens.
-                sharedBridge.bridgehubDepositBaseToken(_request.chainId, msg.sender, token, _request.mintValue);
-            }
         }
 
         address stateTransition = getStateTransition(_request.chainId);
