@@ -98,6 +98,7 @@ export async function create2DeployFromL1(
   constructor: ethers.BytesLike,
   create2Salt: ethers.BytesLike,
   l2GasLimit: ethers.BigNumberish,
+  extraFactoryDeps?: ethers.BytesLike[],
   gasPrice?: ethers.BigNumberish
 ) {
   const bridgehubAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
@@ -132,7 +133,7 @@ export async function create2DeployFromL1(
       l2Calldata: calldata,
       l2GasLimit,
       l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-      factoryDeps: [bytecode],
+      factoryDeps: [bytecode, ...extraFactoryDeps],
       refundRecipient: wallet.address,
     },
     { value: ethIsBaseToken ? expectedCost : 0, gasPrice }

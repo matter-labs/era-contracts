@@ -36,10 +36,11 @@ async function main() {
       console.log(`Using nonce: ${nonce}`);
 
       const l2SharedBridgeBytecode = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
+      const l2SharedBridgeProxyBytecode = hre.artifacts.readArtifactSync("").bytecode;
       const create2Salt = ethers.constants.HashZero;
       /// contracts that need to be deployed:
       /// - L2SharedBridge Implementation
-      const forceDeployUpgraderAddress = computeL2Create2Address(
+      const l2SharedBridgeImplAddress = computeL2Create2Address(
         deployWallet,
         l2SharedBridgeBytecode,
         "0x",
@@ -57,18 +58,26 @@ async function main() {
       );
 
       /// L2SharedBridge Proxy
+      const l2SharedBridgeProxyAddress = computeL2Create2Address(
+        deployWallet,
+        l2SharedBridgeProxyBytecode,
+        "0x",
+        create2Salt
+      );
 
-      /// L2WrappedBaseToken Implementation
+      // TODO: request from API how many L2 gas needs for the transaction.
+      await create2DeployFromL1(
+        chainId,
+        deployWallet,
+        l2SharedBridgeProxyBytecode,
+        "0x",
+        create2Salt,
+        priorityTxMaxGasLimit
+      );
 
-      /// L2WrappedBaseToken Proxy
+      /// L2StandardToken Proxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
 
-      /// L2StandardToken Implementation
-
-      /// L2UpgradableBeacon
-
-      /// L2StandardToken Proxy bytecode. We need this bytecode to be accessible on the L2
-
-      console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
+      console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${l2SharedBridgeProxyAddress}`);
     });
 
   await program.parseAsync(process.argv);
