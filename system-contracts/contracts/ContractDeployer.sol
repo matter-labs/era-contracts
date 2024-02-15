@@ -386,9 +386,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // _initCode is set into evmCode, hence empty calldata is passed here (msg.data[0:0])
 
         // Unfortunately we can not provide revert reason as it would break EVM compatibility
-        require(
-            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0
-        );
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getCodeHash(uint256(uint160(_newAddress))) == 0x0);
         _performDeployOnAddressEVM(_newAddress, AccountAbstractionVersion.None, _initCode, false);
     }
 
@@ -539,7 +537,10 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         */
 
         // 2. Set the constructed code hash on the account
-        _storeConstructingByteCodeHashOnAddress(_newAddress, bytes32(0x0201000000000000000000000000000000000000000000000000000000000000));
+        _storeConstructingByteCodeHashOnAddress(
+            _newAddress,
+            bytes32(0x0201000000000000000000000000000000000000000000000000000000000000)
+        );
 
         // 3. Call the constructor on behalf of the account
         if (value > 0) {

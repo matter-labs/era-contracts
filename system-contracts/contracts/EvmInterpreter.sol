@@ -431,7 +431,7 @@ contract EvmInterpreter {
     function _eraseRtPointer() internal {
         uint256 lastRtSzOffset = LAST_RETURNDATA_SIZE_LENGTH;
 
-        // Erase the active pointer + 
+        // Erase the active pointer +
         uint256 previousRtSz = SystemContractHelper.getActivePtrDataSize();
         SystemContractHelper.ptrShrinkIntoActive(uint32(previousRtSz));
         assembly {
@@ -466,7 +466,7 @@ contract EvmInterpreter {
             _gasLeft = 0;
             _eraseRtPointer();
         }
-    }   
+    }
 
     function _saveReturnDataAfterZkEVMCall() internal {
         SystemContractHelper.loadReturndataIntoActivePtr();
@@ -474,7 +474,7 @@ contract EvmInterpreter {
         assembly {
             mstore(lastRtSzOffset, returndatasize())
         }
-    } 
+    }
 
     function _performCall(
         bool _calleeIsEVM,
@@ -673,7 +673,7 @@ contract EvmInterpreter {
 
             gasLeft = _fetchConstructorReturnGas();
         } else {
-            gasLeft = _saveReturnDataAfterEVMCall(0,0);
+            gasLeft = _saveReturnDataAfterEVMCall(0, 0);
         }
     }
 
