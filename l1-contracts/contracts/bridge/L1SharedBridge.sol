@@ -133,7 +133,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
-
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
 
@@ -235,10 +234,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _amount
     ) internal view returns (bytes memory) {
         bytes memory gettersData = _getERC20Getters(_l1Token);
-        return abi.encodeCall(
-            IL2Bridge.finalizeDeposit,
-            (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData)
-        );
+        return abi.encodeCall(IL2Bridge.finalizeDeposit, (_l1Sender, _l2Receiver, _l1Token, _amount, gettersData));
     }
 
     /// @dev Receives and parses (name, symbol, decimals) from the token contract

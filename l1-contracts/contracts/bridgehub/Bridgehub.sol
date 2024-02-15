@@ -204,13 +204,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
             }
-            
+
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
-                    _request.chainId,
-                    msg.sender,
-                    token,
-                    _request.mintValue
-                );
+                _request.chainId,
+                msg.sender,
+                token,
+                _request.mintValue
+            );
         }
 
         address stateTransition = getStateTransition(_request.chainId);
@@ -253,7 +253,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
                 baseTokenMsgValue = 0;
             }
-            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(_request.chainId, msg.sender, token, _request.mintValue);
+            sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+                _request.chainId,
+                msg.sender,
+                token,
+                _request.mintValue
+            );
         }
 
         address stateTransition = getStateTransition(_request.chainId);
