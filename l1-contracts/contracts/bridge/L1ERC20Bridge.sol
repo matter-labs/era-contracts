@@ -133,13 +133,11 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        uint256 mintValue = _l1Token == sharedBridge.l1WethAddress() ? msg.value + _amount : msg.value;
-
         l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}(
             msg.sender,
             _l2Receiver,
             _l1Token,
-            mintValue,
+            msg.value,
             _amount,
             _l2TxGasLimit,
             _l2TxGasPerPubdataByte,
