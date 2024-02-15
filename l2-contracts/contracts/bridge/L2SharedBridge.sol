@@ -61,9 +61,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenBeacon.transferOwnership(_aliasedOwner);
-        } 
+        }
         // else: l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
-        
     }
 
     /// @notice Finalize the deposit and mint funds
@@ -94,7 +93,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         }
 
         IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
-        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);  
+        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
