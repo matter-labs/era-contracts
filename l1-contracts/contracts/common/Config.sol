@@ -100,15 +100,10 @@ address constant ETH_TOKEN_ADDRESS = address(1);
 /// @dev Era's chainID
 uint256 constant ERA_CHAIN_ID = $(ERA_CHAIN_ID);
 
-address constant ERA_TOKEN_BEACON_ADDRESS = $(ERA_TOKEN_BEACON_ADDRESS);
-
+/// @dev The address of legacy L1 ERC20 bridge.
 address constant ERA_ERC20_BRIDGE_ADDRESS = $(ERA_ERC20_BRIDGE_ADDRESS);
 
-address constant ERA_WETH_BRIDGE_ADDRESS = $(ERA_WETH_BRIDGE_ADDRESS);
-
-address constant ERA_WETH_ADDRESS = $(ERA_WETH_ADDRESS);
-
-/// @dev address of era's diamond proxy
+/// @dev The address of zkSync Era diamond proxy contract.
 address constant ERA_DIAMOND_PROXY = $(ERA_DIAMOND_PROXY);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
