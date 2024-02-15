@@ -169,7 +169,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
-        uint256 , // l2Value, needed for Weth deposits in the future
+        uint256, // l2Value, needed for Weth deposits in the future
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
@@ -188,7 +188,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         } else {
             require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
             amount = _depositAmount;
-            
+
             /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
             /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
             require(_prevMsgSender != address(this), "ShB calling itself");
@@ -467,12 +467,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 l2TxNumberInBatch: _l2TxNumberInBatch
             });
 
-            (l1Receiver, l1Token, amount) = _checkWithdrawal(
-                _chainId,
-                messageParams,
-                _message,
-                _merkleProof
-            );
+            (l1Receiver, l1Token, amount) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
         }
 
         if (!hyperbridgingEnabled[_chainId]) {
