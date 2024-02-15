@@ -34,7 +34,7 @@ contract EvmInterpreter {
     uint256 constant DEBUG_SLOT_OFFSET = 32 * 32;
     uint256 constant LAST_RETURNDATA_SIZE_LENGTH = DEBUG_SLOT_OFFSET + 5 * 32;
     uint256 constant STACK_OFFSET = LAST_RETURNDATA_SIZE_LENGTH + 32;
-    uint256 constant BYTECODE_OFFSET = 1024 + STACK_OFFSET;
+    uint256 constant BYTECODE_OFFSET = 32 * 1024 + STACK_OFFSET;
     // Slightly higher just in case
     uint256 constant MAX_POSSIBLE_BYTECODE = 32000;
     uint256 constant MEM_OFFSET = BYTECODE_OFFSET + MAX_POSSIBLE_BYTECODE;
