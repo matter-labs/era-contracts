@@ -9,13 +9,11 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL2SharedBridge} from "./interfaces/IL2SharedBridge.sol";
 import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
-import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_BASE_TOKEN_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
-import {L2WrappedBaseToken} from "./L2WrappedBaseToken.sol";
 import {ERA_CHAIN_ID, ERA_WETH_ADDRESS} from "../Config.sol";
 
 /// @author Matter Labs
@@ -36,12 +34,6 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
-    /// @dev WETH token address on L2.
-    address public l2WrappedBaseTokenAddress;
-
-    /// @dev the address of L1 base token
-    address internal l1BaseTokenAddress;
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
@@ -51,36 +43,27 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
     /// @param _l1Bridge The address of the L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
-    /// @param _l2WrappedBaseTokenAddress, the address of L2 Wrapped Base Token contract, an instance of WETH9. Has to be deployed separately.
-    /// @param _l1BaseTokenAddress, the address of the base token on L1, if ether, this will be ETH_TOKEN_ADDRESS = address(1)
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1Bridge,
         bytes32 _l2TokenProxyBytecodeHash,
-        address _l2WrappedBaseTokenAddress,
-        address _l1BaseTokenAddress,
         address _aliasedOwner
     ) external reinitializer(2) {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
-        require(_l2WrappedBaseTokenAddress != address(0), "L2 ShB wrong weth address");
-        require(_l1BaseTokenAddress != address(0), "L2 ShB wrong l1 base token address");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
 
         l1Bridge = _l1Bridge;
-        l2WrappedBaseTokenAddress = _l2WrappedBaseTokenAddress;
-        l1BaseTokenAddress = _l1BaseTokenAddress;
-
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenBeacon.transferOwnership(_aliasedOwner);
-        } else {
-            // l2StandardToken and l2TokenBeacon are already deployed on ERA
-        }
+        } 
+        // else: l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
+        
     }
 
     /// @notice Finalize the deposit and mint funds
@@ -98,27 +81,20 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     ) external payable override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge, "mq");
-        if (_l1Token == l1BaseTokenAddress) {
-            require(msg.value == _amount, "Amount mismatch");
-            // Deposit WETH to L2 receiver.
-            IL2WrappedBaseToken(l2WrappedBaseTokenAddress).depositTo{value: msg.value}(_l2Receiver);
-            emit FinalizeDeposit(_l1Sender, _l2Receiver, l2WrappedBaseTokenAddress, _amount);
+        require(msg.value == 0, "Value should be 0 for ERC20 bridge");
+
+        address expectedL2Token = l2TokenAddress(_l1Token);
+        address currentL1Token = l1TokenAddress[expectedL2Token];
+        if (currentL1Token == address(0)) {
+            address deployedToken = _deployL2Token(_l1Token, _data);
+            require(deployedToken == expectedL2Token, "mt");
+            l1TokenAddress[expectedL2Token] = _l1Token;
         } else {
-            require(msg.value == 0, "Value should be 0 for ERC20 bridge");
-
-            address expectedL2Token = l2TokenAddress(_l1Token);
-            address currentL1Token = l1TokenAddress[expectedL2Token];
-            if (currentL1Token == address(0)) {
-                address deployedToken = _deployL2Token(_l1Token, _data);
-                require(deployedToken == expectedL2Token, "mt");
-                l1TokenAddress[expectedL2Token] = _l1Token;
-            } else {
-                require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
-            }
-
-            IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
-            emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
+            require(currentL1Token == _l1Token, "gg"); // Double check that the expected value equal to real one
         }
+
+        IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
+        emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);  
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
@@ -144,16 +120,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address l1Token = l1TokenAddress[_l2Token];
         require(l1Token != address(0), "yh");
 
-        if (_l2Token == l2WrappedBaseTokenAddress) {
-            // WETH withdrawal message.
-            bytes memory wethMessage = abi.encodePacked(_l1Receiver);
-
-            // Withdraw ETH to L1 bridge.
-            L2_BASE_TOKEN_ADDRESS.withdrawWithMessage{value: _amount}(l1Bridge, wethMessage);
-        } else {
-            bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
-            L2ContractHelper.sendMessageToL1(message);
-        }
+        bytes memory message = _getL1WithdrawMessage(_l1Receiver, l1Token, _amount);
+        L2ContractHelper.sendMessageToL1(message);
 
         emit WithdrawalInitiated(msg.sender, _l1Receiver, _l2Token, _amount);
     }
@@ -171,12 +139,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view override returns (address) {
-        if (_l1Token == l1BaseTokenAddress) {
-            return l2WrappedBaseTokenAddress;
-        }
         bytes32 constructorInputHash = keccak256(abi.encode(address(l2TokenBeacon), ""));
         bytes32 salt = _getCreate2Salt(_l1Token);
-
         return
             L2ContractHelper.computeCreate2Address(address(this), salt, l2TokenProxyBytecodeHash, constructorInputHash);
     }
@@ -206,7 +170,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     }
 
     receive() external payable {
-        require(msg.sender == l2WrappedBaseTokenAddress, "pd");
+        revert("Direct deposits are not allowed");
         emit BaseTokenReceived(msg.value);
     }
 }
