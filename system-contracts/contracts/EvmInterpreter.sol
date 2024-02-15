@@ -32,7 +32,7 @@ contract EvmInterpreter {
     uint256 constant DEBUG_SLOT_OFFSET = 32 * 32;
     uint256 constant LAST_RETURNDATA_SIZE_OFFSET = DEBUG_SLOT_OFFSET + 5 * 32;
     uint256 constant STACK_OFFSET = LAST_RETURNDATA_SIZE_OFFSET + 32;
-    uint256 constant BYTECODE_OFFSET =STACK_OFFSET + 1024 * 32;
+    uint256 constant BYTECODE_OFFSET = STACK_OFFSET + 1024 * 32;
 
     // Slightly higher just in case
     uint256 constant MAX_POSSIBLE_BYTECODE = 32000;
@@ -44,7 +44,7 @@ contract EvmInterpreter {
     // but we can pass a limited value, ensuring that the total ergsLeft will never exceed 2bln.
     uint256 constant TO_PASS_INF_GAS = 1e9;
 
-    // Note, that this function can overflow, up to the caller to ensure that it does not. 
+    // Note, that this function can overflow, up to the caller to ensure that it does not.
     function memCost(uint256 memSizeWords) internal pure returns (uint256 gasCost) {
         unchecked {
             gasCost = (memSizeWords * memSizeWords) / 512 + (3 * memSizeWords);
@@ -53,10 +53,11 @@ contract EvmInterpreter {
 
     // To prevent overflows, we always keep memory below 1MB. If someone tries to allocate more, we just return inf.
     uint256 constant MAX_ALLOWED_MEM_SIZE = 1e6;
+
     function expandMemory(uint256 newSize) internal pure returns (uint256 gasCost) {
         unchecked {
             // Ensuring no overflow
-            if(newSize > MAX_ALLOWED_MEM_SIZE) {
+            if (newSize > MAX_ALLOWED_MEM_SIZE) {
                 return uint256(int256(-1));
             }
 
@@ -150,7 +151,7 @@ contract EvmInterpreter {
         }
     }
 
-    // Note that this function modifies EVM memory and does not restore it. It is expected that 
+    // Note that this function modifies EVM memory and does not restore it. It is expected that
     // it is the last called function during execution.
     function _setDeployedCode(uint256 gasLeft, uint256 offset, uint256 len) internal {
         // This error should never be triggered
@@ -301,7 +302,7 @@ contract EvmInterpreter {
             assembly {
                 newTos := add(tos, 0x20)
                 mstore(newTos, item)
-            }    
+            }
         }
     }
 
@@ -438,7 +439,7 @@ contract EvmInterpreter {
 
         if (rtsz > 31) {
             // There was a normal return. The first 32 bytes are the gasLeft.
-            
+
             assembly {
                 returndatacopy(0, 0, 32)
                 _gasLeft := mload(0)
@@ -481,7 +482,16 @@ contract EvmInterpreter {
         // In this case, the call becomes equivalent to staticcall.
         // FIXME: decide on how to handle this in tracer
         if (_isStatic) {
-            return _performStaticCall(_calleeIsEVM, _calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen);
+            return
+                _performStaticCall(
+                    _calleeIsEVM,
+                    _calleeGas,
+                    _callee,
+                    _inputOffset,
+                    _inputLen,
+                    _outputOffset,
+                    _outputLen
+                );
         }
 
         if (_calleeIsEVM) {
@@ -1591,7 +1601,6 @@ contract EvmInterpreter {
                         // We can not return a readable error to preserve compatibility
                         require(!isStatic);
 
-
                         uint256 ost;
                         uint256 len;
                         (ost, len, tos) = _pop2StackItems(tos);
@@ -1662,7 +1671,7 @@ contract EvmInterpreter {
                     if (opcode == OP_LOG3) {
                         // We can not return a readable error to preserve compatibility
                         require(!isStatic);
-                        
+
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1688,7 +1697,7 @@ contract EvmInterpreter {
                     if (opcode == OP_LOG4) {
                         // We can not return a readable error to preserve compatibility
                         require(!isStatic);
-                        
+
                         uint256 ost;
                         uint256 len;
                         uint256 topic0;
@@ -1727,7 +1736,7 @@ contract EvmInterpreter {
                     if (value != 0) {
                         // We can not return a readable error to preserve compatibility
                         require(!isStatic);
-                        
+
                         uint256 codeSize;
                         assembly {
                             codeSize := extcodesize(addr)
@@ -1966,10 +1975,7 @@ contract EvmInterpreter {
         }
     }
 
-    function _pushEVMFrame(
-        uint256 _passGas,
-        bool _isStatic
-    ) internal {
+    function _pushEVMFrame(uint256 _passGas, bool _isStatic) internal {
         bytes4 selector = EVM_GAS_MANAGER.pushEVMFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
         assembly {
@@ -2050,7 +2056,7 @@ contract EvmInterpreter {
         return _evmGas * GAS_DIVISOR;
     }
 
-    // If the caller is a zkEVM contract and 
+    // If the caller is a zkEVM contract and
     function _getIsStaticFromCallFlags() internal view returns (bool) {
         uint256 callFlags = SystemContractHelper.getCallFlags();
         // TODO: make it a constnat
@@ -2076,7 +2082,7 @@ contract EvmInterpreter {
 
         if (!isCallerEVM) {
             evmGas = _getEVMGas();
-            isStatic = _getIsStaticFromCallFlags();    
+            isStatic = _getIsStaticFromCallFlags();
         }
 
         input = msg.data;

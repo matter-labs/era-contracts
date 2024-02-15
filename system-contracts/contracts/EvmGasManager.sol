@@ -58,10 +58,7 @@ contract EvmGasManager {
     EVMStackFrameInfo[] private evmStackFrames;
 
     function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
-        EVMStackFrameInfo memory frame = EVMStackFrameInfo({
-            passGas: _passGas,
-            isStatic: _isStatic
-        });
+        EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);
     }
