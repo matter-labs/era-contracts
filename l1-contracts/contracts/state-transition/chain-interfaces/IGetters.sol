@@ -17,11 +17,11 @@ interface IGetters is IZkSyncStateTransitionBase {
     /// @return The address of the verifier smart contract
     function getVerifier() external view returns (address);
 
-    /// @return The address of the current governor
-    function getGovernor() external view returns (address);
+    /// @return The address of the current admin
+    function getAdmin() external view returns (address);
 
-    /// @return The address of the pending governor
-    function getPendingGovernor() external view returns (address);
+    /// @return The address of the pending admin
+    function getPendingAdmin() external view returns (address);
 
     /// @return The address of the bridgehub
     function getBridgehub() external view returns (address);
@@ -128,9 +128,9 @@ interface IGetters is IZkSyncStateTransitionBase {
     /// @return facet The facet address associated with a selector. Zero if the selector is not added to the diamond
     function facetAddress(bytes4 _selector) external view returns (address facet);
 
-    /// @return Whether the selector can be frozen by the governor or always accessible
+    /// @return Whether the selector can be frozen by the admin or always accessible
     function isFunctionFreezable(bytes4 _selector) external view returns (bool);
 
-    /// @return isFreezable Whether the facet can be frozen by the governor or always accessible
+    /// @return isFreezable Whether the facet can be frozen by the admin or always accessible
     function isFacetFreezable(address _facet) external view returns (bool isFreezable);
 }

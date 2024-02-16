@@ -103,7 +103,7 @@ interface IBridgehub {
         address _stateTransitionManager,
         address _baseToken,
         uint256 _salt,
-        address _governor,
+        address _admin,
         bytes calldata _initData
     ) external returns (uint256 chainId);
 

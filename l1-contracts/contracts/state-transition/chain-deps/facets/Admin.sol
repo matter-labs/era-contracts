@@ -20,25 +20,25 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     string public constant override getName = "AdminFacet";
 
     /// @inheritdoc IAdmin
-    function setPendingGovernor(address _newPendingGovernor) external onlyGovernor {
+    function setPendingAdmin(address _newPendingAdmin) external onlyAdmin {
         // Save previous value into the stack to put it into the event later
-        address oldPendingGovernor = s.pendingGovernor;
-        // Change pending governor
-        s.pendingGovernor = _newPendingGovernor;
-        emit NewPendingGovernor(oldPendingGovernor, _newPendingGovernor);
+        address oldPendingAdmin = s.pendingAdmin;
+        // Change pending admin
+        s.pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
     /// @inheritdoc IAdmin
-    function acceptGovernor() external {
-        address pendingGovernor = s.pendingGovernor;
-        require(msg.sender == pendingGovernor, "n4"); // Only proposed by current governor address can claim the governor rights
+    function acceptAdmin() external {
+        address pendingAdmin = s.pendingAdmin;
+        require(msg.sender == pendingAdmin, "n4"); // Only proposed by current admin address can claim the admin rights
 
-        address previousGovernor = s.governor;
-        s.governor = pendingGovernor;
-        delete s.pendingGovernor;
+        address previousAdmin = s.admin;
+        s.admin = pendingAdmin;
+        delete s.pendingAdmin;
 
-        emit NewPendingGovernor(pendingGovernor, address(0));
-        emit NewGovernor(previousGovernor, pendingGovernor);
+        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
     /// @inheritdoc IAdmin
@@ -64,7 +64,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyGovernorOrStateTransitionManager {
+    function changeFeeParams(FeeParams calldata _newFeeParams) external onlyAdminOrStateTransitionManager {
         // Double checking that the new fee params are valid, i.e.
         // the maximal pubdata per batch is not less than the maximal pubdata per priority transaction.
         require(_newFeeParams.maxPubdataPerBatch >= _newFeeParams.priorityTxMaxPubdata, "n6");
@@ -79,7 +79,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     function setTokenMultiplier(
         uint128 _nominator,
         uint128 _denominator
-    ) external onlyGovernorOrStateTransitionManager {
+    ) external onlyAdminOrStateTransitionManager {
         uint128 oldNominator = s.baseTokenGasPriceMultiplierNominator;
         uint128 oldDenominator = s.baseTokenGasPriceMultiplierDenominator;
 
@@ -97,7 +97,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyGovernorOrStateTransitionManager {
+    ) external onlyAdminOrStateTransitionManager {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         require(
             cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion),
@@ -127,7 +127,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function freezeDiamond() external onlyGovernorOrStateTransitionManager {
+    function freezeDiamond() external onlyAdminOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(!diamondStorage.isFrozen, "a9"); // diamond proxy is frozen already
@@ -137,7 +137,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function unfreezeDiamond() external onlyGovernorOrStateTransitionManager {
+    function unfreezeDiamond() external onlyAdminOrStateTransitionManager {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
 
         require(diamondStorage.isFrozen, "a7"); // diamond proxy is not frozen
