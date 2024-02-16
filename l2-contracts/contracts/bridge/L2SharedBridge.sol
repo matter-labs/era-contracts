@@ -167,9 +167,4 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(success, "mk");
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
-
-    receive() external payable {
-        revert("Direct deposits are not allowed");
-        emit BaseTokenReceived(msg.value);
-    }
 }
