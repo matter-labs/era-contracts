@@ -138,6 +138,7 @@ async function main() {
       /// L2StandardTokenProxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
       console.log("Adding L2StandardTokenProxy to factoryDeps");
       const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+      const deployerContract = deployer.deployerContract(deployer.deployWallet);
 
       const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
       const expectedCost = await bridgehub.l2TransactionBaseCost(
@@ -147,7 +148,7 @@ async function main() {
         REQUIRED_L2_GAS_PRICE_PER_PUBDATA
       );
 
-      const tx = await bridgehub.requestL2TransactionDirect(
+      const tx = await deployerContract.requestL2Transaction(
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
@@ -167,7 +168,7 @@ async function main() {
       /// ####################################################################################################################
 
       console.log("Initializing chain governance");
-      const tx2 = await l1SharedBridge.initializeChainGovernance(chainId, l2SharedBridgeProxyAddress);
+      const tx2 = await l1SharedBridge.initializeChainGovernance(chainId, l2SharedBridgeProxyAddress, { gasPrice });
       await tx2.wait();
       console.log("Chain governance initialized");
     });

@@ -30,7 +30,7 @@ import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory"
 import type { FacetCut } from "./diamondCut";
 import { diamondCut, getCurrentFacetCutsForAdd } from "./diamondCut";
 
-import { ERC20Factory } from "../typechain";
+import { DeployerFactory, ERC20Factory } from "../typechain";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
@@ -719,6 +719,22 @@ export class Deployer {
     this.addresses.ValidatorTimeLock = contractAddress;
   }
 
+  public async deployDeployer(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2(
+      "Deployer",
+      [this.addresses.Bridgehub.BridgehubProxy],
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_DEPLOYER_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.Deployer = contractAddress;
+  }
+
   public async setStateTransitionManagerInValidatorTimelock(ethTxOptions: ethers.providers.TransactionRequest) {
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
     const tx = await validatorTimelock.setStateTransitionManager(
@@ -781,5 +797,9 @@ export class Deployer {
 
   public proxyAdminContract(signerOrProvider: Signer | providers.Provider) {
     return ProxyAdminFactory.connect(this.addresses.TransparentProxyAdmin, signerOrProvider);
+  }
+
+  public deployerContract(signerOrProvider: Signer | providers.Provider) {
+    return DeployerFactory.connect(this.addresses.Deployer, signerOrProvider);
   }
 }
