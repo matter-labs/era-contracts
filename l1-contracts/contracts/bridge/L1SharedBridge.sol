@@ -78,7 +78,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             (msg.sender == address(bridgehub)) ||
-                ((_chainId == ERA_CHAIN_ID) && (msg.sender == bridgehub.getStateTransition(_chainId))),
+                (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
             "L1SharedBridge: not bridgehub or era chain"
         );
         _;
