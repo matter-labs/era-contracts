@@ -31,7 +31,6 @@ export interface DiamondCut {
 export interface InitializeData {
   bridgehub: BigNumberish;
   verifier: BigNumberish;
-  governor: BigNumberish;
   admin: BigNumberish;
   genesisBatchHash: string;
   genesisIndexRepeatedStorageChanges: BigNumberish;
@@ -75,7 +74,7 @@ export async function getCurrentFacetCutsForAdd(
 ) {
   const facetsCuts = {};
   // Some facets should always be available regardless of freezing: upgradability system, getters, etc.
-  // And for some facets there are should be possibility to freeze them by the governor if we found a bug inside.
+  // And for some facets there are should be possibility to freeze them by the admin if we found a bug inside.
   if (adminAddress) {
     // Should be unfreezable. The function to unfreeze contract is located on the admin facet.
     // That means if the admin facet will be freezable, the proxy can NEVER be unfrozen.

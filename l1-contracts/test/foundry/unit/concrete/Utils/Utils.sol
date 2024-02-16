@@ -101,8 +101,8 @@ library Utils {
     function getGettersSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
-        selectors[1] = GettersFacet.getGovernor.selector;
-        selectors[2] = GettersFacet.getPendingGovernor.selector;
+        selectors[1] = GettersFacet.getAdmin.selector;
+        selectors[2] = GettersFacet.getPendingAdmin.selector;
         selectors[3] = GettersFacet.getTotalBlocksCommitted.selector;
         selectors[4] = GettersFacet.getTotalBlocksVerified.selector;
         selectors[5] = GettersFacet.getTotalBlocksExecuted.selector;

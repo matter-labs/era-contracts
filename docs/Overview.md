@@ -46,8 +46,7 @@ even an upgrade system is a separate facet that can be replaced.
 
 One of the differences from the reference implementation is access freezability. Each of the facets has an associated
 parameter that indicates if it is possible to freeze access to the facet. Privileged actors can freeze the **diamond**
-(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the governor or its
-owner unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade
+(not a specific facet!) and all facets with the marker `isFreezable` should be inaccessible until the admin or the state transition manager unfreezes the diamond. Note that it is a very dangerous thing since the diamond proxy can freeze the upgrade
 system and then the diamond will be frozen forever.
 
 #### DiamondInit
@@ -66,7 +65,7 @@ must never be frozen.
 
 #### AdminFacet
 
-Controls changing the privileged addresses such as governor and validators or one of the system parameters (L2
+Controls changing the privileged addresses such as admin and validators or one of the system parameters (L2
 bootloader bytecode hash, verifier address, verifier parameters, etc), and it also manages the freezing/unfreezing and
 execution of upgrades in the diamond proxy.
 

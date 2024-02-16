@@ -78,7 +78,7 @@ describe("Admin facet tests", function () {
       const proposedGovernor = await randomSigner.getAddress();
       await adminFacetTest.setPendingGovernor(proposedGovernor);
 
-      const pendingGovernor = await adminFacetTest.getPendingGovernor();
+      const pendingGovernor = await adminFacetTest.getPendingAdmin();
       expect(pendingGovernor).equal(proposedGovernor);
     });
 
@@ -86,7 +86,7 @@ describe("Admin facet tests", function () {
       const proposedGovernor = await newGovernor.getAddress();
       await adminFacetTest.setPendingGovernor(proposedGovernor);
 
-      const pendingGovernor = await adminFacetTest.getPendingGovernor();
+      const pendingGovernor = await adminFacetTest.getPendingAdmin();
       expect(pendingGovernor).equal(proposedGovernor);
     });
 
@@ -98,7 +98,7 @@ describe("Admin facet tests", function () {
     it("accept governor from proposed account", async () => {
       await adminFacetTest.connect(newGovernor).acceptGovernor();
 
-      const governor = await adminFacetTest.getGovernor();
+      const governor = await adminFacetTest.getAdmin();
       expect(governor).equal(await newGovernor.getAddress());
     });
   });

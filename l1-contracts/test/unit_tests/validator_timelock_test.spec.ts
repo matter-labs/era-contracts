@@ -80,8 +80,8 @@ describe("ValidatorTimelock tests", function () {
     expect(await validatorTimelock.validator(chainId)).equal(ethers.constants.AddressZero);
     expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
     expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
-    expect(await dummyStateTransitionManager.getChainGovernor(chainId)).equal(await owner.getAddress());
-    expect(await dummyExecutor.getGovernor()).equal(await owner.getAddress());
+    expect(await dummyStateTransitionManager.getChainAdmin(chainId)).equal(await owner.getAddress());
+    expect(await dummyExecutor.getAdmin()).equal(await owner.getAddress());
   });
 
   it("Should revert if non-validator commits batches", async () => {

@@ -108,7 +108,7 @@ export class Deployer {
         bridgehub: "0x0000000000000000000000000000000000001234",
         stateTransitionManager: "0x0000000000000000000000000000000000002234",
         protocolVersion: "0x0000000000000000000000000000000000002234",
-        governor: "0x0000000000000000000000000000000000003234",
+        admin: "0x0000000000000000000000000000000000003234",
         validatorTimelock: "0x0000000000000000000000000000000000004234",
         baseToken: "0x0000000000000000000000000000000000004234",
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
@@ -617,7 +617,7 @@ export class Deployer {
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const governor = this.ownerAddress;
+    const admin = this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode(
       [
@@ -631,7 +631,7 @@ export class Deployer {
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
       Date.now(),
-      governor,
+      admin,
       initialDiamondCut,
       {
         gasPrice,

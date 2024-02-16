@@ -21,7 +21,7 @@ contract AdminTest is Test {
     DiamondProxy internal diamondProxy;
     address internal owner;
     address internal securityCouncil;
-    address internal governor;
+    address internal admin;
     AdminFacet internal adminFacet;
     AdminFacet internal proxyAsAdmin;
     GettersMock internal proxyAsGettersMock;
@@ -51,7 +51,7 @@ contract AdminTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         securityCouncil = makeAddr("securityCouncil");
-        governor = makeAddr("governor");
+        admin = makeAddr("admin");
         DiamondInit diamondInit = new DiamondInit();
 
         VerifierParams memory dummyVerifierParams = VerifierParams({
@@ -62,7 +62,7 @@ contract AdminTest is Test {
 
         DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
             verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
-            governor: governor,
+            admin: admin,
             admin: owner,
             genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
             genesisIndexRepeatedStorageChanges: 0,
