@@ -116,7 +116,7 @@ export async function create2DeployFromL1(
   );
 
   const baseTokenAddress = await bridgehub.baseToken(chainId);
-  const baseTokenBridge = await bridgehub.baseTokenBridge(chainId);
+  const baseTokenBridge = deployedAddressesFromEnv().Bridges.SharedBridgeProxy;
   const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
   const ethIsBaseToken = ADDRESS_ONE == baseTokenAddress;
 
