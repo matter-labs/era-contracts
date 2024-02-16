@@ -98,7 +98,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256, //_salt
         address _l2Governor,
         bytes calldata _initData
-    ) external onlyOwnerOrDeployer nonReentrant returns (uint256 chainId) {
+    ) external nonReentrant returns (uint256 chainId) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 

@@ -13,6 +13,7 @@ import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
 import {IWETH9} from "./interfaces/IWETH9.sol";
+import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -50,6 +51,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
 
+    address l2SharedBridgeStandardAddress;
+
     /// @dev A mapping chainId => L2 deposit transaction hash  => keccak256(account, tokenAddress, amount)
     /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail.
     /// @dev the l2TxHash is unique, as it is determined by the contracts, while dataHash is not, so we that is the output.
@@ -77,8 +80,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @notice Checks that the message sender is the bridgehub or Era
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
-            (msg.sender == address(bridgehub)) ||
-                (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
+            (msg.sender == address(bridgehub)) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
             "L1SharedBridge: not bridgehub or era chain"
         );
         _;
@@ -87,6 +89,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @notice Checks that the message sender is the legacy bridge
     modifier onlyLegacyBridge() {
         require(msg.sender == address(legacyBridge), "ShB not legacy bridge");
+        _;
+    }
+
+    modifier onlyOwnerOrChainGovernor(uint256 _chainId) {
+        address stateTransitionManager = bridgehub.stateTransitionManager(_chainId);
+        address chainGovernor = IStateTransitionManager(stateTransitionManager).getChainGovernor(_chainId);
+        require(msg.sender == owner() || msg.sender == chainGovernor, "ShB not owner or chain governor");
         _;
     }
 
@@ -118,7 +127,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain
-    function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
+    function initializeChainGovernance(
+        uint256 _chainId,
+        address _l2BridgeAddress
+    ) external onlyOwnerOrChainGovernor(_chainId) {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
