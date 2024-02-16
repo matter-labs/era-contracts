@@ -127,7 +127,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable onlyBridgehubOrEra(_chainId) {
+    ) external virtual payable onlyBridgehubOrEra(_chainId) {
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
@@ -180,10 +180,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         } else {
             require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
             amount = _depositAmount;
-
-            /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
-            /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
-            require(_prevMsgSender != address(this), "ShB calling itself");
 
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _depositAmount);
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
@@ -404,7 +400,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external override onlyLegacyBridge returns (address, address, uint256) { // l1Receiver, l1Token, amount
         return
             _finalizeWithdrawal(
                 ERA_CHAIN_ID,
@@ -540,7 +536,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
-            require(_l2ToL1message.length == 76, "kk");
+            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
