@@ -275,7 +275,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
 
-        require(_request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
+        require(
+            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+            "Bridgehub: second bridge address too low"
+        ); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,

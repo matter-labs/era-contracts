@@ -59,7 +59,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
-
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
         return IZkSyncStateTransition(stateTransition[_chainId]).getAdmin();
     }
