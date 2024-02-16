@@ -12,7 +12,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IWETH9} from "./interfaces/IWETH9.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
@@ -549,12 +548,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         } else {
             revert("ShB Incorrect message function selector");
         }
-    }
-
-    /// @dev The receive function is called when ETH is sent directly to the contract.
-    receive() external payable {
-        // Do not expect to receive Ether directly, (weth bridging diasbled)
-        revert("ShB: direct ether transfer not allowed");
     }
 
     /*//////////////////////////////////////////////////////////////
