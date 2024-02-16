@@ -45,12 +45,12 @@ async function main() {
       const governance = deployer.governanceContract(deployWallet);
       const zkSync = deployer.stateTransitionContract(deployWallet);
 
-      await (await zkSync.setPendingGovernor(governance.address)).wait();
+      await (await zkSync.setPendingAdmin(governance.address)).wait();
 
       const call = {
         target: zkSync.address,
         value: 0,
-        data: zkSync.interface.encodeFunctionData("acceptGovernor"),
+        data: zkSync.interface.encodeFunctionData("acceptAdmin"),
       };
 
       const operation = {

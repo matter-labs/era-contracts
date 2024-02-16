@@ -69,8 +69,6 @@
     "deploy-testkit": "ts-node scripts/deploy-testkit.ts",
     "verify": "hardhat run --network env scripts/verify.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
-    "initialize-erc20-bridge": "ts-node scripts/initialize-erc20-bridge.ts",
-    "initialize-weth-bridge": "ts-node scripts/initialize-weth-bridge.ts",
     "initialize-governance-chain": "ts-node scripts/initialize-governance-chain.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",

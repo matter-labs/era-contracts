@@ -127,7 +127,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external virtual payable onlyBridgehubOrEra(_chainId) {
+    ) external payable virtual onlyBridgehubOrEra(_chainId) {
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
@@ -400,7 +400,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address, address, uint256) { // l1Receiver, l1Token, amount
+    ) external override onlyLegacyBridge returns (address, address, uint256) {
+        // l1Receiver, l1Token, amount
         return
             _finalizeWithdrawal(
                 ERA_CHAIN_ID,

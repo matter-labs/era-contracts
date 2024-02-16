@@ -4,11 +4,14 @@ import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import type { GettersFacet, MockExecutorFacet } from "../../typechain";
+import { Interface } from "ethers/lib/utils";
+
 import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
 import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
+import { getTokens } from "../../src.ts/deploy-token";
 
 import {
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -52,6 +55,29 @@ describe("Mailbox Era's legacy functions tests", function () {
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
     // we want to reset the original for the rest of the tests (including test files)
     process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID = (270).toString();
+
+    // The L1SharedBridge is compiled with the ERA_DIAMOND_PROXY address in hardhat config, so we update the shared bridge
+    // because all the varaibles are already set in the proxy, this is upgrade works.
+    const sharedBridgeTestFactory = await hardhat.ethers.getContractFactory("L1SharedBridgeTest");
+    const tokens = getTokens();
+    const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    const sharedBridgeTest = await sharedBridgeTestFactory.deploy(
+      deployer.addresses.StateTransition.DiamondProxy,
+      l1WethToken,
+      deployer.addresses.Bridgehub.BridgehubProxy,
+      deployer.addresses.Bridges.ERC20BridgeProxy
+    );
+
+    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+    const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+      deployer.addresses.Bridges.SharedBridgeProxy,
+      sharedBridgeTest.address,
+    ]);
+
+    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
+    if (deployer.verbose) {
+      console.log("L1SharedBridge upgrade sent for testing");
+    }
 
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     getter = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);

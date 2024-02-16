@@ -103,7 +103,7 @@ async function main() {
         target: l1Erc20Bridge.address,
       });
 
-      const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingGovernor", [
+      const zkSyncSetPendingGovernor = zkSync.interface.encodeFunctionData("setPendingAdmin", [
         governanceAddressFromEnv,
       ]);
       displayTx("zkSync Diamond Proxy migration calldata:", {

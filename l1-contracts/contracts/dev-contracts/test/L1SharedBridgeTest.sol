@@ -8,10 +8,14 @@ import "../../bridge/interfaces/IL1SharedBridge.sol";
 
 /// @author Matter Labs
 contract L1SharedBridgeTest is L1SharedBridge {
-
     address private immutable eraDiamondProxy;
 
-    constructor(address _diamondProxyAddress, address payable _l1WethAddress, IBridgehub _bridgehub, IL1ERC20Bridge _legacyBridge) L1SharedBridge(_l1WethAddress, _bridgehub, _legacyBridge){
+    constructor(
+        address _diamondProxyAddress,
+        address payable _l1WethAddress,
+        IBridgehub _bridgehub,
+        IL1ERC20Bridge _legacyBridge
+    ) L1SharedBridge(_l1WethAddress, _bridgehub, _legacyBridge) {
         eraDiamondProxy = _diamondProxyAddress;
     }
 
@@ -31,7 +35,7 @@ contract L1SharedBridgeTest is L1SharedBridge {
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable onlyBridgehubOrTestEra(_chainId) override {
+    ) external payable override onlyBridgehubOrTestEra(_chainId) {
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
