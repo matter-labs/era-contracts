@@ -42,7 +42,7 @@ contract L1SharedBridgeTest is L1SharedBridge {
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
 
-            uint256 amount = _depositFunds(_prevMsgSender, _l1Token, _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
 
