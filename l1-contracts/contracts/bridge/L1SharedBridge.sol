@@ -91,10 +91,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         _;
     }
 
-    modifier onlyOwnerOrChainGovernor(uint256 _chainId) {
+    modifier onlyOwnerOrChainAdmin(uint256 _chainId) {
         address stateTransitionManager = bridgehub.stateTransitionManager(_chainId);
-        address chainGovernor = IStateTransitionManager(stateTransitionManager).getChainGovernor(_chainId);
-        require(msg.sender == owner() || msg.sender == chainGovernor, "ShB not owner or chain governor");
+        address chainAdmin = IStateTransitionManager(stateTransitionManager).getChainAdmin(_chainId);
+        require(msg.sender == owner() || msg.sender == chainAdmin, "ShB not owner or chain admin");
         _;
     }
 
@@ -129,7 +129,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     function initializeChainGovernance(
         uint256 _chainId,
         address _l2BridgeAddress
-    ) external onlyOwnerOrChainGovernor(_chainId) {
+    ) external onlyOwnerOrChainAdmin(_chainId) {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
