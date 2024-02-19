@@ -105,7 +105,7 @@ interface IL1SharedBridge {
     ) external;
 
     function l1WethAddress() external view returns (address);
-    
+
     function bridgehub() external view returns (IBridgehub);
 
     function legacyBridge() external view returns (IL1ERC20Bridge);

@@ -338,7 +338,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
     }
 
-
     /// @dev Determines if a withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
@@ -376,7 +375,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 l2TxNumberInBatch;
     }
 
-    /// @dev Internal function that handles the logic for finalizing withdrawals, 
+    /// @dev Internal function that handles the logic for finalizing withdrawals,
     /// serving both the current bridge system and the legacy ERC20 bridge.
     function _finalizeWithdrawal(
         uint256 _chainId,
@@ -386,10 +385,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) internal nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
-        require(
-            !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
-            "Withdrawal is already finalized"
-        );
+        require(!isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex], "Withdrawal is already finalized");
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
@@ -605,7 +601,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.
-    /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit` 
+    /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit`
     /// method in `L1ERC20Bridge`.
     ///
     /// @param _depositSender The address of the deposit initiator
