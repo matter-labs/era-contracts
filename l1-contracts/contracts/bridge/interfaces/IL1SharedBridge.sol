@@ -104,6 +104,8 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
+    function l1WethAddress() external view returns (address);
+    
     function bridgehub() external view returns (IBridgehub);
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
@@ -131,14 +133,4 @@ interface IL1SharedBridge {
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
-
-    function l1WethAddress() external view returns (address);
-
-    /// @dev Event emitted when ETH is received by the contract.
-    event EthReceived(uint256 amount);
-
-    /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
-    /// @param to The address to which the funds were sent
-    /// @param amount The amount of funds that were sent
-    event EthWithdrawalFinalized(uint256 chainId, address indexed to, uint256 amount);
 }

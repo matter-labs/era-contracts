@@ -422,13 +422,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 callSuccess := call(gas(), l1Receiver, amount, 0, 0, 0, 0)
             }
             require(callSuccess, "ShB: withdraw failed");
-            emit EthWithdrawalFinalized(_chainId, l1Receiver, amount);
         } else {
             // Withdraw funds
             IERC20(l1Token).safeTransfer(l1Receiver, amount);
-
-            emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
         }
+        emit WithdrawalFinalizedSharedBridge(_chainId, l1Receiver, l1Token, amount);
     }
 
     /// @dev Verifies the validity of a withdrawal message from L2 and returns details of the withdrawal.
