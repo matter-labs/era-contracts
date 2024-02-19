@@ -56,19 +56,19 @@ async function main() {
 
     const zkSync = deployer.stateTransitionContract(deployWallet);
 
-    console.log("zkSync governor: ", await zkSync.getGovernor());
-    console.log("zkSync pendingGovernor: ", await zkSync.getPendingGovernor());
+    console.log("zkSync admin: ", await zkSync.getAdmin());
+    console.log("zkSync pendingGovernor: ", await zkSync.getPendingAdmin());
 
     const validatorTimelock = deployer.validatorTimelock(deployWallet);
-    console.log("validatorTimelock governor: ", await validatorTimelock.owner());
-    console.log("validatorTimelock pendingGovernor: ", await validatorTimelock.pendingOwner());
+    console.log("validatorTimelock owner: ", await validatorTimelock.owner());
+    console.log("validatorTimelock pendingOwner: ", await validatorTimelock.pendingOwner());
 
     const l1Erc20Bridge = deployer.transparentUpgradableProxyContract(
       deployer.addresses.Bridges.ERC20BridgeProxy,
       deployWallet
     );
 
-    console.log("l1Erc20Bridge governor: ", await proxyGov(l1Erc20Bridge.address, deployWallet.provider));
+    console.log("l1Erc20Bridge proxy admin: ", await proxyGov(l1Erc20Bridge.address, deployWallet.provider));
 
     // Now, starting to deploy the info about the L2 contracts
 
@@ -77,22 +77,22 @@ async function main() {
     );
 
     const l2SharedBridge = deployer.transparentUpgradableProxyContract(
-      process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
+      process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR!,
       deployWallet2
     );
-    console.log("L2SharedBridge governor: ", await proxyGov(l2SharedBridge.address, deployWallet2.provider));
+    console.log("L2SharedBridge proxy admin: ", await proxyGov(l2SharedBridge.address, deployWallet2.provider));
 
     const l2wethToken = deployer.transparentUpgradableProxyContract(
       process.env.CONTRACTS_L2_WETH_TOKEN_PROXY_ADDR!,
       deployWallet2
     );
-    console.log("l2wethToken governor: ", await proxyGov(l2wethToken.address, deployWallet2.provider));
+    console.log("l2wethToken proxy admin: ", await proxyGov(l2wethToken.address, deployWallet2.provider));
 
     // L2 Tokens are BeaconProxies
     const l2Erc20BeaconAddress: string = await getERC20BeaconAddress(l2SharedBridge.address);
     const l2Erc20TokenBeacon = UpgradeableBeaconFactory.connect(l2Erc20BeaconAddress, deployWallet2);
 
-    console.log("l2Erc20TokenBeacon governor: ", await l2Erc20TokenBeacon.owner());
+    console.log("l2Erc20TokenBeacon owner: ", await l2Erc20TokenBeacon.owner());
   });
 
   await program.parseAsync(process.argv);

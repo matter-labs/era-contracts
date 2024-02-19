@@ -11,9 +11,9 @@ import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 contract ZkSyncStateTransitionBase is ReentrancyGuard {
     ZkSyncStateTransitionStorage internal s;
 
-    /// @notice Checks that the message sender is an active governor
-    modifier onlyGovernor() {
-        require(msg.sender == s.governor, "StateTransition Chain: not governor");
+    /// @notice Checks that the message sender is an active admin
+    modifier onlyAdmin() {
+        require(msg.sender == s.admin, "StateTransition Chain: not admin");
         _;
     }
 
@@ -33,10 +33,10 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyGovernorOrStateTransitionManager() {
+    modifier onlyAdminOrStateTransitionManager() {
         require(
-            msg.sender == s.governor || msg.sender == s.stateTransitionManager,
-            "StateTransition Chain: Only by governor or state transition manager"
+            msg.sender == s.admin || msg.sender == s.stateTransitionManager,
+            "StateTransition Chain: Only by admin or state transition manager"
         );
         _;
     }

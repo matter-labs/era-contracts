@@ -65,7 +65,7 @@ async function getCalldata(
 ) {
   // Generate wallet with random private key to load main contract governor.
   const randomWallet = new Wallet(ethers.utils.randomBytes(32), zksProvider, provider);
-  let governor = await (await randomWallet.getMainContract()).getGovernor();
+  let governor = await (await randomWallet.getMainContract()).getAdmin();
   // Apply L1 to L2 mask if needed.
   if (ethers.utils.hexDataLength(await provider.getCode(governor)) != 0) {
     governor = applyL1ToL2Alias(governor);

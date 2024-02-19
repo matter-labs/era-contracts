@@ -51,9 +51,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         executionDelay = _executionDelay;
     }
 
-    /// @notice Checks if the caller is the governor of the chain.
-    modifier onlyChainOwner(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager.getChainGovernor(_chainId), "9h");
+    /// @notice Checks if the caller is the admin of the chain.
+    modifier onlyChainAdmin(uint256 _chainId) {
+        require(msg.sender == stateTransitionManager.getChainAdmin(_chainId), "9h");
         _;
     }
 
@@ -69,7 +69,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     }
 
     /// @dev Set new validator address.
-    function setValidator(uint256 _chainId, address _newValidator) external onlyChainOwner(_chainId) {
+    function setValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
         address oldValidator = validator[_chainId];
         validator[_chainId] = _newValidator;
         emit NewValidatorSharedBridge(_chainId, oldValidator, _newValidator);

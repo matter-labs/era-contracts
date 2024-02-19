@@ -60,8 +60,8 @@ contract ExecutorTest is Test {
     function getGettersSelectors() public view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](28);
         selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getGovernor.selector;
-        selectors[2] = getters.getPendingGovernor.selector;
+        selectors[1] = getters.getAdmin.selector;
+        selectors[2] = getters.getPendingAdmin.selector;
         selectors[3] = getters.getTotalBlocksCommitted.selector;
         selectors[4] = getters.getTotalBlocksVerified.selector;
         selectors[5] = getters.getTotalBlocksExecuted.selector;

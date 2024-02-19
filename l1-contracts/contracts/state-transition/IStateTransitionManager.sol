@@ -53,14 +53,14 @@ interface IStateTransitionManager {
 
     function setValidatorTimelock(address _validatorTimelock) external;
 
-    function getChainGovernor(uint256 _chainId) external view returns (address);
+    function getChainAdmin(uint256 _chainId) external view returns (address);
 
     /// @notice
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
         address _sharedBridge,
-        address _governor,
+        address _admin,
         bytes calldata _diamondCut
     ) external;
 

@@ -9,7 +9,7 @@ import "../bridge/interfaces/IL1SharedBridge.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../common/ReentrancyGuard.sol";
 import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
 import "../vendor/AddressAliasHelper.sol";
 
@@ -96,7 +96,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         address _stateTransitionManager,
         address _baseToken,
         uint256, //_salt
-        address _l2Governor,
+        address _admin,
         bytes calldata _initData
     ) external nonReentrant returns (uint256 chainId) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
@@ -118,11 +118,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             _chainId,
             _baseToken,
             address(sharedBridge),
-            _l2Governor,
+            _admin,
             _initData
         );
 
-        emit NewChain(_chainId, _stateTransitionManager, _l2Governor);
+        emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
     }
 
@@ -275,7 +275,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
 
         address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
 
-        require(_request.secondBridgeAddress > address(1000), "Bridgehub: second bridge address too low"); // to avoid calls to precompiles
+        require(
+            _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+            "Bridgehub: second bridge address too low"
+        ); // to avoid calls to precompiles
         canonicalTxHash = IZkSyncStateTransition(stateTransition).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
@@ -304,6 +307,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         } else if (_refundRecipient.code.length > 0) {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
             _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
+        } else {
+            _recipient = _refundRecipient;
         }
     }
 }

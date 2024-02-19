@@ -12,7 +12,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1SharedBridge} from "./interfaces/IL1SharedBridge.sol";
 import {IL2Bridge} from "./interfaces/IL2Bridge.sol";
-import {IWETH9} from "./interfaces/IWETH9.sol";
 import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
 
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
@@ -141,7 +140,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable onlyBridgehubOrEra(_chainId) {
+    ) external payable virtual onlyBridgehubOrEra(_chainId) {
         if (_l1Token == ETH_TOKEN_ADDRESS) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
         } else {
@@ -194,10 +193,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         } else {
             require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
             amount = _depositAmount;
-
-            /// This breaks the _depositeFunds function, it returns 0, as we are withdrawing funds from ourselves, so our balance doesn't increase
-            /// This should not happen, this bridge only calls the Bridgehub if Eth is the baseToken or for wrapped base token deposits
-            require(_prevMsgSender != address(this), "ShB calling itself");
 
             uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _depositAmount);
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
@@ -418,7 +413,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external override onlyLegacyBridge returns (address, address, uint256) {
+        // l1Receiver, l1Token, amount
         return
             _finalizeWithdrawal(
                 ERA_CHAIN_ID,
@@ -554,19 +550,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // Check that the message length is correct.
             // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
             // 76 (bytes).
-            require(_l2ToL1message.length == 76, "kk");
+            require(_l2ToL1message.length == 76, "ShB wrong msg len 2");
             (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
             (amount, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset);
         } else {
             revert("ShB Incorrect message function selector");
         }
-    }
-
-    /// @dev The receive function is called when ETH is sent directly to the contract.
-    receive() external payable {
-        // Do not expect to receive Ether directly, (weth bridging diasbled)
-        revert("ShB: direct ether transfer not allowed");
     }
 
     /*//////////////////////////////////////////////////////////////

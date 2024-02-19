@@ -108,7 +108,7 @@ export class Deployer {
         bridgehub: "0x0000000000000000000000000000000000001234",
         stateTransitionManager: "0x0000000000000000000000000000000000002234",
         protocolVersion: "0x0000000000000000000000000000000000002234",
-        governor: "0x0000000000000000000000000000000000003234",
+        admin: "0x0000000000000000000000000000000000003234",
         validatorTimelock: "0x0000000000000000000000000000000000004234",
         baseToken: "0x0000000000000000000000000000000000004234",
         baseTokenBridge: "0x0000000000000000000000000000000000004234",
@@ -442,7 +442,7 @@ export class Deployer {
       create2Salt,
       ethTxOptions
     );
-    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress;
+    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress; // we set this for process, so we can read from process in deploySharedBridgeImplementation
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
@@ -617,7 +617,7 @@ export class Deployer {
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const governor = this.ownerAddress;
+    const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode(
       [
@@ -631,7 +631,7 @@ export class Deployer {
       this.addresses.StateTransition.StateTransitionProxy,
       baseTokenAddress,
       Date.now(),
-      governor,
+      admin,
       initialDiamondCut,
       {
         gasPrice,

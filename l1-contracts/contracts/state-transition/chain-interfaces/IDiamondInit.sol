@@ -9,7 +9,7 @@ import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 /// @param chainId
 /// @param stateTransition contract's address
 /// @param verifier address of Verifier contract
-/// @param governor address who can manage the contract
+/// @param admin address who can manage the contract
 /// @param allowList The address of the allow list smart contract
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
@@ -20,7 +20,7 @@ struct InitializeData {
     address bridgehub;
     address stateTransitionManager;
     uint256 protocolVersion;
-    address governor;
+    address admin;
     address validatorTimelock;
     address baseToken;
     address baseTokenBridge;

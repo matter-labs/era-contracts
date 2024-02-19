@@ -22,7 +22,7 @@ contract AuthorizationTest is AdminTest {
             priorityTxMaxPubdata: 99,
             minimalL2GasPrice: 500_000_000
         });
-        vm.prank(governor);
+        vm.prank(admin);
         proxyAsAdmin.changeFeeParams(newParams);
 
         bytes32 correctNewFeeParamsHash = keccak256(abi.encode(newParams));
@@ -40,7 +40,7 @@ contract AuthorizationTest is AdminTest {
             priorityTxMaxPubdata: 1_001,
             minimalL2GasPrice: 500_000_000
         });
-        vm.prank(governor);
+        vm.prank(admin);
         vm.expectRevert(bytes.concat("n6"));
         proxyAsAdmin.changeFeeParams(newParams);
     }
