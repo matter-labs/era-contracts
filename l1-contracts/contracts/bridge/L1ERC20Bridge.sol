@@ -15,7 +15,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
 /// @dev It is a legacy bridge from zkSync Era, that was deprecated in favour of shared bridge.
-/// It is needed for backward compatibility with already integrated projects
+/// It is needed for backward compatibility with already integrated projects.
 contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -130,6 +130,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
+        require(_amount != 0, "0T"); // empty deposit
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
@@ -174,6 +175,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
+        require(amount != 0, "2T"); // empty deposit
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
         sharedBridge.claimFailedDepositLegacyErc20Bridge(

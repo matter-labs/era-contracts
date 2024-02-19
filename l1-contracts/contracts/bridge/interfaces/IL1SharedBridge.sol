@@ -48,7 +48,7 @@ interface IL1SharedBridge {
         uint256 amount
     );
 
-    function isWithdrawalFinalizedShared(
+    function isWithdrawalFinalized(
         uint256 _chainId,
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
@@ -132,7 +132,7 @@ interface IL1SharedBridge {
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
-    function l1WethAddress() external view returns (address payable);
+    function l1WethAddress() external view returns (address);
 
     /// @dev Event emitted when ETH is received by the contract.
     event EthReceived(uint256 amount);

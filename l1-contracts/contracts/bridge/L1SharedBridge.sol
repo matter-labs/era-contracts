@@ -25,64 +25,61 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Smart contract that allows depositing ERC20 tokens from Ethereum to hyperchains
-/// @dev It is standard implementation of ERC20 Bridge that can be used as a reference
-/// for any other custom token bridges.
+/// @dev Bridges assets between L1 and hyperchains, supporting both ETH and ERC20 tokens.
+/// @dev Designed for use with a proxy for upgradability.
 contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Ownable2Step {
     using SafeERC20 for IERC20;
 
-    /// @dev The address of the WETH token on L1
-    address payable public immutable override l1WethAddress;
+    /// @dev The address of the WETH token on L1.
+    address public immutable override l1WethAddress;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override bridgehub;
 
-    /// @dev Legacy bridge smart contract that used to hold the tokens
+    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
     IL1ERC20Bridge public immutable override legacyBridge;
 
-    /// @dev we need to switch over from the diamondProxy Storage's isWithdrawalFinalized to this one for era
-    /// we first deploy the new Mailbox facet, then transfer the Eth, then deploy this.
-    /// this number is the first batch number that is settled on Era ST Diamond  before we update the Mailbox,
-    /// as withdrawals from batches older than this might already be finalized
-    uint256 internal eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber;
+    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
+    /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
+    /// than this value are considered to have been finalized prior to the upgrade and handled separately.
+    uint256 internal eraFirstPostUpgradeBatch;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
 
-    /// @dev A mapping chainId => L2 deposit transaction hash  => keccak256(account, tokenAddress, amount)
-    /// @dev Used for saving the number of deposited funds, to claim them in case the deposit transaction will fail.
-    /// @dev the l2TxHash is unique, as it is determined by the contracts, while dataHash is not, so we that is the output.
+    /// @dev A mapping chainId => L2 deposit transaction hash => keccak256(abi.encode(account, tokenAddress, amount))
+    /// @dev Tracks deposit transactions from L2 to enable users to claim their funds if a deposit fails.
     mapping(uint256 chainId => mapping(bytes32 l2DepositTxHash => bytes32 depositDataHash))
         public
         override depositHappened;
 
-    /// @dev A mapping L2 _chainId => Batch number => message number => flag
-    /// @dev Used to indicate that L2 -> L1 message was already processed
+    /// @dev Tracks the processing status of L2 to L1 messages, indicating whether a message has already been finalized.
     mapping(uint256 chainId => mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized)))
-        public isWithdrawalFinalizedShared;
-
-    /// @dev Used for extra security until hyperbridging is implemented.
-    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) internal chainBalance;
+        public isWithdrawalFinalized;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
 
-    /// @notice Checks that the message sender is the bridgehub
+    /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
+    /// This serves as a security measure until hyperbridging is implemented.
+    mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) internal chainBalance;
+
+    /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         require(msg.sender == address(bridgehub), "ShB not BH");
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub or Era
+    /// @notice Checks that the message sender is the bridgehub or zkSync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
-            (msg.sender == address(bridgehub)) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
+            msg.sender == address(bridgehub) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
             "L1SharedBridge: not bridgehub or era chain"
         );
         _;
     }
 
-    /// @notice Checks that the message sender is the legacy bridge
+    /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
         require(msg.sender == address(legacyBridge), "ShB not legacy bridge");
         _;
@@ -91,10 +88,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        address payable _l1WethAddress,
+        address _l1WethAddress,
         IBridgehub _bridgehub,
         IL1ERC20Bridge _legacyBridge
     ) reentrancyGuardInitializer {
+        _disableInitializers();
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
         legacyBridge = _legacyBridge;
@@ -102,26 +100,25 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
-    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge
+    /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(
         address _owner,
-        uint256 _eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber
-    ) external reentrancyGuardInitializer reinitializer(2) {
-        _transferOwnership(_owner);
+        uint256 _eraFirstPostUpgradeBatch
+    ) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
+        _transferOwnership(_owner);
 
-        eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber = _eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber;
-
+        eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev Initializes the l2Bridge address by governance for a specific chain
+    /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
     }
 
-    /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
-    /// we also use it to keep to track each chain's assets
+    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
+    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address _prevMsgSender,
@@ -134,30 +131,27 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // The Bridgehub also checks this, but we want to be sure
             require(msg.value == 0, "ShB m.v > 0 b d.it");
 
-            uint256 amount = _depositFunds(_prevMsgSender, _l1Token, _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
             require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
 
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
-        // Note we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
+        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
     }
 
-    /// @dev Transfers tokens from the depositor address to the smart contract address
-    /// @return The difference between the contract balance before and after the transferring of funds
-    function _depositFunds(address _from, address _token, uint256 _amount) internal returns (uint256) {
-        IERC20 token = IERC20(_token);
-        uint256 balanceBefore = token.balanceOf(address(this));
-        token.safeTransferFrom(_from, address(this), _amount);
-        uint256 balanceAfter = token.balanceOf(address(this));
+    /// @dev Transfers tokens from the depositor address to the smart contract address.
+    /// @return The difference between the contract balance before and after the transferring of funds.
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        _token.safeTransferFrom(_from, address(this), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
 
         return balanceAfter - balanceBefore;
     }
 
-    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// specifies called chainId and caller, and requested transaction in _data.
-    /// currently we only support a single tx, depositing.
+    /// @notice Initiates a deposit transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
@@ -181,7 +175,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             require(msg.value == 0, "ShB m.v > 0 for BH d.it 2");
             amount = _depositAmount;
 
-            uint256 withdrawAmount = _depositFunds(_prevMsgSender, _l1Token, _depositAmount);
+            uint256 withdrawAmount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _depositAmount);
             require(withdrawAmount == _depositAmount, "5T"); // The token has non-standard transfer logic
         }
         require(amount != 0, "6T"); // empty deposit amount
@@ -207,9 +201,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         // kl todo. We are breaking the previous events here, as we don't have the txHash, so we can't emit a DepositInitiated event
     }
 
-    /// @notice used by requestL2TransactionTwoBridges in Bridgehub
-    /// used to confirm that the Mailbox has accepted a transaction.
-    /// we can store the fact that the tx has happened using txDataHash and txHash
+    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
+    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -246,6 +239,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2
     /// @param _depositSender The address of the deposit initiator
     /// @param _l1Token The address of the deposited L1 ERC20 token
+    /// @param _amount The amount of the deposit that failed.
     /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
     /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
@@ -276,30 +270,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         );
     }
 
-    function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge {
-        _claimFailedDeposit(
-            true,
-            ERA_CHAIN_ID,
-            _depositSender,
-            _l1Token,
-            _amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
-    }
-
+    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function _claimFailedDeposit(
         bool _checkedInLegacyBridge,
         uint256 _chainId,
@@ -330,7 +301,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
             {
                 // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
-                bool weCanCheckDepositHere = !_isLegacyWithdrawal(_chainId, _l2BatchNumber);
+                bool weCanCheckDepositHere = !_isEraLegacyWithdrawal(_chainId, _l2BatchNumber);
                 // Double claims are not possible, as we this check except for legacy bridge withdrawals
                 // Funds claimed before the update will still be recorded in the legacy bridge
                 // Note we double check NEW deposits if they are called from the legacy bridge
@@ -367,11 +338,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
     }
 
-    function _isLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraIsEthWithdrawalFinalizedStorageSwitchBatchNumber);
+
+    /// @dev Determines if a withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
+    /// @return Whether withdrawal was initiated on zkSync Era before Shared Bridge upgrade.
+    function _isEraLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        return (_chainId == ERA_CHAIN_ID) && (_l2BatchNumber < eraFirstPostUpgradeBatch);
     }
 
     /// @notice Finalize the withdrawal and release funds
+    /// @param _chainId The chain ID of the transaction to check
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
@@ -385,32 +362,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        // To avoid rewithdrawing txs that have already happened on the legacy bridge
-        // note: new withdraws are all recorded here, so double withdrawing them is not possible
-        bool legacyWithdrawal = _isLegacyWithdrawal(_chainId, _l2BatchNumber);
-        if (legacyWithdrawal) {
+        // To avoid rewithdrawing txs that have already happened on the legacy bridge.
+        // Note: new withdraws are all recorded here, so double withdrawing them is not possible.
+        if (_isEraLegacyWithdrawal(_chainId, _l2BatchNumber)) {
             require(!legacyBridge.isWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex), "ShB: legacy withdrawal");
         }
         _finalizeWithdrawal(_chainId, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
-    }
-
-    function finalizeWithdrawalLegacyErc20Bridge(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge returns (address, address, uint256) {
-        // l1Receiver, l1Token, amount
-        return
-            _finalizeWithdrawal(
-                ERA_CHAIN_ID,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBatch,
-                _message,
-                _merkleProof
-            );
     }
 
     struct MessageParams {
@@ -419,6 +376,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 l2TxNumberInBatch;
     }
 
+    /// @dev Internal function that handles the logic for finalizing withdrawals, 
+    /// serving both the current bridge system and the legacy ERC20 bridge.
     function _finalizeWithdrawal(
         uint256 _chainId,
         uint256 _l2BatchNumber,
@@ -428,14 +387,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32[] calldata _merkleProof
     ) internal nonReentrant returns (address l1Receiver, address l1Token, uint256 amount) {
         require(
-            !isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex],
+            !isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex],
             "Withdrawal is already finalized"
         );
-        isWithdrawalFinalizedShared[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
+        isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
-        if (_isLegacyWithdrawal(_chainId, _l2BatchNumber)) {
-            // in this case we have to check we don't double withdraw ether
-            // note the WETH bridge has not yet been deployed, so it cannot be the case that we withdrew Eth but not WETH.
+        // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
+        if (_isEraLegacyWithdrawal(_chainId, _l2BatchNumber)) {
+            // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(ERA_DIAMOND_PROXY).isEthWithdrawalFinalized(
                 _l2BatchNumber,
                 _l2MessageIndex
@@ -443,15 +402,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             require(!alreadyFinalized, "Withdrawal is already finalized 2");
         }
 
-        {
-            MessageParams memory messageParams = MessageParams({
-                l2BatchNumber: _l2BatchNumber,
-                l2MessageIndex: _l2MessageIndex,
-                l2TxNumberInBatch: _l2TxNumberInBatch
-            });
-
-            (l1Receiver, l1Token, amount) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
-        }
+        MessageParams memory messageParams = MessageParams({
+            l2BatchNumber: _l2BatchNumber,
+            l2MessageIndex: _l2MessageIndex,
+            l2TxNumberInBatch: _l2TxNumberInBatch
+        });
+        (l1Receiver, l1Token, amount) = _checkWithdrawal(_chainId, messageParams, _message, _merkleProof);
 
         if (!hyperbridgingEnabled[_chainId]) {
             // Check that the chain has sufficient balance
@@ -475,7 +431,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         }
     }
 
-    /// @dev check that the withdrawal is valid
+    /// @dev Verifies the validity of a withdrawal message from L2 and returns details of the withdrawal.
     function _checkWithdrawal(
         uint256 _chainId,
         MessageParams memory _messageParams,
@@ -494,17 +450,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 data: _message
             });
         }
-        // Preventing the stack too deep error
-        {
-            bool success = bridgehub.proveL2MessageInclusion(
-                _chainId,
-                _messageParams.l2BatchNumber,
-                _messageParams.l2MessageIndex,
-                l2ToL1Message,
-                _merkleProof
-            );
-            require(success, "ShB withd w proof"); // withdrawal wrong proof
-        }
+
+        bool success = bridgehub.proveL2MessageInclusion(
+            _chainId,
+            _messageParams.l2BatchNumber,
+            _messageParams.l2MessageIndex,
+            l2ToL1Message,
+            _merkleProof
+        );
+        require(success, "ShB withd w proof"); // withdrawal wrong proof
     }
 
     function _parseL2WithdrawalMessage(
@@ -551,8 +505,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// of processing an L2 transaction where tokens would be minted
-    /// only used for eth based chains
+    /// of processing an L2 transaction where tokens would be minted.
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
     /// @param _l2Receiver The account address that should receive funds on L2
@@ -574,9 +527,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// L2 tx if the L1 msg.sender is a contract. Without address aliasing for L1 contracts as refund recipients they
     /// would not be able to make proper L2 tx requests through the Mailbox to use or withdraw the funds from L2, and
     /// the funds would be lost.
-    /// @return l2TxHash The L2 transaction hash of deposit finalization
+    /// @return l2TxHash The L2 transaction hash of deposit finalization.
     function depositLegacyErc20Bridge(
-        address _msgSender,
+        address _prevMsgSender,
         address _l2Receiver,
         address _l1Token,
         uint256 _amount,
@@ -584,16 +537,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant returns (bytes32 l2TxHash) {
-        require(_amount != 0, "2T"); // empty deposit amount
         require(l2BridgeAddress[ERA_CHAIN_ID] != address(0), "ShB b. n dep");
         require(_l1Token != l1WethAddress, "ShB: WETH deposit not supported 2");
 
-        // note funds have been transferred to this contract in the legacy ERC20 bridge
+        // Note that funds have been transferred to this contract in the legacy ERC20 bridge.
         if (!hyperbridgingEnabled[ERA_CHAIN_ID]) {
             chainBalance[ERA_CHAIN_ID][_l1Token] += _amount;
         }
 
-        bytes memory l2TxCalldata = _getDepositL2Calldata(_msgSender, _l2Receiver, _l1Token, _amount);
+        bytes memory l2TxCalldata = _getDepositL2Calldata(_prevMsgSender, _l2Receiver, _l1Token, _amount);
 
         {
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
@@ -601,47 +553,92 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // If the recipient is a contract on L1, the address alias will be applied.
             address refundRecipient = _refundRecipient;
             if (_refundRecipient == address(0)) {
-                refundRecipient = _msgSender != tx.origin
-                    ? AddressAliasHelper.applyL1ToL2Alias(_msgSender)
-                    : _msgSender;
+                refundRecipient = _prevMsgSender != tx.origin
+                    ? AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender)
+                    : _prevMsgSender;
             }
 
-            l2TxHash = _depositSendTx(
-                ERA_CHAIN_ID,
-                l2TxCalldata,
-                _l2TxGasLimit,
-                _l2TxGasPerPubdataByte,
-                refundRecipient
-            );
+            L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
+                chainId: ERA_CHAIN_ID,
+                l2Contract: l2BridgeAddress[ERA_CHAIN_ID],
+                mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
+                l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
+                l2Calldata: l2TxCalldata,
+                l2GasLimit: _l2TxGasLimit,
+                l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
+                factoryDeps: new bytes[](0),
+                refundRecipient: refundRecipient
+            });
+            l2TxHash = bridgehub.requestL2TransactionDirect{value: msg.value}(request);
         }
 
-        bytes32 txDataHash = keccak256(abi.encode(_msgSender, _l1Token, _amount));
+        bytes32 txDataHash = keccak256(abi.encode(_prevMsgSender, _l1Token, _amount));
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
 
-        emit DepositInitiatedSharedBridge(ERA_CHAIN_ID, l2TxHash, _msgSender, _l2Receiver, _l1Token, _amount);
+        emit DepositInitiatedSharedBridge(ERA_CHAIN_ID, l2TxHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
     }
 
-    /// @dev internal to avoid stack too deep error. Only used for Era legacy bridge deposits
-    function _depositSendTx(
-        uint256 _chainId,
-        bytes memory _l2TxCalldata,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
-    ) internal returns (bytes32 l2TxHash) {
-        L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
-            chainId: _chainId,
-            l2Contract: l2BridgeAddress[_chainId],
-            mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
-            l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
-            l2Calldata: _l2TxCalldata,
-            l2GasLimit: _l2TxGasLimit,
-            l2GasPerPubdataByteLimit: _l2TxGasPerPubdataByte,
-            factoryDeps: new bytes[](0),
-            refundRecipient: _refundRecipient
-        });
+    /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    ///
+    /// @return l1Receiver The address on L1 that will receive the withdrawn funds
+    /// @return l1Token The address of the L1 token being withdrawn
+    /// @return amount The amount of the token being withdrawns
+    function finalizeWithdrawalLegacyErc20Bridge(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
+    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
+        (l1Receiver, l1Token, amount) = _finalizeWithdrawal(
+            ERA_CHAIN_ID,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _message,
+            _merkleProof
+        );
+    }
 
-        return bridgehub.requestL2TransactionDirect{value: msg.value}(request);
+    /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.
+    /// This function is specifically designed for maintaining backward-compatibility with legacy `claimFailedDeposit` 
+    /// method in `L1ERC20Bridge`.
+    ///
+    /// @param _depositSender The address of the deposit initiator
+    /// @param _l1Token The address of the deposited L1 ERC20 token
+    /// @param _amount The amount of the deposit that failed.
+    /// @param _l2TxHash The L2 transaction hash of the failed deposit finalization
+    /// @param _l2BatchNumber The L2 batch number where the deposit finalization was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization
+    function claimFailedDepositLegacyErc20Bridge(
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external override onlyLegacyBridge {
+        _claimFailedDeposit(
+            true,
+            ERA_CHAIN_ID,
+            _depositSender,
+            _l1Token,
+            _amount,
+            _l2TxHash,
+            _l2BatchNumber,
+            _l2MessageIndex,
+            _l2TxNumberInBatch,
+            _merkleProof
+        );
     }
 }
