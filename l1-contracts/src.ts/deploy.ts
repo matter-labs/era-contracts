@@ -442,7 +442,7 @@ export class Deployer {
       create2Salt,
       ethTxOptions
     );
-    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress;
+    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress; // we set this for process, so we can read from process in deploySharedBridgeImplementation
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
