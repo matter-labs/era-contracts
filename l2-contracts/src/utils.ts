@@ -5,6 +5,7 @@ import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { ADDRESS_ONE, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
+import { DeployerFactory } from "../../l1-contracts/typechain/DeployerFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
@@ -125,7 +126,9 @@ export async function create2DeployFromL1(
     await tx.wait();
   }
   const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
-  return await bridgehub.requestL2TransactionDirect(
+  const deployerContractAddress = deployedAddressesFromEnv().Deployer;
+  const deployerContract = DeployerFactory.connect(deployerContractAddress, wallet);
+  return await deployerContract.requestL2Transaction(
     {
       chainId,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
