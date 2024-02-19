@@ -33,7 +33,7 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/0"
+            "m/44'/60'/0'/0/1"
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
@@ -131,7 +131,7 @@ async function main() {
         priorityTxMaxGasLimit
       );
 
-      console.log(`CONTRACTS_L2_ERC20_BRIDGE_ADDR=${l2SharedBridgeProxyAddress}`);
+      console.log(`CONTRACTS_L2_SHARED_BRIDGE_ADDR=${l2SharedBridgeProxyAddress}`);
 
       /// ####################################################################################################################
 
@@ -167,8 +167,8 @@ async function main() {
       /// ####################################################################################################################
 
       console.log("Initializing chain governance");
-      const tx2 = await l1SharedBridge.initializeChainGovernance(chainId, l2SharedBridgeProxyAddress);
-      await tx2.wait();
+      await deployer.executeUpgrade(l1SharedBridge.address, 0, l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [chainId, l2SharedBridgeProxyAddress]));
+      
       console.log("Chain governance initialized");
     });
 

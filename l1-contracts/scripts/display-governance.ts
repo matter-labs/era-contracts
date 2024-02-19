@@ -77,7 +77,7 @@ async function main() {
     );
 
     const l2SharedBridge = deployer.transparentUpgradableProxyContract(
-      process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
+      process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR!,
       deployWallet2
     );
     console.log("L2SharedBridge proxy admin: ", await proxyGov(l2SharedBridge.address, deployWallet2.provider));

@@ -617,7 +617,7 @@ export class Deployer {
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
     const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
-    const admin = this.ownerAddress;
+    const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode(
       [

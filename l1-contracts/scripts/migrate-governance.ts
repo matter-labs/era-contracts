@@ -126,7 +126,7 @@ async function main() {
 
       // L2 ERC20 bridge as well as Weth token are a transparent upgradable proxy.
       const l2SharedBridge = deployer.transparentUpgradableProxyContract(
-        process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR!,
+        process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR!,
         deployWallet
       );
       const l2SharedBridgeCalldata = l2SharedBridge.interface.encodeFunctionData("changeAdmin", [aliasedNewGovernor]);
@@ -188,7 +188,7 @@ async function main() {
         {
           target: zkSync.address,
           value: 0,
-          data: zkSync.interface.encodeFunctionData("acceptGovernor"),
+          data: zkSync.interface.encodeFunctionData("acceptAdmin"),
         },
         {
           target: validatorTimelock.address,

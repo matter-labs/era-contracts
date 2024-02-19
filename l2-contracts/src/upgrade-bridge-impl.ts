@@ -57,7 +57,7 @@ function validateUpgradeInfo(info: UpgradeInfo) {
 }
 
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
-const l2SharedBridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_ERC20_BRIDGE_ADDR");
+const l2SharedBridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
 const l1Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
