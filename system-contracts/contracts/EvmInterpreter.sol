@@ -11,6 +11,7 @@ import "./libraries/SystemContractHelper.sol";
 // TODO: move to Constants.sol (need to make contract interfaces)
 
 function _words(uint256 n) pure returns (uint256) {
+    // TODO: double check that it is correct
     return (n + 31) >> 5;
 }
 
@@ -52,15 +53,19 @@ contract EvmInterpreter {
     }
 
     // To prevent overflows, we always keep memory below 1MB. If someone tries to allocate more, we just return inf.
+    // This constant is chosen in a way that:
+    // - expandMemory will never overflow with 2 * MAX_ALLOWED_MEM_SIZE as input
+    // - it should never be realistic for an EVM to get that much memory. TODO: possibly enforce that.
     uint256 constant MAX_ALLOWED_MEM_SIZE = 1e6;
+    function ensureAcceptableMemLocation(uint256 location) internal pure {
+        unchecked {
+            require(location < MAX_ALLOWED_MEM_SIZE);
+        }
+    } 
 
+    // This function can overflow, it is the job of the caller to ensure that it does not.
     function expandMemory(uint256 newSize) internal pure returns (uint256 gasCost) {
         unchecked {
-            // Ensuring no overflow
-            if (newSize > MAX_ALLOWED_MEM_SIZE) {
-                return uint256(int256(-1));
-            }
-
             uint256 memOffset = MEM_OFFSET;
             uint256 oldSizeWords;
             assembly {
@@ -73,9 +78,11 @@ contract EvmInterpreter {
             uint256 oldCost = memCost(oldSizeWords);
             uint256 newCost = memCost(newSizeWords);
 
-            gasCost = newCost - oldCost;
-            assembly ("memory-safe") {
-                mstore(memOffset, newSizeWords)
+            if(newSizeWords > oldSizeWords) {
+                gasCost = newCost - oldCost;
+                assembly ("memory-safe") {
+                    mstore(memOffset, newSizeWords)
+                }
             }
         }
     }
@@ -828,6 +835,15 @@ contract EvmInterpreter {
         }
     }
 
+    function chargeGas(uint256 prevGas, uint256 toCharge) internal returns (uint256 gasRemaining) {
+        unchecked {
+            // I can not return any readable error to preserve compatibility
+            require(prevGas >= toCharge);
+
+            gasRemaining = prevGas - toCharge;
+        }
+    }
+
     /// Executes the EVM bytecode and returns a triple of (offset, len, gas) to return to the caller.
     function _simulate(
         bool isCallerEVM,
@@ -866,15 +882,6 @@ contract EvmInterpreter {
                 // optimization: opcode is uint256 instead of uint8 otherwise every op will trim bits every time
                 uint256 opcode;
 
-                // check for stack overflow/underflow
-
-                // TODO: we potentially might need to perform this after each opcode
-                if (int256(gasLeft) < 0) {
-                    assembly {
-                        revert(0, 0)
-                    }
-                }
-
                 {
                     bool outOfBounds = false;
                     (opcode, outOfBounds) = readIP(ip);
@@ -903,59 +910,62 @@ contract EvmInterpreter {
 
                     if (opcode == OP_ADD) {
                         tmp = a + b;
-                        gasLeft -= 3;
+                        gasLeft = chargeGas(gasLeft, 3);
                     } else if (opcode == OP_MUL) {
                         tmp = a * b;
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SUB) {
                         tmp = a - b;
-                        gasLeft -= 3;
+                        gasLeft = chargeGas(gasLeft, 3);
                     } else if (opcode == OP_DIV) {
                         assembly ("memory-safe") {
                             tmp := div(a, b)
                         }
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SDIV) {
                         assembly ("memory-safe") {
                             tmp := sdiv(a, b)
                         }
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_MOD) {
                         assembly ("memory-safe") {
                             tmp := mod(a, b)
                         }
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SMOD) {
                         assembly ("memory-safe") {
                             tmp := smod(a, b)
                         }
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_ADDMOD) {
                         uint256 n;
                         (n, tos) = _popStackItem(tos);
                         assembly ("memory-safe") {
                             tmp := addmod(a, b, n)
                         }
-                        gasLeft -= 8;
+                        gasLeft = chargeGas(gasLeft, 8);
                     } else if (opcode == OP_MULMOD) {
                         uint256 n;
                         (n, tos) = _popStackItem(tos);
                         assembly ("memory-safe") {
                             tmp := mulmod(a, b, n)
                         }
-                        gasLeft -= 8;
+                        gasLeft = chargeGas(gasLeft, 8);
                     } else if (opcode == OP_EXP) {
                         tmp = a ** b;
-                        gasLeft -= 10;
+
+                        uint256 toCharge = 10;
                         while (b > 0) {
-                            gasLeft -= 50;
+                            toCharge += 50;
                             b >>= 8;
                         }
+
+                        gasLeft = chargeGas(gasLeft, toCharge);
                     } else if (opcode == OP_SIGNEXTEND) {
                         assembly ("memory-safe") {
                             tmp := signextend(a, b)
                         }
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                     }
 
                     tos = pushStackItem(tos, tmp);
@@ -1029,7 +1039,7 @@ contract EvmInterpreter {
                     }
 
                     tos = pushStackItem(tos, tmp);
-                    gasLeft -= 3;
+                    gasLeft = chargeGas(gasLeft, 3);
                     // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                     continue;
                 }
@@ -1045,11 +1055,11 @@ contract EvmInterpreter {
                         (ost, tos) = _popStackItem(tos);
                         (len, tos) = _popStackItem(tos);
 
-                        gasLeft -=
-                            30 + // base cost
-                            6 *
-                            _words(len) + // cost per word
-                            expandMemory(ost + len); // memory expansion
+                        ensureAcceptableMemLocation(len);
+                        ensureAcceptableMemLocation(ost);
+                        uint256 toCharge = 30 + 6 * _words(len) + expandMemory(ost + len);
+
+                        gasLeft = chargeGas(gasLeft, toCharge);
 
                         uint256 val;
                         assembly ("memory-safe") {
@@ -1062,7 +1072,7 @@ contract EvmInterpreter {
 
                     if (opcode == OP_ADDRESS) {
                         tos = pushStackItem(tos, uint256(uint160(address(this))));
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1073,28 +1083,28 @@ contract EvmInterpreter {
 
                         tos = pushStackItem(tos, address(uint160(addr)).balance);
                         // TODO: dynamic gas cost (simply 2600 if cold...)
-                        gasLeft -= 100;
+                        gasLeft = chargeGas(gasLeft, 100);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_ORIGIN) {
                         tos = pushStackItem(tos, uint256(uint160(tx.origin)));
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_CALLER) {
                         tos = pushStackItem(tos, uint256(uint160(msg.sender)));
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_CALLVALUE) {
                         tos = pushStackItem(tos, uint256(uint160(msg.value)));
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1108,18 +1118,19 @@ contract EvmInterpreter {
                         // It is assumed that the input is always the last part of the calldata
                         // and it encompasses the entire intended calldata.
                         assembly {
+                            // TODO: double check if non zero `input.offset` should be even allowed, otherwise an overflow might happen
                             val := calldataload(add(input.offset, idx))
                         }
 
                         tos = pushStackItem(tos, val);
-                        gasLeft -= 3;
+                        gasLeft = chargeGas(gasLeft, 3);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_CALLDATASIZE) {
                         tos = pushStackItem(tos, input.length);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1133,11 +1144,13 @@ contract EvmInterpreter {
                         (ost, tos) = _popStackItem(tos);
                         (len, tos) = _popStackItem(tos);
 
-                        gasLeft -=
-                            3 + // base cost
-                            3 *
-                            _words(len) + // word copy cost
-                            expandMemory(dstOst + len); // memory expansion
+                        // Preventing overflow.
+                        ensureAcceptableMemLocation(dstOst);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 3 + 3 * _words(len) + expandMemory(dstOst + len);
+
+                        gasLeft = chargeGas(gasLeft, toCharge);
 
                         assembly ("memory-safe") {
                             calldatacopy(add(memOffset, dstOst), add(input.offset, ost), len)
@@ -1149,7 +1162,7 @@ contract EvmInterpreter {
 
                     if (opcode == OP_CODESIZE) {
                         tos = pushStackItem(tos, _bytecodeLen);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1166,14 +1179,18 @@ contract EvmInterpreter {
                         (ost, tos) = _popStackItem(tos);
                         (len, tos) = _popStackItem(tos);
 
+
+                        // Preventing overflow.
+                        ensureAcceptableMemLocation(dstOst);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 3 + 3 * _words(len) + expandMemory(dstOst + len);
+
+
                         // TODO: double check whether the require below is needed
                         // require(ost + len <= _bytecodeLen, "codecopy: bytecode too long");
 
-                        gasLeft -=
-                            3 + // base cost
-                            3 *
-                            _words(len) + // word copy cost
-                            expandMemory(dstOst + len); // memory expansion
+                        gasLeft = chargeGas(gasLeft, toCharge);
 
                         // basically BYTECODE_OFFSET + 32 - 31, since
                         // we always need to read one byte
@@ -1200,6 +1217,7 @@ contract EvmInterpreter {
 
                     if (opcode == OP_GASPRICE) {
                         tos = pushStackItem(tos, tx.gasprice);
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1208,20 +1226,19 @@ contract EvmInterpreter {
                         uint256 addr;
                         (addr, tos) = _popStackItem(tos);
 
+                        // extra cost if account is cold
+                        if (warmAccount(address(uint160(addr)))) {
+                            gasLeft = chargeGas(gasLeft, 100);
+                        } else {
+                            gasLeft = chargeGas(gasLeft, 2600);
+                        }
+
                         uint256 res;
                         assembly {
                             res := extcodesize(addr)
                         }
-
+                        
                         tos = pushStackItem(tos, res);
-
-                        // extra cost if account is cold
-                        if (warmAccount(address(uint160(addr)))) {
-                            gasLeft -= 100;
-                        } else {
-                            gasLeft -= 2600;
-                        }
-
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1234,18 +1251,25 @@ contract EvmInterpreter {
 
                         (addr, destOffset, offset, size, tos) = _pop4StackItems(tos);
 
+                        uint256 toCharge;
+
                         // extra cost if account is cold
                         if (warmAccount(address(uint160(addr)))) {
-                            gasLeft -= 100;
+                            toCharge = 100;
                         } else {
-                            gasLeft -= 2600;
+                            toCharge = 2600;
                         }
 
-                        gasLeft -=
-                            3 *
+                        ensureAcceptableMemLocation(size);
+                        ensureAcceptableMemLocation(destOffset);
+
+                        toCharge += 3 *
                             _words(size) + // word copy cost
                             expandMemory(destOffset + size); // memory expansion
 
+
+                        gasLeft = chargeGas(gasLeft, toCharge);
+                            
                         _extcodecopy(address(uint160(addr)), destOffset, offset, size);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1254,12 +1278,14 @@ contract EvmInterpreter {
                     if (opcode == OP_RETURNDATASIZE) {
                         uint256 rsz;
                         uint256 rszOffset = LAST_RETURNDATA_SIZE_OFFSET;
+                        
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         assembly {
                             rsz := mload(rszOffset)
                         }
 
                         tos = pushStackItem(tos, rsz);
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1271,7 +1297,10 @@ contract EvmInterpreter {
 
                         (dstOst, ost, len, tos) = _pop3StackItems(tos);
 
-                        gasLeft -= expandMemory(dstOst + len);
+                        ensureAcceptableMemLocation(len);
+                        ensureAcceptableMemLocation(dstOst);
+
+                        gasLeft = chargeGas(gasLeft, expandMemory(dstOst + len));
 
                         SystemContractHelper.copyActivePtrData(memOffset + dstOst, ost, len);
 
@@ -1283,16 +1312,16 @@ contract EvmInterpreter {
                         uint256 addr;
                         (addr, tos) = _popStackItem(tos);
 
+                        // extra cost if account is cold
+                        if (warmAccount(address(uint160(addr)))) {
+                            gasLeft = chargeGas(gasLeft, 100);
+                        } else {
+                            gasLeft = chargeGas(gasLeft, 2600);
+                        }
+
                         uint256 result;
                         assembly {
                             result := extcodehash(addr)
-                        }
-
-                        // extra cost if account is cold
-                        if (warmAccount(address(uint160(addr)))) {
-                            gasLeft -= 100;
-                        } else {
-                            gasLeft -= 2600;
                         }
 
                         tos = pushStackItem(tos, result);
@@ -1303,28 +1332,28 @@ contract EvmInterpreter {
 
                     if (opcode == OP_TIMESTAMP) {
                         tos = pushStackItem(tos, block.timestamp);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_NUMBER) {
                         tos = pushStackItem(tos, block.number);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_CHAINID) {
                         tos = pushStackItem(tos, block.chainid);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_SELFBALANCE) {
                         tos = pushStackItem(tos, address(this).balance);
-                        gasLeft -= 5;
+                        gasLeft = chargeGas(gasLeft, 5);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1332,38 +1361,41 @@ contract EvmInterpreter {
                     if (opcode == OP_BLOCKHASH) {
                         uint256 blockNumber;
                         (blockNumber, tos) = _popStackItem(tos);
+                        gasLeft = chargeGas(gasLeft, 20);
 
                         tos = pushStackItem(tos, uint256(blockhash(blockNumber)));
-                        gasLeft -= 20;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_COINBASE) {
                         tos = pushStackItem(tos, uint256(uint160(address(block.coinbase))));
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_PREVRANDAO) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         // formerly known as DIFFICULTY
                         tos = pushStackItem(tos, block.difficulty);
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_GASLIMIT) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         tos = pushStackItem(tos, block.gaslimit);
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_BASEFEE) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         tos = pushStackItem(tos, block.basefee);
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1372,6 +1404,8 @@ contract EvmInterpreter {
                 // misc group: memory, control flow and more
                 if (opcode < GRP_MISC) {
                     if (opcode == OP_POP) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         (, tos) = _popStackItem(tos);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1380,12 +1414,14 @@ contract EvmInterpreter {
                     if (opcode == OP_MLOAD) {
                         uint256 ost;
                         (ost, tos) = _popStackItem(tos);
-                        uint256 val;
 
+                        ensureAcceptableMemLocation(ost);
+                        gasLeft = chargeGas(gasLeft, 3 + expandMemory(ost));
+
+                        uint256 val;
                         assembly ("memory-safe") {
                             val := mload(add(memOffset, ost))
                         }
-                        gasLeft -= 3 + expandMemory(ost + 32);
 
                         tos = pushStackItem(tos, val);
 
@@ -1399,11 +1435,13 @@ contract EvmInterpreter {
                         uint256 val;
                         (val, tos) = _popStackItem(tos);
 
+                        ensureAcceptableMemLocation(ost);
+
+                        gasLeft = chargeGas(gasLeft, 3 + expandMemory(ost));
+
                         assembly ("memory-safe") {
                             mstore(add(memOffset, ost), val)
                         }
-
-                        gasLeft -= 3 + expandMemory(ost + 32);
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1415,11 +1453,12 @@ contract EvmInterpreter {
                         uint256 val;
                         (val, tos) = _popStackItem(tos);
 
+                        ensureAcceptableMemLocation(ost);
+                        gasLeft = chargeGas(gasLeft, 3 + expandMemory(ost));
+
                         assembly ("memory-safe") {
                             mstore8(add(memOffset, ost), val)
                         }
-
-                        gasLeft -= 3 + expandMemory(ost + 1);
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1430,18 +1469,18 @@ contract EvmInterpreter {
 
                         (key, tos) = _popStackItem(tos);
 
+                        // extra cost if account is cold
+                        if (warmSlot(key)) {
+                            gasLeft = chargeGas(gasLeft, 100);
+                        } else {
+                            gasLeft = chargeGas(gasLeft, 2100);
+                        }
+
                         uint256 tmp;
                         assembly ("memory-safe") {
                             tmp := sload(key)
                         }
                         tos = pushStackItem(tos, tmp);
-
-                        // extra cost if account is cold
-                        if (warmSlot(key)) {
-                            gasLeft -= 100;
-                        } else {
-                            gasLeft -= 2100;
-                        }
 
                         // need not to worry about gas refunds as it happens outside the evm
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
@@ -1458,18 +1497,18 @@ contract EvmInterpreter {
                         (key, tos) = _popStackItem(tos);
                         (val, tos) = _popStackItem(tos);
 
-                        assembly ("memory-safe") {
-                            sstore(key, val)
-                        }
-
                         // TODO: those are not the *exact* same rules
                         // extra cost if account is cold
                         if (warmSlot(key)) {
-                            gasLeft -= 100;
+                            gasLeft = chargeGas(gasLeft, 100);
                             // } else if (val == 0) {
                             //     gasLeft -= 5000; // 2900 + 2100
                         } else {
-                            gasLeft -= 22100; // 20000 + 2100
+                            gasLeft = chargeGas(gasLeft, 22100); // 20000 + 2100
+                        }
+
+                        assembly ("memory-safe") {
+                            sstore(key, val)
                         }
 
                         // need not to worry about gas refunds as it happens outside the evm
@@ -1478,7 +1517,7 @@ contract EvmInterpreter {
                     }
                     // NOTE: We don't currently do full jumpdest validation (i.e. validating a jumpdest isn't in PUSH data)
                     if (opcode == OP_JUMP) {
-                        gasLeft -= 8;
+                        gasLeft = chargeGas(gasLeft, 8);
 
                         uint256 dest;
                         (dest, tos) = _popStackItem(tos);
@@ -1497,7 +1536,7 @@ contract EvmInterpreter {
                     }
                     // NOTE: We don't currently do full jumpdest validation (i.e. validating a jumpdest isn't in PUSH data)
                     if (opcode == OP_JUMPI) {
-                        gasLeft -= 10;
+                        gasLeft = chargeGas(gasLeft, 10);
 
                         uint256 dest;
                         uint256 cond;
@@ -1519,28 +1558,31 @@ contract EvmInterpreter {
                     if (opcode == OP_PC) {
                         // compensate for pc++ earlier
                         tos = pushStackItem(tos, ip - BYTECODE_OFFSET - 32);
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_MSIZE) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         tos = pushStackItem(tos, memSize());
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_GAS) {
                         // GAS opcode gives the remaining gas *after* consuming the opcode
-                        gasLeft -= 2;
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         tos = pushStackItem(tos, gasLeft);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode == OP_JUMPDEST) {
-                        gasLeft -= 1;
+                        gasLeft = chargeGas(gasLeft, 1);
+
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
@@ -1549,14 +1591,17 @@ contract EvmInterpreter {
                 // stack operations (PUSH, DUP, SWAP) and LOGs
                 if (opcode < GRP_STACK_AND_LOGS) {
                     if (opcode == OP_PUSH0) {
+                        gasLeft = chargeGas(gasLeft, 2);
+
                         tos = pushStackItem(tos, 0);
-                        gasLeft -= 2;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode < GRP_PUSH) {
                         // PUSHx
+                        gasLeft = chargeGas(gasLeft, 3);
+
                         uint256 len = opcode - OP_PUSH0;
                         uint256 num = 0;
                         // TODO: this can be optimized by reading uint256 from code then shr by ((0x7f - opcode) * 8)
@@ -1574,15 +1619,15 @@ contract EvmInterpreter {
 
                         tos = pushStackItem(tos, num);
                         ip += len;
-                        gasLeft -= 3;
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }
 
                     if (opcode < GRP_DUP) {
                         // DUPx
+                        gasLeft = chargeGas(gasLeft, 3);
+                        
                         uint256 ost = opcode - 0x80; //0x7F;
-                        gasLeft -= 3;
                         tos = dupStack(tos, ost);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1590,8 +1635,9 @@ contract EvmInterpreter {
 
                     if (opcode < GRP_SWAP) {
                         // SWAPx
+                        gasLeft = chargeGas(gasLeft, 3);
+
                         uint256 ost = opcode - 0x8F;
-                        gasLeft -= 3;
                         swapStack(tos, ost);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1605,15 +1651,15 @@ contract EvmInterpreter {
                         uint256 len;
                         (ost, len, tos) = _pop2StackItems(tos);
 
+                        ensureAcceptableMemLocation(ost);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 375 + 8 * len + expandMemory(ost + len);
+                        gasLeft = chargeGas(gasLeft, toCharge);
+
                         assembly ("memory-safe") {
                             log0(add(memOffset, ost), len)
                         }
-
-                        gasLeft -=
-                            375 + // base cost
-                            8 *
-                            len + // word copy cost
-                            expandMemory(ost + len); // memory expansion
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1628,16 +1674,16 @@ contract EvmInterpreter {
                         uint256 topic0;
 
                         (ost, len, topic0, tos) = _pop3StackItems(tos);
+                        
+                        ensureAcceptableMemLocation(ost);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 750 + 8 * len + expandMemory(ost + len);
+                        gasLeft = chargeGas(gasLeft, toCharge);
 
                         assembly ("memory-safe") {
                             log1(add(memOffset, ost), len, topic0)
                         }
-
-                        gasLeft -=
-                            750 + // base cost
-                            8 *
-                            len + // word copy cost
-                            expandMemory(ost + len); // memory expansion
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1654,15 +1700,15 @@ contract EvmInterpreter {
 
                         (ost, len, topic0, topic1, tos) = _pop4StackItems(tos);
 
+                        ensureAcceptableMemLocation(ost);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 1125 + 8 * len + expandMemory(ost + len);
+                        gasLeft = chargeGas(gasLeft, toCharge);
+
                         assembly ("memory-safe") {
                             log2(add(memOffset, ost), len, topic0, topic1)
                         }
-
-                        gasLeft -=
-                            1125 + // base cost
-                            8 *
-                            len + // word copy cost
-                            expandMemory(ost + len); // memory expansion
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1680,15 +1726,15 @@ contract EvmInterpreter {
 
                         (ost, len, topic0, topic1, topic2, tos) = _pop5StackItems(tos);
 
+                        ensureAcceptableMemLocation(ost);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 1500 + 8 * len + expandMemory(ost + len);
+                        gasLeft = chargeGas(gasLeft, toCharge);
+
                         assembly ("memory-safe") {
                             log3(add(memOffset, ost), len, topic0, topic1, topic2)
                         }
-
-                        gasLeft -=
-                            1500 + // base cost
-                            8 *
-                            len + // word copy cost
-                            expandMemory(ost + len); // memory expansion
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1707,15 +1753,15 @@ contract EvmInterpreter {
 
                         (ost, len, topic0, topic1, topic2, topic3, tos) = _pop6StackItems(tos);
 
+                        ensureAcceptableMemLocation(ost);
+                        ensureAcceptableMemLocation(len);
+
+                        uint256 toCharge = 1875 + 8 * len + expandMemory(ost + len);
+                        gasLeft = chargeGas(gasLeft, toCharge);
+
                         assembly ("memory-safe") {
                             log4(add(memOffset, ost), len, topic0, topic1, topic2, topic3)
                         }
-
-                        gasLeft -=
-                            1875 + // base cost
-                            8 *
-                            len + // word copy cost
-                            expandMemory(ost + len); // memory expansion
 
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1732,6 +1778,8 @@ contract EvmInterpreter {
                     uint256 retLen;
 
                     (gas, addr, value, argOst, argLen, retOst, retLen, tos) = _pop7StackItems(tos);
+
+                    uint256 toCharge = 0;
 
                     if (value != 0) {
                         // We can not return a readable error to preserve compatibility
@@ -1752,25 +1800,32 @@ contract EvmInterpreter {
                         // and another 25000 added to the 9000 - 2300 if
                         if (codeSize == 0) {
                             // if value AND account empty:
-                            gasLeft -= 31700; // 25000 + (9000 - 2300);
+                            toCharge += 31700; // 25000 + (9000 - 2300);
                         } else {
                             // if value AND account not empty:
-                            gasLeft -= 6700; // 9000 - 2300;
+                            toCharge += 6700; // 9000 - 2300;
                         }
 
                         // call stipend: https://github.com/ethereum/go-ethereum/blob/576681f29b895dd39e559b7ba17fcd89b42e4833/core/vm/instructions.go#L659
                         gas += 2300;
                     }
 
-                    gasLeft -= expandMemory(max(argOst + argLen, retOst + retLen));
+                    ensureAcceptableMemLocation(argOst);
+                    ensureAcceptableMemLocation(argLen);
+                    ensureAcceptableMemLocation(retOst);
+                    ensureAcceptableMemLocation(retLen);
+
+                    toCharge += expandMemory(max(argOst + argLen, retOst + retLen));
 
                     // extra cost if account is cold:
                     // If address is warm, then address_access_cost is 100, otherwise it is 2600.
                     if (warmAccount(address(uint160(addr)))) {
-                        gasLeft -= 100;
+                        toCharge += 100;
                     } else {
-                        gasLeft -= 2600;
+                        toCharge += 2600;
                     }
+
+                    gasLeft = chargeGas(gasLeft, toCharge);
 
                     gas = _maxCallGas(gas, gasLeft);
 
@@ -1789,6 +1844,7 @@ contract EvmInterpreter {
 
                     tos = pushStackItem(tos, success ? 1 : 0);
 
+                    // We assume no overflow here
                     gasLeft += frameGasLeft;
 
                     continue;
@@ -1804,15 +1860,22 @@ contract EvmInterpreter {
 
                     (gas, addr, argOst, argLen, retOst, retLen, tos) = _pop6StackItems(tos);
 
-                    gasLeft -= expandMemory(max(argOst + argLen, retOst + retLen));
+                    ensureAcceptableMemLocation(argOst);
+                    ensureAcceptableMemLocation(argLen);
+                    ensureAcceptableMemLocation(retOst);
+                    ensureAcceptableMemLocation(retLen);
+
+                    uint256 toCharge = expandMemory(max(argOst + argLen, retOst + retLen));
 
                     // extra cost if account is cold:
                     // If address is warm, then address_access_cost is 100, otherwise it is 2600.
                     if (warmAccount(address(uint160(addr)))) {
-                        gasLeft -= 100;
+                        toCharge += 100;
                     } else {
-                        gasLeft -= 2600;
+                        toCharge += 2600;
                     }
+
+                    gasLeft = chargeGas(gasLeft, toCharge);
 
                     gas = _maxCallGas(gas, gasLeft);
 
@@ -1830,6 +1893,7 @@ contract EvmInterpreter {
 
                     tos = pushStackItem(tos, success ? 1 : 0);
 
+                    // We assume no overflow here
                     gasLeft += frameGasLeft;
 
                     continue;
@@ -1845,15 +1909,17 @@ contract EvmInterpreter {
 
                     (gas, addr, argOst, argLen, retOst, retLen, tos) = _pop6StackItems(tos);
 
-                    gasLeft -= expandMemory(max(argOst + argLen, retOst + retLen));
+                    uint256 toCharge = expandMemory(max(argOst + argLen, retOst + retLen));
 
                     // extra cost if account is cold:
                     // If address is warm, then address_access_cost is 100, otherwise it is 2600.
                     if (warmAccount(address(uint160(addr)))) {
-                        gasLeft -= 100;
+                        toCharge += 100;
                     } else {
-                        gasLeft -= 2600;
+                        toCharge += 2600;
                     }
+
+                    gasLeft = chargeGas(gasLeft, toCharge);
 
                     gas = _maxCallGas(gas, gasLeft);
                     gasLeft -= gas;
@@ -1869,6 +1935,7 @@ contract EvmInterpreter {
 
                     tos = pushStackItem(tos, success ? 1 : 0);
 
+                    // No overflow is assumed here
                     gasLeft += frameGasLeft;
 
                     continue;
@@ -1880,7 +1947,10 @@ contract EvmInterpreter {
 
                     (ost, len, tos) = _pop2StackItems(tos);
 
-                    gasLeft -= expandMemory(ost + len);
+                    ensureAcceptableMemLocation(ost);
+                    ensureAcceptableMemLocation(len);
+
+                    gasLeft = chargeGas(gasLeft, expandMemory(ost + len));
 
                     _performReturnOrRevert(true, isCallerEVM, gasLeft, ost + memOffset, len);
                 }
@@ -1891,8 +1961,9 @@ contract EvmInterpreter {
 
                     (ost, len, tos) = _pop2StackItems(tos);
 
-                    // FIXME: double check thaat we still have enough gas
-                    gasLeft -= expandMemory(ost + len);
+                    ensureAcceptableMemLocation(ost);
+                    ensureAcceptableMemLocation(len);
+                    gasLeft = chargeGas(gasLeft, expandMemory(ost + len));
 
                     return (ost + memOffset, len, gasLeft);
                 }
@@ -1908,8 +1979,9 @@ contract EvmInterpreter {
                     // TODO: dobule check whether the 63/64 is applicable here
                     (val, ost, len, tos) = _pop3StackItems(tos);
 
-                    // todo: whatchout for gas overflows
-                    gasLeft -= 32000 + 200 * len + expandMemory(ost + len);
+                    ensureAcceptableMemLocation(len);
+                    ensureAcceptableMemLocation(ost);
+                    gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
 
                     (address addr, uint256 _frameGasLeft) = _performCreate(gasLeft, val, memOffset + ost, len);
 
@@ -1931,7 +2003,9 @@ contract EvmInterpreter {
 
                     (val, ost, len, salt, tos) = _pop4StackItems(tos);
 
-                    gasLeft -= 32000 + 200 * len + expandMemory(ost + len);
+                    ensureAcceptableMemLocation(len);
+                    ensureAcceptableMemLocation(ost);
+                    gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
 
                     (address addr, uint256 _frameGasLeft) = _performCreate2(gasLeft, val, memOffset + ost, len, salt);
 
@@ -2119,13 +2193,5 @@ return/revert:
 - caller is zkEVM -> plain return
 - caller is EVM -> gas + return
 - panic -> return with no data
-
-*/
-
-/*
-
-0x
-60
-80604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea264697066735822122064c70c33b791f6d7904ea1cf78deb1ceea5057f756d52084f914dd5391a14dec64736f6c63430008100033
 
 */
