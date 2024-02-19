@@ -57,11 +57,12 @@ contract EvmInterpreter {
     // - expandMemory will never overflow with 2 * MAX_ALLOWED_MEM_SIZE as input
     // - it should never be realistic for an EVM to get that much memory. TODO: possibly enforce that.
     uint256 constant MAX_ALLOWED_MEM_SIZE = 1e6;
+
     function ensureAcceptableMemLocation(uint256 location) internal pure {
         unchecked {
             require(location < MAX_ALLOWED_MEM_SIZE);
         }
-    } 
+    }
 
     // This function can overflow, it is the job of the caller to ensure that it does not.
     function expandMemory(uint256 newSize) internal pure returns (uint256 gasCost) {
@@ -78,7 +79,7 @@ contract EvmInterpreter {
             uint256 oldCost = memCost(oldSizeWords);
             uint256 newCost = memCost(newSizeWords);
 
-            if(newSizeWords > oldSizeWords) {
+            if (newSizeWords > oldSizeWords) {
                 gasCost = newCost - oldCost;
                 assembly ("memory-safe") {
                     mstore(memOffset, newSizeWords)
@@ -1179,13 +1180,11 @@ contract EvmInterpreter {
                         (ost, tos) = _popStackItem(tos);
                         (len, tos) = _popStackItem(tos);
 
-
                         // Preventing overflow.
                         ensureAcceptableMemLocation(dstOst);
                         ensureAcceptableMemLocation(len);
 
                         uint256 toCharge = 3 + 3 * _words(len) + expandMemory(dstOst + len);
-
 
                         // TODO: double check whether the require below is needed
                         // require(ost + len <= _bytecodeLen, "codecopy: bytecode too long");
@@ -1237,7 +1236,7 @@ contract EvmInterpreter {
                         assembly {
                             res := extcodesize(addr)
                         }
-                        
+
                         tos = pushStackItem(tos, res);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1263,13 +1262,13 @@ contract EvmInterpreter {
                         ensureAcceptableMemLocation(size);
                         ensureAcceptableMemLocation(destOffset);
 
-                        toCharge += 3 *
+                        toCharge +=
+                            3 *
                             _words(size) + // word copy cost
                             expandMemory(destOffset + size); // memory expansion
 
-
                         gasLeft = chargeGas(gasLeft, toCharge);
-                            
+
                         _extcodecopy(address(uint160(addr)), destOffset, offset, size);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
@@ -1278,7 +1277,7 @@ contract EvmInterpreter {
                     if (opcode == OP_RETURNDATASIZE) {
                         uint256 rsz;
                         uint256 rszOffset = LAST_RETURNDATA_SIZE_OFFSET;
-                        
+
                         gasLeft = chargeGas(gasLeft, 2);
 
                         assembly {
@@ -1626,7 +1625,7 @@ contract EvmInterpreter {
                     if (opcode < GRP_DUP) {
                         // DUPx
                         gasLeft = chargeGas(gasLeft, 3);
-                        
+
                         uint256 ost = opcode - 0x80; //0x7F;
                         tos = dupStack(tos, ost);
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
@@ -1674,7 +1673,7 @@ contract EvmInterpreter {
                         uint256 topic0;
 
                         (ost, len, topic0, tos) = _pop3StackItems(tos);
-                        
+
                         ensureAcceptableMemLocation(ost);
                         ensureAcceptableMemLocation(len);
 
