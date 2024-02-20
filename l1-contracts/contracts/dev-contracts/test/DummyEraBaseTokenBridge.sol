@@ -8,5 +8,5 @@ contract DummyEraBaseTokenBridge {
         address _prevMsgSender,
         address _l1Token,
         uint256 _amount
-    ) external payable { }
+    ) external payable {}
 }

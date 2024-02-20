@@ -20,7 +20,10 @@ contract TestBaseFacet is ZkSyncStateTransitionBase {
 
     function functionWithOnlyAdminOrStateTransitionManagerModifier() external onlyAdminOrStateTransitionManager {}
 
-    function functionWithonlyValidatorOrStateTransitionManagerModifier () external onlyValidatorOrStateTransitionManager {}
+    function functionWithonlyValidatorOrStateTransitionManagerModifier()
+        external
+        onlyValidatorOrStateTransitionManager
+    {}
 }
 
 bytes constant ERROR_ONLY_ADMIN = "StateTransition Chain: not admin";
