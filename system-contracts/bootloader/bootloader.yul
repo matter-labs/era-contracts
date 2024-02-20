@@ -2683,8 +2683,7 @@ object "Bootloader" {
                     spentPubdata := 0
                 }
 
-                // safemul?
-                ret := mul(spentPubdata, gasPerPubdata)
+                ret := safeMul(spentPubdata, gasPerPubdata, "mul: getErgsSpentForPubdata")
             }
 
             function comparePubdataSpent(
