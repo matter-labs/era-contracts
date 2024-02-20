@@ -397,7 +397,7 @@ export class Deployer {
     const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, [validatorAddress]],
       create2Salt,
       ethTxOptions
     );

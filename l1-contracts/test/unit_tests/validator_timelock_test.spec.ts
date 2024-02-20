@@ -57,7 +57,7 @@ describe("ValidatorTimelock tests", function () {
       await owner.getAddress(),
       dummyExecutor.address,
       0,
-      ethers.constants.AddressZero
+      [ethers.constants.AddressZero]
     );
     validatorTimelock = ValidatorTimelockFactory.connect(
       validatorTimelockContract.address,
@@ -99,7 +99,7 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if non-owner sets validator", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).setValidator(await randomSigner.getAddress())
+      validatorTimelock.connect(randomSigner).addValidator(await randomSigner.getAddress())
     );
 
     expect(revertReason).equal("Ownable: caller is not the owner");
@@ -113,9 +113,9 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should successfully set the validator", async () => {
     const validatorAddress = await validator.getAddress();
-    await validatorTimelock.connect(owner).setValidator(validatorAddress);
+    await validatorTimelock.connect(owner).addValidator(validatorAddress);
 
-    expect(await validatorTimelock.validator()).equal(validatorAddress);
+    expect(await validatorTimelock.validators(validatorAddress)).equal(true);
   });
 
   it("Should successfully set the execution delay", async () => {
