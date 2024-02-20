@@ -4,11 +4,13 @@ import "@matterlabs/hardhat-zksync-solc";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
+import { COMPILER_PATH } from "./scripts/constants";
+
 export default {
   zksolc: {
-    version: "1.3.18",
     compilerSource: "binary",
     settings: {
+      compilerPath: COMPILER_PATH,
       isSystem: true,
     },
   },

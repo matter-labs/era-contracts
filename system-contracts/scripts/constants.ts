@@ -1,6 +1,8 @@
 import type { BigNumberish, BytesLike } from "ethers";
 import { constants, ethers } from "ethers";
 
+export const COMPILER_PATH = `${process.env.ZKSYNC_HOME}/local-compiler/zksolc`;
+
 export const BOOTLOADER_FORMAL_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const ETH_ADDRESS = constants.AddressZero;
 
