@@ -74,7 +74,7 @@ object "Sekp256r1" {
             ////////////////////////////////////////////////////////////////
 
 
-            let success := verbatim_2i_1o("decommit", 0, 0)
+            // let success := verbatim_2i_1o("decommit", 0, 0)
         }
     }
 }
