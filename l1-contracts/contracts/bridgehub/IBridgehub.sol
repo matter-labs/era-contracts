@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IL1Bridge} from "../bridge/interfaces/IL1Bridge.sol";
+import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import "../common/Messaging.sol";
 import "../state-transition/IStateTransitionManager.sol";
 import "../state-transition/libraries/Diamond.sol";
@@ -40,12 +40,6 @@ struct L2TransactionRequestTwoBridgesInner {
 }
 
 interface IBridgehub {
-    struct ChainData {
-        address stateTransitionManager;
-        address baseToken;
-        address baseTokenBridge;
-    }
-
     /// Getters
     function stateTransitionManagerIsRegistered(address _stateTransitionManager) external view returns (bool);
 
@@ -55,11 +49,7 @@ interface IBridgehub {
 
     function baseToken(uint256 _chainId) external view returns (address);
 
-    function wethBridge() external view returns (IL1Bridge);
-
-    function tokenBridgeIsRegistered(address _baseTokenBridge) external view returns (bool);
-
-    function baseTokenBridge(uint256 _chainId) external view returns (address);
+    function sharedBridge() external view returns (IL1SharedBridge);
 
     function getStateTransition(uint256 _chainId) external view returns (address);
 
@@ -91,7 +81,7 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
-    function requestL2Transaction(
+    function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
@@ -112,9 +102,8 @@ interface IBridgehub {
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-        address _baseTokenBridge,
         uint256 _salt,
-        address _governor,
+        address _admin,
         bytes calldata _initData
     ) external returns (uint256 chainId);
 
@@ -124,9 +113,7 @@ interface IBridgehub {
 
     function addToken(address _token) external;
 
-    function addTokenBridge(address _tokenBridge) external;
-
-    function setWethBridge(address _wethBridge) external;
+    function setSharedBridge(address _sharedBridge) external;
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 }

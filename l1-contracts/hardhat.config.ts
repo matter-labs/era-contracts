@@ -8,7 +8,7 @@ import "hardhat-typechain";
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 import { task } from "hardhat/config";
 import "solidity-coverage";
-import { getNumberFromEnv } from "./scripts/utils";
+import { getNumberFromEnv } from "./src.ts/utils";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
@@ -68,6 +68,7 @@ const hardhatConfig = {
 };
 const localConfig = {
   ...prodConfig,
+  UPGRADE_NOTICE_PERIOD: 0,
   DUMMY_VERIFIER: true,
   EOA_GOVERNOR: true,
   ERA_CHAIN_ID: 9,
@@ -78,13 +79,6 @@ const localConfig = {
   ERA_WETH_BRIDGE_ADDRESS: "address(0)",
   ERC20_BRIDGE_IS_BASETOKEN_BRIDGE: true,
 };
-// const hardhatConfig = {
-//   ...prodConfig,
-//   DUMMY_VERIFIER: true,
-//   EOA_GOVERNOR: true,
-//   ERA_CHAIN_ID: 9,
-//   ERA_TOKEN_BEACON_ADDRESS: 0,
-// };
 
 const contractDefs = {
   sepolia: testnetConfig,

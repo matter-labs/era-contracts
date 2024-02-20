@@ -70,9 +70,9 @@
     "sourceCodeHash": "0xbdea2303ca17a2cc859089650d3db2a3af359cb402dbc948ab3e150956978d00"
   },
   {
-    "contractName": "L2EthToken",
-    "bytecodePath": "artifacts-zk/contracts-preprocessed/L2EthToken.sol/L2EthToken.json",
-    "sourceCodePath": "contracts-preprocessed/L2EthToken.sol",
+    "contractName": "L2BaseToken",
+    "bytecodePath": "artifacts-zk/contracts-preprocessed/L2BaseToken.sol/L2BaseToken.json",
+    "sourceCodePath": "contracts-preprocessed/L2BaseToken.sol",
     "bytecodeHash": "0x01000101172cd648d36a6b60d882f7985a1d6e72aee313fa1e7c985029c4cc07",
     "sourceCodeHash": "0xcd01e3e781df35aa53fec1509008967e9e60dd833d4f54bdfc51ac7fbf97ae8a"
   },

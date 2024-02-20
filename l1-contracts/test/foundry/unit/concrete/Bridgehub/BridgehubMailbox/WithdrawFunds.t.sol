@@ -18,7 +18,7 @@ contract WithdrawFundsTest is BridgehubMailboxTest {
     //     bridgehub.withdrawFunds(chainId, to, amount);
     // }
     // function test_RevertWhen_NotEnoughBalance() public {
-    //     address chainContract = bridgehub.getChainContract(chainId);
+    //     address chainContract = bridgehub.getStateTransition(chainId);
     //     // setting the balance of the bridgehub to 0 and trying to withdraw 1 ether
     //     vm.deal(chainContract, 0 ether);
     //     amount = 1 ether;
@@ -27,7 +27,7 @@ contract WithdrawFundsTest is BridgehubMailboxTest {
     //     bridgehub.withdrawFunds(chainId, to, amount);
     // }
     // function test_SuccessfulWithdraw() public {
-    //     address chainContract = bridgehub.getChainContract(chainId);
+    //     address chainContract = bridgehub.getStateTransition(chainId);
     //     vm.deal(address(bridgehub), 100 ether);
     //     amount = 10 ether;
     //     vm.startPrank(chainContract);

@@ -4,7 +4,9 @@ import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
-import { web3Provider, deployedAddressesFromEnv } from "./utils";
+import { web3Provider, GAS_MULTIPLIER } from "./utils";
+import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
+import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -36,10 +38,12 @@ async function main() {
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      let nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
+      const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
       const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
@@ -51,52 +55,15 @@ async function main() {
         verbose: true,
       });
 
-      // Create2 factory already deployed on the public networks, only deploy it on local node
-      if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
-        await deployer.deployCreate2Factory({ gasPrice, nonce });
-        nonce++;
-
-        await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
-        nonce++;
-      }
-
-      if (cmd.onlyVerifier) {
-        await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
-        return;
-      }
-
-      // Deploy diamond upgrade init contract if needed
-      const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
-      if (diamondUpgradeContractVersion) {
-        await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
-          gasPrice,
-          nonce,
-        });
-        nonce++;
-      }
-
-      await deployer.deployDefaultUpgrade(create2Salt, {
+      await initialBridgehubDeployment(
+        deployer,
+        [],
         gasPrice,
-        nonce,
-      });
-      nonce++;
-
-      await deployer.deployGenesisUpgrade(create2Salt, {
-        gasPrice,
-        nonce,
-      });
-      nonce++;
-
-      await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
-      nonce++;
-
-      await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-      await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-      await deployer.deployBridgehubContract(create2Salt, gasPrice);
-      await deployer.deployStateTransitionContract(create2Salt, null, gasPrice); // Do not pass nonce, since it was increment after deploying factory contracts
-      await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-      await deployer.deployBridgeContracts(create2Salt, gasPrice);
-      await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
+        cmd.onlyVerifier,
+        cmd.diamondUpgradeInit,
+        create2Salt,
+        nonce
+      );
     });
 
   await program.parseAsync(process.argv);

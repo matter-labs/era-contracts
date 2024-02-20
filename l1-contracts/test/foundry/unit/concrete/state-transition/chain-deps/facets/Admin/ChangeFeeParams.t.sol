@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
@@ -37,7 +37,7 @@ contract ChangeFeeParamsTest is AdminTest {
         });
 
         vm.startPrank(nonStateTransitionManager);
-        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);
 
         adminFacet.changeFeeParams(newFeeParams);
     }

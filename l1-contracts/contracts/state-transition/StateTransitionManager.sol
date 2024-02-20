@@ -59,23 +59,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
-    /// @notice only the state transition chain contract can call
-    modifier onlyChain(uint256 _chainId) {
-        require(stateTransition[_chainId] == msg.sender, "StateTransition: only chain");
-        _;
-    }
-
-    /// @notice only the governor of the chain can call
-    modifier onlyChainGovernor(uint256 _chainId) {
-        require(
-            IZkSyncStateTransition(stateTransition[_chainId]).getGovernor() == msg.sender,
-            "StateTransition: only chain governor"
-        );
-        _;
-    }
-
-    function getChainGovernor(uint256 _chainId) external view override returns (address) {
-        return IZkSyncStateTransition(stateTransition[_chainId]).getGovernor();
+    function getChainAdmin(uint256 _chainId) external view override returns (address) {
+        return IZkSyncStateTransition(stateTransition[_chainId]).getAdmin();
     }
 
     /// @dev initialize
@@ -142,6 +127,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
     }
 
+    /// @dev reverts batches on the specified chain
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+    }
+
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
@@ -202,8 +192,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
-        address _baseTokenBridge,
-        address _governor,
+        address _sharedBridge,
+        address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
         // check not registered
@@ -222,10 +212,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             bytes32(uint256(uint160(bridgehub))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(protocolVersion)),
-            bytes32(uint256(uint160(_governor))),
+            bytes32(uint256(uint160(_admin))),
             bytes32(uint256(uint160(validatorTimelock))),
             bytes32(uint256(uint160(_baseToken))),
-            bytes32(uint256(uint160(_baseTokenBridge))),
+            bytes32(uint256(uint160(_sharedBridge))),
             bytes32(storedBatchZero),
             diamondCut.initCalldata
         );

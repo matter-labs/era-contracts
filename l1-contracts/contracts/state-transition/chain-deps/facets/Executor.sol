@@ -450,7 +450,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidator {
+    function revertBatches(uint256 _newLastBatch) external nonReentrant onlyValidatorOrStateTransitionManager {
         _revertBatches(_newLastBatch);
     }
 

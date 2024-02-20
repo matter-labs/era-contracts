@@ -23,7 +23,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
     /// initializer
     function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
         require(address(_initializeData.verifier) != address(0), "vt");
-        require(_initializeData.governor != address(0), "vy");
+        require(_initializeData.admin != address(0), "vy");
         require(_initializeData.validatorTimelock != address(0), "hc");
         require(_initializeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
 
@@ -35,7 +35,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         s.protocolVersion = _initializeData.protocolVersion;
 
         s.verifier = _initializeData.verifier;
-        s.governor = _initializeData.governor;
+        s.admin = _initializeData.admin;
         s.validators[_initializeData.validatorTimelock] = true;
 
         s.storedBatchHashes[0] = _initializeData.storedBatchZero;

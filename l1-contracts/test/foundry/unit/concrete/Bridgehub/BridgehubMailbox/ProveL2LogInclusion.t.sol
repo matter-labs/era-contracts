@@ -26,12 +26,12 @@ contract ProveL2LogInclusionTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsTrue() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2LogInclusion.selector, blockNumber, index, l2Log, proof),
     //         abi.encode(true)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2LogInclusion.selector, blockNumber, index, l2Log, proof)
     //     );
     //     bool res = bridgehub.proveL2LogInclusion(chainId, blockNumber, index, l2Log, proof);
@@ -39,12 +39,12 @@ contract ProveL2LogInclusionTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsFalse() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2LogInclusion.selector, blockNumber, index, l2Log, proof),
     //         abi.encode(false)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2LogInclusion.selector, blockNumber, index, l2Log, proof)
     //     );
     //     bool res = bridgehub.proveL2LogInclusion(chainId, blockNumber, index, l2Log, proof);

@@ -31,7 +31,7 @@ contract DummyExecutor is IExecutor {
         _;
     }
 
-    function getGovernor() external view returns (address) {
+    function getAdmin() external view returns (address) {
         return owner;
     }
 

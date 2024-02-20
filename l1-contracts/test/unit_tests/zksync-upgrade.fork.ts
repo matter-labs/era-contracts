@@ -34,7 +34,7 @@ describe("Diamond proxy upgrade fork test", function () {
   before(async () => {
     const signers = await hardhat.ethers.getSigners();
     diamondProxy = IBridgehubFactory.connect(DIAMOND_PROXY_ADDRESS, signers[0]);
-    const governorAddress = await diamondProxy.getGovernor();
+    const governorAddress = await diamondProxy.getAdmin();
 
     await hardhat.network.provider.request({ method: "hardhat_impersonateAccount", params: [governorAddress] });
     governor = await hardhat.ethers.provider.getSigner(governorAddress);
@@ -149,7 +149,7 @@ describe("Diamond proxy upgrade fork test", function () {
   });
 
   it("check getters functions", async () => {
-    const governorAddr = await diamondProxy.getGovernor();
+    const governorAddr = await diamondProxy.getAdmin();
     expect(governorAddr).to.be.eq(await governor.getAddress());
 
     const isFrozen = await diamondProxy.isDiamondStorageFrozen();

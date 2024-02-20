@@ -1,11 +1,10 @@
 import { expect } from "chai";
 import type { BigNumberish, BytesLike } from "ethers";
-import * as ethers from "ethers";
 import { Wallet } from "ethers";
-import * as fs from "fs";
+import * as ethers from "ethers";
 import * as hardhat from "hardhat";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
-import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
+
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {
   AdminFacetFactory,
@@ -16,6 +15,15 @@ import {
   GettersFacetFactory,
   StateTransitionManagerFactory,
 } from "../../typechain";
+
+import {
+  initialTestnetDeploymentProcess,
+  ethTestConfig,
+  L2_BOOTLOADER_BYTECODE_HASH,
+  L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
+} from "../../src.ts/deploy-process";
+import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
+
 import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
 import {
   EMPTY_STRING_KECCAK,
@@ -27,19 +35,9 @@ import {
   createSystemLogsWithUpgrade,
   genesisStoredBatchInfo,
   getCallRevertReason,
-  initialDeployment,
   packBatchTimestampAndBatchTimestamp,
+  SYSTEM_UPGRADE_TX_TYPE,
 } from "./utils";
-
-// process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
-
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
-
-const testConfigPath = "./test/test_config/constant";
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-
-const SYSTEM_UPGRADE_TX_TYPE = 254;
 
 describe("L2 upgrade test", function () {
   let proxyExecutor: ExecutorFacet;
@@ -85,7 +83,7 @@ describe("L2 upgrade test", function () {
     const dummyAdminfFacetContract = await dummyAdminFacetFactory.deploy();
     const extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
 
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
     initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
 
     chainId = deployer.chainId;

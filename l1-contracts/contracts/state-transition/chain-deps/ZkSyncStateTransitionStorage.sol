@@ -66,10 +66,10 @@ struct FeeParams {
 struct ZkSyncStateTransitionStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
-    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing)
-    address governor;
+    /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by STM
+    address __DEPRECATED_governor;
     /// @notice Address that the governor proposed as one that will replace it
-    address pendingGovernor;
+    address __DEPRECATED_pendingGovernor;
     /// @notice List of permitted validators
     mapping(address validatorAddress => bool isValidator) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
@@ -127,9 +127,9 @@ struct ZkSyncStateTransitionStorage {
     /// yet.
     uint256 l2SystemContractsUpgradeBatchNumber;
     /// @dev Address which will exercise non-critical changes to the Diamond Proxy (changing validator set & unfreezing)
-    address __DEPRECATED_admin;
-    /// @notice Address that the governor or admin proposed as one that will replace admin role
-    address __DEPRECATED_pendingAdmin;
+    address admin;
+    /// @notice Address that the admin proposed as one that will replace admin role
+    address pendingAdmin;
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
@@ -144,4 +144,8 @@ struct ZkSyncStateTransitionStorage {
     address baseToken;
     /// @dev The address of the baseTokenbridge. Eth uses the weth bridge.
     address baseTokenBridge;
+    /// @notice gasPriceMultiplier for each baseToken, so that each L1->L2 transaction pays for its transaction on the destination
+    /// we multiply by the nominator, and divide by the denominator
+    uint128 baseTokenGasPriceMultiplierNominator;
+    uint128 baseTokenGasPriceMultiplierDenominator;
 }

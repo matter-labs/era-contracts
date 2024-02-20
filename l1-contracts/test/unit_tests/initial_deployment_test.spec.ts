@@ -1,17 +1,18 @@
 import { expect } from "chai";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
+
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { CONTRACTS_LATEST_PROTOCOL_VERSION, ethTestConfig, initialDeployment } from "./utils";
-
-import * as ethers from "ethers";
-import { Wallet } from "ethers";
+import { ethTestConfig, initialTestnetDeploymentProcess } from "../../src.ts/deploy-process";
 import type { Deployer } from "../../src.ts/deploy";
 
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
+// todo I had trouble making this work, there is some importation error
+// import {deploySharedBridgeOnL2ThroughL1} from "../../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
 
-describe("Initial Deployment", function () {
+describe("Initial deployment", function () {
   let bridgehub: Bridgehub;
   let stateTransition: StateTransitionManager;
   let owner: ethers.Signer;
@@ -40,9 +41,11 @@ describe("Initial Deployment", function () {
 
     await owner.sendTransaction(tx);
 
-    deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, []);
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
 
     chainId = deployer.chainId;
+
+    // await deploySharedBridgeOnL2ThroughL1(deployer, chainId.toString(), gasPrice);
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
     stateTransition = StateTransitionManagerFactory.connect(

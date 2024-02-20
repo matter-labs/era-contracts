@@ -6,7 +6,7 @@ import "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
     constructor() {
-        s.governor = msg.sender;
+        s.admin = msg.sender;
         s.stateTransitionManager = msg.sender;
     }
 
@@ -22,11 +22,11 @@ contract AdminFacetTest is AdminFacet {
         return s.priorityTxMaxGasLimit;
     }
 
-    function getGovernor() external view returns (address) {
-        return s.governor;
+    function getAdmin() external view returns (address) {
+        return s.admin;
     }
 
-    function getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+    function getPendingAdmin() external view returns (address) {
+        return s.pendingAdmin;
     }
 }

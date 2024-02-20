@@ -3,22 +3,22 @@
 pragma solidity 0.8.20;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 contract FreezeDiamondTest is AdminTest {
     event Freeze();
 
-    function test_revertWhen_calledByNonGovernorOrStateTransitionManager() public {
-        address nonGovernorOrStateTransitionManager = makeAddr("nonGovernorOrStateTransitionManager");
+    function test_revertWhen_calledByNonAdminOrStateTransitionManager() public {
+        address nonAdminOrStateTransitionManager = makeAddr("nonAdminOrStateTransitionManager");
 
-        vm.expectRevert(ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);
 
-        vm.startPrank(nonGovernorOrStateTransitionManager);
+        vm.startPrank(nonAdminOrStateTransitionManager);
         adminFacet.freezeDiamond();
     }
 
     // function test_revertWhen_diamondIsAlreadyFrozen() public {
-    //     address governor = utilsFacet.util_getGovernor();
+    //     address governor = utilsFacet.util_getAdmin();
 
     //     utilsFacet.util_setIsFrozen(true);
 
@@ -29,7 +29,7 @@ contract FreezeDiamondTest is AdminTest {
     // }
 
     // function test_successfulFreeze() public {
-    //     address governor = utilsFacet.util_getGovernor();
+    //     address governor = utilsFacet.util_getAdmin();
 
     //     utilsFacet.util_setIsFrozen(false);
 

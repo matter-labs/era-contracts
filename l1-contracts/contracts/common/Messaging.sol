@@ -123,3 +123,15 @@ struct L2CanonicalTransaction {
     // But it is still here, just in case we want to enable some additional functionality
     bytes reservedDynamic;
 }
+
+struct BridgehubL2TransactionRequest {
+    address sender;
+    address contractL2;
+    uint256 mintValue;
+    uint256 l2Value;
+    bytes l2Calldata;
+    uint256 l2GasLimit;
+    uint256 l2GasPerPubdataByteLimit;
+    bytes[] factoryDeps;
+    address refundRecipient;
+}

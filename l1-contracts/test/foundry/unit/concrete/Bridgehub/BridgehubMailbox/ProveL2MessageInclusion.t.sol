@@ -23,12 +23,12 @@ contract ProveL2MessageInclusionTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsTrue() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2MessageInclusion.selector, blockNumber, index, message, proof),
     //         abi.encode(true)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2MessageInclusion.selector, blockNumber, index, message, proof)
     //     );
     //     bool res = bridgehub.proveL2MessageInclusion(chainId, blockNumber, index, message, proof);
@@ -36,12 +36,12 @@ contract ProveL2MessageInclusionTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsFalse() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2MessageInclusion.selector, blockNumber, index, message, proof),
     //         abi.encode(false)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.proveL2MessageInclusion.selector, blockNumber, index, message, proof)
     //     );
     //     bool res = bridgehub.proveL2MessageInclusion(chainId, blockNumber, index, message, proof);

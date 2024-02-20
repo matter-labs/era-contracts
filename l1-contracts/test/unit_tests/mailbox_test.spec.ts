@@ -1,5 +1,8 @@
 import { expect } from "chai";
+import * as ethers from "ethers";
+import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
+
 import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
@@ -10,34 +13,25 @@ import {
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
+import { PubdataPricingMode } from "../../src.ts/utils";
+import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
+import { Action, facetCut } from "../../src.ts/diamondCut";
+
 import {
-  CONTRACTS_LATEST_PROTOCOL_VERSION,
   DEFAULT_REVERT_REASON,
-  L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR,
+  L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
   L2_TO_L1_MESSENGER,
-  PubdataPricingMode,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
-  ethTestConfig,
   getCallRevertReason,
-  initialDeployment,
   requestExecute,
-  requestExecuteDirect,
 } from "./utils";
-
-import * as ethers from "ethers";
-import { Wallet } from "ethers";
-
-import { Action, facetCut } from "../../src.ts/diamondCut";
-process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = CONTRACTS_LATEST_PROTOCOL_VERSION;
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
   let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
-  const MAX_CODE_LEN_WORDS = (1 << 16) - 1;
-  const MAX_CODE_LEN_BYTES = MAX_CODE_LEN_WORDS * 32;
   let forwarder: Forwarder;
   let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
@@ -64,7 +58,7 @@ describe("Mailbox tests", function () {
     const mockExecutorContract = await mockExecutorFactory.deploy();
     const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
 
-    const deployer = await initialDeployment(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
     chainId = deployer.chainId;
 
@@ -131,36 +125,15 @@ describe("Mailbox tests", function () {
     expect(revertReason).equal("ps");
   });
 
-  it("Should not accept bytecode that is too long", async () => {
-    const revertReason = await getCallRevertReason(
-      requestExecuteDirect(
-        mailbox,
-        ethers.constants.AddressZero,
-        ethers.BigNumber.from(0),
-        "0x",
-        ethers.BigNumber.from(100000),
-        [
-          // "+64" to keep the length in words odd and bytecode chunkable
-          new Uint8Array(MAX_CODE_LEN_BYTES + 64),
-        ],
-        ethers.constants.AddressZero
-      )
-    );
-
-    expect(revertReason).equal("pp");
-  });
-
   describe("finalizeEthWithdrawal", function () {
     const BLOCK_NUMBER = 0;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
-    const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    const AMOUNT = 1;
 
     const MESSAGE =
       "0x6c0960f9d8dA6BF26964aF9D7eEd9e03E53415D37aA960450000000000000000000000000000000000000000000000000000000000000001";
     const MESSAGE_HASH = ethers.utils.keccak256(MESSAGE);
-    const key = ethers.utils.hexZeroPad(L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
+    const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
       [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
@@ -194,22 +167,21 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("vq");
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Successful withdrawal", async () => {
-      const balanceBefore = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-
-      await mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF);
-      const balanceAfter = await hardhat.ethers.provider.getBalance(L1_RECEIVER);
-      expect(balanceAfter.sub(balanceBefore)).equal(AMOUNT);
+      const revertReason = await getCallRevertReason(
+        mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
+      );
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("Withdrawal is already finalized");
+      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
     });
   });
 
@@ -313,7 +285,7 @@ describe("Mailbox tests", function () {
     overrides.gasLimit = 10000000;
 
     const encodeRequest = (refundRecipient) =>
-      bridgehub.interface.encodeFunctionData("requestL2Transaction", [
+      bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,

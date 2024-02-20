@@ -43,7 +43,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("StateTransition Chain: not validator"));
         executor.commitBatches(storedBatchInfo, commitBatchInfoArray);
     }
 
@@ -53,7 +53,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(owner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("StateTransition Chain: not validator"));
         executor.proveBatches(storedBatchInfo, storedBatchInfoArray, proofInput);
     }
 
@@ -63,7 +63,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("StateTransition Chain: not validator"));
         executor.executeBatches(storedBatchInfoArray);
     }
 }

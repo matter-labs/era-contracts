@@ -80,20 +80,20 @@ contract UtilsFacet is ZkSyncStateTransitionBase {
         return s.l2DefaultAccountBytecodeHash;
     }
 
-    function util_setPendingGovernor(address _pendingGovernor) external {
-        s.governor = _pendingGovernor;
+    function util_setPendingAdmin(address _pendingAdmin) external {
+        s.pendingAdmin = _pendingAdmin;
     }
 
-    function util_getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+    function util_getPendingAdmin() external view returns (address) {
+        return s.pendingAdmin;
     }
 
-    function util_setGovernor(address _governor) external {
-        s.governor = _governor;
+    function util_setAdmin(address _admin) external {
+        s.admin = _admin;
     }
 
-    function util_getGovernor() external view returns (address) {
-        return s.governor;
+    function util_getAdmin() external view returns (address) {
+        return s.admin;
     }
 
     function util_setValidator(address _validator, bool _active) external {

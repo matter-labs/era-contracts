@@ -25,7 +25,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsTrue() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.proveL1ToL2TransactionStatus.selector,
     //             l2TxHash,
@@ -38,7 +38,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     //         abi.encode(true)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.proveL1ToL2TransactionStatus.selector,
     //             l2TxHash,
@@ -62,7 +62,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsFalse() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.proveL1ToL2TransactionStatus.selector,
     //             l2TxHash,
@@ -75,7 +75,7 @@ contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     //         abi.encode(false)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.proveL1ToL2TransactionStatus.selector,
     //             l2TxHash,

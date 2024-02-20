@@ -8,7 +8,7 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
 
 contract MailboxFacetTest is MailboxFacet {
     constructor() {
-        s.governor = msg.sender;
+        s.admin = msg.sender;
     }
 
     function setFeeParams(FeeParams memory _feeParams) external {

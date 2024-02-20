@@ -1,30 +1,14 @@
-import type { BigNumberish, BytesLike, Wallet } from "ethers";
+import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/src/types";
-import type { FacetCut } from "../../src.ts/diamondCut";
-
-import { Deployer } from "../../src.ts/deploy";
-import { deployTestnetTokens } from "../../src.ts/deploy-testnet-token";
-import { initializeErc20Bridge } from "../../src.ts/erc20-initialize";
-import { initializeWethBridge } from "../../src.ts/weth-initialize";
-
-import { GovernanceFactory } from "../../typechain";
-
-import type { IBridgehub } from "../../typechain/IBridgehub";
-import type { IL1Bridge } from "../../typechain/IL1Bridge";
-import type { IMailbox } from "../../typechain/IMailbox";
-
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/src/utils";
 
-import * as fs from "fs";
-import { ADDRESS_ONE } from "../../scripts/utils";
+import type { IBridgehub } from "../../typechain/IBridgehub";
+import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
+import type { IMailbox } from "../../typechain/IMailbox";
 
-const testConfigPath = "./test/test_config/constant";
-export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
-const testnetTokenPath = `${testConfigPath}/hardhat.json`;
-const testnetTokens = JSON.parse(fs.readFileSync(testnetTokenPath, { encoding: "utf-8" }));
-
+import type { FeeParams } from "../../src.ts/utils";
+import { ADDRESS_ONE, PubdataPricingMode } from "../../src.ts/utils";
 export const CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
@@ -36,13 +20,14 @@ export const L2_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000
 export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
 export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
-export const L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
+export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
+export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
+export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
-const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
-
-const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
-const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
+export function randomAddress() {
+  return ethers.utils.hexlify(ethers.utils.randomBytes(20));
+}
 
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -108,31 +93,6 @@ export async function getCallRevertReason(promise) {
   return revertReason;
 }
 
-export async function executeUpgrade(
-  deployer: Deployer,
-  deployWallet: Wallet,
-  targetAddress: string,
-  value: BigNumberish,
-  callData: string
-) {
-  const governance = GovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
-  const operation = {
-    calls: [{ target: targetAddress, value: value, data: callData }],
-    predecessor: ethers.constants.HashZero,
-    salt: ethers.constants.HashZero,
-  };
-  await governance.scheduleTransparent(operation, 0);
-  await governance.execute(operation);
-  if (deployer.verbose) {
-    console.log(
-      "Upgrade with target ",
-      targetAddress,
-      "executed: ",
-      await governance.isOperationDone(await governance.hashOperation(operation))
-    );
-  }
-}
-
 export async function requestExecute(
   chainId: ethers.BigNumberish,
   bridgehub: IBridgehub,
@@ -157,7 +117,7 @@ export async function requestExecute(
     overrides.value = baseCost.add(l2Value);
   }
 
-  return await bridgehub.requestL2Transaction(
+  return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: to,
@@ -181,7 +141,8 @@ export async function requestExecuteDirect(
   calldata: ethers.BytesLike,
   l2GasLimit: ethers.BigNumber,
   factoryDeps: BytesLike[],
-  refundRecipient: string
+  refundRecipient: string,
+  value?: ethers.BigNumber
 ) {
   const gasPrice = await mailbox.provider.getGasPrice();
 
@@ -194,7 +155,7 @@ export async function requestExecuteDirect(
 
   const overrides = {
     gasPrice,
-    value: baseCost.add(ethers.BigNumber.from(0)),
+    value: baseCost.add(value || ethers.BigNumber.from(0)),
   };
 
   return await mailbox.requestL2Transaction(
@@ -325,72 +286,6 @@ export function packBatchTimestampAndBatchTimestamp(
   return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
 
-export async function initialDeployment(
-  deployWallet: Wallet,
-  ownerAddress: string,
-  gasPrice: BigNumberish,
-  extraFacets: FacetCut[],
-  baseTokenName?: string
-): Promise<Deployer> {
-  process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
-
-  const deployer = new Deployer({
-    deployWallet,
-    ownerAddress,
-    verbose: false, // change here to view deployement
-    addresses: addressConfig,
-    bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-    defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-  });
-
-  const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
-
-  let nonce = await deployWallet.getTransactionCount();
-
-  await deployTestnetTokens(testnetTokens, deployWallet, testnetTokenPath, deployer.verbose);
-  const baseTokenAddress = baseTokenName
-    ? testnetTokens.find((token: { symbol: string }) => token.symbol == baseTokenName).address
-    : ADDRESS_ONE;
-
-  nonce = await deployWallet.getTransactionCount();
-
-  await deployer.deployCreate2Factory({ gasPrice, nonce });
-  nonce++;
-
-  // await deployer.deployMulticall3(create2Salt, {gasPrice, nonce});
-  // nonce++;
-
-  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
-  process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
-  process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
-  process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = zeroHash;
-  process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = "72000000";
-  process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
-  process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
-  process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
-
-  await deployer.deployGenesisUpgrade(create2Salt, { gasPrice });
-  await deployer.deployGovernance(create2Salt, { gasPrice });
-  await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
-
-  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-  await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  await deployer.deployStateTransitionContract(create2Salt, extraFacets, gasPrice);
-  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
-  await deployer.deployBridgeContracts(create2Salt, gasPrice);
-  await initializeErc20Bridge(deployer, deployWallet, gasPrice, null);
-
-  await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
-  await initializeWethBridge(deployer, deployWallet, gasPrice);
-
-  if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
-    await deployer.registerToken(baseTokenAddress);
-  }
-
-  await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice);
-  return deployer;
-}
-
 export function defaultFeeParams(): FeeParams {
   return {
     pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -427,7 +322,7 @@ export interface CommitBatchInfo {
 }
 
 export async function depositERC20(
-  bridge: IL1Bridge,
+  bridge: IL1ERC20Bridge,
   bridgehubContract: IBridgehub,
   chainId: string,
   l2Receiver: string,
@@ -441,11 +336,9 @@ export async function depositERC20(
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
-  await bridge.deposit(
-    chainId,
+  await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
     l2Receiver,
     l1Token,
-    neededValue,
     amount,
     l2GasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
@@ -454,18 +347,4 @@ export async function depositERC20(
       value: ethIsBaseToken ? neededValue : 0,
     }
   );
-}
-
-export enum PubdataPricingMode {
-  Rollup,
-  Validium,
-}
-
-export interface FeeParams {
-  pubdataPricingMode: PubdataPricingMode;
-  batchOverheadL1Gas: number;
-  maxPubdataPerBatch: number;
-  maxL2GasPerBatch: number;
-  priorityTxMaxPubdata: number;
-  minimalL2GasPrice: BigNumberish;
 }

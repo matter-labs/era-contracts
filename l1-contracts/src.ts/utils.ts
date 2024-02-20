@@ -1,10 +1,11 @@
-import type { BytesLike } from "ethers";
+import type { BytesLike, BigNumberish } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
+export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
@@ -71,4 +72,42 @@ export function computeL2Create2Address(
   );
 
   return ethers.utils.hexDataSlice(data, 12);
+}
+
+export function getAddressFromEnv(envName: string): string {
+  const address = process.env[envName];
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
+  }
+  return address;
+}
+
+export function getHashFromEnv(envName: string): string {
+  const hash = process.env[envName];
+  if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
+    throw new Error(`Incorrect hash format hash in ${envName} env: ${hash}`);
+  }
+  return hash;
+}
+
+export function getNumberFromEnv(envName: string): string {
+  const number = process.env[envName];
+  if (!/^([1-9]\d*|0)$/.test(number)) {
+    throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
+  }
+  return number;
+}
+
+export enum PubdataPricingMode {
+  Rollup,
+  Validium,
+}
+
+export interface FeeParams {
+  pubdataPricingMode: PubdataPricingMode;
+  batchOverheadL1Gas: number;
+  maxPubdataPerBatch: number;
+  maxL2GasPerBatch: number;
+  priorityTxMaxPubdata: number;
+  minimalL2GasPrice: BigNumberish;
 }

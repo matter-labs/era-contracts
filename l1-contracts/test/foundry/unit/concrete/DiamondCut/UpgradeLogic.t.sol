@@ -14,6 +14,7 @@ import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol
 import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -21,26 +22,29 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
-    address private governor;
+    address private admin;
+    address private stateTransitionManager;
     address private randomSigner;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](10);
-        dcSelectors[0] = adminFacet.setPendingGovernor.selector;
-        dcSelectors[1] = adminFacet.acceptGovernor.selector;
-        dcSelectors[2] = adminFacet.setPendingAdmin.selector;
-        dcSelectors[3] = adminFacet.acceptAdmin.selector;
-        dcSelectors[4] = adminFacet.setValidator.selector;
-        dcSelectors[5] = adminFacet.setPorterAvailability.selector;
-        dcSelectors[6] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        dcSelectors[7] = adminFacet.executeUpgrade.selector;
-        dcSelectors[8] = adminFacet.freezeDiamond.selector;
-        dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
-        return dcSelectors;
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = adminFacet.setPendingAdmin.selector;
+        selectors[1] = adminFacet.acceptAdmin.selector;
+        selectors[2] = adminFacet.setValidator.selector;
+        selectors[3] = adminFacet.setPorterAvailability.selector;
+        selectors[4] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = adminFacet.changeFeeParams.selector;
+        selectors[6] = adminFacet.setTokenMultiplier.selector;
+        selectors[7] = adminFacet.upgradeChainFromVersion.selector;
+        selectors[8] = adminFacet.executeUpgrade.selector;
+        selectors[9] = adminFacet.freezeDiamond.selector;
+        selectors[10] = adminFacet.unfreezeDiamond.selector;
+        return selectors;
     }
 
     function setUp() public {
-        governor = makeAddr("governor");
+        admin = makeAddr("admin");
+        stateTransitionManager = address(new DummyStateTransitionManager());
         randomSigner = makeAddr("randomSigner");
 
         diamondCutTestContract = new DiamondCutTestContract();
@@ -72,10 +76,10 @@ contract UpgradeLogicTest is DiamondCutTest {
             // TODO REVIEW
             chainId: 1,
             bridgehub: makeAddr("bridgehub"),
-            stateTransitionManager: makeAddr("stateTransitionManager"),
+            stateTransitionManager: stateTransitionManager,
             protocolVersion: 0,
-            governor: governor,
-            admin: governor,
+            admin: admin,
+            validatorTimelock: makeAddr("validatorTimelock"),
             baseToken: makeAddr("baseToken"),
             baseTokenBridge: makeAddr("baseTokenBridge"),
             storedBatchZero: bytes32(0),
@@ -115,12 +119,12 @@ contract UpgradeLogicTest is DiamondCutTest {
     function test_RevertWhen_EmergencyFreezeWhenUnauthurizedGovernor() public {
         vm.startPrank(randomSigner);
 
-        vm.expectRevert(abi.encodePacked("1g"));
+        vm.expectRevert(abi.encodePacked("StateTransition Chain: Only by admin or state transition manager"));
         proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_DoubleFreezingByGovernor() public {
-        vm.startPrank(governor);
+        vm.startPrank(admin);
 
         proxyAsAdmin.freezeDiamond();
 
@@ -129,7 +133,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
-        vm.startPrank(governor);
+        vm.startPrank(admin);
 
         vm.expectRevert(abi.encodePacked("a7"));
         proxyAsAdmin.unfreezeDiamond();
@@ -150,7 +154,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
 
@@ -181,7 +185,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
         proxyAsAdmin.executeUpgrade(diamondCutData);

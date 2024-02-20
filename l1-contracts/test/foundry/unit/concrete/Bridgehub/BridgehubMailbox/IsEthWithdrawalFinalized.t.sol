@@ -15,12 +15,12 @@ contract IsEthWithdrawalFinalizedTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsTrue() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
     //         abi.encode(true)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
     //     );
     //     bool res = bridgehub.isEthWithdrawalFinalized(chainId, l2MessageIndex, l2TxNumberInBlock);
@@ -28,12 +28,12 @@ contract IsEthWithdrawalFinalizedTest is BridgehubMailboxTest {
     // }
     // function test_WhenChainContractReturnsFalse() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock),
     //         abi.encode(false)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(IMailbox.isEthWithdrawalFinalized.selector, l2MessageIndex, l2TxNumberInBlock)
     //     );
     //     bool res = bridgehub.isEthWithdrawalFinalized(chainId, l2MessageIndex, l2TxNumberInBlock);

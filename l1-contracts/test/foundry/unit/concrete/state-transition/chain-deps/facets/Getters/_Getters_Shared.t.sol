@@ -16,12 +16,12 @@ contract GettersFacetWrapper is GettersFacet {
         s.verifier = IVerifier(_verifier);
     }
 
-    function util_setGovernor(address _governor) external {
-        s.governor = _governor;
+    function util_setAdmin(address _admin) external {
+        s.admin = _admin;
     }
 
-    function util_setPendingGovernor(address _pendingGovernor) external {
-        s.pendingGovernor = _pendingGovernor;
+    function util_setPendingAdmin(address _pendingAdmin) external {
+        s.pendingAdmin = _pendingAdmin;
     }
 
     function util_setBridgehub(address _bridgehub) external {

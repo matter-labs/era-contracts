@@ -24,7 +24,7 @@ contract NewChainTest is RegistryTest {
     //     bridgehub.addStateTransition(stateTransitionAddress);
     // }
 
-    // function getChainContractAddress() internal returns (address chainContractAddress) {
+    // function getStateTransitionAddress() internal returns (address chainContractAddress) {
     //     // vm.mockCall(
     //     //     bridgehub.getChainImplementation(),
     //     //     abi.encodeWithSelector(IBridgehubChain.initialize.selector),
@@ -90,7 +90,7 @@ contract NewChainTest is RegistryTest {
 
     // function test_NewChainSuccessfullyWithNonZeroChainId() public {
     //     // === Shared variables ===
-    //     address chainContractAddress = getChainContractAddress();
+    //     address chainContractAddress = getStateTransitionAddress();
 
     //     // === Mocking ===
     //     // vm.mockCall(
@@ -157,13 +157,13 @@ contract NewChainTest is RegistryTest {
     //     // === Storage checks ===
     //     assertEq(bridgehub.getStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
     //     assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
-    //     assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
+    //     assertEq(bridgehub.getStateTransition(chainId), chainContractAddress, "saved chainContract address is wrong");
     //     assertEq(resChainId, chainId, "returned chainId is wrong");
     // }
 
     // function test_NewChainSuccessfullyWithZeroChainId() public {
     //     // === Shared variables ===
-    //     address chainContractAddress = getChainContractAddress();
+    //     address chainContractAddress = getStateTransitionAddress();
     //     uint256 inputChainId = 0;
     //     chainId = uint16(
     //         uint256(
@@ -245,7 +245,7 @@ contract NewChainTest is RegistryTest {
     //     // === Storage checks ===
     //     assertEq(bridgehub.getStateTransition(chainId), stateTransitionAddress, "saved chainStateTransition is wrong");
     //     assertEq(bridgehub.getTotalChains(), 1, "saved totalChains is wrong");
-    //     assertEq(bridgehub.getChainContract(chainId), chainContractAddress, "saved chainContract address is wrong");
+    //     assertEq(bridgehub.getStateTransition(chainId), chainContractAddress, "saved chainContract address is wrong");
     //     assertEq(resChainId, chainId, "returned chainId is wrong");
     // }
 }

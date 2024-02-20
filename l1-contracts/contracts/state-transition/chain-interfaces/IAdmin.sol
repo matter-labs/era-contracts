@@ -11,13 +11,13 @@ import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAdmin is IZkSyncStateTransitionBase {
-    /// @notice Starts the transfer of governor rights. Only the current governor can propose a new pending one.
-    /// @notice New governor can accept governor rights by calling `acceptGovernor` function.
-    /// @param _newPendingGovernor Address of the new governor
-    function setPendingGovernor(address _newPendingGovernor) external;
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
+    function setPendingAdmin(address _newPendingAdmin) external;
 
-    /// @notice Accepts transfer of governor rights. Only pending governor can accept the role.
-    function acceptGovernor() external;
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external;
 
     /// @notice Change validator status (active or not active)
     /// @param _validator Validator address
@@ -36,10 +36,13 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
 
+    /// @notice Change the token multiplier for L1->L2 transactions
+    function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
+
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
-    /// @dev Only the current governor can execute the upgrade
+    /// @dev Only the current admin can execute the upgrade
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
@@ -48,7 +51,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
     function freezeDiamond() external;
 
     /// @notice Unpause the functionality of all freezable facets & their selectors
-    /// @dev Both the governor and its owner can unfreeze Diamond Proxy
+    /// @dev Both the admin and the STM can unfreeze Diamond Proxy
     function unfreezeDiamond() external;
 
     /// @notice Porter availability status changes
@@ -57,18 +60,26 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
 
-    /// @notice pendingGovernor is changed
-    /// @dev Also emitted when new governor is accepted and in this case, `newPendingGovernor` would be zero address
-    event NewPendingGovernor(address indexed oldPendingGovernor, address indexed newPendingGovernor);
+    /// @notice pendingAdmin is changed
+    /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
+    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
 
-    /// @notice Governor changed
-    event NewGovernor(address indexed oldGovernor, address indexed newGovernor);
+    /// @notice Admin changed
+    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
+
+    /// @notice BaseToken multiplier for L1->L2 transactions changed
+    event NewBaseTokenMultiplier(
+        uint128 oldNominator,
+        uint128 oldDenominator,
+        uint128 newNominator,
+        uint128 newDenominator
+    );
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

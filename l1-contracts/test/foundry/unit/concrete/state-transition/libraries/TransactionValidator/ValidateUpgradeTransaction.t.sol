@@ -88,7 +88,7 @@ contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
         L2CanonicalTransaction memory testTx = createUpgradeTransaction();
         // PaymasterInput must be 0 - otherwise we revert.
         testTx.paymasterInput = bytes("hi");
-        vm.expectRevert(bytes("ul"));
+        vm.expectRevert(bytes("ul1"));
         TransactionValidator.validateUpgradeTransaction(testTx);
     }
 

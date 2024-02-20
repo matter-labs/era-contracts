@@ -2,22 +2,22 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_GOVERNOR} from "./_Base_Shared.t.sol";
+import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_ADMIN} from "./_Base_Shared.t.sol";
 
-contract OnlyGovernorTest is ZkSyncStateTransitionBaseTest {
-    function test_revertWhen_calledByNonGovernor() public {
-        address nonGovernor = makeAddr("nonGovernor");
+contract OnlyAdminTest is ZkSyncStateTransitionBaseTest {
+    function test_revertWhen_calledByNonAdmin() public {
+        address nonAdmin = makeAddr("nonAdmin");
 
-        vm.expectRevert(ERROR_ONLY_GOVERNOR);
+        vm.expectRevert(ERROR_ONLY_ADMIN);
 
-        vm.startPrank(nonGovernor);
-        testBaseFacet.functionWithOnlyGovernorModifier();
+        vm.startPrank(nonAdmin);
+        testBaseFacet.functionWithOnlyAdminModifier();
     }
 
     function test_successfulCall() public {
-        address governor = utilsFacet.util_getGovernor();
+        address admin = utilsFacet.util_getAdmin();
 
-        vm.startPrank(governor);
-        testBaseFacet.functionWithOnlyGovernorModifier();
+        vm.startPrank(admin);
+        testBaseFacet.functionWithOnlyAdminModifier();
     }
 }

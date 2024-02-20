@@ -33,13 +33,13 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getGovernor() external view returns (address) {
-        return s.governor;
+    function getAdmin() external view returns (address) {
+        return s.admin;
     }
 
     /// @inheritdoc IGetters
-    function getPendingGovernor() external view returns (address) {
-        return s.pendingGovernor;
+    function getPendingAdmin() external view returns (address) {
+        return s.pendingAdmin;
     }
 
     /// @inheritdoc IGetters

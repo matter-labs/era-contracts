@@ -29,7 +29,7 @@ contract InitializeTest is DiamondInitTest {
 
     function test_revertWhen_governorIsZeroAddress() public {
         InitializeData memory initializeData = Utils.makeInitializeData();
-        initializeData.governor = address(0);
+        initializeData.admin = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -89,7 +89,7 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getProtocolVersion(), initializeData.protocolVersion);
 
         assertEq(address(utilsFacet.util_getVerifier()), address(initializeData.verifier));
-        assertEq(utilsFacet.util_getGovernor(), initializeData.governor);
+        assertEq(utilsFacet.util_getAdmin(), initializeData.admin);
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);

@@ -18,7 +18,7 @@ contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     // function test_RevertWhen_InternalCallReverts() public {
     //     bytes memory revertMessage = "random revert";
     //     vm.mockCallRevert(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.l2TransactionBaseCost.selector,
     //             gasPrice,
@@ -28,7 +28,7 @@ contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     //         revertMessage
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.l2TransactionBaseCost.selector,
     //             gasPrice,
@@ -42,7 +42,7 @@ contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     // function test_ShouldReturnReceivedCanonicalTxHash() public {
     //     uint256 expectedBaseCost = 123456789;
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.l2TransactionBaseCost.selector,
     //             gasPrice,
@@ -52,7 +52,7 @@ contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     //         abi.encode(expectedBaseCost)
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.l2TransactionBaseCost.selector,
     //             gasPrice,

@@ -1,5 +1,5 @@
 import * as hardhat from "hardhat";
-import { deployedAddressesFromEnv } from "../scripts/utils";
+import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function verifyPromise(address: string, constructorArguments?: Array<any>, libraries?: object): Promise<any> {

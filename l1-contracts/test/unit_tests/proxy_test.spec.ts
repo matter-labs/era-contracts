@@ -87,7 +87,7 @@ describe("Diamond proxy tests", function () {
         bridgehub: "0x0000000000000000000000000000000000000000",
         stateTransitionManager: await owner.getAddress(),
         protocolVersion: 0,
-        governor: governorAddress,
+        admin: governorAddress,
         validatorTimelock: governorAddress,
         baseToken: "0x0000000000000000000000000000000000000001",
         baseTokenBridge: "0x0000000000000000000000000000000000000001",

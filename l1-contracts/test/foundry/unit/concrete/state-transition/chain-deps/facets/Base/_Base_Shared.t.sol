@@ -10,7 +10,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 
 contract TestBaseFacet is ZkSyncStateTransitionBase {
-    function functionWithOnlyGovernorModifier() external onlyGovernor {}
+    function functionWithOnlyAdminModifier() external onlyAdmin {}
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
 
@@ -18,26 +18,30 @@ contract TestBaseFacet is ZkSyncStateTransitionBase {
 
     function functionWithOnlyBridgehubModifier() external onlyBridgehub {}
 
-    function functionWithOnlyGovernorOrStateTransitionManagerModifier() external onlyGovernorOrStateTransitionManager {}
+    function functionWithOnlyAdminOrStateTransitionManagerModifier() external onlyAdminOrStateTransitionManager {}
+
+    function functionWithonlyValidatorOrStateTransitionManagerModifier () external onlyValidatorOrStateTransitionManager {}
 }
 
-bytes constant ERROR_ONLY_GOVERNOR = "StateTransition Chain: not governor";
+bytes constant ERROR_ONLY_ADMIN = "StateTransition Chain: not admin";
 bytes constant ERROR_ONLY_VALIDATOR = "StateTransition Chain: not validator";
 bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "StateTransition Chain: not state transition manager";
 bytes constant ERROR_ONLY_BRIDGEHUB = "StateTransition Chain: not bridgehub";
-bytes constant ERROR_ONLY_GOVERNOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by governor or state transition manager";
+bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by admin or state transition manager";
+bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by validator or state transition manager";
 
 contract ZkSyncStateTransitionBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](5);
-        selectors[0] = TestBaseFacet.functionWithOnlyGovernorModifier.selector;
+        selectors = new bytes4[](6);
+        selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyStateTransitionManagerModifier.selector;
         selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
-        selectors[4] = TestBaseFacet.functionWithOnlyGovernorOrStateTransitionManagerModifier.selector;
+        selectors[4] = TestBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier.selector;
+        selectors[5] = TestBaseFacet.functionWithonlyValidatorOrStateTransitionManagerModifier.selector;
     }
 
     function setUp() public virtual {

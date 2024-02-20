@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IZkSyncStateTransitionBase} from "./IBase.sol";
-import {L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -96,15 +96,7 @@ interface IMailbox is IZkSyncStateTransitionBase {
     ) external payable returns (bytes32 canonicalTxHash);
 
     function bridgehubRequestL2Transaction(
-        address sender,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _calldata,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit,
-        bytes[] calldata _factoryDeps,
-        address _refundRecipient
+        BridgehubL2TransactionRequest calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1

@@ -21,7 +21,7 @@ address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(0x8008);
 address constant L2_BOOTLOADER_ADDRESS = address(0x8001);
 
 /// @dev The address of the eth token system contract
-address constant L2_ETH_TOKEN_SYSTEM_CONTRACT_ADDR = address(0x800a);
+address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(0x800a);
 
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(0x8004);

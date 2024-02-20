@@ -24,7 +24,7 @@ contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     // function test_RevertWhen_InternalCallReverts() public {
     //     bytes memory revertMessage = "random revert";
     //     vm.mockCallRevert(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.finalizeEthWithdrawalBridgehub.selector,
     //             msgSender,
@@ -37,7 +37,7 @@ contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     //         revertMessage
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.finalizeEthWithdrawalBridgehub.selector,
     //             msgSender,
@@ -61,7 +61,7 @@ contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     // }
     // function test_ShouldReturnReceivedCanonicalTxHash() public {
     //     vm.mockCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.finalizeEthWithdrawalBridgehub.selector,
     //             msgSender,
@@ -74,7 +74,7 @@ contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     //         ""
     //     );
     //     vm.expectCall(
-    //         bridgehub.getChainContract(chainId),
+    //         bridgehub.getStateTransition(chainId),
     //         abi.encodeWithSelector(
     //             IMailbox.finalizeEthWithdrawalBridgehub.selector,
     //             msgSender,
