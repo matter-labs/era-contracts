@@ -116,17 +116,17 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
     //         )
     //     );
 
-    //     vm.startPrank(msgSender);
-    //     bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: msgValue}(
-    //         chainId,
-    //         contractL2,
-    //         l2Value,
-    //         calldataBytes,
-    //         l2GasLimit,
-    //         l2GasPerPubdataByteLimit,
-    //         factoryDeps,
-    //         refundRecipient
-    //     );
-    //     assertEq(canonicalTxHash, expectedCanonicalTxHash, "Canonical transaction hash should be returned");
+    // vm.startPrank(msgSender);
+    // bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: msgValue}(
+    //     chainId,
+    //     contractL2,
+    //     l2Value,
+    //     calldataBytes,
+    //     l2GasLimit,
+    //     l2GasPerPubdataByteLimit,
+    //     factoryDeps,
+    //     refundRecipient
+    // );
+    // assertEq(canonicalTxHash, expectedCanonicalTxHash, "Canonical transaction hash should be returned");
     // }
 }
