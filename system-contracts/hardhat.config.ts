@@ -9,6 +9,7 @@ import { COMPILER_PATH } from "./scripts/constants";
 export default {
   zksolc: {
     compilerSource: "binary",
+    // version: 'zksolc-macosx-arm64-vprerelease-0640c18-test-zkvm-v1.5.0',
     settings: {
       compilerPath: COMPILER_PATH,
       isSystem: true,
