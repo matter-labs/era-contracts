@@ -9,7 +9,7 @@ const COMPILER_VERSION = "1.3.18";
 const IS_COMPILER_PRE_RELEASE = false;
 
 export async function compileYul(paths: CompilerPaths, file: string) {
-  const zksolcLocation = COMPILER_PATH;//await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
+  const zksolcLocation = COMPILER_PATH; //await compilerLocation(COMPILER_VERSION, IS_COMPILER_PRE_RELEASE);
   await spawn(`${zksolcLocation} --version`);
   await spawn(
     `${zksolcLocation} ${paths.absolutePathSources}/${file} --optimization 3 --system-mode --yul --bin --overwrite -o ${paths.absolutePathArtifacts}`
