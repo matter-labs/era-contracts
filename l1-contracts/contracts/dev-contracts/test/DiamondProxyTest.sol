@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import "../../state-transition/libraries/Diamond.sol";
-import "../../state-transition/chain-deps/facets/Base.sol";
+import "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 
 contract DiamondProxyTest is ZkSyncStateTransitionBase {
     function setFreezability(bool _freeze) external returns (bytes32) {

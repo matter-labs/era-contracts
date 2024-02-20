@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {ZkSyncStateTransitionBase} from "./facets/Base.sol";
+import {ZkSyncStateTransitionBase} from "./facets/ZkSyncStateTransitionBase.sol";
 import {FeeParams} from "./ZkSyncStateTransitionStorage.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";

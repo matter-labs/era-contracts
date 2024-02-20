@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBase} from "./Base.sol";
+import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -11,7 +11,7 @@ import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IBase.sol";
+import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs

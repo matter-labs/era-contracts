@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-// solhint-disable max-line-length
-
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {RevertFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/RevertFallback.sol";
-import {ReturnSomething} from "../../../../../cache/solpp-generated-contracts/dev-contracts/ReturnSomething.sol";
-import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 
-// solhint-enable max-line-length
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondCutTestContract} from "solpp/dev-contracts/test/DiamondCutTestContract.sol";
+import {ReturnSomething} from "solpp/dev-contracts/ReturnSomething.sol";
+import {RevertFallback} from "solpp/dev-contracts/RevertFallback.sol";
 
 contract InitializationTest is DiamondCutTest {
     address private revertFallbackAddress;

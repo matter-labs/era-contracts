@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IZkSyncStateTransitionBase} from "../chain-interfaces/IBase.sol";
+import {IZkSyncStateTransitionBase} from "../chain-interfaces/IZkSyncStateTransitionBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";

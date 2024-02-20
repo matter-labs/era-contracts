@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IZkSyncStateTransitionBase} from "./IBase.sol";
+import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
