@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {FeeParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Base.sol";
+import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 
 contract UtilsFacet is ZkSyncStateTransitionBase {

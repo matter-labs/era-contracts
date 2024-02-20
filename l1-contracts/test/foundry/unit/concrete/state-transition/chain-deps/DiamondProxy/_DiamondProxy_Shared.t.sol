@@ -14,7 +14,7 @@ import {IVerifier, VerifierParams} from "solpp/state-transition/chain-interfaces
 import {FeeParams, PubdataPricingMode, ZkSyncStateTransitionStorage} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Base.sol";
+import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 
 contract TestFacet is ZkSyncStateTransitionBase {
     function func() public pure returns (bool) {

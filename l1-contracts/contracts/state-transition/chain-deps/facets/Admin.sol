@@ -6,11 +6,11 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
 import {FeeParams} from "../ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "./Base.sol";
+import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IBase.sol";
+import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs

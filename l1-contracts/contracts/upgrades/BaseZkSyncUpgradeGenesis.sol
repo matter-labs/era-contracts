@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../state-transition/chain-deps/facets/Base.sol";
+import "../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 import "../state-transition/chain-interfaces/IMailbox.sol";
 import "../state-transition/chain-interfaces/IVerifier.sol";
 import "../common/libraries/L2ContractHelper.sol";
