@@ -92,31 +92,33 @@ library Utils {
     }
 
     function createStoredBatchInfo() public pure returns (IExecutor.StoredBatchInfo memory) {
-        return IExecutor.StoredBatchInfo({
-            batchNumber: 0,
-            batchHash: bytes32(""),
-            indexRepeatedStorageChanges: 0,
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            timestamp: 0,
-            commitment: bytes32("")
-        });
+        return
+            IExecutor.StoredBatchInfo({
+                batchNumber: 0,
+                batchHash: bytes32(""),
+                indexRepeatedStorageChanges: 0,
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+                timestamp: 0,
+                commitment: bytes32("")
+            });
     }
 
     function createCommitBatchInfo() public view returns (IExecutor.CommitBatchInfo memory) {
-        return IExecutor.CommitBatchInfo({
-            batchNumber: 1,
-            timestamp: uint64(uint256(randomBytes32("timestamp"))),
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: randomBytes32("newStateRoot"),
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
-            eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
-            systemLogs: abi.encode(randomBytes32("systemLogs")),
-            totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
-        });
+        return
+            IExecutor.CommitBatchInfo({
+                batchNumber: 1,
+                timestamp: uint64(uint256(randomBytes32("timestamp"))),
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: randomBytes32("newStateRoot"),
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
+                eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
+                systemLogs: abi.encode(randomBytes32("systemLogs")),
+                totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
+            });
     }
 
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {

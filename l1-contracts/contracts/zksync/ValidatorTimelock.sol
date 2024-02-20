@@ -48,7 +48,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _transferOwnership(_initialOwner);
         zkSyncContract = _zkSyncContract;
         executionDelay = _executionDelay;
-        
+
         for (uint256 i = 0; i < _validators.length; i++) {
             validators[_validators[i]] = true;
         }

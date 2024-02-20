@@ -26,7 +26,7 @@ contract ValidatorTimelockTest is Test {
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         charles = makeAddr("charles");
-        
+
         address[] memory initValidators = new address[](1);
         initValidators[0] = alice;
 
@@ -59,11 +59,7 @@ contract ValidatorTimelockTest is Test {
 
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
-        vm.mockCall(
-            zkSync, 
-            abi.encodeWithSelector(IExecutor.commitBatches.selector),
-            ""
-        );
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), "");
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
