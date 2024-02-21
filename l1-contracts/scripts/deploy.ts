@@ -49,11 +49,6 @@ async function main() {
         verbose: true,
       });
 
-      if (cmd.onlyVerifier) {
-        await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
-        return;
-      }
-
       // Create2 factory already deployed on the public networks, only deploy it on local node
       if (process.env.CHAIN_ETH_NETWORK === "localhost") {
         await deployer.deployCreate2Factory({ gasPrice, nonce });
@@ -61,6 +56,11 @@ async function main() {
 
         await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
         nonce++;
+      }
+      
+      if (cmd.onlyVerifier) {
+        await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+        return;
       }
 
       // Deploy diamond upgrade init contract if needed
