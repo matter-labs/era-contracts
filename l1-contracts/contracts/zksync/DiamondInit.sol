@@ -31,6 +31,7 @@ contract DiamondInit is Base {
     /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
     /// @param initialProtocolVersion initial protocol version
     /// @param feeParams Fee parameters to be used for L1->L2 transactions
+    /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
     struct InitializeData {
         IVerifier verifier;
         address governor;
@@ -45,6 +46,7 @@ contract DiamondInit is Base {
         uint256 priorityTxMaxGasLimit;
         uint256 initialProtocolVersion;
         FeeParams feeParams;
+        address blobVersionedHashRetriever;
     }
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
@@ -83,6 +85,7 @@ contract DiamondInit is Base {
         s.priorityTxMaxGasLimit = _initalizeData.priorityTxMaxGasLimit;
         s.protocolVersion = _initalizeData.initialProtocolVersion;
         s.feeParams = _initalizeData.feeParams;
+        s.blobVersionedHashRetriever = _initalizeData.blobVersionedHashRetriever;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

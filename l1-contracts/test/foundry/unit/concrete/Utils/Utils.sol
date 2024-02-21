@@ -3,26 +3,16 @@ pragma solidity 0.8.20;
 
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {IExecutor} from "solpp/zksync/interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
+address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
 
 library Utils {
-    enum SystemLogKeys {
-        L2_TO_L1_LOGS_TREE_ROOT_KEY,
-        TOTAL_L2_TO_L1_PUBDATA_KEY,
-        STATE_DIFF_HASH_KEY,
-        PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-        PREV_BATCH_HASH_KEY,
-        CHAINED_PRIORITY_TXN_HASH_KEY,
-        NUMBER_OF_LAYER_1_TXS_KEY,
-        EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
-    }
-
     function packBatchTimestampAndBlockTimestamp(
         uint256 batchTimestamp,
         uint256 blockTimestamp
@@ -50,44 +40,46 @@ library Utils {
     }
 
     function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+        bytes[] memory logs = new bytes[](9);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKeys.L2_TO_L1_LOGS_TREE_ROOT_KEY),
+            uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
             bytes32("")
         );
         logs[1] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKeys.TOTAL_L2_TO_L1_PUBDATA_KEY),
+            uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
             0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
         );
-        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKeys.STATE_DIFF_HASH_KEY), bytes32(""));
+        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32(""));
         logs[3] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             bytes32("")
         );
         logs[4] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKeys.PREV_BATCH_HASH_KEY),
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
         logs[5] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
         logs[6] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
+        logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
+        logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
         return logs;
     }
 
@@ -117,7 +109,7 @@ library Utils {
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
-                totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
+                pubdataCommitments: abi.encodePacked(uint256(0))
             });
     }
 
