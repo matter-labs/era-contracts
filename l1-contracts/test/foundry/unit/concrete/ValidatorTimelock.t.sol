@@ -12,20 +12,24 @@ contract ValidatorTimelockTest is Test {
     /// @notice Event emitted from ValidatorTimelock when new validator is removed
     event ValidatorRemoved(address _removedValidator);
 
+    /// @notice Error for when an address is already a validator.
+    error AddressAlreadyValidator();
+
+    /// @notice Error for when an address is not a validator.
+    error ValidatorDoesNotExist();
+
     ValidatorTimelock validator;
 
     address owner;
     address zkSync;
     address alice;
     address bob;
-    address charles;
 
     function setUp() public {
         owner = makeAddr("owner");
         zkSync = makeAddr("zkSync");
         alice = makeAddr("alice");
         bob = makeAddr("bob");
-        charles = makeAddr("charles");
 
         address[] memory initValidators = new address[](1);
         initValidators[0] = alice;
@@ -87,6 +91,22 @@ contract ValidatorTimelockTest is Test {
         validator.removeValidator(alice);
 
         assert(validator.validators(alice) == true);
+    }
+
+    function test_addValidator_revertWhenAddressAlreadyValidator() public {
+        assert(validator.validators(alice) == true);
+
+        vm.prank(owner);
+        vm.expectRevert(AddressAlreadyValidator.selector);
+        validator.addValidator(alice);
+    }
+
+    function test_removeValidator_revertWhenAddressNotValidator() public {
+        assert(validator.validators(bob) == false);
+
+        vm.prank(owner);
+        vm.expectRevert(ValidatorDoesNotExist.selector);
+        validator.removeValidator(bob);
     }
 
     function test_validatorCanMakeCall_revertWhenNotValidator() public {

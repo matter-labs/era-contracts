@@ -32,6 +32,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @notice A validator has been removed.
     event ValidatorRemoved(address _removedValidator);
 
+    /// @notice Error for when an address is already a validator.
+    error AddressAlreadyValidator();
+
+    /// @notice Error for when an address is not a validator.
+    error ValidatorDoesNotExist();
+
     /// @dev The main zkSync smart contract.
     address public immutable zkSyncContract;
 
@@ -56,12 +62,18 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @dev Sets an address as a validator.
     function addValidator(address _newValidator) external onlyOwner {
+        if (validators[_newValidator]) {
+            revert AddressAlreadyValidator();
+        }
         validators[_newValidator] = true;
         emit ValidatorAdded(_newValidator);
     }
 
     /// @dev Removes an address as a validator.
     function removeValidator(address _validator) external onlyOwner {
+        if (!validators[_validator]) {
+            revert ValidatorDoesNotExist();
+        }
         validators[_validator] = false;
         emit ValidatorRemoved(_validator);
     }
