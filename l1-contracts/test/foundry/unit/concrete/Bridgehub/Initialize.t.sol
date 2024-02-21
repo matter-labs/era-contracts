@@ -3,24 +3,21 @@
 pragma solidity ^0.8.17;
 
 import {BridgehubTest} from "./_Bridgehub_Shared.t.sol";
-import {IAllowList} from "../../../../../cache/solpp-generated-contracts/common/interfaces/IAllowList.sol";
-// import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/common/DiamondProxy.sol";
-import {BridgehubDiamondInit} from "../../../../../cache/solpp-generated-contracts/bridgehub/bridgehub-deps/BridgehubDiamondInit.sol";
+
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 
 contract InitializeTest is BridgehubTest {
     address internal governor;
     address internal chainImplementation;
     address internal chainProxyAdmin;
-    IAllowList internal allowList;
     uint256 internal priorityTxMaxGasLimit;
 
     function setUp() public {
-        bridgehubDiamondInit = new BridgehubDiamondInit();
+        bridgehubDiamondInit = new DiamondInit();
 
         governor = GOVERNOR;
         chainImplementation = makeAddr("chainImplementation");
         chainProxyAdmin = makeAddr("chainProxyAdmin");
-        allowList = IAllowList(makeAddr("owner"));
         priorityTxMaxGasLimit = 1090193;
     }
 

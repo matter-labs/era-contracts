@@ -1,8 +1,17 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.20;
 
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {UtilsFacet} from "../Utils/UtilsFacet.sol";
+
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
+import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -132,56 +141,154 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
-        selectors[0] = MailboxFacet.isEthWithdrawalFinalized.selector;
-        selectors[1] = MailboxFacet.finalizeEthWithdrawalBridgehub.selector;
-        selectors[2] = MailboxFacet.requestL2TransactionBridgehub.selector;
-        selectors[3] = MailboxFacet.proveL2MessageInclusion.selector;
-        selectors[4] = MailboxFacet.proveL2LogInclusion.selector;
-        selectors[5] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[6] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[7] = MailboxFacet.requestL2Transaction.selector;
-        selectors[8] = MailboxFacet.l2TransactionBaseCost.selector;
+        bytes4[] memory selectors = new bytes4[](7);
+        selectors[0] = MailboxFacet.proveL2MessageInclusion.selector;
+        selectors[1] = MailboxFacet.proveL2LogInclusion.selector;
+        selectors[2] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[3] = MailboxFacet.finalizeEthWithdrawal.selector;
+        selectors[4] = MailboxFacet.requestL2Transaction.selector;
+        selectors[5] = MailboxFacet.bridgehubRequestL2Transaction.selector;
+        selectors[6] = MailboxFacet.l2TransactionBaseCost.selector;
         return selectors;
     }
 
-    function initial_deployment() public returns (address[] memory) {
-        GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet();
-        allowList = new AllowList(owner);
+    function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](36);
+        selectors[0] = UtilsFacet.util_setChainId.selector;
+        selectors[1] = UtilsFacet.util_getChainId.selector;
+        selectors[2] = UtilsFacet.util_setBridgehub.selector;
+        selectors[3] = UtilsFacet.util_getBridgehub.selector;
+        selectors[4] = UtilsFacet.util_setBaseToken.selector;
+        selectors[5] = UtilsFacet.util_getBaseToken.selector;
+        selectors[6] = UtilsFacet.util_setBaseTokenBridge.selector;
+        selectors[7] = UtilsFacet.util_getBaseTokenBridge.selector;
+        selectors[8] = UtilsFacet.util_setVerifier.selector;
+        selectors[9] = UtilsFacet.util_getVerifier.selector;
+        selectors[10] = UtilsFacet.util_setStoredBatchHashes.selector;
+        selectors[11] = UtilsFacet.util_getStoredBatchHashes.selector;
+        selectors[12] = UtilsFacet.util_setVerifierParams.selector;
+        selectors[13] = UtilsFacet.util_getVerifierParams.selector;
+        selectors[14] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
+        selectors[15] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
+        selectors[16] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
+        selectors[17] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
+        selectors[18] = UtilsFacet.util_setPendingAdmin.selector;
+        selectors[19] = UtilsFacet.util_getPendingAdmin.selector;
+        selectors[20] = UtilsFacet.util_setAdmin.selector;
+        selectors[21] = UtilsFacet.util_getAdmin.selector;
+        selectors[22] = UtilsFacet.util_setValidator.selector;
+        selectors[23] = UtilsFacet.util_getValidator.selector;
+        selectors[24] = UtilsFacet.util_setZkPorterAvailability.selector;
+        selectors[25] = UtilsFacet.util_getZkPorterAvailability.selector;
+        selectors[26] = UtilsFacet.util_setStateTransitionManager.selector;
+        selectors[27] = UtilsFacet.util_getStateTransitionManager.selector;
+        selectors[28] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
+        selectors[29] = UtilsFacet.util_getPriorityTxMaxGasLimit.selector;
+        selectors[30] = UtilsFacet.util_setFeeParams.selector;
+        selectors[31] = UtilsFacet.util_getFeeParams.selector;
+        selectors[32] = UtilsFacet.util_setProtocolVersion.selector;
+        selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
+        selectors[34] = UtilsFacet.util_setIsFrozen.selector;
+        selectors[35] = UtilsFacet.util_getIsFrozen.selector;
+        return selectors;
+    }
+
+    // function initial_deployment() public returns (address[] memory) {
+    //     GettersFacet gettersFacet = new GettersFacet();
+    //     MailboxFacet mailboxFacet = new MailboxFacet();
+    //     // allowList = new AllowList(owner);
+    //     DiamondInit diamondInit = new DiamondInit();
+
+    //     bytes8 dummyHash = 0x1234567890123456;
+    //     address dummyAddress = makeAddr("dummyAddress");
+    //     bytes memory diamondInitData = abi.encodeWithSelector(
+    //         diamondInit.initialize.selector,
+    //         dummyAddress,
+    //         owner,
+    //         owner,
+    //         0,
+    //         0,
+    //         0,
+    //         allowList,
+    //         VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
+    //         false,
+    //         dummyHash,
+    //         dummyHash,
+    //         10000000
+    //     );
+
+    //     Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+    //     facetCuts[0] = Diamond.FacetCut({
+    //         facet: address(gettersFacet),
+    //         action: Diamond.Action.Add,
+    //         isFreezable: false,
+    //         selectors: Utils.getGettersSelectors()
+    //     });
+    //     facetCuts[1] = Diamond.FacetCut({
+    //         facet: address(mailboxFacet),
+    //         action: Diamond.Action.Add,
+    //         isFreezable: true,
+    //         selectors: Utils.getMailboxSelectors()
+    //     });
+
+    //     Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+    //         facetCuts: facetCuts,
+    //         initAddress: address(diamondInit),
+    //         initCalldata: diamondInitData
+    //     });
+
+    //     uint256 chainId = block.chainid;
+    //     DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
+
+    //     vm.prank(owner);
+    //     allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
+    // }
+
+    function makeVerifier() public pure returns (IVerifier) {
+        return IVerifier(address(0xdeadbeef));
+    }
+
+    function makeVerifierParams() public pure returns (VerifierParams memory) {
+        return
+            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0});
+    }
+
+    function makeFeeParams() public pure returns (FeeParams memory) {
+        return
+            FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            });
+    }
+
+    function makeInitializeData() public pure returns (InitializeData memory) {
+        return
+            InitializeData({
+                chainId: 1,
+                bridgehub: address(0x876543567890),
+                stateTransitionManager: address(0x1234567890876543567890),
+                protocolVersion: 0,
+                admin: address(0x32149872498357874258787),
+                validatorTimelock: address(0x85430237648403822345345),
+                baseToken: address(0x923645439232223445),
+                baseTokenBridge: address(0x23746765237749923040872834),
+                storedBatchZero: bytes32(0),
+                verifier: makeVerifier(),
+                verifierParams: makeVerifierParams(),
+                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                priorityTxMaxGasLimit: 500000,
+                feeParams: makeFeeParams()
+            });
+    }
+
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
-
-        bytes8 dummyHash = 0x1234567890123456;
-        address dummyAddress = makeAddr("dummyAddress");
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            dummyAddress,
-            owner,
-            owner,
-            0,
-            0,
-            0,
-            allowList,
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
-            false,
-            dummyHash,
-            dummyHash,
-            10000000
-        );
-
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(gettersFacet),
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getGettersSelectors()
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: address(mailboxFacet),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getMailboxSelectors()
-        });
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, makeInitializeData());
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -191,8 +298,6 @@ library Utils {
 
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
-
-        vm.prank(owner);
-        allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
+        return address(diamondProxy);
     }
 }

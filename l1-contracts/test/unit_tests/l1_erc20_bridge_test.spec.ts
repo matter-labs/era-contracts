@@ -86,7 +86,7 @@ describe("L1ERC20Bridge tests", function () {
         "deposit(address,address,uint256,uint256,uint256,address)"
       ](await randomSigner.getAddress(), erc20TestToken.address, 0, 0, 0, ethers.constants.AddressZero)
     );
-    expect(revertReason).equal("2T");
+    expect(revertReason).equal("0T");
   });
 
   it("Should deposit successfully", async () => {

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IZkSyncStateTransitionBase} from "./IBase.sol";
+import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.

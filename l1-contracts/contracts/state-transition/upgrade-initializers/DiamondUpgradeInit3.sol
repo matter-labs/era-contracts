@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import "../libraries/Diamond.sol";
-import "../chain-deps/facets/Base.sol";
+import "../chain-deps/facets/ZkSyncStateTransitionBase.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
 interface IOldDiamondCut {

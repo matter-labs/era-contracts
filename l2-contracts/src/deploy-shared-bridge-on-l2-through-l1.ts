@@ -18,6 +18,7 @@ import * as hre from "hardhat";
 export async function deploySharedBridgeOnL2ThroughL1(
   deployer: Deployer,
   chainId: string,
+  gasPrice: ethers.BigNumber,
   registerL2BridgeAddressViaGovernance: boolean = false
 ) {
   const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
@@ -54,7 +55,8 @@ export async function deploySharedBridgeOnL2ThroughL1(
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
     "0x",
     ethers.constants.HashZero,
-    priorityTxMaxGasLimit
+    priorityTxMaxGasLimit,
+    gasPrice
   );
 
   await tx2.wait();
@@ -107,7 +109,7 @@ export async function deploySharedBridgeOnL2ThroughL1(
     l2SharedBridgeProxyConstructorData,
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
-    null,
+    gasPrice,
     [L2_STANDARD_TOKEN_PROXY_BYTECODE]
   );
   await tx3.wait();
@@ -173,7 +175,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      await deploySharedBridgeOnL2ThroughL1(deployer, chainId);
+      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice);
     });
 
   await program.parseAsync(process.argv);
