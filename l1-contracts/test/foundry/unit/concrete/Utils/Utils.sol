@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -81,6 +81,36 @@ library Utils {
         logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
         logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
         return logs;
+    }
+
+    function createStoredBatchInfo() public pure returns (IExecutor.StoredBatchInfo memory) {
+        return
+            IExecutor.StoredBatchInfo({
+                batchNumber: 0,
+                batchHash: bytes32(""),
+                indexRepeatedStorageChanges: 0,
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+                timestamp: 0,
+                commitment: bytes32("")
+            });
+    }
+
+    function createCommitBatchInfo() public view returns (IExecutor.CommitBatchInfo memory) {
+        return
+            IExecutor.CommitBatchInfo({
+                batchNumber: 1,
+                timestamp: uint64(uint256(randomBytes32("timestamp"))),
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: randomBytes32("newStateRoot"),
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
+                eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
+                systemLogs: abi.encode(randomBytes32("systemLogs")),
+                pubdataCommitments: abi.encodePacked(uint256(0))
+            });
     }
 
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {
