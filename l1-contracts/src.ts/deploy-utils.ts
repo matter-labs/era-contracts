@@ -89,7 +89,6 @@ export interface DeployedAddresses {
   Governance: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
-  Deployer: string;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -123,6 +122,5 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-    Deployer: getAddressFromEnv("CONTRACTS_DEPLOYER_ADDR"),
   };
 }
