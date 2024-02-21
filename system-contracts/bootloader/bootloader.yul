@@ -646,40 +646,6 @@ object "Bootloader" {
                     }
             }
 
-            /// @dev The function that is temporarily needed to upgrade the Keccak256 precompile. This function and `ContractDeployer:forceDeployKeccak256`
-            /// are to be removed once the upgrade is complete.
-            /// @dev Checks whether the code hash of the Keccak256 precompile contract is correct and updates it if needed.
-            /// @dev When we upgrade to the new version of the Keccak256 precompile contract, the keccak precompile will not work correctly 
-            /// and so the upgrade it should be done before any `keccak` calls. 
-            function upgradeKeccakIfNeeded() {
-                let expectedCodeHash := {{KECCAK256_EXPECTED_CODE_HASH}}
-                
-                let actualCodeHash := getRawCodeHash(KECCAK256_ADDR(), true)
-                if iszero(eq(expectedCodeHash, actualCodeHash)) {
-                    // The `mimicCallOnlyResult` requires that the first word of the data
-                    // contains its length. Here is 36 bytes, i.e. 4 byte selector + 32 byte hash.
-                    mstore(0, 36)
-                    mstore(32, {{PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR}})
-                    mstore(36, expectedCodeHash)
-                    
-                    // We'll use a mimicCall to simulate the correct sender.
-                    let success := mimicCallOnlyResult(
-                        CONTRACT_DEPLOYER_ADDR(),
-                        FORCE_DEPLOYER(), 
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    )
-
-                    if iszero(success) {
-                        assertionError("keccak256 upgrade fail")
-                    }
-                }
-            }
-
             /// @notice Returns "raw" code hash of the address. "Raw" means that it returns exactly the value
             /// that is stored in the AccountCodeStorage system contract for that address, without applying any
             /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
@@ -3873,11 +3839,6 @@ object "Bootloader" {
                 /// Just like the batch number, while calculated on the bootloader side,
                 /// the operator still provides it to make sure that its data is in sync. 
                 let EXPECTED_BASE_FEE := mload(192)
-
-                // When the 1.4.1 VM launches, the old Keccak precompile will stop working. 
-                // Thus, the first thing we need to do before any transaction starts is to upgrade
-                // keccak precompile to the new version.
-                upgradeKeccakIfNeeded()
 
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
