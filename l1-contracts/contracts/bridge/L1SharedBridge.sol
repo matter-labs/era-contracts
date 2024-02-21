@@ -120,7 +120,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev Initializes the l2Bridge address by governance for a specific chain
+    /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(
         uint256 _chainId,
         address _l2BridgeAddress
