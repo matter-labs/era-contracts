@@ -15,12 +15,7 @@ import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
 
-export async function deploySharedBridgeOnL2ThroughL1(
-  deployer: Deployer,
-  chainId: string,
-  gasPrice: ethers.BigNumber,
-  registerL2BridgeAddressViaGovernance: boolean = false
-) {
+export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: ethers.BigNumber) {
   const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
 
   /// ####################################################################################################################
@@ -121,22 +116,11 @@ export async function deploySharedBridgeOnL2ThroughL1(
   if (deployer.verbose) {
     console.log("Initializing chain governance");
   }
-  if (registerL2BridgeAddressViaGovernance) {
-    await deployer.executeUpgrade(
-      l1SharedBridge.address,
-      0,
-      l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [chainId, l2SharedBridgeProxyAddress])
-    );
-    if (deployer.verbose) {
-      console.log("L2 shared bridge address registered on L1 via governance");
-    }
-  } else {
-    const tx4 = await l1SharedBridge.initializeChainGovernance(chainId, l2SharedBridgeProxyAddress);
-    await tx4.wait();
+  const tx4 = await l1SharedBridge.initializeChainGovernance(chainId, l2SharedBridgeProxyAddress);
+  await tx4.wait();
 
-    if (deployer.verbose) {
-      console.log("L2 shared bridge address registered on L1");
-    }
+  if (deployer.verbose) {
+    console.log("L2 shared bridge address registered on L1");
   }
 }
 
