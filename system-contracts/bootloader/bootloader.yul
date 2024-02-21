@@ -991,27 +991,29 @@ object "Bootloader" {
                     assertionError("deposited eth too low")
                 }
                 
+                // In previous steps, there might have been already some pubdata published (e.g. to mark factory dependencies as published). 
+                // However, these actions are mandatory and it is assumed that the L1 Mailbox contract ensured that the provided gas is enough to cover for pubdata.
+
                 if gt(gasLimitForTx, gasUsedOnPreparation) {
                     let gasSpentOnExecution := 0
+                    let gasForExecution := sub(gasLimitForTx, gasUsedOnPreparation)
 
-                    gasSpentOnExecution, success := getExecuteL1TxAndGetRefund(
+                    gasSpentOnExecution, success := getExecuteL1TxAndNotifyResult(
                         txDataOffset, 
-                        sub(gasLimitForTx, gasUsedOnPreparation),
+                        gasForExecution,
                         basePubdataSpent,
-                        // Note, that for L1->L2 transactions the reserved gas is used to protect the operator from
-                        // transactions that might accidentally cause to publish too many pubdata.
-                        // FIXME: maybe a more elegant approach can be chosen here.
-                        0,
                         gasPerPubdata,
                     )
 
-                    // It is assumed that `comparePubdataSpent` ensured that the user did not publish too much pubdata
+                    // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata
                     let ergsSpentOnPubdata := getErgsSpentForPubdata(
                         basePubdataSpent,
                         gasPerPubdata
                     )
-                    let potentialRefund := saturatingSub(add(reservedGas, gasSpentOnExecution), add(gasSpentOnExecution, ergsSpentOnPubdata))
-
+                    let potentialRefund := saturatingSub(
+                        safeAdd(reservedGas, gasForExecution, "safeadd: potentialRefund1"), 
+                        safeAdd(gasSpentOnExecution, ergsSpentOnPubdata, "safeadd: potentialRefund2")
+                    )
 
                     // Asking the operator for refund
                     askOperatorForRefund(potentialRefund, ergsSpentOnPubdata, gasPerPubdata)
@@ -1076,11 +1078,10 @@ object "Bootloader" {
                 }   
             }
 
-            function getExecuteL1TxAndGetRefund(
+            function getExecuteL1TxAndNotifyResult(
                 txDataOffset, 
                 gasForExecution,
                 basePubdataSpent,
-                reservedGas,
                 gasPerPubdata
             ) -> gasSpentOnExecution, success {
                 debugLog("gasForExecution", gasForExecution)
@@ -1095,7 +1096,6 @@ object "Bootloader" {
                     callAbi,
                     txDataOffset,
                     basePubdataSpent,
-                    reservedGas,
                     gasPerPubdata
                 )
                 notifyExecutionResult(success)
@@ -1195,11 +1195,10 @@ object "Bootloader" {
                 let gasLeft := l2TxValidation(
                     txDataOffset,
                     gasLimitForTx,
-                    gasPrice
-                )
-
-                comparePubdataSpent(
-                    basePubdataSpent, gasLeft, reservedGas, gasPerPubdata, 1
+                    gasPrice,
+                    basePubdataSpent,
+                    reservedGas,
+                    gasPerPubdata
                 )
 
                 debugLog("validation finished", 0)
@@ -1301,7 +1300,10 @@ object "Bootloader" {
             function l2TxValidation(
                 txDataOffset,
                 gasLimitForTx,
-                gasPrice
+                gasPrice,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
             ) -> gasLeft {
                 let gasBeforeValidate := gas()
 
@@ -1341,6 +1343,12 @@ object "Bootloader" {
 
                 // isValid can only be zero if the validation has failed with out of gas
                 if or(iszero(gasLeft), iszero(isValid)) {
+                    revertWithReason(TX_VALIDATION_OUT_OF_GAS(), 0)
+                }
+
+                if isNotEnoughGasForPubdata(
+                    basePubdataSpent, gasLeft, reservedGas, gasPerPubdata
+                ) {
                     revertWithReason(TX_VALIDATION_OUT_OF_GAS(), 0)
                 }
 
@@ -1409,7 +1417,7 @@ object "Bootloader" {
                     gasSpentOnExecute := add(gasSpentOnFactoryDeps, sub(gasBeforeExecute, gas()))
                 }
 
-                debugLog("notification", success)
+                debugLog("notifySuccess", success)
 
                 notifyExecutionResult(success)
             }
@@ -1467,13 +1475,17 @@ object "Bootloader" {
 
                 success := executeL2Tx(txDataOffset, from)
 
-                comparePubdataSpent(
+                if isNotEnoughGasForPubdata(
                     basePubdataSpent,
                     gas(),
                     reservedGas,
-                    gasPerPubdata,
-                    0
-                )
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages 
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
+
                 debugLog("Executing L2 ret", success)
             }
 
@@ -1520,13 +1532,16 @@ object "Bootloader" {
                 // For bytecodes published in the previous step, no need pubdata will have to be published 
                 markFactoryDepsForTx(innerTxDataOffset, false)
 
-                comparePubdataSpent(
+                if isNotEnoughGasForPubdata(
                     basePubdataSpent,
                     gas(),
                     reservedGas,
-                    gasPerPubdata,
-                    0
-                )
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages 
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
 
                 newDataInfoPtr := dataInfoPtr
             }
@@ -1604,7 +1619,7 @@ object "Bootloader" {
                     } 
                 }
 
-                // It was expected that before this point various `comparePubdataSpent` methods would ensure that the user 
+                // It was expected that before this point various `isNotEnoughGasForPubdata` methods would ensure that the user 
                 // has enough funds for pubdata. Now, we just subtract the leftovers from the user.
                 let spentOnPubdata := getErgsSpentForPubdata(
                     basePubdataSpent,
@@ -1797,7 +1812,6 @@ object "Bootloader" {
                 abi,
                 txDataOffset,
                 basePubdataSpent,
-                reservedGas,
                 gasPerPubdata,
             ) -> success {
                 // Skipping the first word of the ABI encoding of the struct
@@ -1835,13 +1849,19 @@ object "Bootloader" {
                     nearCallPanic()
                 }
 
-                comparePubdataSpent(
+                if isNotEnoughGasForPubdata(
                     basePubdataSpent,
                     gas(),
-                    reservedGas,
+                    // Note, that for L1->L2 transactions the reserved gas is used to protect the operator from
+                    // transactions that might accidentally cause to publish too many pubdata.
+                    // Thus, even if there is some accidental `reservedGas` left, it should not be used to publish pubdata.
+                    0,
                     gasPerPubdata,
-                    0
-                )
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages 
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
             }
 
             /// @dev Returns the ABI for nearCalls.
@@ -2311,13 +2331,16 @@ object "Bootloader" {
                     0
                 )
 
-                comparePubdataSpent(
+                if isNotEnoughGasForPubdata(
                     basePubdataSpent,
                     gas(),
                     reservedGas,
                     gasPerPubdata,
-                    0
-                )
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages 
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
             }
 
             /// @dev Copies [from..from+len] to [to..to+len]
@@ -2720,25 +2743,20 @@ object "Bootloader" {
                 ret := safeMul(spentPubdata, gasPerPubdata, "mul: getErgsSpentForPubdata")
             }
 
-            function comparePubdataSpent(
+            /// @dev Compares the amount of spent ergs on the pubdatawith the allowed amount.
+            /// @dev If the spent ergs on pubdata are too high it will either reject or revert 
+            /// the transaction depending on the `rejectTransaction` flag.
+            function isNotEnoughGasForPubdata(
                 basePubdataSpent,
                 computeGas,
                 reservedGas,
-                gasPerPubdata,
-                rejectTransaction
-            ) {
+                gasPerPubdata
+            ) -> ret {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
 
-                if lt(allowedGasLimit, spentErgs) {
-                    if rejectTransaction {
-                        // TODO: use better code
-                        revertWithReason(ACCOUNT_TX_VALIDATION_ERR_CODE(), 0)
-                    }
-
-                    nearCallPanic()
-                }
+                ret := lt(allowedGasLimit, spentErgs)
             }
 
             /// @dev Set the new value for the tx origin context value
