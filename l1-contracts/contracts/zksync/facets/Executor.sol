@@ -433,7 +433,13 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
-        return abi.encodePacked(s.zkPorterIsAvailable, s.l2BootloaderBytecodeHash, s.l2DefaultAccountBytecodeHash);
+        return abi.encodePacked(
+            s.zkPorterIsAvailable, 
+            s.l2BootloaderBytecodeHash, 
+            s.l2DefaultAccountBytecodeHash,
+            // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is 0.
+            0
+        );
     }
 
     function _batchAuxiliaryOutput(
