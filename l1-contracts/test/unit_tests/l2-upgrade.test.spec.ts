@@ -88,6 +88,7 @@ describe("L2 upgrade test", function () {
         priorityTxMaxGasLimit: 10000000,
         initialProtocolVersion: 0,
         feeParams: defaultFeeParams(),
+        blobVersionedHashRetriever: ethers.constants.AddressZero,
       },
     ]);
 
@@ -718,7 +719,7 @@ async function buildCommitBatchInfo(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    totalL2ToL1Pubdata: ethers.constants.HashZero,
+    pubdataCommitments: `${ethers.constants.HashZero}00`,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
@@ -745,7 +746,7 @@ async function buildCommitBatchInfoWithCustomLogs(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    totalL2ToL1Pubdata: ethers.constants.HashZero,
+    pubdataCommitments: `${ethers.constants.HashZero}00`,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
