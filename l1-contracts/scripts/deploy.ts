@@ -57,7 +57,7 @@ async function main() {
         await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
         nonce++;
       }
-      
+
       if (cmd.onlyVerifier) {
         await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
         return;
