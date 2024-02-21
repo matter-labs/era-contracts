@@ -439,7 +439,7 @@ contract ExecutorFacet is Base, IExecutor {
                 s.l2BootloaderBytecodeHash,
                 s.l2DefaultAccountBytecodeHash,
                 // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is 0.
-                0
+                bytes32(0)
             );
     }
 
