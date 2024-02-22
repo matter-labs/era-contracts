@@ -23,7 +23,7 @@ jobs:
         id: init
         run: |
           yarn
-          echo "release_tag=$(echo ${GITHUB_REF#refs/heads/})-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "release_tag=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build contracts
         run: |
