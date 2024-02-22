@@ -24,7 +24,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         bytes32 _expectedSystemContractUpgradeTxHash
     )
         external
-        pure
+        view
         returns (
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
