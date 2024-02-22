@@ -106,7 +106,7 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32 _expectedSystemContractUpgradeTxHash
     )
         internal
-        pure
+        view
         returns (
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
@@ -124,7 +124,7 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 processedLogs;
 
         bytes32 providedL2ToL1PubdataHash;
-        if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
         }
 
@@ -143,7 +143,7 @@ contract ExecutorFacet is Base, IExecutor {
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 l2LogsTreeRoot = logValue;
-            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) && feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) && s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                 require(providedL2ToL1PubdataHash == logValue, "wp");
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
