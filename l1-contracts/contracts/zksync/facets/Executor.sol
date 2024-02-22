@@ -24,8 +24,6 @@ contract ExecutorFacet is Base, IExecutor {
     /// @inheritdoc IBase
     string public constant override getName = "ExecutorFacet";
 
-    bool constant VALIDIUM_MODE = $(VALIDIUM_MODE);
-
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage
@@ -125,9 +123,10 @@ contract ExecutorFacet is Base, IExecutor {
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
 
-        // #if VALIDIUM_MODE == false
-        bytes32 providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
-        // #endif
+        bytes32 providedL2ToL1PubdataHash;
+        if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+            providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
+        }
 
         // linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
@@ -144,11 +143,9 @@ contract ExecutorFacet is Base, IExecutor {
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 l2LogsTreeRoot = logValue;
-            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-            // #if VALIDIUM_MODE == false
+            } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY) && feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                 require(providedL2ToL1PubdataHash == logValue, "wp");
-            // #endif
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 stateDiffHash = logValue;
