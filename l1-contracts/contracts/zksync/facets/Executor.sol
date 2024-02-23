@@ -54,14 +54,10 @@ contract ExecutorFacet is Base, IExecutor {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
             require(
                 logOutput.pubdataHash ==
-                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 64]),
+                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
                 "wp"
             );
-            blobHashes[0] = bytes32(
-                _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 64:_newBatch
-                    .pubdataCommitments
-                    .length - 32]
-            );
+            blobHashes[0] = logOutput.blob1Hash;
             blobCommitments[0] = bytes32(
                 _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
                     .pubdataCommitments

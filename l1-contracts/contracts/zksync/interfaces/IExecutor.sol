@@ -100,10 +100,10 @@ interface IExecutor is IBase {
     /// @dev pubdataCommitments format: This will always start with a 1 byte pubdataSource flag. Current allowed values are 0 (calldata) or 1 (blobs)
     ///                             kzg: list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes) = 144 bytes
     ///                             calldata: pubdataCommitments.length - 1 - 64 bytes of pubdata
-    ///                                       and 64 bytes appended to serve as the input for the aux output part of the batch commitment
-    ///                                       The format is: blob_1_linear hash (32 bytes) || blob_1_commitment (32 bytes)
+    ///                                       and 32 bytes appended to serve as the blob commitment part for the aux output part of the batch commitment
     /// @dev For 2 blobs we will be sending 288 bytes of calldata instead of the full amount for pubdata.
-    /// @dev When using calldata, we only need to send one linear hash and one blob commitment the max number of bytes in calldata fits in a single blob
+    /// @dev When using calldata, we only need to send one blob commitment since the max number of bytes in calldata fits in a single blob and we can pull the
+    ///     linear hash from the system logs
     struct CommitBatchInfo {
         uint64 batchNumber;
         uint64 timestamp;
