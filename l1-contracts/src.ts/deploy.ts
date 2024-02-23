@@ -343,7 +343,11 @@ export class Deployer {
     this.addresses.ZkSync.DefaultUpgrade = contractAddress;
   }
 
-  public async deployDiamondProxy(validiumMode:boolean, create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDiamondProxy(
+    validiumMode: boolean,
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
