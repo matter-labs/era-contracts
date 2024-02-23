@@ -9,7 +9,7 @@ import {
   priorityTxMaxGasLimit,
   hashL2Bytecode,
   applyL1ToL2Alias,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 
 import { ADDRESS_ONE } from "../../l1-contracts/src.ts/utils";
