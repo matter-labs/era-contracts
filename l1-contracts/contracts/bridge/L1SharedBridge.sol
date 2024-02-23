@@ -198,7 +198,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             });
         }
         emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
-        // kl todo. We are breaking the previous events here, as we don't have the txHash, so we can't emit a DepositInitiated event
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.

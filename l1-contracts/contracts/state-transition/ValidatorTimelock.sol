@@ -28,11 +28,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @notice The validator address is changed.
-    event NewValidator(address _oldValidator, address _newValidator);
+    /// @notice A new validator has been added.
+    event ValidatorAdded(uint256 _chainId, address _addedValidator);
 
-    /// @notice The validator address is changed.
-    event NewValidatorSharedBridge(uint256 _chainId, address _oldValidator, address _newValidator);
+    /// @notice A validator has been removed.
+    event ValidatorRemoved(uint256 _chainId, address _removedValidator);
+
+    /// @notice Error for when an address is already a validator.
+    error AddressAlreadyValidator(uint256 _chainId);
+
+    /// @notice Error for when an address is not a validator.
+    error ValidatorDoesNotExist(uint256 _chainId);
 
     /// @dev The stateTransitionManager smart contract.
     IStateTransitionManager public stateTransitionManager;
@@ -41,7 +47,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     mapping(uint256 => LibMap.Uint32Map) internal committedBatchTimestamp;
 
     /// @dev The address that can commit/revert/validate/execute batches.
-    mapping(uint256 => address) public validator;
+    mapping(uint256 _chainId => mapping(address _validator => bool)) public validators;
 
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
@@ -59,7 +65,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(msg.sender == validator[_chainId], "8h");
+        require(validators[_chainId][msg.sender] == true, "8h");
         _;
     }
 
@@ -68,11 +74,22 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         stateTransitionManager = _stateTransitionManager;
     }
 
-    /// @dev Set new validator address.
-    function setValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
-        address oldValidator = validator[_chainId];
-        validator[_chainId] = _newValidator;
-        emit NewValidatorSharedBridge(_chainId, oldValidator, _newValidator);
+    /// @dev Sets an address as a validator.
+    function addValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
+        if (validators[_chainId][_newValidator]) {
+            revert AddressAlreadyValidator(_chainId);
+        }
+        validators[_chainId][_newValidator] = true;
+        emit ValidatorAdded(_chainId, _newValidator);
+    }
+
+    /// @dev Removes an address as a validator.
+    function removeValidator(uint256 _chainId, address _validator) external onlyChainAdmin(_chainId) {
+        if (!validators[_chainId][_validator]) {
+            revert ValidatorDoesNotExist(_chainId);
+        }
+        validators[_chainId][_validator] = false;
+        emit ValidatorRemoved(_chainId, _validator);
     }
 
     /// @dev Set the delay between committing and executing batches.

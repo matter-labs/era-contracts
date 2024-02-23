@@ -69,7 +69,7 @@ export async function deployBytecodeViaCreate2(
 
   const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
   const receipt = await tx.wait();
-  
+
   const gasUsed = receipt.gasUsed;
   log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
 
@@ -109,6 +109,7 @@ export interface DeployedAddresses {
   BaseToken: string;
   TransparentProxyAdmin: string;
   Governance: string;
+  BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
 }
@@ -142,6 +143,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
   };

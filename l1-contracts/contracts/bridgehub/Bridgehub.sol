@@ -247,7 +247,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             uint256 baseTokenMsgValue;
             if (token == ETH_TOKEN_ADDRESS) {
                 require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
-                // kl todo it would be nice here to be able to deposit weth instead of eth
                 baseTokenMsgValue = _request.mintValue;
             } else {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
