@@ -319,9 +319,32 @@ contract CommittingTest is ExecutorTest {
             uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
+        correctL2Logs[uint256(SystemLogKey.BLOB_ONE_HASH_KEY)] = Utils.constructL2Log(
+            true,
+            L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
+            uint256(SystemLogKey.BLOB_ONE_HASH_KEY),
+            0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
+        );
 
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+        correctNewCommitBatchInfo.pubdataCommitments = abi.encodePacked(
+            "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            bytes32(uint256(0xbeef))
+        );
+
+        bytes32[] memory blobHashes = new bytes32[](2);
+        blobHashes[0] = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
+
+        bytes32[] memory blobCommitments = new bytes32[](2);
+        blobCommitments[0] = bytes32(uint256(0xbeef));
+
+        bytes32 expectedBatchCommitment = Utils.createBatchCommitment(
+            correctNewCommitBatchInfo,
+            bytes32(""),
+            blobCommitments,
+            blobHashes
+        );
 
         IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
@@ -337,6 +360,8 @@ contract CommittingTest is ExecutorTest {
         assertEq(entries.length, 1);
         assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries[0].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);

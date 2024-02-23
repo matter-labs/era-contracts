@@ -30,7 +30,8 @@ describe("ValidatorTimelock tests", function () {
       bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
       eventsQueueStateHash: ethers.utils.randomBytes(32),
       systemLogs: [],
-      pubdataCommitments: "0x00290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
+      pubdataCommitments:
+        "0x00290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
     };
   }
 
@@ -89,7 +90,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator proves batches", async () => {
@@ -99,13 +100,13 @@ describe("ValidatorTimelock tests", function () {
         .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator revert batches", async () => {
     const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).revertBatches(1));
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator executes batches", async () => {
@@ -113,7 +114,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).executeBatches([getMockStoredBatchInfo(1)])
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if not chain governor sets validator", async () => {
@@ -121,7 +122,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).addValidator(chainId, await randomSigner.getAddress())
     );
 
-    expect(revertReason).equal("9h");
+    expect(revertReason).equal("ValidatorTimelock: only chain admin");
   });
 
   it("Should revert if non-owner sets execution delay", async () => {

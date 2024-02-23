@@ -53,7 +53,17 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
-            require(logOutput.pubdataHash == keccak256(_newBatch.pubdataCommitments[1:]), "wp");
+            require(
+                logOutput.pubdataHash ==
+                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
+                "wp"
+            );
+            blobHashes[0] = logOutput.blob1Hash;
+            blobCommitments[0] = bytes32(
+                _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
+                    .pubdataCommitments
+                    .length]
+            );
         }
 
         require(_previousBatch.batchHash == logOutput.previousBatchHash, "l");

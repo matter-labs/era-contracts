@@ -1,3 +1,4 @@
+// hardhat import should be the first import in the file
 import * as hre from "hardhat";
 
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";

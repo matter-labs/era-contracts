@@ -1,8 +1,10 @@
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, ethTestConfig, provider } from "./utils";
 
-import * as hre from "hardhat";
 
 // Script to deploy the force deploy upgrader contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR

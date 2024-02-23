@@ -324,4 +324,61 @@ library Utils {
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
     }
+    
+    function createBatchCommitment(
+        IExecutor.CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) public pure returns (bytes32) {
+        bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
+        bytes32 metadataHash = keccak256(_batchMetaParameters());
+        bytes32 auxiliaryOutputHash = keccak256(
+            _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
+        );
+
+        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+    }
+
+    function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
+        return
+            abi.encodePacked(
+                _batch.indexRepeatedStorageChanges,
+                _batch.newStateRoot,
+                uint64(0), // index repeated storage changes in zkPorter
+                bytes32(0) // zkPorter batch hash
+            );
+    }
+
+    function _batchMetaParameters() internal pure returns (bytes memory) {
+        // Used in __Executor_Shared.t.sol
+        bytes8 dummyHash = 0x1234567890123456;
+        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash));
+    }
+
+    function _batchAuxiliaryOutput(
+        IExecutor.CommitBatchInfo calldata _batch,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes memory) {
+        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
+
+        return
+            abi.encode(
+                l2ToL1LogsHash,
+                _stateDiffHash,
+                _batch.bootloaderHeapInitialContentsHash,
+                _batch.eventsQueueStateHash,
+                // for each blob we have:
+                // linear hash (hash of preimage from system logs) and
+                // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+                // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
+                // If we only utilize a single blob, _blobHash[1] and _blobCommitments[1] will be bytes32(0)
+                _blobHashes[0],
+                _blobCommitments[0],
+                _blobHashes[1],
+                _blobCommitments[1]
+            );
+    }
 }
