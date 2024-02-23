@@ -259,7 +259,7 @@ export function createSystemLogsWithUpgrade(
       L2_BOOTLOADER_ADDRESS,
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
-    ),    
+    ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(

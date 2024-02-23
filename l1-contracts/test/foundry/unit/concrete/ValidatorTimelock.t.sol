@@ -7,8 +7,6 @@ import {ValidatorTimelock, IExecutor} from "solpp/state-transition/ValidatorTime
 import {DummyStateTransitionManagerForValidatorTimelock} from "solpp/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
 import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
 
-import "forge-std/console.sol";
-
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.
     event ValidatorAdded(uint256 _chainId, address _addedValidator);
@@ -36,7 +34,7 @@ contract ValidatorTimelockTest is Test {
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         chainId = 1;
-        
+
         stateTransitionManager = new DummyStateTransitionManagerForValidatorTimelock(owner, zkSync);
         validator = new ValidatorTimelock(owner, 10);
         vm.prank(owner);
