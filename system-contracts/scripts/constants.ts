@@ -1,6 +1,8 @@
 import type { BigNumberish, BytesLike } from "ethers";
 import { constants, ethers } from "ethers";
 
+export const COMPILER_PATH = `${process.env.ZKSYNC_HOME}/local-compiler/zksolc`;
+
 export const BOOTLOADER_FORMAL_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const ETH_ADDRESS = constants.AddressZero;
 
@@ -140,6 +142,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   keccak256: {
     address: "0x0000000000000000000000000000000000008010",
     codeName: "Keccak256",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
+  codeOracle: {
+    address: "0x0000000000000000000000000000000000008011",
+    codeName: "CodeOracle",
     lang: Language.Yul,
     path: "precompiles",
   },
