@@ -7,7 +7,7 @@ import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "solpp/common/Config.sol";
-import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 
 contract ProvingTest is ExecutorTest {
     function setUp() public {
@@ -15,13 +15,12 @@ contract ProvingTest is ExecutorTest {
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-            );
+        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 

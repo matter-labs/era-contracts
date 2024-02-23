@@ -5,7 +5,7 @@ import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
-import { deployedAddressesFromEnv, deployViaCreate2 } from "./deploy-utils";
+import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
@@ -119,6 +119,7 @@ export class Deployer {
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         feeParams,
+        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
       },
     ]);
 
@@ -168,6 +169,25 @@ export class Deployer {
       this.verbose,
       libraries
     );
+    return result[0];
+  }
+
+  private async deployBytecodeViaCreate2(
+    contractName: string,
+    bytecode: ethers.BytesLike,
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ): Promise<string> {
+    const result = await deployBytecodeViaCreate2(
+      this.deployWallet,
+      contractName,
+      bytecode,
+      create2Salt,
+      ethTxOptions,
+      this.addresses.Create2Factory,
+      this.verbose
+    );
+
     return result[0];
   }
 
@@ -736,6 +756,28 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_MULTICALL3_ADDR=${contractAddress}`);
     }
+  }
+
+  public async deployBlobVersionedHashRetriever(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
+    const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+
+    const contractAddress = await this.deployBytecodeViaCreate2(
+      "BlobVersionedHashRetriever",
+      bytecode,
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.BlobVersionedHashRetriever = contractAddress;
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {

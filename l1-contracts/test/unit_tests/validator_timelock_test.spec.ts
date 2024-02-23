@@ -30,7 +30,7 @@ describe("ValidatorTimelock tests", function () {
       bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
       eventsQueueStateHash: ethers.utils.randomBytes(32),
       systemLogs: [],
-      totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
+      pubdataCommitments: "0x00290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
     };
   }
 
@@ -118,7 +118,7 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should revert if not chain governor sets validator", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).setValidator(chainId, await randomSigner.getAddress())
+      validatorTimelock.connect(randomSigner).addValidator(chainId, await randomSigner.getAddress())
     );
 
     expect(revertReason).equal("9h");
@@ -132,9 +132,9 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should successfully set the validator", async () => {
     const validatorAddress = await validator.getAddress();
-    await validatorTimelock.connect(owner).setValidator(chainId, validatorAddress);
+    await validatorTimelock.connect(owner).addValidator(chainId, validatorAddress);
 
-    expect(await validatorTimelock.validator(chainId)).equal(validatorAddress);
+    expect(await validatorTimelock.validators(chainId, validatorAddress)).equal(true);
   });
 
   it("Should successfully set the execution delay", async () => {

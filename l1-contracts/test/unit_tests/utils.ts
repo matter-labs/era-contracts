@@ -23,6 +23,8 @@ export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
 export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
+export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x0000000000000000000000000000000000008011";
+
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
 export function randomAddress() {
@@ -37,6 +39,8 @@ export enum SYSTEM_LOG_KEYS {
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  BLOB_ONE_HASH_KEY,
+  BLOB_TWO_HASH_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -253,7 +257,9 @@ export function createSystemLogsWithUpgrade(
       L2_BOOTLOADER_ADDRESS,
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
-    ),
+    ),    
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -318,7 +324,7 @@ export interface CommitBatchInfo {
   bootloaderHeapInitialContentsHash: BytesLike;
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
-  totalL2ToL1Pubdata: BytesLike;
+  pubdataCommitments: BytesLike;
 }
 
 export async function depositERC20(
