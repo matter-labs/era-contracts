@@ -145,6 +145,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
+  codeOracle: {
+    address: "0x0000000000000000000000000000000000008011",
+    codeName: "CodeOracle",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
   sekp256r1: {
     // FIXME: ensure to double check EIP7212 address compatibility
     address: "0x0000000000000000000000000000000000008100",
