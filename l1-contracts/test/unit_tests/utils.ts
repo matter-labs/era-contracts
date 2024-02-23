@@ -192,12 +192,7 @@ export function createSystemLogs(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      PUBDATA_HASH
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
@@ -235,12 +230,7 @@ export function createSystemLogsWithUpgrade(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      PUBDATA_HASH
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
