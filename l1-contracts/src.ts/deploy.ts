@@ -49,7 +49,7 @@ export class Deployer {
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
   }
 
-  public async initialProxyDiamondCut() {
+  public async initialProxyDiamondCut(validiumMode: boolean) {
     const facetCuts = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.ZkSync.AdminFacet,
@@ -78,7 +78,6 @@ export class Deployer {
     const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
-    const validiumMode = process.env["VALIDIUM_MODE"] == "true";
     const pubdataPricingMode = validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
 
     const feeParams = {
@@ -344,11 +343,11 @@ export class Deployer {
     this.addresses.ZkSync.DefaultUpgrade = contractAddress;
   }
 
-  public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDiamondProxy(validiumMode:boolean, create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
-    const initialDiamondCut = await this.initialProxyDiamondCut();
+    const initialDiamondCut = await this.initialProxyDiamondCut(validiumMode);
     const contractAddress = await this.deployViaCreate2(
       "DiamondProxy",
       [chainId, initialDiamondCut],
@@ -363,7 +362,7 @@ export class Deployer {
     this.addresses.ZkSync.DiamondProxy = contractAddress;
   }
 
-  public async deployZkSyncContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deployZkSyncContract(validiumMode: boolean, create2Salt: string, gasPrice?: BigNumberish, nonce?) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     // deploy zkSync contract
@@ -377,7 +376,7 @@ export class Deployer {
     await Promise.all(independentZkSyncDeployPromises);
     nonce += 5;
 
-    await this.deployDiamondProxy(create2Salt, { gasPrice, nonce });
+    await this.deployDiamondProxy(validiumMode, create2Salt, { gasPrice, nonce });
   }
 
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
