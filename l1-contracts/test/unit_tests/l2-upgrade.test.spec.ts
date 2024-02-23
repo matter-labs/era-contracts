@@ -789,7 +789,7 @@ async function buildCommitBatchInfoWithUpgrade(
     numberOfLayer1Txs: 0,
     priorityOperationsHash: EMPTY_STRING_KECCAK,
     systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `${ethers.constants.HashZero}00`,
+    pubdataCommitments: `0x${"0".repeat(130)}`,
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
