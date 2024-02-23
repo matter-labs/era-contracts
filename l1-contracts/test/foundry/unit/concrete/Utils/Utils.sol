@@ -324,7 +324,7 @@ library Utils {
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
     }
-    
+
     function createBatchCommitment(
         IExecutor.CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

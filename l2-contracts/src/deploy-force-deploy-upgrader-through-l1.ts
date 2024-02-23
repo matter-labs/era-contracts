@@ -5,7 +5,6 @@ import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, ethTestConfig, provider } from "./utils";
 
-
 // Script to deploy the force deploy upgrader contract and output its address.
 // Note, that this script expects that the L2 contracts have been compiled PRIOR
 // to running this script.
