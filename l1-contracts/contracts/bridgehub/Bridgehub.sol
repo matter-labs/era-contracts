@@ -78,7 +78,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice token can be any contract with the appropriate interface/functionality
-    function addToken(address _token) external onlyOwner {
+    function addToken(address _token) external {
         require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
         tokenIsRegistered[_token] = true;
     }
