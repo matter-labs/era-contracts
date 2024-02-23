@@ -59,13 +59,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is the admin of the chain.
     modifier onlyChainAdmin(uint256 _chainId) {
-        require(msg.sender == stateTransitionManager.getChainAdmin(_chainId), "9h");
+        require(msg.sender == stateTransitionManager.getChainAdmin(_chainId), "ValidatorTimelock: only chain admin");
         _;
     }
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(validators[_chainId][msg.sender] == true, "8h");
+        require(validators[_chainId][msg.sender] == true, "ValidatorTimelock: only validator");
         _;
     }
 

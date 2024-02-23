@@ -684,7 +684,7 @@ export class Deployer {
 
     const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx2 = await validatorTimelock.setValidator(chainId, validatorAddress, {
+    const tx2 = await validatorTimelock.addValidator(chainId, validatorAddress, {
       gasPrice,
       nonce,
       gasLimit,

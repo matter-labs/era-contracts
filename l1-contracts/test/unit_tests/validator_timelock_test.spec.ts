@@ -77,7 +77,7 @@ describe("ValidatorTimelock tests", function () {
   it("Should check deployment", async () => {
     expect(await validatorTimelock.owner()).equal(await owner.getAddress());
     expect(await validatorTimelock.executionDelay()).equal(0);
-    expect(await validatorTimelock.validator(chainId)).equal(ethers.constants.AddressZero);
+    expect(await validatorTimelock.validators(chainId, ethers.constants.AddressZero)).equal(false);
     expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
     expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
     expect(await dummyStateTransitionManager.getChainAdmin(chainId)).equal(await owner.getAddress());
