@@ -750,7 +750,8 @@ contract EvmInterpreter {
     }
 
     bytes4 constant GET_DEPLOYMENT_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce.selector;
-    bytes4 constant INCREMENT_DEPLOYMENT_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce.selector;
+    bytes4 constant INCREMENT_DEPLOYMENT_NONCE_SELECTOR =
+        NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce.selector;
 
     function getNonce(address _addr) internal returns (uint256 nonce) {
         bytes4 selector = GET_DEPLOYMENT_NONCE_SELECTOR;
@@ -849,7 +850,7 @@ contract EvmInterpreter {
         // Max allowed EVM code size
         require(_len <= 2 * MAX_ALLOWED_EVM_CODE_SIZE);
 
-        incrementDeploymentNonce(address(this));        
+        incrementDeploymentNonce(address(this));
 
         (address _createdAddress, uint256 gasLeftFromFrame) = _performCreateCall(
             _expectedAddress,
@@ -872,7 +873,11 @@ contract EvmInterpreter {
         uint256 _value,
         uint256 _inputOffset,
         uint256 _inputLen
-    ) internal store4TmpVars(_inputOffset, CREATE_EVM_INTERNAL_SELECTOR, uint256(uint160(_deployedAddress)), 64, _inputLen) returns (address addr, uint256 gasLeft) {
+    )
+        internal
+        store4TmpVars(_inputOffset, CREATE_EVM_INTERNAL_SELECTOR, uint256(uint160(_deployedAddress)), 64, _inputLen)
+        returns (address addr, uint256 gasLeft)
+    {
         _pushEVMFrame(_calleeGas, false);
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
         bool success;
@@ -880,15 +885,7 @@ contract EvmInterpreter {
         uint256 zkevmGas = TO_PASS_INF_GAS;
 
         assembly {
-            success := call(
-                zkevmGas, 
-                to, 
-                _value, 
-                sub(_inputOffset, 100), 
-                add(_inputLen, 100), 
-                0, 
-                0
-            )
+            success := call(zkevmGas, to, _value, sub(_inputOffset, 100), add(_inputLen, 100), 0, 0)
         }
 
         if (success) {
@@ -928,7 +925,7 @@ contract EvmInterpreter {
     }
 
     uint256 constant GAS_CODE_DEPOSIT = 200;
-    
+
     /// This function assumes that `len` can only be a reasoable value, otherwise it might overflow.
     function validateCorrectBytecode(uint256 offset, uint256 len, uint256 gasToReturn) internal returns (uint256) {
         unchecked {
@@ -2100,20 +2097,11 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(ost);
 
                     gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
-                    
-                    address expectedAddress = Utils.getNewAddressCreateEVM(
-                        address(this), 
-                        getNonce(address(this))
-                    );
+
+                    address expectedAddress = Utils.getNewAddressCreateEVM(address(this), getNonce(address(this)));
 
                     address addr;
-                    (addr, gasLeft) = genericCreate(
-                        expectedAddress,
-                        ost + memOffset,
-                        len,
-                        val,
-                        gasLeft
-                    );
+                    (addr, gasLeft) = genericCreate(expectedAddress, ost + memOffset, len, val, gasLeft);
 
                     tos = pushStackItem(tos, uint256(uint160(addr)));
 
@@ -2142,19 +2130,13 @@ contract EvmInterpreter {
                     }
 
                     address expectedAddress = Utils.getNewAddressCreate2EVM(
-                        address(this), 
+                        address(this),
                         bytes32(salt),
                         _bytecodeHash
                     );
 
                     address addr;
-                    (addr, gasLeft) = genericCreate(
-                        expectedAddress,
-                        ost + memOffset,
-                        len,
-                        val,
-                        gasLeft
-                    );
+                    (addr, gasLeft) = genericCreate(expectedAddress, ost + memOffset, len, val, gasLeft);
 
                     tos = pushStackItem(tos, uint256(uint160(addr)));
 
@@ -2167,10 +2149,10 @@ contract EvmInterpreter {
     }
 
     function _maxAllowedCallGas(uint256 _gasLeft) internal pure returns (uint256) {
-        unchecked {   
+        unchecked {
             return _gasLeft - _gasLeft / 64;
         }
-    } 
+    }
 
     function _maxCallGas(uint256 gasLimit, uint256 gasLeft) internal pure returns (uint256) {
         unchecked {
