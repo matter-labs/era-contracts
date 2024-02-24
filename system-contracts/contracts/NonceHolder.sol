@@ -134,7 +134,7 @@ contract NonceHolder is INonceHolder, ISystemContract {
     /// @return prevDeploymentNonce The deployment nonce at the time this function is called.
     function incrementDeploymentNonce(address _address) external returns (uint256 prevDeploymentNonce) {
         require(
-            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT),
+            msg.sender == address(DEPLOYER_SYSTEM_CONTRACT) || DEPLOYER_SYSTEM_CONTRACT.isEVM(msg.sender),
             "Only the contract deployer can increment the deployment nonce"
         );
         uint256 addressAsKey = uint256(uint160(_address));

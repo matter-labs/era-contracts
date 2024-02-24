@@ -3,8 +3,10 @@ pragma solidity ^0.8.0;
 
 import "./EvmConstants.sol";
 
-// blake2f at address 0x9 is currently the last precompile
-uint160 constant PRECOMPILES_END = 0x0a;
+import {DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
+
+// We consider all the contracts (including system ones) as warm.
+uint160 constant PRECOMPILES_END = 0xffff;
 
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
@@ -16,8 +18,7 @@ contract EvmGasManager {
     bytes latestReturndata;
 
     modifier onlySystemEvm() {
-        // TODO: uncomment
-        //require(ContractDeployer.isEVM(msg.sender), "only system evm");
+        require(DEPLOYER_SYSTEM_CONTRACT.isEVM(msg.sender), "only system evm");
         _;
     }
 

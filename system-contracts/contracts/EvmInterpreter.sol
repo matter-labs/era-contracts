@@ -19,6 +19,8 @@ function max(uint256 a, uint256 b) pure returns (uint256) {
     return a > b ? a : b;
 }
 
+uint256 constant MAX_ALLOWED_EVM_CODE_SIZE = 0x6000;
+
 contract EvmInterpreter {
     /*
         Memory layout:
@@ -743,62 +745,160 @@ contract EvmInterpreter {
             mstore(pos, prev1)
             mstore(add(pos, 0x20), prev2)
             mstore(add(pos, 0x40), prev3)
-            mstore(add(pos, 0x40), prev4)
+            mstore(add(pos, 0x60), prev4)
         }
     }
 
-    uint32 constant CREATE_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.createEVM.selector);
-    uint32 constant CREATE2_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.create2EVM.selector);
+    bytes4 constant GET_DEPLOYMENT_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce.selector;
+    bytes4 constant INCREMENT_DEPLOYMENT_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce.selector;
 
-    function _performCreate(
+    function getNonce(address _addr) internal returns (uint256 nonce) {
+        bytes4 selector = GET_DEPLOYMENT_NONCE_SELECTOR;
+        address to = address(NONCE_HOLDER_SYSTEM_CONTRACT);
+        assembly {
+            mstore(0, selector)
+            mstore(4, _addr)
+
+            let success := staticcall(gas(), to, 0, 36, 0, 32)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            nonce := mload(0)
+        }
+    }
+
+    function incrementDeploymentNonce(address _addr) internal {
+        bytes4 selector = INCREMENT_DEPLOYMENT_NONCE_SELECTOR;
+        address to = address(NONCE_HOLDER_SYSTEM_CONTRACT);
+
+        assembly {
+            mstore(0, selector)
+            mstore(4, _addr)
+
+            let success := call(gas(), to, 0, 0, 36, 0, 0)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        }
+    }
+
+    // Returns a pair of created address and the new gasLeft.
+    function genericCreate(
+        address _expectedAddress,
+        uint256 _offset,
+        uint256 _len,
+        uint256 _value,
+        uint256 _gasLeft
+    ) internal returns (address, uint256) {
+        warmAccount(_expectedAddress);
+
+        _eraseReturndataPointer();
+
+        uint256 gasForTheCall = _maxAllowedCallGas(_gasLeft);
+        _gasLeft -= gasForTheCall;
+
+        /*
+            In the execution spec the following check is present here:
+            ```python
+                if (
+                sender.balance < endowment
+                or sender.nonce == Uint(2**64 - 1)
+                or evm.message.depth + 1 > STACK_DEPTH_LIMIT
+            ):
+                evm.gas_left += create_message_gas
+                push(evm.stack, U256(0))
+                return
+            ```
+
+            We do not check for for nonce as it is not feasible to achieve that high of a nonce, while it would
+            introduce unncecessary computation. 
+
+            We also can not support max stack depth in a feasible way, so we do not check it either.
+        */
+        if (address(this).balance < _value) {
+            _gasLeft += gasForTheCall;
+            return (address(0), _gasLeft);
+        }
+
+        uint256 targetNonce = getNonce(_expectedAddress);
+        uint256 targetCodeSize;
+        assembly {
+            targetCodeSize := extcodesize(_expectedAddress)
+        }
+
+        /*
+        ```python
+            if account_has_code_or_nonce(evm.env.state, contract_address):
+                increment_nonce(evm.env.state, evm.message.current_target)
+                push(evm.stack, U256(0))
+                return
+        ```
+
+        Note, that this part can not be moved to ContractDeployer, because it will revert & so rollback those changes
+        */
+        if (targetNonce > 0 || targetCodeSize > 0) {
+            incrementDeploymentNonce(address(this));
+            return (address(0), _gasLeft);
+        }
+
+        // Max allowed EVM code size
+        require(_len <= 2 * MAX_ALLOWED_EVM_CODE_SIZE);
+
+        incrementDeploymentNonce(address(this));        
+
+        (address _createdAddress, uint256 gasLeftFromFrame) = _performCreateCall(
+            _expectedAddress,
+            gasForTheCall,
+            _value,
+            _offset,
+            _len
+        );
+
+        _gasLeft += gasLeftFromFrame;
+
+        return (_createdAddress, _gasLeft);
+    }
+
+    uint32 constant CREATE_EVM_INTERNAL_SELECTOR = uint32(DEPLOYER_SYSTEM_CONTRACT.createEVMInternal.selector);
+
+    function _performCreateCall(
+        address _deployedAddress,
         uint256 _calleeGas,
         uint256 _value,
         uint256 _inputOffset,
         uint256 _inputLen
-    ) internal store3TmpVars(_inputOffset, CREATE_SELECTOR, 32, _inputLen) returns (address addr, uint256 gasLeft) {
+    ) internal store4TmpVars(_inputOffset, CREATE_EVM_INTERNAL_SELECTOR, uint256(uint160(_deployedAddress)), 64, _inputLen) returns (address addr, uint256 gasLeft) {
         _pushEVMFrame(_calleeGas, false);
-
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
         bool success;
-
         uint256 _addr;
-
         uint256 zkevmGas = TO_PASS_INF_GAS;
 
         assembly {
-            success := call(zkevmGas, to, _value, sub(_inputOffset, 68), add(_inputLen, 68), 0, 0)
+            success := call(
+                zkevmGas, 
+                to, 
+                _value, 
+                sub(_inputOffset, 100), 
+                add(_inputLen, 100), 
+                0, 
+                0
+            )
         }
 
-        (addr, gasLeft) = _processCreateResult(success);
-
-        _popEVMFrame();
-    }
-
-    function _performCreate2(
-        uint256 _calleeGas,
-        uint256 _value,
-        uint256 _inputOffset,
-        uint256 _inputLen,
-        uint256 _salt
-    )
-        internal
-        store4TmpVars(_inputOffset, CREATE2_SELECTOR, _salt, 64, _inputLen)
-        returns (address addr, uint256 gasLeft)
-    {
-        _pushEVMFrame(_calleeGas, false);
-        address to = address(DEPLOYER_SYSTEM_CONTRACT);
-
-        bool success;
-
-        uint256 _addr;
-
-        uint256 zkevmGas = TO_PASS_INF_GAS;
-
-        assembly {
-            success := call(zkevmGas, to, _value, sub(_inputOffset, 100), add(_inputLen, 100), 0, 32)
+        if (success) {
+            // reseting the returndata
+            gasLeft = _fetchConstructorReturnGas();
+            addr = _deployedAddress;
+        } else {
+            // If failure, then EVM contract should've returned the gas in the first 32 bytes of the returndata
+            gasLeft = _saveReturnDataAfterEVMCall(0, 0);
         }
-
-        (addr, gasLeft) = _processCreateResult(success);
 
         _popEVMFrame();
     }
@@ -822,7 +922,27 @@ contract EvmInterpreter {
 
         (uint256 offset, uint256 len, uint256 gasToReturn) = _simulate(isCallerEVM, msg.data[0:0], evmGas, false);
 
+        gasToReturn = validateCorrectBytecode(offset, len, gasToReturn);
+
         _setDeployedCode(gasToReturn, offset, len);
+    }
+
+    uint256 constant GAS_CODE_DEPOSIT = 200;
+    
+    /// This function assumes that `len` can only be a reasoable value, otherwise it might overflow.
+    function validateCorrectBytecode(uint256 offset, uint256 len, uint256 gasToReturn) internal returns (uint256) {
+        unchecked {
+            if (len > 0) {
+                uint256 firstByte;
+                assembly {
+                    firstByte := shr(mload(offset), 248)
+                }
+                // Check for invalid contract prefix.
+                require(firstByte != 0xEF);
+            }
+            uint256 gasForCode = len * GAS_CODE_DEPOSIT;
+            return chargeGas(gasToReturn, gasForCode);
+        }
     }
 
     function dbg(uint256 _tos, uint256 _ip, uint256 _opcode, uint256 _gasleft) internal {
@@ -840,7 +960,6 @@ contract EvmInterpreter {
         unchecked {
             // I can not return any readable error to preserve compatibility
             require(prevGas >= toCharge);
-
             gasRemaining = prevGas - toCharge;
         }
     }
@@ -1975,16 +2094,26 @@ contract EvmInterpreter {
                     uint256 ost;
                     uint256 len;
 
-                    // TODO: dobule check whether the 63/64 is applicable here
                     (val, ost, len, tos) = _pop3StackItems(tos);
 
                     ensureAcceptableMemLocation(len);
                     ensureAcceptableMemLocation(ost);
+
                     gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
+                    
+                    address expectedAddress = Utils.getNewAddressCreateEVM(
+                        address(this), 
+                        getNonce(address(this))
+                    );
 
-                    (address addr, uint256 _frameGasLeft) = _performCreate(gasLeft, val, memOffset + ost, len);
-
-                    gasLeft = _frameGasLeft;
+                    address addr;
+                    (addr, gasLeft) = genericCreate(
+                        expectedAddress,
+                        ost + memOffset,
+                        len,
+                        val,
+                        gasLeft
+                    );
 
                     tos = pushStackItem(tos, uint256(uint160(addr)));
 
@@ -2004,13 +2133,30 @@ contract EvmInterpreter {
 
                     ensureAcceptableMemLocation(len);
                     ensureAcceptableMemLocation(ost);
+
                     gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
 
-                    (address addr, uint256 _frameGasLeft) = _performCreate2(gasLeft, val, memOffset + ost, len, salt);
+                    bytes32 _bytecodeHash;
+                    assembly {
+                        _bytecodeHash := keccak256(add(memOffset, ost), len)
+                    }
+
+                    address expectedAddress = Utils.getNewAddressCreate2EVM(
+                        address(this), 
+                        bytes32(salt),
+                        _bytecodeHash
+                    );
+
+                    address addr;
+                    (addr, gasLeft) = genericCreate(
+                        expectedAddress,
+                        ost + memOffset,
+                        len,
+                        val,
+                        gasLeft
+                    );
 
                     tos = pushStackItem(tos, uint256(uint160(addr)));
-
-                    gasLeft = _frameGasLeft;
 
                     continue;
                 }
@@ -2020,14 +2166,21 @@ contract EvmInterpreter {
         } // unchecked
     }
 
-    function _maxCallGas(uint256 gasLimit, uint256 gasLeft) internal pure returns (uint256) {
-        // shift 6 more efficient than div 64
-        uint256 maxGas = ((gasLeft + 1) * 63) >> 6;
-        if (gasLimit > maxGas) {
-            return maxGas;
+    function _maxAllowedCallGas(uint256 _gasLeft) internal pure returns (uint256) {
+        unchecked {   
+            return _gasLeft - _gasLeft / 64;
         }
+    } 
 
-        return gasLimit;
+    function _maxCallGas(uint256 gasLimit, uint256 gasLeft) internal pure returns (uint256) {
+        unchecked {
+            uint256 maxGas = _maxAllowedCallGas(gasLeft);
+            if (gasLimit > maxGas) {
+                return maxGas;
+            }
+
+            return gasLimit;
+        }
     }
 
     function _isEVM(address _addr) internal view returns (bool isEVM) {

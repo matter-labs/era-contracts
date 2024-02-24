@@ -51,13 +51,13 @@ interface IContractDeployer {
 
     function getNewAddressCreate(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
 
-    function getNewAddressCreate2EVM(
-        address _sender,
-        bytes32 _salt,
-        bytes calldata _bytecode
-    ) external view returns (address newAddress);
+    // function getNewAddressCreate2EVM(
+    //     address _sender,
+    //     bytes32 _salt,
+    //     bytes calldata _bytecode
+    // ) external view returns (address newAddress);
 
-    function getNewAddressCreateEVM(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
+    // function getNewAddressCreateEVM(address _sender, uint256 _senderNonce) external pure returns (address newAddress);
 
     function create2(
         bytes32 _salt,
@@ -117,6 +117,8 @@ interface IContractDeployer {
     function createEVM(bytes calldata _initCode) external payable returns (address newAddress);
 
     function create2EVM(bytes32 _salt, bytes calldata _initCode) external payable returns (address);
+
+    function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable;
 
     function evmCode(address) external view returns (bytes memory);
     function evmCodeHash(address) external view returns (bytes32);
