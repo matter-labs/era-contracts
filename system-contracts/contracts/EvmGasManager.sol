@@ -13,7 +13,7 @@ uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffff
 
 contract EvmGasManager {
     mapping(address => bool) private warmAccounts;
-    
+
     struct SlotInfo {
         bool warm;
         uint256 originalValue;
@@ -38,19 +38,14 @@ contract EvmGasManager {
         if (!wasWarm) warmAccounts[account] = true;
     }
 
-    function isSlotWarm(
-        uint256 _slot
-    ) external view returns (bool) {
+    function isSlotWarm(uint256 _slot) external view returns (bool) {
         return warmSlots[msg.sender][_slot].warm;
     }
 
-    function warmSlot(
-        uint256 _slot,
-        uint256 _currentValue
-    ) external payable onlySystemEvm returns (bool, uint256) {
+    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
         SlotInfo memory info = warmSlots[msg.sender][_slot];
 
-        if(info.warm) {
+        if (info.warm) {
             return (true, info.originalValue);
         }
 

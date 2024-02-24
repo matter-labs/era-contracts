@@ -407,7 +407,6 @@ contract EvmInterpreter {
         }
     }
 
- 
     function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
         bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
         address addr = address(EVM_GAS_MANAGER);
@@ -1624,7 +1623,7 @@ contract EvmInterpreter {
                             tmp := sload(key)
                         }
 
-                        if(!isWarm) {
+                        if (!isWarm) {
                             warmSlot(key, tmp);
                         }
 
@@ -1647,7 +1646,7 @@ contract EvmInterpreter {
 
                         require(gasLeft > GAS_CALL_STIPEND);
 
-                        // Here it is okay to read before we charge since we known anyway that 
+                        // Here it is okay to read before we charge since we known anyway that
                         // the context has enough funds to compensate at least for the read.
                         uint256 currentValue;
                         assembly {
@@ -1657,12 +1656,12 @@ contract EvmInterpreter {
 
                         uint256 gasCost;
 
-                        if(!wasWarm) {
+                        if (!wasWarm) {
                             // The slot has been warmed up before
                             gasCost += GAS_COLD_SLOAD;
                         }
 
-                        if(originalValue == currentValue && currentValue != val) {
+                        if (originalValue == currentValue && currentValue != val) {
                             if (originalValue == 0) {
                                 gasCost += GAS_STORAGE_SET;
                             } else {
