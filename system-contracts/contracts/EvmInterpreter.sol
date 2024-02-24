@@ -20,6 +20,11 @@ function max(uint256 a, uint256 b) pure returns (uint256) {
 }
 
 uint256 constant MAX_ALLOWED_EVM_CODE_SIZE = 0x6000;
+uint256 constant GAS_CALL_STIPEND = 2300;
+uint256 constant GAS_COLD_SLOAD = 2100;
+uint256 constant GAS_STORAGE_SET = 20000;
+uint256 constant GAS_STORAGE_UPDATE = 5000;
+uint256 constant GAS_WARM_ACCESS = 100;
 
 contract EvmInterpreter {
     /*
@@ -384,8 +389,8 @@ contract EvmInterpreter {
         }
     }
 
-    function warmSlot(uint256 key) internal returns (bool isWarm) {
-        bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
+    function isSlotWarm(uint256 key) internal returns (bool isWarm) {
+        bytes4 selector = EVM_GAS_MANAGER.isSlotWarm.selector;
         address addr = address(EVM_GAS_MANAGER);
         assembly {
             mstore(0, selector)
@@ -399,6 +404,27 @@ contract EvmInterpreter {
             }
 
             isWarm := mload(0)
+        }
+    }
+
+ 
+    function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
+        bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
+        address addr = address(EVM_GAS_MANAGER);
+        assembly {
+            mstore(0, selector)
+            mstore(4, key)
+            mstore(36, currentValue)
+
+            let success := call(gas(), addr, 0, 0, 68, 0, 64)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            isWarm := mload(0)
+            originalValue := mload(32)
         }
     }
 
@@ -1584,17 +1610,24 @@ contract EvmInterpreter {
 
                         (key, tos) = _popStackItem(tos);
 
+                        bool isWarm = isSlotWarm(key);
+
                         // extra cost if account is cold
-                        if (warmSlot(key)) {
-                            gasLeft = chargeGas(gasLeft, 100);
+                        if (isWarm) {
+                            gasLeft = chargeGas(gasLeft, GAS_WARM_ACCESS);
                         } else {
-                            gasLeft = chargeGas(gasLeft, 2100);
+                            gasLeft = chargeGas(gasLeft, GAS_COLD_SLOAD);
                         }
 
                         uint256 tmp;
                         assembly ("memory-safe") {
                             tmp := sload(key)
                         }
+
+                        if(!isWarm) {
+                            warmSlot(key, tmp);
+                        }
+
                         tos = pushStackItem(tos, tmp);
 
                         // need not to worry about gas refunds as it happens outside the evm
@@ -1612,21 +1645,41 @@ contract EvmInterpreter {
                         (key, tos) = _popStackItem(tos);
                         (val, tos) = _popStackItem(tos);
 
-                        // TODO: those are not the *exact* same rules
-                        // extra cost if account is cold
-                        if (warmSlot(key)) {
-                            gasLeft = chargeGas(gasLeft, 100);
-                            // } else if (val == 0) {
-                            //     gasLeft -= 5000; // 2900 + 2100
-                        } else {
-                            gasLeft = chargeGas(gasLeft, 22100); // 20000 + 2100
+                        require(gasLeft > GAS_CALL_STIPEND);
+
+                        // Here it is okay to read before we charge since we known anyway that 
+                        // the context has enough funds to compensate at least for the read.
+                        uint256 currentValue;
+                        assembly {
+                            currentValue := sload(key)
                         }
+                        (bool wasWarm, uint256 originalValue) = warmSlot(key, currentValue);
+
+                        uint256 gasCost;
+
+                        if(!wasWarm) {
+                            // The slot has been warmed up before
+                            gasCost += GAS_COLD_SLOAD;
+                        }
+
+                        if(originalValue == currentValue && currentValue != val) {
+                            if (originalValue == 0) {
+                                gasCost += GAS_STORAGE_SET;
+                            } else {
+                                gasCost += GAS_STORAGE_UPDATE - GAS_COLD_SLOAD;
+                            }
+                        } else {
+                            gasCost += GAS_WARM_ACCESS;
+                        }
+
+                        // Need not to worry about gas refunds as it happens outside the EVM
+
+                        gasLeft = chargeGas(gasLeft, gasCost);
 
                         assembly ("memory-safe") {
                             sstore(key, val)
                         }
 
-                        // need not to worry about gas refunds as it happens outside the evm
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                         continue;
                     }

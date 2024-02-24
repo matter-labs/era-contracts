@@ -13,7 +13,13 @@ uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffff
 
 contract EvmGasManager {
     mapping(address => bool) private warmAccounts;
-    mapping(address => mapping(uint256 => bool)) private warmSlots;
+    
+    struct SlotInfo {
+        bool warm;
+        uint256 originalValue;
+    }
+
+    mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
 
     bytes latestReturndata;
 
@@ -32,9 +38,28 @@ contract EvmGasManager {
         if (!wasWarm) warmAccounts[account] = true;
     }
 
-    function warmSlot(uint256 slot) external payable onlySystemEvm returns (bool wasWarm) {
-        wasWarm = warmSlots[msg.sender][slot];
-        if (!wasWarm) warmSlots[msg.sender][slot] = true;
+    function isSlotWarm(
+        uint256 _slot
+    ) external view returns (bool) {
+        return warmSlots[msg.sender][_slot].warm;
+    }
+
+    function warmSlot(
+        uint256 _slot,
+        uint256 _currentValue
+    ) external payable onlySystemEvm returns (bool, uint256) {
+        SlotInfo memory info = warmSlots[msg.sender][_slot];
+
+        if(info.warm) {
+            return (true, info.originalValue);
+        }
+
+        info.warm = true;
+        info.originalValue = _currentValue;
+
+        warmSlots[msg.sender][_slot] = info;
+
+        return (false, _currentValue);
     }
 
     // We dont care about the size, since none of it will be stored/pub;ushed anywya
