@@ -82,7 +82,7 @@ async function getWETHAddress() {
 }
 
 async function getTransparentProxyUpgradeCalldata(target: string) {
-  const proxyArtifact = await hre.artifacts.readArtifact("TransparentUpgradeableProxy");
+  const proxyArtifact = await hre.artifacts.readArtifact("ITransparentUpgradeableProxy");
   const proxyInterface = new ethers.utils.Interface(proxyArtifact.abi);
 
   return proxyInterface.encodeFunctionData("upgradeTo", [target]);
