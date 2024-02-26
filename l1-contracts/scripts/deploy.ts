@@ -81,7 +81,7 @@ async function main() {
       });
       nonce++;
 
-      let pubdataPricingMode = cmd.validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
+      const pubdataPricingMode = cmd.validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
 
       await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
       await deployer.deployZkSyncContract(pubdataPricingMode, create2Salt, gasPrice, nonce + 1);
