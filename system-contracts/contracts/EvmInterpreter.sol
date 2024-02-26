@@ -25,6 +25,9 @@ uint256 constant GAS_COLD_SLOAD = 2100;
 uint256 constant GAS_STORAGE_SET = 20000;
 uint256 constant GAS_STORAGE_UPDATE = 5000;
 uint256 constant GAS_WARM_ACCESS = 100;
+uint256 constant GAS_COLD_ACCOUNT_ACCESS = 2600;
+uint256 constant GAS_NEW_ACCOUNT = 25000;
+uint256 constant GAS_CALL_VALUE = 9000;
 
 contract EvmInterpreter {
     /*
@@ -389,6 +392,14 @@ contract EvmInterpreter {
         }
     }
 
+    function doesAccountExist(address _addr) internal returns (bool accountExists) {
+        uint256 codeSize;
+        assembly {
+            codeSize := extcodesize(_addr)
+        }
+        return codeSize > 0 || _addr.balance > 0 || getRawNonce(_addr) > 0;
+    }
+
     function isSlotWarm(uint256 key) internal returns (bool isWarm) {
         bytes4 selector = EVM_GAS_MANAGER.isSlotWarm.selector;
         address addr = address(EVM_GAS_MANAGER);
@@ -500,6 +511,37 @@ contract EvmInterpreter {
         assembly {
             mstore(lastRtSzOffset, returndatasize())
         }
+    }
+
+    // Returns a pair of `(gasToPay, gasToPass)`
+    function getMessageCallGas(
+        uint256 _value,
+        uint256 _gas,
+        uint256 _gasLeft,
+        uint256 _memoryCost,
+        uint256 _extraGas
+    ) internal returns (uint256, uint256) {
+        uint256 callStipend;
+        if (_value > 0) {
+            callStipend = GAS_CALL_STIPEND;
+        } else {
+            callStipend = 0;
+        }
+
+        if(_gasLeft < _extraGas + _memoryCost) {
+            // We don't have enough funds to cover for memory growth as well as the cost for the call
+            return (_gas + _extraGas, _gas + callStipend);
+        }
+
+        uint256 maxGasToPass = _maxAllowedCallGas(
+            _gasLeft - _extraGas - _memoryCost
+        );
+
+        if (_gas > maxGasToPass) {
+            _gas = maxGasToPass;
+        }
+
+        return (_gas + _extraGas, _gas + callStipend);
     }
 
     function _performCall(
@@ -775,11 +817,30 @@ contract EvmInterpreter {
     }
 
     bytes4 constant GET_DEPLOYMENT_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.getDeploymentNonce.selector;
+    bytes4 constant GET_RAW_NONCE_SELECTOR = NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce.selector;
     bytes4 constant INCREMENT_DEPLOYMENT_NONCE_SELECTOR =
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce.selector;
 
     function getNonce(address _addr) internal returns (uint256 nonce) {
         bytes4 selector = GET_DEPLOYMENT_NONCE_SELECTOR;
+        address to = address(NONCE_HOLDER_SYSTEM_CONTRACT);
+        assembly {
+            mstore(0, selector)
+            mstore(4, _addr)
+
+            let success := staticcall(gas(), to, 0, 36, 0, 32)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            nonce := mload(0)
+        }
+    }
+
+    function getRawNonce(address _addr) internal returns (uint256 nonce) {
+        bytes4 selector = GET_RAW_NONCE_SELECTOR;
         address to = address(NONCE_HOLDER_SYSTEM_CONTRACT);
         assembly {
             mstore(0, selector)
@@ -1946,61 +2007,44 @@ contract EvmInterpreter {
 
                     (gas, addr, value, argOst, argLen, retOst, retLen, tos) = _pop7StackItems(tos);
 
-                    uint256 toCharge = 0;
-
-                    if (value != 0) {
-                        // We can not return a readable error to preserve compatibility
-                        require(!isStatic);
-
-                        uint256 codeSize;
-                        assembly {
-                            codeSize := extcodesize(addr)
-                        }
-
-                        /*
-                        If value is not 0, then positive_value_cost is 9000.
-                        In this case there is also a call stipend that is given to
-                        make sure that a basic fallback function can be called.
-                        2300 is thus removed from the cost, and also added to the gas input.
-                        */
-                        // that is, 9000 minus 2300 stipend going towards gas limit
-                        // and another 25000 added to the 9000 - 2300 if
-                        if (codeSize == 0) {
-                            // if value AND account empty:
-                            toCharge += 31700; // 25000 + (9000 - 2300);
-                        } else {
-                            // if value AND account not empty:
-                            toCharge += 6700; // 9000 - 2300;
-                        }
-
-                        // call stipend: https://github.com/ethereum/go-ethereum/blob/576681f29b895dd39e559b7ba17fcd89b42e4833/core/vm/instructions.go#L659
-                        gas += 2300;
-                    }
-
                     ensureAcceptableMemLocation(argOst);
                     ensureAcceptableMemLocation(argLen);
                     ensureAcceptableMemLocation(retOst);
                     ensureAcceptableMemLocation(retLen);
 
-                    toCharge += expandMemory(max(argOst + argLen, retOst + retLen));
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
+                    // only to keep the code closer to the execution spec. 
+                    // In essense their sum could be used as just one variable.
+                    uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
-                    // extra cost if account is cold:
-                    // If address is warm, then address_access_cost is 100, otherwise it is 2600.
+                    uint256 extraCost = 0;
                     if (warmAccount(address(uint160(addr)))) {
-                        toCharge += 100;
+                        extraCost = GAS_WARM_ACCESS;
                     } else {
-                        toCharge += 2600;
+                        extraCost = GAS_COLD_ACCOUNT_ACCESS;
+                    }
+                    if (!doesAccountExist(address(uint160(addr)))) {
+                        extraCost += GAS_NEW_ACCOUNT;
+                    }
+                    if (value > 0) {
+                       require(!isStatic);
+                       extraCost += GAS_CALL_VALUE;
                     }
 
-                    gasLeft = chargeGas(gasLeft, toCharge);
+                    (uint256 gasToPay, uint256 gasToPass) = getMessageCallGas(
+                        value,
+                        gas,
+                        gasLeft,
+                        memoryExpansionCost,
+                        extraCost
+                    );
 
-                    gas = _maxCallGas(gas, gasLeft);
-
-                    gasLeft -= gas;
+                    gasLeft = chargeGas(gasLeft, memoryExpansionCost + gasToPay);
+            
                     (bool success, uint256 frameGasLeft) = _performCall(
                         _isEVM(address(uint160(addr))),
                         isStatic,
-                        gas,
+                        gasToPass,
                         address(uint160(addr)),
                         value,
                         argOst + memOffset,
@@ -2032,25 +2076,33 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(retOst);
                     ensureAcceptableMemLocation(retLen);
 
-                    uint256 toCharge = expandMemory(max(argOst + argLen, retOst + retLen));
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
+                    // only to keep the code closer to the execution spec. 
+                    // In essense their sum could be used as just one variable.
+                    uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
-                    // extra cost if account is cold:
-                    // If address is warm, then address_access_cost is 100, otherwise it is 2600.
+                    uint256 extraCost = 0;
+
                     if (warmAccount(address(uint160(addr)))) {
-                        toCharge += 100;
+                        extraCost = GAS_WARM_ACCESS;
                     } else {
-                        toCharge += 2600;
+                        extraCost = GAS_COLD_ACCOUNT_ACCESS;
                     }
 
-                    gasLeft = chargeGas(gasLeft, toCharge);
+                    (uint256 gasToPay, uint256 gasToPass) = getMessageCallGas(
+                        0,
+                        gas,
+                        gasLeft,
+                        memoryExpansionCost,
+                        extraCost
+                    );
 
-                    gas = _maxCallGas(gas, gasLeft);
+                    gasLeft = chargeGas(gasLeft, gasToPay);
 
-                    gasLeft -= gas;
                     (bool success, uint256 frameGasLeft) = _performDelegateCall(
                         _isEVM(address(uint160(addr))),
                         isStatic,
-                        gas,
+                        gasToPass,
                         address(uint160(addr)),
                         argOst + memOffset,
                         argLen,
@@ -2076,23 +2128,32 @@ contract EvmInterpreter {
 
                     (gas, addr, argOst, argLen, retOst, retLen, tos) = _pop6StackItems(tos);
 
-                    uint256 toCharge = expandMemory(max(argOst + argLen, retOst + retLen));
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
+                    // only to keep the code closer to the execution spec. 
+                    // In essence their sum could be used as just one variable.
+                    uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
-                    // extra cost if account is cold:
-                    // If address is warm, then address_access_cost is 100, otherwise it is 2600.
+                    uint256 extraCost = 0;
+
                     if (warmAccount(address(uint160(addr)))) {
-                        toCharge += 100;
+                        extraCost = GAS_WARM_ACCESS;
                     } else {
-                        toCharge += 2600;
+                        extraCost = GAS_COLD_ACCOUNT_ACCESS;
                     }
+                   
+                    (uint256 gasToPay, uint256 gasToPass) = getMessageCallGas(
+                        0,
+                        gas,
+                        gasLeft,
+                        memoryExpansionCost,
+                        extraCost
+                    );
 
-                    gasLeft = chargeGas(gasLeft, toCharge);
+                    gasLeft = chargeGas(gasLeft, gasToPay);
 
-                    gas = _maxCallGas(gas, gasLeft);
-                    gasLeft -= gas;
                     (bool success, uint256 frameGasLeft) = _performStaticCall(
                         _isEVM(address(uint160(addr))),
-                        gas,
+                        gasToPass,
                         address(uint160(addr)),
                         argOst + memOffset,
                         argLen,
