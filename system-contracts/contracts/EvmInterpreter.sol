@@ -528,14 +528,12 @@ contract EvmInterpreter {
             callStipend = 0;
         }
 
-        if(_gasLeft < _extraGas + _memoryCost) {
+        if (_gasLeft < _extraGas + _memoryCost) {
             // We don't have enough funds to cover for memory growth as well as the cost for the call
             return (_gas + _extraGas, _gas + callStipend);
         }
 
-        uint256 maxGasToPass = _maxAllowedCallGas(
-            _gasLeft - _extraGas - _memoryCost
-        );
+        uint256 maxGasToPass = _maxAllowedCallGas(_gasLeft - _extraGas - _memoryCost);
 
         if (_gas > maxGasToPass) {
             _gas = maxGasToPass;
@@ -2012,8 +2010,8 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(retOst);
                     ensureAcceptableMemLocation(retLen);
 
-                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
-                    // only to keep the code closer to the execution spec. 
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done
+                    // only to keep the code closer to the execution spec.
                     // In essense their sum could be used as just one variable.
                     uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
@@ -2027,8 +2025,8 @@ contract EvmInterpreter {
                         extraCost += GAS_NEW_ACCOUNT;
                     }
                     if (value > 0) {
-                       require(!isStatic);
-                       extraCost += GAS_CALL_VALUE;
+                        require(!isStatic);
+                        extraCost += GAS_CALL_VALUE;
                     }
 
                     (uint256 gasToPay, uint256 gasToPass) = getMessageCallGas(
@@ -2040,7 +2038,7 @@ contract EvmInterpreter {
                     );
 
                     gasLeft = chargeGas(gasLeft, memoryExpansionCost + gasToPay);
-            
+
                     (bool success, uint256 frameGasLeft) = _performCall(
                         _isEVM(address(uint160(addr))),
                         isStatic,
@@ -2076,8 +2074,8 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(retOst);
                     ensureAcceptableMemLocation(retLen);
 
-                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
-                    // only to keep the code closer to the execution spec. 
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done
+                    // only to keep the code closer to the execution spec.
                     // In essense their sum could be used as just one variable.
                     uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
@@ -2128,8 +2126,8 @@ contract EvmInterpreter {
 
                     (gas, addr, argOst, argLen, retOst, retLen, tos) = _pop6StackItems(tos);
 
-                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done 
-                    // only to keep the code closer to the execution spec. 
+                    // The separation betweeen `memoryExpansionCost` and `extraCost` is done
+                    // only to keep the code closer to the execution spec.
                     // In essence their sum could be used as just one variable.
                     uint256 memoryExpansionCost = expandMemory(max(argOst + argLen, retOst + retLen));
 
@@ -2140,7 +2138,7 @@ contract EvmInterpreter {
                     } else {
                         extraCost = GAS_COLD_ACCOUNT_ACCESS;
                     }
-                   
+
                     (uint256 gasToPay, uint256 gasToPass) = getMessageCallGas(
                         0,
                         gas,
