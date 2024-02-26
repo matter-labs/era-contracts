@@ -28,6 +28,7 @@ uint256 constant GAS_WARM_ACCESS = 100;
 uint256 constant GAS_COLD_ACCOUNT_ACCESS = 2600;
 uint256 constant GAS_NEW_ACCOUNT = 25000;
 uint256 constant GAS_CALL_VALUE = 9000;
+uint256 constant GAS_INIT_CODE_WORD_COST = 2;
 
 contract EvmInterpreter {
     /*
@@ -870,6 +871,10 @@ contract EvmInterpreter {
                 revert(0, 0)
             }
         }
+    }
+
+    function initCodeGas(uint256 _len) internal pure returns (uint256) {
+        return GAS_INIT_CODE_WORD_COST * _words(_len);
     }
 
     // Returns a pair of created address and the new gasLeft.
@@ -2207,7 +2212,7 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(len);
                     ensureAcceptableMemLocation(ost);
 
-                    gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
+                    gasLeft = chargeGas(gasLeft, 32000 + initCodeGas(len) + expandMemory(ost + len));
 
                     address expectedAddress = Utils.getNewAddressCreateEVM(address(this), getNonce(address(this)));
 
@@ -2233,7 +2238,7 @@ contract EvmInterpreter {
                     ensureAcceptableMemLocation(len);
                     ensureAcceptableMemLocation(ost);
 
-                    gasLeft = chargeGas(gasLeft, 32000 + 200 * len + expandMemory(ost + len));
+                    gasLeft = chargeGas(gasLeft, 32000 + initCodeGas(len) + expandMemory(ost + len));
 
                     bytes32 _bytecodeHash;
                     assembly {
@@ -2348,8 +2353,9 @@ contract EvmInterpreter {
         }
     }
 
-    // Each evm gas is 200 zkEVM one
-    uint256 constant GAS_DIVISOR = 20;
+    // Each evm gas is 5 zkEVM one
+    // FIXME: change this variable to reflect real ergs : gas ratio
+    uint256 constant GAS_DIVISOR = 5;
     uint256 constant EVM_GAS_STIPEND = (1 << 30);
     uint256 constant OVERHEAD = 2000;
 
