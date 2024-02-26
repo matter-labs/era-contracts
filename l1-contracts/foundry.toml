@@ -5,4 +5,4 @@ libs = ['node_modules', 'lib']
 cache_path = 'cache-forge'
 test = 'test/foundry'
 
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+# See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config
