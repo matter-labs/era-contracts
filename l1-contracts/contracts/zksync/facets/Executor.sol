@@ -27,10 +27,6 @@ contract ExecutorFacet is Base, IExecutor {
 
     bool constant VALIDIUM_MODE = $(VALIDIUM_MODE);
 
-    function getPubdataPriceMode() external view returns (PubdataPricingMode) {
-        return s.feeParams.pubdataPricingMode;
-    }
-
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
     /// @dev returns new batch StoredBatchInfo
     /// @notice Does not change storage

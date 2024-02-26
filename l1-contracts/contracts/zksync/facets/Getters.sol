@@ -158,6 +158,12 @@ contract GettersFacet is Base, IGetters, ILegacyGetters {
         return s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
     }
 
+    /// @inheritdoc IGetters
+    /// @notice This method is unstable.
+    function getPubdataPriceMode() external view returns (PubdataPricingMode) {
+        return s.feeParams.pubdataPricingMode;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/
