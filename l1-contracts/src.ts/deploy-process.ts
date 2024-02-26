@@ -98,6 +98,7 @@ export async function initialBridgehubDeployment(
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
+  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 

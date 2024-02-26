@@ -33,7 +33,7 @@ contract AuthorizationTest is ExecutorTest {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: bytes(""),
-            totalL2ToL1Pubdata: bytes("")
+            pubdataCommitments: bytes("")
         });
     }
 

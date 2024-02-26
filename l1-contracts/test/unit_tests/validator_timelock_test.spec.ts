@@ -30,7 +30,8 @@ describe("ValidatorTimelock tests", function () {
       bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
       eventsQueueStateHash: ethers.utils.randomBytes(32),
       systemLogs: [],
-      totalL2ToL1Pubdata: "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563",
+      pubdataCommitments:
+        "0x00290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
     };
   }
 
@@ -77,7 +78,7 @@ describe("ValidatorTimelock tests", function () {
   it("Should check deployment", async () => {
     expect(await validatorTimelock.owner()).equal(await owner.getAddress());
     expect(await validatorTimelock.executionDelay()).equal(0);
-    expect(await validatorTimelock.validator(chainId)).equal(ethers.constants.AddressZero);
+    expect(await validatorTimelock.validators(chainId, ethers.constants.AddressZero)).equal(false);
     expect(await validatorTimelock.stateTransitionManager()).equal(dummyStateTransitionManager.address);
     expect(await dummyStateTransitionManager.stateTransition(chainId)).equal(dummyExecutor.address);
     expect(await dummyStateTransitionManager.getChainAdmin(chainId)).equal(await owner.getAddress());
@@ -89,7 +90,7 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).commitBatches(getMockStoredBatchInfo(0), [getMockCommitBatchInfo(1)])
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator proves batches", async () => {
@@ -99,13 +100,13 @@ describe("ValidatorTimelock tests", function () {
         .proveBatches(getMockStoredBatchInfo(0), [getMockStoredBatchInfo(1)], MOCK_PROOF_INPUT)
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator revert batches", async () => {
     const revertReason = await getCallRevertReason(validatorTimelock.connect(randomSigner).revertBatches(1));
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if non-validator executes batches", async () => {
@@ -113,15 +114,15 @@ describe("ValidatorTimelock tests", function () {
       validatorTimelock.connect(randomSigner).executeBatches([getMockStoredBatchInfo(1)])
     );
 
-    expect(revertReason).equal("8h");
+    expect(revertReason).equal("ValidatorTimelock: only validator");
   });
 
   it("Should revert if not chain governor sets validator", async () => {
     const revertReason = await getCallRevertReason(
-      validatorTimelock.connect(randomSigner).setValidator(chainId, await randomSigner.getAddress())
+      validatorTimelock.connect(randomSigner).addValidator(chainId, await randomSigner.getAddress())
     );
 
-    expect(revertReason).equal("9h");
+    expect(revertReason).equal("ValidatorTimelock: only chain admin");
   });
 
   it("Should revert if non-owner sets execution delay", async () => {
@@ -132,9 +133,9 @@ describe("ValidatorTimelock tests", function () {
 
   it("Should successfully set the validator", async () => {
     const validatorAddress = await validator.getAddress();
-    await validatorTimelock.connect(owner).setValidator(chainId, validatorAddress);
+    await validatorTimelock.connect(owner).addValidator(chainId, validatorAddress);
 
-    expect(await validatorTimelock.validator(chainId)).equal(validatorAddress);
+    expect(await validatorTimelock.validators(chainId, validatorAddress)).equal(true);
   });
 
   it("Should successfully set the execution delay", async () => {

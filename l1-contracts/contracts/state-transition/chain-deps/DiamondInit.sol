@@ -44,6 +44,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
+        s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

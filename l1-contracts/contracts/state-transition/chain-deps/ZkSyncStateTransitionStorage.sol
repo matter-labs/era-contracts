@@ -133,6 +133,8 @@ struct ZkSyncStateTransitionStorage {
     /// @dev Fee params used to derive gasPrice for the L1->L2 transactions. For L2 transactions,
     /// the bootloader gives enough freedom to the operator.
     FeeParams feeParams;
+    /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
+    address blobVersionedHashRetriever;
     /// new fields
     /// @dev The chainId of the chain
     uint256 chainId;

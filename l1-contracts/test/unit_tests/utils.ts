@@ -23,6 +23,9 @@ export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
 export const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = "0x000000000000000000000000000000000000800a";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
 export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
+export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x0000000000000000000000000000000000008011";
+const PUBDATA_HASH = "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563";
+
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
 export function randomAddress() {
@@ -37,6 +40,8 @@ export enum SYSTEM_LOG_KEYS {
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  BLOB_ONE_HASH_KEY,
+  BLOB_TWO_HASH_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -187,12 +192,7 @@ export function createSystemLogs(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
@@ -218,6 +218,8 @@ export function createSystemLogs(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
   ];
 }
 
@@ -228,12 +230,7 @@ export function createSystemLogsWithUpgrade(
 ) {
   return [
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.L2_TO_L1_LOGS_TREE_ROOT_KEY, ethers.constants.HashZero),
-    constructL2Log(
-      true,
-      L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY,
-      "0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563"
-    ),
+    constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.TOTAL_L2_TO_L1_PUBDATA_KEY, PUBDATA_HASH),
     constructL2Log(true, L2_TO_L1_MESSENGER, SYSTEM_LOG_KEYS.STATE_DIFF_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
@@ -254,6 +251,8 @@ export function createSystemLogsWithUpgrade(
       SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY,
       numberOfLayer1Txs ? numberOfLayer1Txs.toString() : ethers.constants.HashZero
     ),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
       L2_BOOTLOADER_ADDRESS,
@@ -318,7 +317,7 @@ export interface CommitBatchInfo {
   bootloaderHeapInitialContentsHash: BytesLike;
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
-  totalL2ToL1Pubdata: BytesLike;
+  pubdataCommitments: BytesLike;
 }
 
 export async function depositERC20(

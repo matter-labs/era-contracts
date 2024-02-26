@@ -9,8 +9,10 @@ import {
   priorityTxMaxGasLimit,
   hashL2Bytecode,
   applyL1ToL2Alias,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
 } from "./utils";
 
+import { ADDRESS_ONE } from "../../l1-contracts/src.ts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
@@ -18,6 +20,53 @@ import * as hre from "hardhat";
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: ethers.BigNumber) {
   const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
 
+  /// ####################################################################################################################
+
+  if (deployer.verbose) {
+    console.log("Providing necessary L2 bytecodes");
+  }
+  const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+
+  const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
+    chainId,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );
+
+  const ethIsBaseToken = ADDRESS_ONE == deployer.addresses.BaseToken;
+
+  if (!ethIsBaseToken) {
+    const erc20 = deployer.baseTokenContract(deployer.deployWallet);
+
+    const approveTx = await erc20.approve(
+      deployer.addresses.Bridges.SharedBridgeProxy,
+      requiredValueToPublishBytecodes.add(requiredValueToPublishBytecodes)
+    );
+    await approveTx.wait(1);
+  }
+  const nonce = await deployer.deployWallet.getTransactionCount();
+  const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = hre.artifacts.readArtifactSync("UpgradeableBeacon").bytecode;
+  const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2StandardERC20").bytecode;
+
+  const tx1 = await bridgehub.requestL2TransactionDirect(
+    {
+      chainId,
+      l2Contract: ethers.constants.AddressZero,
+      mintValue: requiredValueToPublishBytecodes,
+      l2Value: 0,
+      l2Calldata: "0x",
+      l2GasLimit: priorityTxMaxGasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
+      refundRecipient: deployer.deployWallet.address,
+    },
+    { gasPrice, nonce, value: ethIsBaseToken ? requiredValueToPublishBytecodes : 0 }
+  );
+  await tx1.wait();
+  if (deployer.verbose) {
+    console.log("Bytecodes published on L2");
+  }
   /// ####################################################################################################################
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
@@ -43,6 +92,10 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
 
     console.log("Deploying L2SharedBridge Implementation");
   }
+
+  /// L2StandardTokenProxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
+  const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
+
   // TODO: request from API how many L2 gas needs for the transaction.
   const tx2 = await create2DeployFromL1(
     chainId,
@@ -51,7 +104,8 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
     "0x",
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
-    gasPrice
+    gasPrice,
+    [L2_STANDARD_TOKEN_PROXY_BYTECODE]
   );
 
   await tx2.wait();
@@ -66,7 +120,7 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
   const BEACON_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
   const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
-
+  // console.log("kl todo l2GovernorAddress", l2GovernorAddress, deployer.addresses.Governance)
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
     hashL2Bytecode(BEACON_PROXY_BYTECODE),
@@ -92,9 +146,6 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
     ethers.constants.HashZero
   );
 
-  /// L2StandardTokenProxy bytecode. We need this bytecode to be accessible on the L2, it is enough to add to factoryDeps
-  const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
-
   /// deploy L2SharedBridgeProxy
   // TODO: request from API how many L2 gas needs for the transaction.
   const tx3 = await create2DeployFromL1(
@@ -104,8 +155,7 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
     l2SharedBridgeProxyConstructorData,
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
-    gasPrice,
-    [L2_STANDARD_TOKEN_PROXY_BYTECODE]
+    gasPrice
   );
   await tx3.wait();
   if (deployer.verbose) {

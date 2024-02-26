@@ -1,7 +1,9 @@
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import * as hre from "hardhat";
 import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, ethTestConfig, priorityTxMaxGasLimit } from "./utils";
 
 function getContractBytecode(contractName: string) {

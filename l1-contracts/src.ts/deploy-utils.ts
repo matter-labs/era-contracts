@@ -19,6 +19,34 @@ export async function deployViaCreate2(
 ): Promise<[string, string]> {
   // [address, txHash]
 
+  const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
+    signer: deployWallet,
+    libraries,
+  });
+  const bytecode = contractFactory.getDeployTransaction(...[...args, ethTxOptions]).data;
+
+  return await deployBytecodeViaCreate2(
+    deployWallet,
+    contractName,
+    bytecode,
+    create2Salt,
+    ethTxOptions,
+    create2FactoryAddress,
+    verbose
+  );
+}
+
+export async function deployBytecodeViaCreate2(
+  deployWallet: ethers.Wallet,
+  contractName: string,
+  bytecode: ethers.BytesLike,
+  create2Salt: string,
+  ethTxOptions: ethers.providers.TransactionRequest,
+  create2FactoryAddress: string,
+  verbose: boolean = true
+): Promise<[string, string]> {
+  // [address, txHash]
+
   const log = (msg: string) => {
     if (verbose) {
       console.log(msg);
@@ -27,11 +55,6 @@ export async function deployViaCreate2(
   log(`Deploying ${contractName}`);
 
   const create2Factory = SingletonFactoryFactory.connect(create2FactoryAddress, deployWallet);
-  const contractFactory = await hardhat.ethers.getContractFactory(contractName, {
-    signer: deployWallet,
-    libraries,
-  });
-  const bytecode = contractFactory.getDeployTransaction(...[...args, ethTxOptions]).data;
   const expectedAddress = ethers.utils.getCreate2Address(
     create2Factory.address,
     create2Salt,
@@ -45,9 +68,8 @@ export async function deployViaCreate2(
   }
 
   const tx = await create2Factory.deploy(bytecode, create2Salt, ethTxOptions);
+  const receipt = await tx.wait();
 
-  const waitBlocks = (await deployWallet.provider.getNetwork()).chainId == 31337 ? 1 : 2; //hardhat chainId
-  const receipt = await tx.wait(waitBlocks);
   const gasUsed = receipt.gasUsed;
   log(`${contractName} deployed, gasUsed: ${gasUsed.toString()}`);
 
@@ -87,6 +109,7 @@ export interface DeployedAddresses {
   BaseToken: string;
   TransparentProxyAdmin: string;
   Governance: string;
+  BlobVersionedHashRetriever: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
 }
@@ -120,6 +143,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
+    BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
   };
