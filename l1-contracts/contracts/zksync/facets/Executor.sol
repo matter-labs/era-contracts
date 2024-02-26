@@ -126,6 +126,10 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32 providedL2ToL1PubdataHash;
         if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
+        } else if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+            require(_newBatch.totalL2ToL1Pubdata.length == 0, "Mts");
+        } else {
+            revert("sop");
         }
 
         // linear traversal of the logs
