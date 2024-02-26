@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
-import {VerifierParams} from "../Storage.sol";
+import {VerifierParams, PubdataPricingMode} from "../Storage.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
@@ -159,8 +159,7 @@ contract GettersFacet is Base, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    /// @notice This method is unstable.
-    function getPubdataPriceMode() external view returns (PubdataPricingMode) {
+    function getPubdataPricingMode() external view returns (PubdataPricingMode) {
         return s.feeParams.pubdataPricingMode;
     }
 

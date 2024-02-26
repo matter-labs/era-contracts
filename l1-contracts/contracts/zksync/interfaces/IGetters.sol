@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {PriorityOperation} from "../libraries/PriorityQueue.sol";
-import {VerifierParams, UpgradeState} from "../Storage.sol";
+import {VerifierParams, UpgradeState, PubdataPricingMode} from "../Storage.sol";
 import "./IBase.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
@@ -91,6 +91,10 @@ interface IGetters is IBase {
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
+
+    /// @return The pubdata pricing mode.
+    /// @dev This method is unstable.
+    function getPubdataPricingMode() external view returns (PubdataPricingMode);
 
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
