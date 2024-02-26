@@ -43,7 +43,7 @@ contract ExecutorFacet is Base, IExecutor {
             bytes32 stateDiffHash,
             bytes32 l2LogsTreeRoot,
             uint256 packedBatchAndL2BlockTimestamp
-        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        ) = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, s.feeParams.pubdataPricingMode);
 
         require(_previousBatch.batchHash == previousBatchHash, "l");
         // Check that the priority operation hash in the L2 logs is as expected
@@ -103,10 +103,11 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        PubdataPricingMode pubdataPricingMode
     )
         internal
-        view
+        pure
         returns (
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
@@ -124,9 +125,9 @@ contract ExecutorFacet is Base, IExecutor {
         uint256 processedLogs;
 
         bytes32 providedL2ToL1PubdataHash;
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+        if (pubdataPricingMode == PubdataPricingMode.Rollup) {
             providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
-        } else if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+        } else if (pubdataPricingMode == PubdataPricingMode.Validium) {
             require(_newBatch.totalL2ToL1Pubdata.length == 0, "Mts");
         } else {
             revert("sop");
@@ -148,7 +149,7 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+                if (pubdataPricingMode == PubdataPricingMode.Rollup) {
                     require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
                     require(providedL2ToL1PubdataHash == logValue, "wp");
                 }
