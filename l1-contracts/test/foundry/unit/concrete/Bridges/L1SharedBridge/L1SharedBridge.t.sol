@@ -20,7 +20,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "solpp/common/L2ContractAddress
 import {ERA_CHAIN_ID, ERA_DIAMOND_PROXY} from "solpp/common/Config.sol";
 import {IGetters} from "solpp/state-transition/chain-interfaces/IGetters.sol";
 
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 contract L1SharedBridgeTest is Test {
     event BridgehubDepositBaseTokenInitiated(

@@ -19,8 +19,6 @@ import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "solpp/common/L2ContractAddresses.sol";
 import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
 
-import "forge-std/console.sol";
-
 contract L1SharedBridgeLegacyTest is Test {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,

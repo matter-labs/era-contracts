@@ -19,7 +19,7 @@ import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "solpp/common/L2ContractAddresses.sol";
 import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
 
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 // note, this should be the same as where hyper is disalbed
 contract L1SharedBridgeHyperEnabledTest is Test {
