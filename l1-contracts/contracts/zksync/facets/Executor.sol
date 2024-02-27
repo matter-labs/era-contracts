@@ -10,7 +10,6 @@ import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 import {VerifierParams} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
-import {PubdataPricingMode} from "../Storage.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IBase} from "../interfaces/IBase.sol";
