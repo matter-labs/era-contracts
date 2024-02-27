@@ -3,6 +3,7 @@ import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
+import type { Contract } from "ethers";
 import { Wallet } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 import { web3Provider } from "./utils";
@@ -25,7 +26,52 @@ type Token = {
 
 type TokenDescription = Token & {
   implementation?: string;
+  contract?: Contract;
 };
+
+async function deployContracts(tokens: TokenDescription[], wallet: Wallet) {
+  for (const token of tokens) {
+    token.implementation = token.implementation || DEFAULT_ERC20;
+    const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
+    const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
+
+    token.contract = await tokenFactory.deploy(...args, { gasLimit: 5000000 });
+  }
+
+  await Promise.all(tokens.map(async (token) => token.contract.deployTransaction.wait()));
+}
+
+async function mint(token: TokenDescription, wallet: Wallet): Promise<Promise<null>[]> {
+  if (token.implementation === "WETH9") {
+    return [];
+  }
+
+  const promises = [];
+  let tx = await token.contract.mint(wallet.address, parseEther("3000000000"));
+  promises.push(tx.wait());
+
+  for (let i = 0; i < 10; ++i) {
+    const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
+      provider
+    );
+
+    tx = await token.contract.mint(testWallet.address, parseEther("3000000000"));
+    promises.push(tx.wait());
+  }
+
+  return promises;
+}
+
+function unwrapToken(token: TokenDescription): Token {
+  token.address = token.contract.address;
+
+  delete token.contract;
+  if (token.implementation) {
+    delete token.implementation;
+  }
+
+  return token;
+}
 
 async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Token> {
   token.implementation = token.implementation || DEFAULT_ERC20;
@@ -36,13 +82,15 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
 
   if (token.implementation !== "WETH9") {
     await erc20.mint(wallet.address, parseEther("3000000000"));
-  }
-  for (let i = 0; i < 10; ++i) {
-    const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
-      provider
-    );
-    if (token.implementation !== "WETH9") {
-      await erc20.mint(testWallet.address, parseEther("3000000000"));
+
+    for (let i = 0; i < 10; ++i) {
+      const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
+        provider
+      );
+
+      if (token.implementation !== "WETH9") {
+        await erc20.mint(testWallet.address, parseEther("3000000000"));
+      }
     }
   }
 
@@ -74,7 +122,7 @@ async function main() {
         name: cmd.tokenName,
         symbol: cmd.symbol,
         decimals: cmd.decimals,
-        implementation: cmd.implementation,
+        implementation: cmd.implementation
       };
 
       const wallet = cmd.privateKey
@@ -96,9 +144,14 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
+      await deployContracts(tokens, wallet);
+
+      const mintPromises = [];
       for (const token of tokens) {
-        result.push(await deployToken(token, wallet));
+        mintPromises.push(...(await mint(token, wallet)));
+        result.push(unwrapToken(token));
       }
+      await Promise.all(mintPromises);
 
       console.log(JSON.stringify(result, null, 2));
     });
