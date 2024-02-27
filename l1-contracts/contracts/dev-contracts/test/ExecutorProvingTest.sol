@@ -25,7 +25,7 @@ contract ExecutorProvingTest is ExecutorFacet {
         PubdataPricingMode pubdataPricingMode
     )
         external
-        view
+        pure
         returns (
             uint256 numberOfLayer1Txs,
             bytes32 chainedPriorityTxsHash,
