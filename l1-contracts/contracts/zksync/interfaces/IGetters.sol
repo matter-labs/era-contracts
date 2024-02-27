@@ -93,7 +93,7 @@ interface IGetters is IBase {
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
     /// @return The pubdata pricing mode.
-    /// @dev This method is unstable.
+    /// @dev This method is unstable and will likely change in the future. Use at your own risk.
     function getPubdataPricingMode() external view returns (PubdataPricingMode);
 
     /*//////////////////////////////////////////////////////////////
