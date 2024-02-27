@@ -971,11 +971,12 @@ object "Bootloader" {
                         gasPerPubdata,
                     )
 
-                    // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata
                     let ergsSpentOnPubdata := getErgsSpentForPubdata(
                         basePubdataSpent,
                         gasPerPubdata
                     )
+
+                    // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata.
                     let potentialRefund := saturatingSub(
                         safeAdd(reservedGas, gasForExecution, "safeadd: potentialRefund1"), 
                         safeAdd(gasSpentOnExecution, ergsSpentOnPubdata, "safeadd: potentialRefund2")
