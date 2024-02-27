@@ -120,7 +120,7 @@ async function main() {
         name: cmd.tokenName,
         symbol: cmd.symbol,
         decimals: cmd.decimals,
-        implementation: cmd.implementation
+        implementation: cmd.implementation,
       };
 
       const wallet = cmd.privateKey
