@@ -9,6 +9,7 @@ import {
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers, network } from "hardhat";
+import { BigNumber } from "ethers";
 
 describe("NonceHolder tests", () => {
   const wallet = getWallets()[0];
@@ -36,29 +37,45 @@ describe("NonceHolder tests", () => {
     });
   });
 
-  describe("increaseMinNonce", () => {
-    it("should revert This method require system call flag", async () => {
-      await expect(nonceHolder.increaseMinNonce(123)).to.be.rejectedWith("This method require system call flag");
+  describe("increaseMinNonce and getters", () => {
+    it("should increase account minNonce by 1", async () => {
+      const nonceBefore = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(1);
+      const result = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      expect(result).to.equal(nonceBefore.add(1));
     });
 
-    it("should increase account minNonce", async () => {
+    it("should stay the same", async () => {
+      const nonceBefore = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      const rawNonceBefore = await nonceHolder.getRawNonce(nonceHolderAccount.address);
+      await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(0);
+      const nonceAfter = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(nonceHolderAccount.address);
+
+      expect(nonceBefore).to.equal(nonceAfter);
+      expect(rawNonceBefore).to.equal(rawNonceAfter);
+    });
+
+    it("should increase account minNonce by many", async () => {
+      const nonceBefore = await nonceHolder.getMinNonce(nonceHolderAccount.address);
       await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4);
       const result = await nonceHolder.getMinNonce(nonceHolderAccount.address);
-      expect(result).to.equal(2 ** 4);
+      expect(result).to.equal(nonceBefore.add(2 ** 4));
     });
-  });
 
-  describe("getMinNonce", async () => {
-    it("should get account min nonce", async () => {
+    it("should fail with too high", async () => {
+      const nonceBefore = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      await nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4 + 1);
       const result = await nonceHolder.getMinNonce(nonceHolderAccount.address);
-      expect(result).to.equal(2 ** 4);
-    });
-  });
+      expect(result).to.equal(nonceBefore.add(2 ** 4 + 1));
 
-  describe("getRawNonce", async () => {
-    it("should get account raw nonce", async () => {
-      const result = await nonceHolder.getRawNonce(nonceHolderAccount.address);
-      expect(result).to.equal(2 ** 4);
+      // await expect(nonceHolder.connect(nonceHolderAccount).increaseMinNonce(2 ** 4 + 1)).to.be.rejectedWith(
+      //   "The value for incrementing the nonce is too high"
+      // );
+    });
+
+    it("should revert This method require system call flag", async () => {
+      await expect(nonceHolder.increaseMinNonce(123)).to.be.rejectedWith("This method require system call flag");
     });
   });
 
@@ -92,13 +109,18 @@ describe("NonceHolder tests", () => {
     });
 
     it("should increment deployment nonce", async () => {
+      const nonceBefore = await nonceHolder.getDeploymentNonce(nonceHolderAccount.address);
+      const rawNonceBefore = await nonceHolder.getRawNonce(nonceHolderAccount.address);
       await nonceHolder.connect(deployerAccount).incrementDeploymentNonce(nonceHolderAccount.address);
-      const result = await nonceHolder.getDeploymentNonce(nonceHolderAccount.address);
-      expect(result).to.equal(1);
+      const nonceAfter = await nonceHolder.getDeploymentNonce(nonceHolderAccount.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(nonceHolderAccount.address);
+
+      expect(nonceAfter).to.equal(nonceBefore.add(BigNumber.from(1)));
+      expect(rawNonceAfter).to.equal(rawNonceBefore.add(BigNumber.from(2).pow(128)));
     });
   });
 
-  describe("setValueUnderNonce", async () => {
+  describe("setValueUnderNonce and getValueUnderNonce", async () => {
     it("should revert Nonce value cannot be set to 0", async () => {
       const accountInfo = [1, 0];
       const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [accountInfo]);
@@ -118,7 +140,7 @@ describe("NonceHolder tests", () => {
         failure: false,
         returnData: encodedAccountInfo,
       });
-      await expect(nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(123, 111)).to.be.rejectedWith(
+      await expect(nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(443, 111)).to.be.rejectedWith(
         "Previous nonce has not been used"
       );
     });
@@ -139,25 +161,57 @@ describe("NonceHolder tests", () => {
       const storedValue = await nonceHolder.connect(nonceHolderAccount).getValueUnderNonce(key);
       expect(storedValue).to.equal(333);
     });
-  });
 
-  describe("getValueUnderNonce", () => {
-    it("should get value under nonce", async () => {
+    it("should emit ValueSetUnderNonce event", async () => {
+      const currentNonce = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      await nonceHolder.connect(nonceHolderAccount).incrementMinNonceIfEquals(currentNonce);
+      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [[1, 0]]);
+      await setResult("ContractDeployer", "getAccountInfo", [nonceHolderAccount.address], {
+        failure: false,
+        returnData: encodedAccountInfo,
+      });
+
+      await expect(nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(currentNonce.add(1), 111))
+        .to.emit(nonceHolder, "ValueSetUnderNonce")
+        .withArgs(nonceHolderAccount.address, currentNonce.add(1), 111);
+
+      await expect(
+        nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(currentNonce.add(3), 333)
+      ).to.rejectedWith("Previous nonce has not been used");
+
+      await expect(nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(currentNonce.add(2), 222))
+        .to.emit(nonceHolder, "ValueSetUnderNonce")
+        .withArgs(nonceHolderAccount.address, currentNonce.add(2), 222);
+
       const key = await nonceHolder.getMinNonce(nonceHolderAccount.address);
       const storedValue = await nonceHolder.connect(nonceHolderAccount).getValueUnderNonce(key);
-      expect(storedValue).to.equal(333);
+      expect(storedValue).to.equal(111);
+      const storedValueNext = await nonceHolder.connect(nonceHolderAccount).getValueUnderNonce(key.add(1));
+      expect(storedValueNext).to.equal(222);
     });
   });
 
   describe("isNonceUsed", () => {
-    it("used nonce", async () => {
+    it("used nonce because it too small", async () => {
       const isUsed = await nonceHolder.isNonceUsed(nonceHolderAccount.address, 1);
       expect(isUsed).to.equal(true);
     });
 
+    it("used nonce because set", async () => {
+      const currentNonce = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      const checkedNonce = currentNonce.add(1);
+      await nonceHolder.connect(nonceHolderAccount).setValueUnderNonce(checkedNonce, 5);
+
+      const isUsed = await nonceHolder.isNonceUsed(nonceHolderAccount.address, checkedNonce);
+      expect(isUsed).to.equal(true);
+    });
+
     it("not used nonce", async () => {
-      const isUsed = await nonceHolder.isNonceUsed(nonceHolderAccount.address, 2222222);
-      expect(isUsed).to.equal(false);
+      const currentNonce = await nonceHolder.getMinNonce(nonceHolderAccount.address);
+      const checkedNonce = currentNonce.add(2137 * 2 ** 10);
+
+      const isUsed = await nonceHolder.isNonceUsed(nonceHolderAccount.address, checkedNonce);
+      expect(isUsed).to.be.false;
     });
   });
 
