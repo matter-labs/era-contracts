@@ -1,7 +1,7 @@
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The contract used to emulate EVM's ecrecover precompile.
+ * @notice The contract used to emulate EIP7212's P256VERIFY precompile.
  * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
  */
 object "Sekp256r1" {
@@ -14,41 +14,40 @@ object "Sekp256r1" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            // Group order of secp256r1, see https://eips.ethereum.org/EIPS/eip-7212
+            /// @notice Group order of secp256r1, see https://eips.ethereum.org/EIPS/eip-7212
             function SECP256K1_GROUP_SIZE() -> ret {
                 ret := 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
             }
 
-            // Curve prime field modulus, see https://eips.ethereum.org/EIPS/eip-7212
+            /// @notice Curve prime field modulus, see https://eips.ethereum.org/EIPS/eip-7212
             function PRIME_FIELD_MODULUS() -> ret {
                 ret := 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
             }
 
-            // The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
-            // This function returns the first (`a`) coeficient
+            /// @notice The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
+            /// This function returns the first (`a`) coeficient
             function ELLIPTIC_CURVE_WEIERSTRASS_FIRST_COEFICIENT() -> ret {
                 ret := 0xffffffff00000001000000000000000000000000fffffffffffffffffffffffc
             }
 
-            // The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
-            // This function returns the second (`b`) coeficient
+            /// @notice The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
+            /// This function returns the second (`b`) coeficient
             function ELLIPTIC_CURVE_WEIERSTRASS_SECOND_COEFICIENT() -> ret {
                 ret := 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
             }
 
             /// @dev The gas cost of processing ecrecover circuit precompile.
-            /// TODO: amend the price according to costs
-            function ECRECOVER_GAS_COST() -> ret {
-                ret := 7000
+            function SEKP256_VERIFY_GAS_COST() -> ret {
+                ret := 12000
             }
 
             ////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             ////////////////////////////////////////////////////////////////
             
-            // @dev Packs precompile parameters into one word.
-            // Note: functions expect to work with 32/64 bits unsigned integers.
-            // Caller should ensure the type matching before!
+            /// @dev Packs precompile parameters into one word.
+            /// Note: functions expect to work with 32/64 bits unsigned integers.
+            /// Caller should ensure the type matching before!
             function unsafePackPrecompileParams(
                 uint32_inputOffsetInWords,
                 uint32_inputLengthInWords,
@@ -95,7 +94,6 @@ object "Sekp256r1" {
             mstore(64, s)
             mstore(96, x)
             mstore(128, y)
-            
 
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words
@@ -104,7 +102,7 @@ object "Sekp256r1" {
                 1, // output length in words (success)
                 0  // No special meaning, sekp256r1 circuit doesn't check this value
             )
-            let gasToPay := ECRECOVER_GAS_COST()
+            let gasToPay := SEKP256_VERIFY_GAS_COST()
 
             // Check whether the call is successfully handled by the ecrecover circuit
             let success := precompileCall(precompileParams, gasToPay)
