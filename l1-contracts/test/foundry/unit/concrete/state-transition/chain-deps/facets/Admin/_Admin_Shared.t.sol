@@ -52,4 +52,7 @@ contract AdminTest is Test {
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

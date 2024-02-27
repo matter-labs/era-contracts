@@ -7,6 +7,9 @@ import "../../state-transition/chain-interfaces/IExecutor.sol";
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
 contract DummyExecutor is IExecutor {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     address owner;
 
     // Flags to control if the contract should revert during commit, prove, and execute batch operations

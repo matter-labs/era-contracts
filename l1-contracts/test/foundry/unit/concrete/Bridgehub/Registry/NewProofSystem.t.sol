@@ -9,6 +9,9 @@ contract NewStateTransitionTest is RegistryTest {
         stateTransitionAddress = makeAddr("stateTransitionAddress");
     }
 
+    // add this to be excluded from coverage report
+    function test() internal override {}
+
     // function test_RevertWhen_NonGovernor() public {
     //     vm.prank(NON_GOVERNOR);
     //     vm.expectRevert(bytes.concat("12g"));

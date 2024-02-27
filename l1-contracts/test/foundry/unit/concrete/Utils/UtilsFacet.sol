@@ -153,4 +153,7 @@ contract UtilsFacet is ZkSyncStateTransitionBase {
         Diamond.DiamondStorage storage s = Diamond.getDiamondStorage();
         return s.isFrozen;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
