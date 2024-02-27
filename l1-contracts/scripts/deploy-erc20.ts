@@ -88,9 +88,7 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
         provider
       );
 
-      if (token.implementation !== "WETH9") {
-        await erc20.mint(testWallet.address, parseEther("3000000000"));
-      }
+      await erc20.mint(testWallet.address, parseEther("3000000000"));
     }
   }
 
