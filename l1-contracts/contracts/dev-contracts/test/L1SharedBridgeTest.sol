@@ -8,6 +8,9 @@ import "../../bridge/interfaces/IL1SharedBridge.sol";
 
 /// @author Matter Labs
 contract L1SharedBridgeTest is L1SharedBridge {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     address private immutable eraDiamondProxy;
 
     constructor(

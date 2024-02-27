@@ -381,4 +381,7 @@ library Utils {
                 _blobCommitments[1]
             );
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

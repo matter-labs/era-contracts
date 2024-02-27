@@ -7,6 +7,9 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
 
 contract MailboxFacetTest is MailboxFacet {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     constructor() {
         s.admin = msg.sender;
     }

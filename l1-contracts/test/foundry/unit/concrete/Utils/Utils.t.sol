@@ -152,4 +152,7 @@ contract UtilsTest is Test {
             "log[8] should be correct"
         );
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

@@ -170,6 +170,9 @@ contract GettersFacetWrapper is GettersFacet {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         ds.selectorToFacet[_selector].facetAddress = _facet;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
 
 contract GettersFacetTest is Test {
@@ -182,4 +185,7 @@ contract GettersFacetTest is Test {
         gettersFacet = IGetters(gettersFacetWrapper);
         legacyGettersFacet = ILegacyGetters(gettersFacetWrapper);
     }
+
+    // add this to be excluded from coverage report
+    function testA() internal virtual {}
 }

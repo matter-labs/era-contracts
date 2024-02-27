@@ -23,4 +23,7 @@ contract PriorityQueueSharedTest is Test {
             priorityQueue.pushBack(dummyOp);
         }
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

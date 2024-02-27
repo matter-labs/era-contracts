@@ -31,4 +31,7 @@ contract DiamondUpgradeInit1 is MailboxFacet {
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

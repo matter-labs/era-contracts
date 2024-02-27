@@ -22,6 +22,9 @@ pragma solidity 0.8.20;
 
 /// @title Multicall - Aggregate results from multiple read-only function calls
 contract Multicall {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     struct Call {
         address target;
         bytes callData;

@@ -24,6 +24,9 @@ contract TestBaseFacet is ZkSyncStateTransitionBase {
         external
         onlyValidatorOrStateTransitionManager
     {}
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
 
 bytes constant ERROR_ONLY_ADMIN = "StateTransition Chain: not admin";
@@ -66,4 +69,7 @@ contract ZkSyncStateTransitionBaseTest is Test {
         testBaseFacet = TestBaseFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
