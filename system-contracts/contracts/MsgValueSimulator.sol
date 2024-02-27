@@ -35,10 +35,10 @@ contract MsgValueSimulator is ISystemContract {
     /// @notice The maximal number of gas out of the stipend that should be passed to the callee.
     uint256 constant GAS_TO_PASS = 2300;
 
-    /// @notice The amount of gas that is passed to the MsgValueSimulator as a stipend. 
+    /// @notice The amount of gas that is passed to the MsgValueSimulator as a stipend.
     /// This number servers to pay for the ETH transfer as well as to provide gas for the `GAS_TO_PASS` gas.
     /// It is equal to the following constant: https://github.com/matter-labs/era-zkevm_opcode_defs/blob/a9b01a0d4081ec0c8a08dd099f4fb2abc60bb395/src/system_params.rs#L82.
-    uint256 constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 65500; 
+    uint256 constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 75500;
 
     /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
@@ -48,9 +48,11 @@ contract MsgValueSimulator is ISystemContract {
         // Firstly we calculate how much gas has been actually provided by the user to the inner call.
         // For that, we need to get the total gas available in this context and subtract the stipend from it.
         uint256 gasInContext = gasleft();
-        // Note, that the `gasInContext` might be slightly less than the MSG_VALUE_SIMULATOR_STIPEND_GAS, since 
+        // Note, that the `gasInContext` might be slightly less than the MSG_VALUE_SIMULATOR_STIPEND_GAS, since
         // by the time we retrieve it, some gas might have already been spent, e.g. on the `gasleft` opcode itself.
-        uint256 userGas = gasInContext > MSG_VALUE_SIMULATOR_STIPEND_GAS ? gasInContext - MSG_VALUE_SIMULATOR_STIPEND_GAS : 0;
+        uint256 userGas = gasInContext > MSG_VALUE_SIMULATOR_STIPEND_GAS
+            ? gasInContext - MSG_VALUE_SIMULATOR_STIPEND_GAS
+            : 0;
 
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
