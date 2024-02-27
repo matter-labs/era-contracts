@@ -7,11 +7,10 @@ import {Test} from "forge-std/Test.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {IDiamondInit} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 
 contract BridgehubTest is Test {
     DiamondProxy internal bridgehub;
-    IDiamondInit internal bridgehubDiamondInit;
+    DiamondInit internal bridgehubDiamondInit;
     address internal constant GOVERNOR = address(0x101010101010101010101);
     address internal constant NON_GOVERNOR = address(0x202020202020202020202);
 
@@ -25,7 +24,7 @@ contract BridgehubTest is Test {
     function getDiamondCutData(address diamondInit) internal pure returns (Diamond.DiamondCutData memory) {
         address governor = GOVERNOR;
 
-        bytes memory initCalldata = abi.encodeWithSelector(IDiamondInit.initialize.selector, governor);
+        bytes memory initCalldata = abi.encodeWithSelector(DiamondInit.initialize.selector, governor);
 
         return
             Diamond.DiamondCutData({
