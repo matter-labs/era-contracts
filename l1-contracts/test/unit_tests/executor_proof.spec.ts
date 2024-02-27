@@ -43,7 +43,7 @@ describe("Executor test", function () {
     const processL2Logs = await executor.processL2Logs(
       nextBatch,
       "0x0000000000000000000000000000000000000000000000000000000000000000",
-      PubdataPricingMode.Rollup,
+      PubdataPricingMode.Rollup
     );
     expect(processL2Logs.stateDiffHash, "State diff hash computation failed").is.equal(
       "0x9a67073c2df8f53087fcfc32d82c98bba591da35df6ce1fb55a23b677d37f9fc"
@@ -94,7 +94,7 @@ describe("Executor test", function () {
     const processL2Logs = await executor.processL2Logs(
       nextBatch,
       "0x0000000000000000000000000000000000000000000000000000000000000000",
-      PubdataPricingMode.Validium,
+      PubdataPricingMode.Validium
     );
     expect(processL2Logs.stateDiffHash, "State diff hash computation failed").is.equal(
       "0x9a67073c2df8f53087fcfc32d82c98bba591da35df6ce1fb55a23b677d37f9fc"
