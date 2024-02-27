@@ -11,7 +11,7 @@ export default {
     compilerSource: "binary",
     // version: 'zksolc-macosx-arm64-vprerelease-0640c18-test-zkvm-v1.5.0',
     settings: {
-      compilerPath: COMPILER_PATH,
+      compilerPath: "https://github.com/matter-labs/era-compiler-solidity/releases/download/prerelease-e880101-test-features/zksolc-macosx-arm64",
       isSystem: true,
     },
   },
