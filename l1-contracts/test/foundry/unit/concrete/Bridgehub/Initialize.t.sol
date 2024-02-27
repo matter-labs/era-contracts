@@ -24,7 +24,6 @@ contract InitializeTest is BridgehubTest {
     // add this to be excluded from coverage report
     function test() internal override {}
 
-
     // function test_RevertWhen_AlreadyInitialized() public {
     //     bridgehub.initialize(governor, chainImplementation, chainProxyAdmin, allowList, priorityTxMaxGasLimit);
 

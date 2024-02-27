@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
@@ -112,8 +111,16 @@ contract L1SharedBridgeTest is Test {
         chainId = 1;
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge(l1WethAddress, IBridgehub(bridgehubAddress), IL1ERC20Bridge(l1ERC20BridgeAddress));
-        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(address(sharedBridgeImpl), admin, abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch));
+        sharedBridgeImpl = new L1SharedBridge(
+            l1WethAddress,
+            IBridgehub(bridgehubAddress),
+            IL1ERC20Bridge(l1ERC20BridgeAddress)
+        );
+        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
+            address(sharedBridgeImpl),
+            admin,
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
+        );
         sharedBridge = L1SharedBridge(address(sharedBridgeProxy));
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
@@ -142,27 +149,44 @@ contract L1SharedBridgeTest is Test {
     function test_bridgehubDeposit_Eth() public {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(address(token)));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(address(token))
+        );
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, ETH_TOKEN_ADDRESS, amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit{value:amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
+        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit{value: amount}(
+            chainId,
+            alice,
+            0,
+            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
+        );
     }
 
     function test_bridgehubDeposit_Erc() public {
         token.mint(alice, amount);
         vm.prank(alice);
-        token.approve(address(sharedBridge), amount);        
+        token.approve(address(sharedBridge), amount);
         vm.prank(bridgehubAddress);
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(ETH_TOKEN_ADDRESS));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, address(token), amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
+        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit(
+            chainId,
+            alice,
+            0,
+            abi.encode(address(token), amount, bob)
+        );
     }
 
     function test_bridgehubConfirmL2Transaction() public {
-
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
@@ -174,64 +198,141 @@ contract L1SharedBridgeTest is Test {
         token.mint(address(sharedBridge), amount);
 
         // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1 );
+        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(address(sharedBridge), keccak256(abi.encode( txHash , keccak256(abi.encode(chainId , depositLocationInStorage)))), txDataHash);
+        vm.store(
+            address(sharedBridge),
+            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
+            txDataHash
+        );
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(address(token))) , keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(address(token))),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
         // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector, chainId, txHash, l2BatchNumber, l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof,
-            TxStatus.Failure), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                chainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, address(token), amount);
-        sharedBridge.claimFailedDeposit(chainId, alice, address(token), amount, txHash, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, merkleProof);
+        sharedBridge.claimFailedDeposit(
+            chainId,
+            alice,
+            address(token),
+            amount,
+            txHash,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            merkleProof
+        );
     }
 
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
         // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1 );
+        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        vm.store(address(sharedBridge), keccak256(abi.encode( txHash , keccak256(abi.encode(chainId , depositLocationInStorage)))), txDataHash);
+        vm.store(
+            address(sharedBridge),
+            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
+            txDataHash
+        );
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(ETH_TOKEN_ADDRESS)) , keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(ETH_TOKEN_ADDRESS)),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
         // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector, chainId, txHash, l2BatchNumber, l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof,
-            TxStatus.Failure), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                chainId,
+                txHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.claimFailedDeposit(chainId, alice, ETH_TOKEN_ADDRESS, amount, txHash, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, merkleProof);
+        sharedBridge.claimFailedDeposit(
+            chainId,
+            alice,
+            ETH_TOKEN_ADDRESS,
+            amount,
+            txHash,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            merkleProof
+        );
     }
 
     function test_finalizeWithdrawal_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(ETH_TOKEN_ADDRESS)), keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(ETH_TOKEN_ADDRESS));
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(ETH_TOKEN_ADDRESS)),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
 
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
@@ -240,112 +341,227 @@ contract L1SharedBridgeTest is Test {
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            chainId,
-            l2BatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.finalizeWithdrawal(chainId, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            chainId,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
 
     function test_finalizeWithdrawal_ErcOnEth() public {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(address(token))), keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(ETH_TOKEN_ADDRESS));
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(address(token))),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, address(token), amount);
+        bytes memory message = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            address(token),
+            amount
+        );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: l2SharedBridge,
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            chainId,
-            l2BatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
-        sharedBridge.finalizeWithdrawal(chainId, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            chainId,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
-
 
     function test_finalizeWithdrawal_EthOnErc() public {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(ETH_TOKEN_ADDRESS)), keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(address(token)));
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(ETH_TOKEN_ADDRESS)),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(address(token))
+        );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, ETH_TOKEN_ADDRESS, amount);
+        bytes memory message = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            ETH_TOKEN_ADDRESS,
+            amount
+        );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: l2SharedBridge,
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            chainId,
-            l2BatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.finalizeWithdrawal(chainId, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            chainId,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
 
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(address(token))), keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(address(token))); 
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(address(token))),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(address(token))
+        );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, address(token), amount);
+        bytes memory message = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            address(token),
+            amount
+        );
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            chainId,
-            l2BatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
-        sharedBridge.finalizeWithdrawal(chainId, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            chainId,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
 
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(address(token))), keccak256(abi.encode(chainId , chainBalanceLocationInStorage)))), bytes32(amount));
-        
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, address(token), amount);
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(address(token))),
+                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+
+        bytes memory message = abi.encodePacked(
+            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            alice,
+            address(token),
+            amount
+        );
         vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(address(2))); //alt base token
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
@@ -353,26 +569,51 @@ contract L1SharedBridgeTest is Test {
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            chainId,
-            l2BatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                chainId,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
-        sharedBridge.finalizeWithdrawal(chainId, l2BatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            chainId,
+            l2BatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTx() public {
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1 );
-        vm.store(address(sharedBridge), keccak256(abi.encode( uint256(uint160(ETH_TOKEN_ADDRESS)), keccak256(abi.encode(ERA_CHAIN_ID , chainBalanceLocationInStorage)))), bytes32(amount));
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(IBridgehub.baseToken.selector), abi.encode(ETH_TOKEN_ADDRESS));
+        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+        vm.store(
+            address(sharedBridge),
+            keccak256(
+                abi.encode(
+                    uint256(uint160(ETH_TOKEN_ADDRESS)),
+                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                )
+            ),
+            bytes32(amount)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
 
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
@@ -381,22 +622,40 @@ contract L1SharedBridgeTest is Test {
             data: message
         });
 
-        vm.mockCall(bridgehubAddress, abi.encodeWithSelector(
-            IBridgehub.proveL2MessageInclusion.selector,
-            ERA_CHAIN_ID,
-            legacyBatchNumber, 
-            l2MessageIndex,
-            l2ToL1Message,
-            merkleProof), abi.encode(true));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(
+                IBridgehub.proveL2MessageInclusion.selector,
+                ERA_CHAIN_ID,
+                legacyBatchNumber,
+                l2MessageIndex,
+                l2ToL1Message,
+                merkleProof
+            ),
+            abi.encode(true)
+        );
 
-        vm.mockCall(l1ERC20BridgeAddress, abi.encodeWithSelector(
-            IL1ERC20Bridge.isWithdrawalFinalized.selector), abi.encode(false));
+        vm.mockCall(
+            l1ERC20BridgeAddress,
+            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
+            abi.encode(false)
+        );
 
-        vm.mockCall(ERA_DIAMOND_PROXY, abi.encodeWithSelector(
-                IGetters.isEthWithdrawalFinalized.selector), abi.encode(false));
+        vm.mockCall(
+            ERA_DIAMOND_PROXY,
+            abi.encodeWithSelector(IGetters.isEthWithdrawalFinalized.selector),
+            abi.encode(false)
+        );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.finalizeWithdrawal(ERA_CHAIN_ID, legacyBatchNumber, l2MessageIndex, l2TxNumberInBatch, message, merkleProof);
+        sharedBridge.finalizeWithdrawal(
+            ERA_CHAIN_ID,
+            legacyBatchNumber,
+            l2MessageIndex,
+            l2TxNumberInBatch,
+            message,
+            merkleProof
+        );
     }
 }
