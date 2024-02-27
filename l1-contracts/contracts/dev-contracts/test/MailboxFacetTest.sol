@@ -17,4 +17,8 @@ contract MailboxFacetTest is MailboxFacet {
     function getL2GasPrice(uint256 _l1GasPrice) external view returns (uint256) {
         return _deriveL2GasPrice(_l1GasPrice, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
     }
+
+    function getPubdataPricingMode() external view returns (PubdataPricingMode) {
+        return s.pubdataPricingMode;
+    }
 }
