@@ -34,7 +34,6 @@ contract EvmGasManager {
     mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
     EVMStackFrameInfo[] private evmStackFrames;
 
-
     function tstoreWarmAccount(address account, bool isWarm) internal {
         WarmAccountInfo storage ptr = warmAccounts[account];
 
