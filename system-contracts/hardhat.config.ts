@@ -20,8 +20,9 @@ export default {
     ethNetwork: process.env.INFURA,
   },
   solidity: {
-    version: "0.8.20",
+    version: "0.8.24",
     settings: {
+      evmVersion: 'cancun',
       optimizer: {
         enabled: true,
         runs: 9999999,

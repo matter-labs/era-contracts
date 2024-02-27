@@ -12,16 +12,71 @@ uint160 constant PRECOMPILES_END = 0xffff;
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
 contract EvmGasManager {
-    mapping(address => bool) private warmAccounts;
+    // We need strust to use `storage` pointers
+    struct WarmAccountInfo {
+        bool isWarm;
+    }
 
     struct SlotInfo {
         bool warm;
         uint256 originalValue;
     }
 
-    mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
+    // We dont care about the size, since none of it will be stored/pub;ushed anywya
+    struct EVMStackFrameInfo {
+        bool isStatic;
+        uint256 passGas;
+    }
 
-    bytes latestReturndata;
+    // The following storage variables are not used anywhere explicitly and are just used to obtain the storage pointers
+    // to use the transient storage with.
+    mapping(address => WarmAccountInfo) private warmAccounts;
+    mapping(address => mapping(uint256 => SlotInfo)) private warmSlots;
+    EVMStackFrameInfo[] private evmStackFrames;
+
+
+    function tstoreWarmAccount(address account, bool isWarm) internal {
+        WarmAccountInfo storage ptr = warmAccounts[account];
+
+        assembly {
+            tstore(ptr.slot, isWarm)
+        }
+    }
+
+    function tloadWarmAccount(address account) internal returns (bool isWarm) {
+        WarmAccountInfo storage ptr = warmAccounts[account];
+
+        assembly {
+            isWarm := tload(ptr.slot)
+        }
+    }
+
+    function tstoreWarmSlot(address _account, uint256 _key, SlotInfo memory info) internal {
+        SlotInfo storage ptr = warmSlots[_account][_key];
+
+        bool warm = info.warm;
+        uint256 originalValue = info.originalValue;
+
+        assembly {
+            tstore(ptr.slot, warm)
+            tstore(add(ptr.slot, 1), originalValue)
+        }
+    }
+
+    function tloadWarmSlot(address _account, uint256 _key) internal view returns (SlotInfo memory info) {
+        SlotInfo storage ptr = warmSlots[_account][_key];
+
+        bool isWarm;
+        uint256 originalValue;
+
+        assembly {
+            isWarm := tload(ptr.slot)
+            originalValue := tload(add(ptr.slot, 1))
+        }
+
+        info.warm = isWarm;
+        info.originalValue = originalValue;
+    }
 
     modifier onlySystemEvm() {
         require(DEPLOYER_SYSTEM_CONTRACT.isEVM(msg.sender), "only system evm");
@@ -34,16 +89,16 @@ contract EvmGasManager {
     function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
-        wasWarm = warmAccounts[account];
-        if (!wasWarm) warmAccounts[account] = true;
+        wasWarm = tloadWarmAccount(account);
+        if (!wasWarm) tstoreWarmAccount(account, true);
     }
 
     function isSlotWarm(uint256 _slot) external view returns (bool) {
-        return warmSlots[msg.sender][_slot].warm;
+        return tloadWarmSlot(msg.sender, _slot).warm;
     }
 
     function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
-        SlotInfo memory info = warmSlots[msg.sender][_slot];
+        SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
 
         if (info.warm) {
             return (true, info.originalValue);
@@ -52,16 +107,9 @@ contract EvmGasManager {
         info.warm = true;
         info.originalValue = _currentValue;
 
-        warmSlots[msg.sender][_slot] = info;
+        tstoreWarmSlot(msg.sender, _slot, info);
 
         return (false, _currentValue);
-    }
-
-    // We dont care about the size, since none of it will be stored/pub;ushed anywya
-    struct EVMStackFrameInfo {
-        uint256 passGas;
-        bool isStatic;
-        // uint256 returnGas;
     }
 
     /*
@@ -75,8 +123,6 @@ contract EvmGasManager {
         4. callee calls popEVMFrame to return the gas to the caller & remove the frame
 
     */
-
-    EVMStackFrameInfo[] private evmStackFrames;
 
     function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});

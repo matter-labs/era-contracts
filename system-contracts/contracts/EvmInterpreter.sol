@@ -315,8 +315,7 @@ contract EvmInterpreter {
 
     function pushStackItem(uint256 tos, uint256 item) internal returns (uint256 newTos) {
         unchecked {
-            // TODO: remove this error for more compatibility
-            require(tos < BYTECODE_OFFSET, "interpreter: stack overflow");
+            require(tos < BYTECODE_OFFSET);
 
             assembly {
                 newTos := add(tos, 0x20)
