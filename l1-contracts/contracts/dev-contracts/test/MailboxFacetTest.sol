@@ -19,6 +19,6 @@ contract MailboxFacetTest is MailboxFacet {
     }
 
     function getPubdataPricingMode() external view returns (PubdataPricingMode) {
-        return s.pubdataPricingMode;
+        return s.feeParams.pubdataPricingMode;
     }
 }

@@ -265,6 +265,9 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
+      const pricingMode = await testContract.getPubdataPricingMode();
+      expect(pricingMode).to.equal(PubdataPricingMode.Validium);
+
       // The gas price per pubdata is still constant, however, the L2 gas price is always equal to the minimalL2GasPrice
       testOnAllGasPrices(() => {
         return ethers.BigNumber.from(defaultFeeParams().minimalL2GasPrice);
