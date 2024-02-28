@@ -1,7 +1,7 @@
 pragma solidity 0.8.20;
 
 import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
-import {VerifierParams} from "../../zksync/Storage.sol";
+import {VerifierParams, PubdataPricingMode} from "../../zksync/Storage.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
@@ -21,7 +21,8 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        PubdataPricingMode pubdataPricingMode
     )
         external
         pure
@@ -34,7 +35,7 @@ contract ExecutorProvingTest is ExecutorFacet {
             uint256 packedBatchAndL2BlockTimestamp
         )
     {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataPricingMode);
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.

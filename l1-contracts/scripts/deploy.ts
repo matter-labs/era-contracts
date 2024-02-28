@@ -5,6 +5,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
 import { web3Provider } from "./utils";
+import { PubdataPricingMode } from "../test/unit_tests/utils";
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -23,6 +24,7 @@ async function main() {
     .option("--create2-salt <create2-salt>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
+    .option("--validium-mode")
     .action(async (cmd) => {
       const deployWallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
@@ -79,8 +81,10 @@ async function main() {
       });
       nonce++;
 
+      const pubdataPricingMode = cmd.validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
+
       await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
-      await deployer.deployZkSyncContract(create2Salt, gasPrice, nonce + 1);
+      await deployer.deployZkSyncContract(pubdataPricingMode, create2Salt, gasPrice, nonce + 1);
       await deployer.deployBridgeContracts(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying zkSync contracts
       await deployer.deployWethBridgeContracts(create2Salt, gasPrice);
       await deployer.deployValidatorTimelock(create2Salt, { gasPrice });
