@@ -1,3 +1,7 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
@@ -6,8 +10,7 @@ import { Provider, Wallet } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
-import * as fs from "fs";
-import * as path from "path";
+import { ethTestConfig } from "../../src.ts/utils";
 import { applyL1ToL2Alias, hashBytecode } from "zksync-ethers/build/src/utils";
 
 type ForceDeployment = {
@@ -51,8 +54,6 @@ async function prepareCalldata(
 }
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;

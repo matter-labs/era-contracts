@@ -11,7 +11,8 @@ import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import { ADDRESS_ONE } from "../../src.ts/utils";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
-import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
+import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
+import { ethTestConfig } from "../../src.ts/utils";
 
 import { depositERC20, getCallRevertReason } from "./utils";
 

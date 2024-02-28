@@ -1,6 +1,14 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import type { BytesLike, BigNumberish } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
+import * as path from "path";
+
+export const testConfigPath = process.env.ZKSYNC_ENV ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant") : "./test/test_config/constant";
+export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;

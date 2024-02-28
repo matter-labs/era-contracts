@@ -1,3 +1,6 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
 import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
@@ -7,9 +10,7 @@ import { web3Url } from "zk/build/utils";
 import { deployViaCreate2 } from "../src.ts/deploy-utils";
 import { getFacetCutsForUpgrade } from "../src.ts/diamondCut";
 import { insertGasPrice } from "./utils";
-
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { ethTestConfig } from "../src.ts/utils";
 
 async function deployFacetCut(
   wallet: ethers.Wallet,

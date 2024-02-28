@@ -9,9 +9,10 @@ import { Interface } from "ethers/lib/utils";
 import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { initialTestnetDeploymentProcess, ethTestConfig } from "../../src.ts/deploy-process";
+import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
+import { ethTestConfig } from "../../src.ts/utils";
 
 import {
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
