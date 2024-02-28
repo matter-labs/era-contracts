@@ -5,7 +5,6 @@ import { Command } from "commander";
 import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";
-import * as path from "path";
 import { web3Url } from "zk/build/utils";
 import { deployViaCreate2 } from "../src.ts/deploy-utils";
 import { getFacetCutsForUpgrade } from "../src.ts/diamondCut";

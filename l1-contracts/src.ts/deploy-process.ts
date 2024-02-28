@@ -9,7 +9,7 @@ import { ethers } from "ethers";
 
 import type { FacetCut } from "./diamondCut";
 
-import { Deployer } from "./deploy";
+import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
 import { ADDRESS_ONE } from "../src.ts/utils";
@@ -30,8 +30,6 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
 }
-
-
 
 export async function initialBridgehubDeployment(
   deployer: Deployer,
@@ -115,4 +113,3 @@ export async function registerHyperchain(
   }
   await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice);
 }
-

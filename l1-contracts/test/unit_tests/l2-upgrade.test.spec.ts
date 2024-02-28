@@ -16,10 +16,7 @@ import {
   StateTransitionManagerFactory,
 } from "../../typechain";
 
-import {  
-  L2_BOOTLOADER_BYTECODE_HASH,
-  L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-} from "../../src.ts/deploy-process";
+import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from "../../src.ts/deploy-process";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { ethTestConfig } from "../../src.ts/utils";
