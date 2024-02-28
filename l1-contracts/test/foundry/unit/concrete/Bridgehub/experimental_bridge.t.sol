@@ -72,20 +72,56 @@ contract ExperimentalBridgeTest is Test {
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
             
             bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
-        } else {
-            vm.prank(bridgeOwner);
-            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
-            
-            isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-            assertTrue(isSTMRegistered);
-
-            // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
-            vm.prank(bridgeOwner);
-            vm.expectRevert(bytes("Bridgehub: state transition already registered"));
-            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
-
-            isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-            assertTrue(isSTMRegistered);
         }
+        
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+
+        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+    }
+
+    function test_removeStateTransitionManager(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
+        bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            
+            bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        } 
+        
+        // A non-existent STM cannot be removed
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        // Let's first register our particular stateTransitionManager
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+
+        // Only an address that has already been registered, can be removed.
+        vm.prank(bridgeOwner);
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+
+        // An already removed STM cannot be removed again
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
     }
 }
