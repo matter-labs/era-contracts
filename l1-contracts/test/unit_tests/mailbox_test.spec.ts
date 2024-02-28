@@ -248,7 +248,7 @@ describe("Mailbox tests", function () {
           minimalL2GasPrice: 500_000_000,
         })
       ).wait();
-        
+
       const pricingMode = await testContract.getPubdataPricingMode();
       expect(pricingMode).to.equal(PubdataPricingMode.Rollup);
 
