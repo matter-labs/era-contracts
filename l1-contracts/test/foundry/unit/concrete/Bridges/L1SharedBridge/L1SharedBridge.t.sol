@@ -90,6 +90,10 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
+    // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+    uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
+    uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+
     function setUp() public {
         owner = makeAddr("owner");
         admin = makeAddr("admin");
@@ -197,8 +201,6 @@ contract L1SharedBridgeTest is Test {
     function test_claimFailedDeposit_Erc() public {
         token.mint(address(sharedBridge), amount);
 
-        // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
@@ -207,7 +209,6 @@ contract L1SharedBridgeTest is Test {
         );
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -218,10 +219,6 @@ contract L1SharedBridgeTest is Test {
             ),
             bytes32(amount)
         );
-
-        // Bridgehub bridgehub = new Bridgehub();
-        // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
-        // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
 
         vm.mockCall(
             bridgehubAddress,
@@ -256,8 +253,6 @@ contract L1SharedBridgeTest is Test {
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
-        // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.store(
             address(sharedBridge),
@@ -266,8 +261,6 @@ contract L1SharedBridgeTest is Test {
         );
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -278,10 +271,6 @@ contract L1SharedBridgeTest is Test {
             ),
             bytes32(amount)
         );
-
-        // Bridgehub bridgehub = new Bridgehub();
-        // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
-        // require(address(bridgehub.deployer()) == address(31337), "Bridgehub: deployer wrong");
 
         vm.mockCall(
             bridgehubAddress,
@@ -316,8 +305,6 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -369,8 +356,6 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_ErcOnEth() public {
         token.mint(address(sharedBridge), amount);
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -427,8 +412,6 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_EthOnErc() public {
         vm.deal(address(sharedBridge), amount);
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -485,8 +468,6 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -543,8 +524,6 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -597,8 +576,19 @@ contract L1SharedBridgeTest is Test {
     function test_finalizeWithdrawal_EthOnEth_LegacyTx() public {
         vm.deal(address(sharedBridge), amount);
         uint256 legacyBatchNumber = 0;
-        /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+
+        vm.mockCall(
+            l1ERC20BridgeAddress,
+            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
+            abi.encode(false)
+        );
+
+        vm.mockCall(
+            ERA_DIAMOND_PROXY,
+            abi.encodeWithSelector(IGetters.isEthWithdrawalFinalized.selector),
+            abi.encode(false)
+        );
+
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -633,18 +623,6 @@ contract L1SharedBridgeTest is Test {
                 merkleProof
             ),
             abi.encode(true)
-        );
-
-        vm.mockCall(
-            l1ERC20BridgeAddress,
-            abi.encodeWithSelector(IL1ERC20Bridge.isWithdrawalFinalized.selector),
-            abi.encode(false)
-        );
-
-        vm.mockCall(
-            ERA_DIAMOND_PROXY,
-            abi.encodeWithSelector(IGetters.isEthWithdrawalFinalized.selector),
-            abi.encode(false)
         );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));

@@ -5,7 +5,8 @@ import { Wallet, ethers, BigNumber } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import { Provider } from "zksync-web3";
-import { getNumberFromEnv, web3Provider } from "../../l1-contracts/scripts/utils";
+import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { getL1TxInfo } from "./utils";
 
