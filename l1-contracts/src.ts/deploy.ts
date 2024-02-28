@@ -418,7 +418,7 @@ export class Deployer {
     const commitValidatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const blobValidatorAddress = getOptionalAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
 
-    let validatorAddresses = [commitValidatorAddress];
+    const validatorAddresses = [commitValidatorAddress];
 
     if (blobValidatorAddress && blobValidatorAddress.length > 0) {
       validatorAddresses.push(blobValidatorAddress);
