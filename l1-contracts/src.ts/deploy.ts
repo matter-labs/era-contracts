@@ -454,7 +454,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
-      console.log(`BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
+      console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
     }
 
     this.addresses.BlobVersionedHashRetriever = contractAddress;
