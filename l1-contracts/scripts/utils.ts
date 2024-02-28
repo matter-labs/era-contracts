@@ -54,6 +54,41 @@ export function web3Provider() {
   return provider;
 }
 
+export function getAddressFromEnv(envName: string): string {
+  const address = process.env[envName];
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    throw new Error(`Incorrect address format hash in ${envName} env: ${address}`);
+  }
+  return address;
+}
+
+export function getOptionalAddressFromEnv(envName: string): string {
+  const address = process.env[envName];
+  return address;
+}
+
+export function getHashFromEnv(envName: string): string {
+  const hash = process.env[envName];
+  if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
+    throw new Error(`Incorrect hash format hash in ${envName} env: ${hash}`);
+  }
+  return hash;
+}
+
+export function getNumberFromEnv(envName: string): string {
+  const number = process.env[envName];
+  if (!/^([1-9]\d*|0)$/.test(number)) {
+    throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
+  }
+  return number;
+}
+
+const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+
+export function applyL1ToL2Alias(address: string): string {
+  return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+}
+
 export function readBatchBootloaderBytecode() {
   const bootloaderPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/system-contracts/bootloader");
   return fs.readFileSync(`${bootloaderPath}/build/artifacts/proved_batch.yul.zbin`);
