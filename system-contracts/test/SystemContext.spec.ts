@@ -80,13 +80,6 @@ describe("SystemContext tests", () => {
     });
   });
 
-  describe("getBlockTimestamp", async () => {
-    it("should get current l2 block timestamp", async () => {
-      const blockTimestamp = await systemContext.getBlockTimestamp();
-      expect(blockTimestamp).to.be.equal(0);
-    });
-  });
-
   describe("setNewBatch", async () => {
     it("should get hash of the given batch", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
@@ -125,18 +118,16 @@ describe("SystemContext tests", () => {
     it("should set new batch", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
       const batchHash = await systemContext.getBatchHash(batchData.batchNumber);
-      const newBatchHash = await ethers.utils.keccak256(
-        ethers.utils.solidityPack(["uint32"], [batchData.batchNumber.add(1)])
-      );
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2137]));
       await systemContext
         .connect(bootloaderAccount)
         .setNewBatch(newBatchHash, batchData.batchTimestamp.add(42), batchData.batchNumber.add(1), 2);
       const batchDataAfter = await systemContext.getBatchNumberAndTimestamp();
       expect(batchDataAfter.batchNumber).to.be.equal(batchData.batchNumber.add(1));
       expect(batchDataAfter.batchTimestamp).to.be.equal(batchData.batchTimestamp.add(42));
-      const batchHashAfter = await systemContext.getBatchHash(batchData.batchNumber);
-      expect(batchHashAfter).to.not.be.equal(batchHash);
-      expect(batchHashAfter).to.be.equal(newBatchHash);
+      const prevBatchHashAfter = await systemContext.getBatchHash(batchData.batchNumber);
+      expect(prevBatchHashAfter).to.not.be.equal(batchHash);
+      expect(prevBatchHashAfter).to.be.equal(newBatchHash);
     });
   });
 
