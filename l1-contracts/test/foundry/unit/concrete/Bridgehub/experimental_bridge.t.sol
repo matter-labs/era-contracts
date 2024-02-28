@@ -59,4 +59,33 @@ contract ExperimentalBridgeTest is Test {
             assertEq(randomDeployer, bridgeHub.deployer());
         }
     }
+
+    // @follow-up Concern:
+    // 1. Addresses that do not implement the correct interface or any interface whatsoever (EOAs and address(0)) can also be added as a StateTransitionManager
+    // 2. After being added, if the contracts are upgradable, they can change their logic to include malicious code as well.
+    function test_addStateTransitionManager(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
+        bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            
+            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        } else {
+            vm.prank(bridgeOwner);
+            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+            
+            isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+            assertTrue(isSTMRegistered);
+
+            // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+            vm.prank(bridgeOwner);
+            vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+            isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+            assertTrue(isSTMRegistered);
+        }
+    }
 }
