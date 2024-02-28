@@ -11,7 +11,7 @@ import { getCompilersDir } from "hardhat/internal/util/global-dir";
 import { getZksolcUrl, saltFromUrl } from "@matterlabs/hardhat-zksync-solc";
 import path from "path";
 import { spawn as _spawn } from "child_process";
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 
 export interface Dependency {
   name: string;
@@ -200,10 +200,10 @@ export async function compilerLocation(compilerVersion: string, isCompilerPreRel
 
   if (isCompilerPreRelease) {
     const url = hre.config.zksolc.settings.compilerPath;
-    const salt = createHash('sha1').update(url!).digest('hex');
+    const salt = createHash("sha1").update(url!).digest("hex");
     const compilerPath = `${compilersCache}/zksolc/zksolc-remote-${salt}.0`; // Path of the downloaded compiler
     return compilerPath;
-}
+  }
 
   return path.join(compilersCache, "zksolc", `zksolc-v${compilerVersion}${salt ? "-" : ""}${salt}`);
 }
