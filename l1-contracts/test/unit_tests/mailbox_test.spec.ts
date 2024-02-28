@@ -1,13 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest } from "../../typechain";
+import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest, GettersFacet } from "../../typechain";
 import {
   MailboxFacetTestFactory,
   MailboxFacetFactory,
   MockExecutorFacetFactory,
   DiamondInitFactory,
   ForwarderFactory,
+  GettersFacetFactory,
 } from "../../typechain";
 import {
   DEFAULT_REVERT_REASON,
@@ -21,6 +22,7 @@ import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
   let mailbox: MailboxFacet;
+  let gettersFacet: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   let diamondProxyContract: ethers.Contract;
   let owner: ethers.Signer;
@@ -89,6 +91,10 @@ describe("Mailbox tests", function () {
     const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
     const forwarderContract = await forwarderFactory.deploy();
     forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
+
+    const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
+    const gettersFacetContract = await gettersFacetFactory.deploy();
+    gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
   });
 
   it("Should accept correctly formatted bytecode", async () => {
@@ -249,8 +255,8 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
-      const pricingMode = await testContract.getPubdataPricingMode();
-      expect(pricingMode).to.equal(PubdataPricingMode.Rollup);
+      const pubdataPricingMode = await gettersFacet.getPubdataPricingMode();
+      expect(pubdataPricingMode).to.equal(PubdataPricingMode.Rollup);
 
       // Testing the logic under low / medium / high L1 gas price
       testOnAllGasPrices(expectedLegacyL2GasPrice);
@@ -265,8 +271,8 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
-      const pricingMode = await testContract.getPubdataPricingMode();
-      expect(pricingMode).to.equal(PubdataPricingMode.Validium);
+      const pubdataPricingMode = await gettersFacet.getPubdataPricingMode();
+      expect(pubdataPricingMode).to.equal(PubdataPricingMode.Validium);
 
       // The gas price per pubdata is still constant, however, the L2 gas price is always equal to the minimalL2GasPrice
       testOnAllGasPrices(() => {
