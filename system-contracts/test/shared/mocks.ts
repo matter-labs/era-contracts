@@ -12,6 +12,7 @@ import {
   TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
   TEST_COMPRESSOR_CONTRACT_ADDRESS,
+  TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
 } from "./constants";
 import { deployContractOnAddress, getWallets, loadArtifact } from "./utils";
 
@@ -33,6 +34,7 @@ const TEST_SYSTEM_CONTRACTS_MOCKS = {
   ImmutableSimulator: TEST_IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT_ADDRESS,
   MsgValueSimulator: TEST_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS,
   Bootloader: TEST_BOOTLOADER_FORMAL_ADDRESS,
+  PubdataChunkPublisher: TEST_PUBDATA_CHUNK_PUBLISHER_ADDRESS,
 };
 
 // Deploys mocks, and cleans previous call results during deployments.
