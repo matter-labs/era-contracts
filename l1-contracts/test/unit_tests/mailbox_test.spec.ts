@@ -37,10 +37,6 @@ describe("Mailbox tests", function () {
     const mailboxContract = await mailboxFactory.deploy();
     const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
 
-    const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
-    const gettersContract = await gettersFactory.deploy();
-    const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
-
     const mockExecutorFactory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
     const mockExecutorContract = await mockExecutorFactory.deploy();
     const mockExecutorFacet = MockExecutorFacetFactory.connect(
@@ -81,7 +77,6 @@ describe("Mailbox tests", function () {
 
     const facetCuts = [
       facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false),
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
       facetCut(mockExecutorFacet.address, mockExecutorFacet.interface, Action.Add, false),
     ];
     const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
@@ -91,7 +86,6 @@ describe("Mailbox tests", function () {
     diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
     mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
-    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer); 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(diamondProxyContract.address, mockExecutorContract.signer);
 
     const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
@@ -237,6 +231,53 @@ describe("Mailbox tests", function () {
       const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
       const mailboxTestContract = await mailboxTestContractFactory.deploy();
       testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
+
+      const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
+      const gettersContract = await gettersFactory.deploy();
+      const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+
+      // Note, that while this testsuit is focused on testing MailboxFaucet only,
+    // we still need to initialize its storage via DiamondProxy
+    const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
+    const diamondInitContract = await diamondInitFactory.deploy();
+    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+
+    const dummyHash = new Uint8Array(32);
+    dummyHash.set([1, 0, 0, 1]);
+    const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
+      {
+        verifier: dummyAddress,
+        governor: dummyAddress,
+        admin: dummyAddress,
+        genesisBatchHash: ethers.constants.HashZero,
+        genesisIndexRepeatedStorageChanges: 0,
+        genesisBatchCommitment: ethers.constants.HashZero,
+        verifierParams: {
+          recursionCircuitsSetVksHash: ethers.constants.HashZero,
+          recursionLeafLevelVkHash: ethers.constants.HashZero,
+          recursionNodeLevelVkHash: ethers.constants.HashZero,
+        },
+        zkPorterIsAvailable: false,
+        l2BootloaderBytecodeHash: dummyHash,
+        l2DefaultAccountBytecodeHash: dummyHash,
+        priorityTxMaxGasLimit: 10000000,
+        initialProtocolVersion: 0,
+        feeParams: defaultFeeParams(),
+      },
+    ]);
+
+    const facetCuts = [
+      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
+      facetCut(testContract.address, testContract.interface, Action.Add, false),
+    ];
+    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+
+    const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
+    const chainId = hardhat.network.config.chainId;
+    diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+
+    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer); 
 
       // Generating 10 more gas prices for test suit
       let priceGwei = 0.001;
