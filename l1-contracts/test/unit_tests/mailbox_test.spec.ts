@@ -22,7 +22,7 @@ import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
   let mailbox: MailboxFacet;
-  let gettersFacet: GettersFacet;
+  let proxyGetters: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   let diamondProxyContract: ethers.Contract;
   let owner: ethers.Signer;
@@ -36,6 +36,10 @@ describe("Mailbox tests", function () {
     const mailboxFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
     const mailboxContract = await mailboxFactory.deploy();
     const mailboxFacet = MailboxFacetFactory.connect(mailboxContract.address, mailboxContract.signer);
+
+    const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
+    const gettersContract = await gettersFactory.deploy();
+    const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
 
     const mockExecutorFactory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
     const mockExecutorContract = await mockExecutorFactory.deploy();
@@ -77,6 +81,7 @@ describe("Mailbox tests", function () {
 
     const facetCuts = [
       facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, false),
+      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
       facetCut(mockExecutorFacet.address, mockExecutorFacet.interface, Action.Add, false),
     ];
     const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
@@ -86,15 +91,13 @@ describe("Mailbox tests", function () {
     diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
     mailbox = MailboxFacetFactory.connect(diamondProxyContract.address, mailboxContract.signer);
+    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer); 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(diamondProxyContract.address, mockExecutorContract.signer);
 
     const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
     const forwarderContract = await forwarderFactory.deploy();
     forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
 
-    const gettersFacetFactory = await hardhat.ethers.getContractFactory("GettersFacet");
-    const gettersFacetContract = await gettersFacetFactory.deploy();
-    gettersFacet = GettersFacetFactory.connect(gettersFacetContract.address, gettersFacetContract.signer);
   });
 
   it("Should accept correctly formatted bytecode", async () => {
@@ -255,7 +258,7 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
-      const pubdataPricingMode = await gettersFacet.getPubdataPricingMode();
+      const pubdataPricingMode = await proxyGetters.getPubdataPricingMode();
       expect(pubdataPricingMode).to.equal(PubdataPricingMode.Rollup);
 
       // Testing the logic under low / medium / high L1 gas price
@@ -271,7 +274,7 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
-      const pubdataPricingMode = await gettersFacet.getPubdataPricingMode();
+      const pubdataPricingMode = await proxyGetters.getPubdataPricingMode();
       expect(pubdataPricingMode).to.equal(PubdataPricingMode.Validium);
 
       // The gas price per pubdata is still constant, however, the L2 gas price is always equal to the minimalL2GasPrice
