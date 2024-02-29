@@ -11,7 +11,7 @@ import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
-import {L2Message} from "solpp/common/Messaging.sol";
+import {L2Message, L2Log} from "solpp/common/Messaging.sol";
 
 contract ExperimentalBridgeTest is Test {
 
@@ -269,6 +269,47 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
     }
 
+    function test_proveL2LogInclusion(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        L2Log memory l2Log = _createMockL2Log(
+            randomL2ShardId,
+            randomIsService,
+            randomTxNumInBatch,
+            randomSender,
+            randomKey,
+            randomValue
+        );
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL2LogInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Log,
+                mockProof    
+             ),
+            abi.encode(true)
+        );
+
+        assertTrue(bridgeHub.proveL2LogInclusion(mockChainId,mockBatchNumber,mockIndex,l2Log,mockProof));
+    }
+
     function _createMockL2Message(
         uint16 randomTxNumInBatch,
         address randomSender,
@@ -281,6 +322,26 @@ contract ExperimentalBridgeTest is Test {
         l2Message.data = randomData;
 
         return l2Message;
+    }
+
+    function _createMockL2Log(
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) internal returns(L2Log memory) {
+        L2Log memory l2Log;
+
+        l2Log.l2ShardId = randomL2ShardId;
+        l2Log.isService = randomIsService;
+        l2Log.txNumberInBatch = randomTxNumInBatch;
+        l2Log.sender = randomSender;
+        l2Log.key = randomKey;
+        l2Log.value = randomValue;
+
+        return l2Log;
     }
 
     function _createNewChainInitData(bool isFreezable, bytes4[] memory mockSelectors, address mockInitAddress, bytes memory mockInitCalldata) internal returns (bytes memory) {
