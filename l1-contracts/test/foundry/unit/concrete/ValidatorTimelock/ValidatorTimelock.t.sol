@@ -94,7 +94,10 @@ contract ValidatorTimelockTest is Test {
     function test_setStateTransitionManager() public {
         assert(validator.stateTransitionManager() == IStateTransitionManager(address(stateTransitionManager)));
 
-        DummyStateTransitionManagerForValidatorTimelock newManager = new DummyStateTransitionManagerForValidatorTimelock(bob, zkSync);
+        DummyStateTransitionManagerForValidatorTimelock newManager = new DummyStateTransitionManagerForValidatorTimelock(
+                bob,
+                zkSync
+            );
         vm.prank(owner);
         validator.setStateTransitionManager(IStateTransitionManager(address(newManager)));
 
@@ -169,7 +172,11 @@ contract ValidatorTimelockTest is Test {
         IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
         batchesToProve[0] = batchToProve;
 
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.proveBatches.selector), abi.encode(prevBatch, batchesToProve, proof));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.proveBatches.selector),
+            abi.encode(prevBatch, batchesToProve, proof)
+        );
         vm.prank(dan);
         validator.proveBatches(prevBatch, batchesToProve, proof);
     }
@@ -182,7 +189,11 @@ contract ValidatorTimelockTest is Test {
         IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
         batchesToProve[0] = batchToProve;
 
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.proveBatches.selector), abi.encode(chainId, prevBatch, batchesToProve, proof));
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.proveBatches.selector),
+            abi.encode(chainId, prevBatch, batchesToProve, proof)
+        );
         vm.prank(alice);
         validator.proveBatchesSharedBridge(chainId, prevBatch, batchesToProve, proof);
     }
@@ -414,7 +425,6 @@ contract ValidatorTimelockTest is Test {
         storedBatch2.batchNumber = batchNumber;
         IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
         storedBatches[0] = storedBatch2;
-
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay - 1);
