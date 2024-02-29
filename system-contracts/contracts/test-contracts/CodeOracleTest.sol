@@ -5,11 +5,16 @@ pragma solidity ^0.8.0;
 address constant REAL_CODE_ORACLE_ADDR = 0x0000000000000000000000000000000000008011;
 
 contract CodeOracleTest {
-    function callCodeOracle(bytes32 _versionedHash, bytes32 _expectedBytecodeHash) external view returns (uint256 gasCost) {
+    function callCodeOracle(
+        bytes32 _versionedHash,
+        bytes32 _expectedBytecodeHash
+    ) external view returns (uint256 gasCost) {
         uint256 gasBefore = gasleft();
 
         // Call the code oracle
-        (bool success, bytes memory returnedBytecode) = REAL_CODE_ORACLE_ADDR.staticcall(abi.encodePacked(_versionedHash));
+        (bool success, bytes memory returnedBytecode) = REAL_CODE_ORACLE_ADDR.staticcall(
+            abi.encodePacked(_versionedHash)
+        );
 
         gasCost = gasBefore - gasleft();
 
@@ -17,7 +22,10 @@ contract CodeOracleTest {
         require(success, "CodeOracle call failed");
 
         // Check the returned bytecode
-        require(keccak256(returnedBytecode) == _expectedBytecodeHash, "Returned bytecode does not match the expected hash");
+        require(
+            keccak256(returnedBytecode) == _expectedBytecodeHash,
+            "Returned bytecode does not match the expected hash"
+        );
     }
 
     function codeOracleTest(bytes32 _versionedHash, bytes32 _expectedBytecodeHash) external view {
@@ -30,5 +38,4 @@ contract CodeOracleTest {
         require(secondCallCost < firstCallCost, "The second call should have cost less gas");
         require(thirdCallCost == secondCallCost, "The third call should have the same gas cost as the second call");
     }
-
 }

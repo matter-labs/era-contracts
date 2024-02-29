@@ -22,7 +22,7 @@ contract TransferTest {
 
         require(success, "Transaction failed");
     }
-    
+
     receive() external payable {}
 }
 

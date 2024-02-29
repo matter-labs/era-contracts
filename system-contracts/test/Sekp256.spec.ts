@@ -18,7 +18,7 @@ import { prepareEnvironment } from "./shared/mocks";
 import { ec as EC } from "elliptic";
 
 describe("Sekp256r1 tests", function () {
-  const ONE = '0x0000000000000000000000000000000000000000000000000000000000000001';
+  const ONE = "0x0000000000000000000000000000000000000000000000000000000000000001";
 
   let oldSekp256Code: string;
 
@@ -28,13 +28,7 @@ describe("Sekp256r1 tests", function () {
   let correctS: string;
   let correctR: string;
 
-  function compileSignature(options: {
-    digest?: string;
-    x?: string;
-    y?: string;
-    r?: string;
-    s?: string;
-  }) {
+  function compileSignature(options: { digest?: string; x?: string; y?: string; r?: string; s?: string }) {
     const { digest: providedDigest, x: providedX, y: providedY, r: providedR, s: proviedS } = options;
 
     const digest = providedDigest || correctDigest;
@@ -43,7 +37,7 @@ describe("Sekp256r1 tests", function () {
     const r = providedR || correctR;
     const s = proviedS || correctS;
 
-    // Contatenate the digest, r, s, x and y. 
+    // Contatenate the digest, r, s, x and y.
     // Note that for r,s,x,y we need to remove the 0x prefix
     return digest + r.slice(2) + s.slice(2) + x.slice(2) + y.slice(2);
   }
@@ -73,13 +67,13 @@ describe("Sekp256r1 tests", function () {
     const signature = keyPair.sign(correctDigest.slice(2));
 
     // Export the signature to hexadecimal format
-    correctR = '0x' + signature.r.toString(16);
-    correctS = '0x' + signature.s.toString(16);
+    correctR = "0x" + signature.r.toString(16);
+    correctS = "0x" + signature.s.toString(16);
 
     const pk = keyPair.getPublic();
 
-    correctX = '0x' + pk.getX().toString(16);
-    correctY = '0x' + pk.getY().toString(16);
+    correctX = "0x" + pk.getX().toString(16);
+    correctY = "0x" + pk.getY().toString(16);
   });
 
   it("Should correctly verify valid signature", async () => {
@@ -97,7 +91,7 @@ describe("Sekp256r1 tests", function () {
       data: "0xdeadbeef",
     });
 
-    expect(result).to.eq('0x');
+    expect(result).to.eq("0x");
   });
 
   it("Should reject zeroed params", async () => {
@@ -108,19 +102,19 @@ describe("Sekp256r1 tests", function () {
         data: compileSignature({ [param]: ethers.constants.HashZero }),
       });
 
-      expect(result).to.eq('0x');
+      expect(result).to.eq("0x");
     }
   });
 
   it("Should reject large s/r", async () => {
-    const groupSize = '0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551';
+    const groupSize = "0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
     for (const param of ["r", "s"]) {
       const result = await getWallets()[0].call({
         to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
         data: compileSignature({ [param]: groupSize }),
       });
 
-      expect(result).to.eq('0x');
+      expect(result).to.eq("0x");
     }
   });
 
@@ -132,7 +126,7 @@ describe("Sekp256r1 tests", function () {
         data: compileSignature({ [param]: ONE }),
       });
 
-      expect(result).to.eq('0x');
+      expect(result).to.eq("0x");
     }
   });
 
