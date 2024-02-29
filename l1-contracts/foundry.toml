@@ -5,7 +5,4 @@ libs = ['node_modules', 'lib']
 cache_path = 'cache-forge'
 test = 'test/foundry'
 
-[fuzz]
-runs = 2048
-
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
