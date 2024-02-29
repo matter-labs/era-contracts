@@ -24,19 +24,7 @@ object "Sekp256r1" {
                 ret := 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
             }
 
-            /// @notice The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
-            /// This function returns the first (`a`) coeficient
-            function ELLIPTIC_CURVE_WEIERSTRASS_FIRST_COEFICIENT() -> ret {
-                ret := 0xffffffff00000001000000000000000000000000fffffffffffffffffffffffc
-            }
-
-            /// @notice The short weierstrass form of the curve is y^2 ≡ x^3 + ax + b.
-            /// This function returns the second (`b`) coeficient
-            function ELLIPTIC_CURVE_WEIERSTRASS_SECOND_COEFICIENT() -> ret {
-                ret := 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b
-            }
-
-            /// @dev The gas cost of processing ecrecover circuit precompile.
+            /// @dev The gas cost of processing sekp256r1 circuit precompile.
             function SEKP256_VERIFY_GAS_COST() -> ret {
                 ret := 12000
             }
@@ -88,7 +76,7 @@ object "Sekp256r1" {
 
             // No need for us to check whether the point is on curve as it is done in the internal precompile implementation
 
-            // Store the data in memory, so the ecrecover circuit will read it 
+            // Store the data in memory, so the sekp256r1 circuit will read it 
             mstore(0, digest)
             mstore(32, r)
             mstore(64, s)
@@ -104,7 +92,7 @@ object "Sekp256r1" {
             )
             let gasToPay := SEKP256_VERIFY_GAS_COST()
 
-            // Check whether the call is successfully handled by the ecrecover circuit
+            // Check whether the call is successfully handled by the sekp256r1 circuit
             let success := precompileCall(precompileParams, gasToPay)
             let internalSuccess := mload(0)
 
