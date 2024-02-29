@@ -150,9 +150,8 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     path: "precompiles",
   },
   sekp256r1: {
-    // FIXME: ensure to double check EIP7212 address compatibility
-    address: "0x0000000000000000000000000000000000008100",
-    codeName: "Keccak256",
+    address: "0x0000000000000000000000000000000000000100",
+    codeName: "Sekp256r1",
     lang: Language.Yul,
     path: "precompiles",
   },
