@@ -217,7 +217,7 @@ contract ExperimentalBridgeTest is Test {
             abi.encodeWithSelector(mockSTM.createNewChain.selector, chainId, address(mockSTM), address(testToken), uint256(chainId * 2), admin, _newChainInitData),
             bytes('')
         );
-        newChainId = bridgeHub.createNewChain(
+        bridgeHub.createNewChain(
             chainId,
             address(mockSTM),
             address(testToken),
