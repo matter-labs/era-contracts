@@ -11,7 +11,7 @@ import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
-import {L2Message, L2Log} from "solpp/common/Messaging.sol";
+import {L2Message, L2Log, TxStatus} from "solpp/common/Messaging.sol";
 
 contract ExperimentalBridgeTest is Test {
 
@@ -150,11 +150,13 @@ contract ExperimentalBridgeTest is Test {
 
         assertTrue(bridgeHub.tokenIsRegistered(randomAddress), "after call from the bridgeowner, this randomAddress should be a registered token");
         
-        // Testing to see if an actual ERC20 implementation can also be added or not
-        vm.prank(bridgeOwner);
-        bridgeHub.addToken(address(testToken));
+        if(randomAddress != address(testToken)) {
+            // Testing to see if an actual ERC20 implementation can also be added or not
+            vm.prank(bridgeOwner);
+            bridgeHub.addToken(address(testToken));
 
-        assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+        }
     }
 
     function test_setSharedBridge(address randomCaller, address randomAddress) public {
@@ -308,6 +310,53 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(bridgeHub.proveL2LogInclusion(mockChainId,mockBatchNumber,mockIndex,l2Log,mockProof));
+    }
+
+    function test_proveL1ToL2TransactionStatus(
+        uint256 randomChainId,
+        bytes32 randomL2TxHash,
+        uint256 randomL2BatchNumber,
+        uint256 randomL2MessageIndex,
+        uint16 randomL2TxNumberInBatch,
+        bytes32[] memory randomMerkleProof,
+        bool randomResultantBool
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        TxStatus txStatus;
+
+        if (randomChainId % 2 == 0) {
+            txStatus = TxStatus.Failure;
+        } else {
+            txStatus = TxStatus.Success;
+        }
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL1ToL2TransactionStatus.selector,
+                randomChainId,
+                randomL2TxHash,
+                randomL2BatchNumber,
+                randomL2MessageIndex,
+                randomL2TxNumberInBatch,
+                randomMerkleProof,
+                txStatus
+            ),
+            abi.encode(randomResultantBool)
+        );
+
+        assertTrue(bridgeHub.proveL1ToL2TransactionStatus(
+            randomChainId, 
+            randomL2TxHash,
+            randomL2BatchNumber,
+            randomL2MessageIndex,
+            randomL2TxNumberInBatch,
+            randomMerkleProof,
+            txStatus
+        ) == randomResultantBool);
     }
 
     function _createMockL2Message(
