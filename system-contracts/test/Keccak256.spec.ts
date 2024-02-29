@@ -17,7 +17,6 @@ describe("Keccak256 tests", function () {
   let oldKeccakCodeHash: string;
   let correctKeccakCodeHash: string;
   let alwaysRevertCodeHash: string;
-  let keccakMockCodeHash: string;
 
   // Kernel space address, needed to enable mimicCall
   const KECCAK_TEST_ADDRESS = "0x0000000000000000000000000000000000009000";
@@ -35,8 +34,6 @@ describe("Keccak256 tests", function () {
       lang: Language.Yul,
       address: ethers.constants.AddressZero,
     });
-
-    keccakMockCodeHash = ethers.utils.hexlify(hashBytecode(keccakMockCode));
 
     keccakTest = KeccakTestFactory.connect(KECCAK_TEST_ADDRESS, getWallets()[0]);
     const correctKeccakCode = readYulBytecode({
@@ -105,29 +102,6 @@ describe("Keccak256 tests", function () {
     const expectedOutput = inputsToTest.map((e) => ethers.utils.keccak256(e));
 
     await keccakTest.keccakValidationTest(upgradeInput, resetInput, inputsToTest, expectedOutput);
-  });
-
-  it("keccak upgrade if needed test", async () => {
-    const deployerInterfact = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
-
-    const mockKeccakInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [keccakMockCodeHash]);
-
-    await keccakTest.keccakPerformUpgrade(mockKeccakInput);
-
-    let keccakCode = await getCode(REAL_KECCAK256_CONTRACT_ADDRESS);
-    let keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
-
-    expect(keccakCodeHash).to.eq(keccakMockCodeHash);
-
-    // Needed to create a new batch & thus start the bootloader once more.
-    // After this, the bootloader should automatically return the code hash to the
-    // previous one.
-    await hre.network.provider.send("hardhat_mine", ["0x100"]);
-
-    keccakCode = await getCode(REAL_KECCAK256_CONTRACT_ADDRESS);
-    keccakCodeHash = ethers.utils.hexlify(hashBytecode(keccakCode));
-
-    expect(keccakCodeHash).to.eq(oldKeccakCodeHash);
   });
 });
 

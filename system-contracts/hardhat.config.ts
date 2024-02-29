@@ -37,7 +37,7 @@ export default {
     },
     zkSyncTestNode: {
       url: "http://127.0.0.1:8011",
-      ethNetwork: "",
+      ethNetwork: "localhost",
       zksync: true,
     },
   },
