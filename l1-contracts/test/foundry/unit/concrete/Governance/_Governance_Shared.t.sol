@@ -64,5 +64,5 @@ contract GovernanceTest is Test, EventOnFallback {
     }
 
     // add this to be excluded from coverage report
-    function test() internal override {}
+    function test() internal {}
 }

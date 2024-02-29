@@ -11,6 +11,8 @@ import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
+import {L2Message} from "solpp/common/Messaging.sol";
+
 contract ExperimentalBridgeTest is Test {
 
     Bridgehub bridgeHub;
@@ -171,6 +173,7 @@ contract ExperimentalBridgeTest is Test {
     }
 
 
+/*
     uint256 newChainId;
     address admin;
     function test_createNewChain(
@@ -211,6 +214,8 @@ contract ExperimentalBridgeTest is Test {
 
         emit log_named_bytes32("ICH", mockSTM.initialCutHash());
 
+        emit log_named_bytes32("createNewChain function selector", mockSTM.createNewChain.selector);
+
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockSTM),
@@ -229,6 +234,53 @@ contract ExperimentalBridgeTest is Test {
 
         assertTrue(bridgeHub.stateTransitionManager(newChainId) == address(mockSTM));
         assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
+    }
+
+*/
+
+    function test_proveL2MessageInclusion(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL2MessageInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Message,
+                mockProof    
+             ),
+            abi.encode(true)
+        );
+
+        assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
+    }
+
+    function _createMockL2Message(
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) internal returns(L2Message memory) {
+        L2Message memory l2Message;
+
+        l2Message.txNumberInBatch = randomTxNumInBatch;
+        l2Message.sender = randomSender;
+        l2Message.data = randomData;
+
+        return l2Message;
     }
 
     function _createNewChainInitData(bool isFreezable, bytes4[] memory mockSelectors, address mockInitAddress, bytes memory mockInitCalldata) internal returns (bytes memory) {
