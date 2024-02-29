@@ -18,6 +18,11 @@ import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
+/// @dev Unlike the value above, it is not overridden for the purpose of testing and 
+/// is identical to the constant value actually used as the system contracts offset on 
+/// mainnet. 
+uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
+
 /// @dev All the system contracts must be located in the kernel space,
 /// i.e. their addresses must be below 2^16.
 uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
@@ -50,6 +55,7 @@ IL1Messenger constant L1_MESSENGER_CONTRACT = IL1Messenger(address(SYSTEM_CONTRA
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
 IEthToken constant ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IEthToken constant REAL_ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
