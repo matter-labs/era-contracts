@@ -1,3 +1,6 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import * as chalk from "chalk";
 import { ethers } from "ethers";
 import * as fs from "fs";

@@ -2,20 +2,16 @@ import * as hre from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
-import * as fs from "fs";
-import * as path from "path";
 import { Provider } from "zksync-web3";
 import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { getL1TxInfo } from "./utils";
+import { getL1TxInfo, ethTestConfig } from "./utils";
 
 // From openzeppelin-upgradable v4.9.5 Initializable contract implementation.
 const INITIALIZED_STORAGE_SLOT = 0;
 const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function getReinitializeTokenCalldata(
   newName: string,
