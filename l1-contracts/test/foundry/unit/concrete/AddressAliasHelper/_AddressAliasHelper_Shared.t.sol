@@ -10,4 +10,7 @@ contract AddressAliasHelperSharedTest is Test {
     function setUp() public {
         addressAliasHelper = new AddressAliasHelperTest();
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

@@ -10,4 +10,7 @@ contract UncheckedMathSharedTest is Test {
     function setUp() public {
         uncheckedMath = new UncheckedMathTest();
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
