@@ -29,37 +29,28 @@ type TokenDescription = Token & {
   contract?: Contract;
 };
 
-async function deployContracts(tokens: TokenDescription[], wallet: Wallet) {
+async function deployContracts(tokens: TokenDescription[], wallet: Wallet): Promise<number> {
+  let nonce = await wallet.getTransactionCount("pending");
+
   for (const token of tokens) {
     token.implementation = token.implementation || DEFAULT_ERC20;
     const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
     const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
 
-    token.contract = await tokenFactory.deploy(...args, { gasLimit: 5000000 });
+    token.contract = await tokenFactory.deploy(...args, { gasLimit: 5000000, nonce: nonce++ });
   }
 
   await Promise.all(tokens.map(async (token) => token.contract.deployTransaction.wait()));
+
+  return nonce;
 }
 
-async function mint(token: TokenDescription, wallet: Wallet): Promise<Promise<null>[]> {
-  if (token.implementation === "WETH9") {
-    return [];
-  }
-
-  const promises = [];
-  let tx = await token.contract.mint(wallet.address, parseEther("3000000000"));
-  promises.push(tx.wait());
-
-  for (let i = 0; i < 10; ++i) {
-    const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
-      provider
-    );
-
-    tx = await token.contract.mint(testWallet.address, parseEther("3000000000"));
-    promises.push(tx.wait());
-  }
-
-  return promises;
+function getTestAddresses(): string[] {
+  return Array.from(
+    { length: 10 },
+    (_, i) =>
+      Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, `m/44'/60'/0'/0/${i}`).connect(provider).address
+  );
 }
 
 function unwrapToken(token: TokenDescription): Token {
@@ -71,6 +62,26 @@ function unwrapToken(token: TokenDescription): Token {
   }
 
   return token;
+}
+
+async function mintTokens(tokens: TokenDescription[], wallet: Wallet, nonce: number): Promise<Token[]> {
+  const targetAddresses = [wallet.address, ...getTestAddresses()];
+
+  const results = [];
+  const promises = [];
+  for (const token of tokens) {
+    if (token.implementation !== "WETH9") {
+      for (const address of targetAddresses) {
+        const tx = await token.contract.mint(address, parseEther("3000000000"), { nonce: nonce++ });
+        promises.push(tx.wait());
+      }
+    }
+
+    results.push(unwrapToken(token));
+  }
+  await Promise.all(promises);
+
+  return results;
 }
 
 async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Token> {
@@ -136,20 +147,13 @@ async function main() {
     .description("Adds a multiple tokens given in JSON format")
     .action(async (tokens_json: string, cmd) => {
       const tokens: Array<TokenDescription> = JSON.parse(tokens_json);
-      const result = [];
 
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-      await deployContracts(tokens, wallet);
-
-      const mintPromises = [];
-      for (const token of tokens) {
-        mintPromises.push(...(await mint(token, wallet)));
-        result.push(unwrapToken(token));
-      }
-      await Promise.all(mintPromises);
+      const nonce = await deployContracts(tokens, wallet);
+      const result = await mintTokens(tokens, wallet, nonce);
 
       console.log(JSON.stringify(result, null, 2));
     });
