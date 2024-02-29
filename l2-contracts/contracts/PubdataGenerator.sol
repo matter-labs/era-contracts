@@ -18,7 +18,7 @@ contract PubdataGenerator {
             data[i] = bytes1(uint8(i % 256));
         }
         return data;
-    } 
+    }
 
     function generate(uint _size) public {
         unchecked {

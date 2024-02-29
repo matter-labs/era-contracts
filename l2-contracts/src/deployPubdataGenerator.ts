@@ -17,10 +17,7 @@ const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LI
 async function main() {
   const program = new Command();
 
-  program
-    .version("0.1.0")
-    .name("deploy-pubdata-generator")
-    .description("Deploys the pubdata generator contract to L2");
+  program.version("0.1.0").name("deploy-pubdata-generator").description("Deploys the pubdata generator contract to L2");
 
   program.option("--private-key <private-key>").action(async (cmd) => {
     const deployWallet = cmd.privateKey
@@ -33,12 +30,7 @@ async function main() {
 
     const pubdataGeneratorBytecode = hre.artifacts.readArtifactSync("PubdataGenerator").bytecode;
     const create2Salt = ethers.constants.HashZero;
-    const pubdataGeneratorAddress = computeL2Create2Address(
-      deployWallet,
-      pubdataGeneratorBytecode,
-      "0x",
-      create2Salt
-    );
+    const pubdataGeneratorAddress = computeL2Create2Address(deployWallet, pubdataGeneratorBytecode, "0x", create2Salt);
 
     // TODO: request from API how many L2 gas needs for the transaction.
     await create2DeployFromL1(deployWallet, pubdataGeneratorBytecode, "0x", create2Salt, priorityTxMaxGasLimit);
