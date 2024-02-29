@@ -4,17 +4,24 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
+import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
+import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
+import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
 contract ExperimentalBridgeTest is Test {
 
     Bridgehub bridgeHub;
     address public bridgeOwner;
+    DummyStateTransitionManager mockSTM;
+    TestnetERC20Token testToken;
 
     function setUp() public {
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-    
+        mockSTM = new DummyStateTransitionManager();
+        testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
+
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
 
@@ -123,5 +130,58 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+    }
+
+    /**
+        /// @notice token can be any contract with the appropriate interface/functionality
+    function addToken(address _token) external onlyOwner {
+        require(!tokenIsRegistered[_token], "Bridgehub: token already registered");
+        tokenIsRegistered[_token] = true;
+    }
+
+    /// @notice To set shared bridge, only Owner. Not done in initialize, as
+    /// the order of deployment is Bridgehub, Shared bridge, and then we call this
+    function setSharedBridge(address _sharedBridge) external onlyOwner {
+        sharedBridge = IL1SharedBridge(_sharedBridge);
+    }
+
+
+    
+     */
+
+    function test_addToken(address randomCaller, address randomAddress) public {
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            bridgeHub.addToken(randomAddress);
+        }
+
+        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.addToken(randomAddress);
+
+        assertTrue(bridgeHub.tokenIsRegistered(randomAddress), "after call from the bridgeowner, this randomAddress should be a registered token");
+        
+        // Testing to see if an actual ERC20 implementation can also be added or not
+        vm.prank(bridgeOwner);
+        bridgeHub.addToken(address(testToken));
+
+        assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+    }
+
+    function test_setSharedBridge(address randomCaller, address randomAddress) public {
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            bridgeHub.setSharedBridge(randomAddress);
+        }
+
+        assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(address(0)), "This random address is not registered as sharedBridge");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setSharedBridge(randomAddress);
+
+        assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(randomAddress), "after call from the bridgeowner, this randomAddress should be the registered sharedBridge");
     }
 }
