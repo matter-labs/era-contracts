@@ -5,9 +5,6 @@ pragma solidity 0.8.20;
 import "../../state-transition/libraries/PriorityQueue.sol";
 
 contract PriorityQueueTest {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     PriorityQueue.Queue priorityQueue;
 
     function getFirstUnprocessedPriorityTx() external view returns (uint256) {

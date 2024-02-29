@@ -5,9 +5,6 @@ pragma solidity 0.8.20;
 import "../../vendor/AddressAliasHelper.sol";
 
 contract AddressAliasHelperTest {
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
-
     function applyL1ToL2Alias(address _l1Address) external pure returns (address) {
         return AddressAliasHelper.applyL1ToL2Alias(_l1Address);
     }
