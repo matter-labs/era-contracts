@@ -42,7 +42,7 @@ jobs:
         with:
           tag_name: ${{ steps.init.outputs.release_tag }}
           fail_on_unmatched_files: true
-          target_commitish: ${{env.GITHUB_SHA}}
+          target_commitish: ${{ github.sha }}
           body: ""
           files: |
             l1-contracts.tar.gz
