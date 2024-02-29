@@ -60,8 +60,6 @@ describe("Sekp256r1 tests", function () {
       address: ethers.constants.AddressZero,
     });
 
-    console.log("tested", testedSekp256R1Code.length);
-
     await setCode(REAL_SEKP256_R1_CONTRACT_ADDRESS, testedSekp256R1Code);
 
     const ec = new EC("p256");
