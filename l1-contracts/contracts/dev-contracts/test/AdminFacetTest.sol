@@ -5,6 +5,9 @@ pragma solidity 0.8.20;
 import "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     constructor() {
         s.admin = msg.sender;
         s.stateTransitionManager = msg.sender;

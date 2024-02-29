@@ -2,18 +2,15 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 
-import "@nomiclabs/hardhat-ethers";
+// import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet } from "ethers";
 import { web3Provider } from "./utils";
-import * as fs from "fs";
-import * as path from "path";
 
 import type { TokenDescription } from "../src.ts/deploy-token";
 import { deployTokens } from "../src.ts/deploy-token";
 
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
 

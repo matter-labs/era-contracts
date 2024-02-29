@@ -6,6 +6,9 @@ import "../../state-transition/libraries/Diamond.sol";
 import "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 
 contract DiamondProxyTest is ZkSyncStateTransitionBase {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function setFreezability(bool _freeze) external returns (bytes32) {
         Diamond.DiamondStorage storage diamondStorage = Diamond.getDiamondStorage();
         diamondStorage.isFrozen = _freeze;

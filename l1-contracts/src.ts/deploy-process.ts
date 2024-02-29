@@ -1,18 +1,16 @@
-// import * as hardhat from "hardhat";
-// import "@nomiclabs/hardhat-ethers";
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
+import "@nomiclabs/hardhat-ethers";
+
 import type { BigNumberish, Wallet } from "ethers";
 import { ethers } from "ethers";
 
 import type { FacetCut } from "./diamondCut";
 
-import { Deployer } from "./deploy";
-import { deployTokens, getTokens } from "./deploy-token";
-import * as fs from "fs";
-
-const testConfigPath = "./test/test_config/constant";
-export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
-const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
-const testnetTokenPath = `${testConfigPath}/hardhat.json`;
+import type { Deployer } from "./deploy";
+import { getTokens } from "./deploy-token";
 
 import { ADDRESS_ONE } from "../src.ts/utils";
 
@@ -31,17 +29,6 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
-}
-
-export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<Deployer> {
-  return new Deployer({
-    deployWallet,
-    ownerAddress,
-    verbose: false, // change here to view deployement
-    addresses: addressConfig,
-    bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
-    defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-  });
 }
 
 export async function initialBridgehubDeployment(
@@ -125,23 +112,4 @@ export async function registerHyperchain(
     await deployer.registerToken(baseTokenAddress);
   }
   await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice);
-}
-
-export async function initialTestnetDeploymentProcess(
-  deployWallet: Wallet,
-  ownerAddress: string,
-  gasPrice: BigNumberish,
-  extraFacets: FacetCut[],
-  baseTokenName?: string
-): Promise<Deployer> {
-  await loadDefaultEnvVarsForTests(deployWallet);
-  const deployer = await defaultDeployerForTests(deployWallet, ownerAddress);
-
-  const testnetTokens = getTokens();
-  const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
-  fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
-
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
-  await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName);
-  return deployer;
 }

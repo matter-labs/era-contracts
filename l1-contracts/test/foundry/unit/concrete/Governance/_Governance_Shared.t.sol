@@ -62,4 +62,7 @@ contract GovernanceTest is Test, EventOnFallback {
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});
     }
+
+    // add this to be excluded from coverage report
+    function test() internal override {}
 }

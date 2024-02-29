@@ -6,7 +6,9 @@ import * as hardhat from "hardhat";
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { ethTestConfig, initialTestnetDeploymentProcess } from "../../src.ts/deploy-process";
+import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
+import { ethTestConfig } from "../../src.ts/utils";
+
 import type { Deployer } from "../../src.ts/deploy";
 
 // todo I had trouble making this work, there is some importation error
