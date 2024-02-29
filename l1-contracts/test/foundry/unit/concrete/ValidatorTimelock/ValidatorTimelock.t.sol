@@ -190,7 +190,7 @@ contract ValidatorTimelockTest is Test {
     function test_executeBatches() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
-        // Prove batches first to have the valid timestamp
+        // Commit batches first to have the valid timestamp
         vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
@@ -220,7 +220,7 @@ contract ValidatorTimelockTest is Test {
     function test_executeBatchesSharedBridge() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
-        // Prove batches first to have the valid timestamp
+        // Commit batches first to have the valid timestamp
         vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(chainId));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
