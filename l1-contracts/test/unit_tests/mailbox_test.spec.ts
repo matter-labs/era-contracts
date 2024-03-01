@@ -22,7 +22,6 @@ import * as ethers from "ethers";
 
 describe("Mailbox tests", function () {
   let mailbox: MailboxFacet;
-  let proxyGetters: GettersFacet;
   let proxyAsMockExecutor: MockExecutorFacet;
   let diamondProxyContract: ethers.Contract;
   let owner: ethers.Signer;
@@ -91,7 +90,6 @@ describe("Mailbox tests", function () {
     const forwarderFactory = await hardhat.ethers.getContractFactory("Forwarder");
     const forwarderContract = await forwarderFactory.deploy();
     forwarder = ForwarderFactory.connect(forwarderContract.address, forwarderContract.signer);
-
   });
 
   it("Should accept correctly formatted bytecode", async () => {
@@ -217,6 +215,8 @@ describe("Mailbox tests", function () {
 
   describe("L2 gas price", async () => {
     let testContract: MailboxFacetTest;
+    let proxyGetters: GettersFacet;
+    let diamondProxyContract: ethers.Contract;
     const TEST_GAS_PRICES = [];
 
     async function testOnAllGasPrices(
@@ -237,47 +237,48 @@ describe("Mailbox tests", function () {
       const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
 
       // Note, that while this testsuit is focused on testing MailboxFaucet only,
-    // we still need to initialize its storage via DiamondProxy
-    const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
-    const diamondInitContract = await diamondInitFactory.deploy();
-    const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+      // we still need to initialize its storage via DiamondProxy
+      const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
+      const diamondInitContract = await diamondInitFactory.deploy();
+      const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
 
-    const dummyHash = new Uint8Array(32);
-    dummyHash.set([1, 0, 0, 1]);
-    const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
-    const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
-      {
-        verifier: dummyAddress,
-        governor: dummyAddress,
-        admin: dummyAddress,
-        genesisBatchHash: ethers.constants.HashZero,
-        genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
-        verifierParams: {
-          recursionCircuitsSetVksHash: ethers.constants.HashZero,
-          recursionLeafLevelVkHash: ethers.constants.HashZero,
-          recursionNodeLevelVkHash: ethers.constants.HashZero,
+      const dummyHash = new Uint8Array(32);
+      dummyHash.set([1, 0, 0, 1]);
+      const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+      const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
+        {
+          verifier: dummyAddress,
+          governor: dummyAddress,
+          admin: dummyAddress,
+          genesisBatchHash: ethers.constants.HashZero,
+          genesisIndexRepeatedStorageChanges: 0,
+          genesisBatchCommitment: ethers.constants.HashZero,
+          verifierParams: {
+            recursionCircuitsSetVksHash: ethers.constants.HashZero,
+            recursionLeafLevelVkHash: ethers.constants.HashZero,
+            recursionNodeLevelVkHash: ethers.constants.HashZero,
+          },
+          zkPorterIsAvailable: false,
+          l2BootloaderBytecodeHash: dummyHash,
+          l2DefaultAccountBytecodeHash: dummyHash,
+          priorityTxMaxGasLimit: 10000000,
+          initialProtocolVersion: 0,
+          feeParams: defaultFeeParams(),
         },
-        zkPorterIsAvailable: false,
-        l2BootloaderBytecodeHash: dummyHash,
-        l2DefaultAccountBytecodeHash: dummyHash,
-        priorityTxMaxGasLimit: 10000000,
-        initialProtocolVersion: 0,
-        feeParams: defaultFeeParams(),
-      },
-    ]);
+      ]);
 
-    const facetCuts = [
-      facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
-      facetCut(testContract.address, testContract.interface, Action.Add, false),
-    ];
-    const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+      const facetCuts = [
+        facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
+        facetCut(testContract.address, testContract.interface, Action.Add, false),
+      ];
+      const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
 
-    const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
-    const chainId = hardhat.network.config.chainId;
-    diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+      const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
+      const chainId = hardhat.network.config.chainId;
+      diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
 
-    proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer); 
+      proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer);
+      testContract = MailboxFacetTestFactory.connect(diamondProxyContract.address, mailboxTestContract.signer);
 
       // Generating 10 more gas prices for test suit
       let priceGwei = 0.001;
