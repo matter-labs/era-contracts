@@ -352,7 +352,7 @@ object "Bootloader" {
             }
 
             /// @dev Slots needed to store L1 Messenger pubdata.
-            /// @dev Note that are many more these than the maximal pubdata in batch, since 
+            /// @dev Note that there are many more of these than the maximal pubdata in batch, since 
             /// it needs to also accommodate uncompressed state diffs that are required for the state diff
             /// compression verification.
             function OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS() -> ret {
@@ -1153,7 +1153,7 @@ object "Bootloader" {
             ) {
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
+                // First, we publish all the bytecodes needed. This needs to be done separately, since
                 // bytecodes usually form the bulk of the L2 gas prices.
 
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
@@ -1445,8 +1445,8 @@ object "Bootloader" {
                     let currentExpectedBytecodeHash := mload(dataInfoPtr)
 
                     if eq(bytecodeHash, currentExpectedBytecodeHash) {
-                        // Here we are making sure that the bytecode is indeed not yet know and needs to be published,
-                        // preveting users from being overcharged by the operator.
+                        // Here we are making sure that the bytecode is indeed not yet known and needs to be published,
+                        // preventing users from being overcharged by the operator.
                         let marker := getCodeMarker(bytecodeHash)
 
                         if marker {
@@ -1603,13 +1603,13 @@ object "Bootloader" {
                 ret := mload(txBatchOverheadPtr)
             }
 
-            /// @dev Return the operator's "trusted" transaction gas limit
+            /// @dev Return the operator's "trusted" transaction gas limit.
             function getOperatorTrustedGasLimitForTx(transactionIndex) -> ret {
                 let txTrustedGasLimitPtr := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_BYTE(), mul(transactionIndex, 32))
                 ret := mload(txTrustedGasLimitPtr)
             }
 
-            /// @dev Returns the bytecode hash that is next for being published
+            /// @dev Returns the bytecode hash that is next for being published.
             function getCurrentCompressedBytecodeHash() -> ret {
                 let compressionPtr := mload(COMPRESSED_BYTECODES_BEGIN_BYTE())
 
@@ -1651,7 +1651,7 @@ object "Bootloader" {
 
                 let totalLen := safeSub(nextAfterCalldata, calldataPtr, "xqwf")
                 
-                // Note, that it is safe because the 
+                // Note, that it is safe 
                 let success := call(
                     gas(),
                     BYTECODE_COMPRESSOR_ADDR(),
@@ -1684,8 +1684,7 @@ object "Bootloader" {
 
             /// @dev Get checked for overcharged operator's overhead for the transaction.
             /// @param transactionIndex The index of the transaction in the batch
-            /// @param txTotalGasLimit The total gass limit of the transaction (including the overhead).
-            /// @param gasPerPubdataByte The price for pubdata byte in gas.
+            /// @param txTotalGasLimit The total gas limit of the transaction (including the overhead).
             /// @param txEncodeLen The length of the ABI-encoding of the transaction
             function getVerifiedOperatorOverheadForTx(
                 transactionIndex,
@@ -2001,7 +2000,7 @@ object "Bootloader" {
 
                 // This method returns AccountAbstractVersion enum.
                 // Currently only two versions are supported: 1 or 0, which basically 
-                // mean whether the contract is an account or not.
+                // means whether the contract is an account or not.
                 if iszero(supportedVersion) {
                     revertWithReason(
                         FROM_IS_NOT_AN_ACCOUNT_ERR_CODE(),
@@ -2010,7 +2009,7 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @dev Checks whether an address is an EOA (i.e. has no code deployed on it)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
                 ret := 0
@@ -2064,9 +2063,9 @@ object "Bootloader" {
                 mstore(add(txDataWithHashesOffset, 64), 96)
 
                 let calldataPtr := prependSelector(txDataWithHashesOffset, selector)
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // Besides the length of the transaction itself,
                 // we also require 3 words for hashes and the offset
@@ -2088,9 +2087,9 @@ object "Bootloader" {
             /// @dev Calculates and saves the explorer hash and the suggested signed hash for the transaction.
             function saveTxHashes(txDataOffset) {
                 let calldataPtr := prependSelector(txDataOffset, {{GET_TX_HASHES_SELECTOR}})
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // The first word is formal, but still required by the ABI
                 // We also should take into account the selector.
@@ -2237,12 +2236,12 @@ object "Bootloader" {
             /// this method also enforces that the nonce has been marked as used.
             function accountValidateTx(txDataOffset) {
                 // Skipping the first 0x20 word of the ABI-encoding of the struct
-                let innerTxDataOffst := add(txDataOffset, 32)
-                let from := getFrom(innerTxDataOffst)
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let from := getFrom(innerTxDataOffset)
                 ensureAccount(from)
 
                 // The nonce should be unique for each transaction.
-                let nonce := getNonce(innerTxDataOffst)
+                let nonce := getNonce(innerTxDataOffset)
                 // Here we check that this nonce was not available before the validation step
                 ensureNonceUsage(from, nonce, 0)
 
@@ -3615,7 +3614,7 @@ object "Bootloader" {
                 ret := 11
             }
 
-            /// @norice The id of the VM hook that use used to notify the operator that it needs to insert the pubdata.
+            /// @notice The id of the VM hook that use used to notify the operator that it needs to insert the pubdata.
             function VM_HOOK_PUBDATA_REQUESTED() -> ret {
                 ret := 12
             }
