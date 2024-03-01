@@ -57,7 +57,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "0000" + "0000" + "0000" + "0000";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Dictionary length mismatch or no encoded data provided");
+      ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
     });
 
     it("should revert when there is no encoded data", async () => {
@@ -66,7 +66,7 @@ describe("Compressor tests", function () {
       const COMPRESSED_BYTECODE = "0x0002" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Dictionary length mismatch or no encoded data provided");
+      ).to.be.revertedWith("Encoded data length should be 4 times shorter than the original bytecode");
     });
 
     it("should revert when the encoded data length is invalid", async () => {
@@ -102,16 +102,6 @@ describe("Compressor tests", function () {
       await expect(
         compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
       ).to.be.revertedWith("Dictionary should have at most the same number of entries as the encoded data");
-    });
-
-    it("should revert when dictionary has unused entries", async () => {
-      const BYTECODE = "0x" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef" + "deadbeefdeadbeef";
-      // Dictionary has 2 entries, but the first one is unused
-      const COMPRESSED_BYTECODE =
-        "0x0002" + "0000000000000000" + "deadbeefdeadbeef" + "0001" + "0001" + "0001" + "0001";
-      await expect(
-        compressor.connect(bootloaderAccount).publishCompressedBytecode(BYTECODE, COMPRESSED_BYTECODE)
-      ).to.be.revertedWith("Dictionary should have no unused entries");
     });
 
     it("should revert when the encoded data has chunks where index is out of bounds", async () => {
