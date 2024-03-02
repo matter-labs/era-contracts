@@ -82,6 +82,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 
+    /// @notice The current gas per pubdata byte
+    uint256 public gasPerPubdataByte;
+
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.
     function setTxOrigin(address _newOrigin) external onlyCallFromBootloader {
