@@ -14,7 +14,7 @@ object "Sekp256r1" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @notice Group order of secp256r1, see https://eips.ethereum.org/EIPS/eip-7212
+            /// @notice Subgroup order of secp256r1, see https://github.com/ethereum/RIPs/blob/master/RIPS/rip-7212.md
             function SECP256K1_GROUP_SIZE() -> ret {
                 ret := 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
             }
