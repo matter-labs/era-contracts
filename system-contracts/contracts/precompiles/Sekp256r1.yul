@@ -66,7 +66,7 @@ object "Sekp256r1" {
             let x := calldataload(96)
             let y := calldataload(128)
 
-            // Validate the input by the yellow paper rules (Appendix E. Precompiled contracts)
+            // Validate the input by the RIP-7212 specification (Required Checks in Verification)
             let sIsInvalid := or(eq(s, 0), gt(s, sub(SECP256K1_GROUP_SIZE(), 1)))
             let rIsInvalid := or(eq(r, 0), gt(r, sub(SECP256K1_GROUP_SIZE(), 1)))
 
