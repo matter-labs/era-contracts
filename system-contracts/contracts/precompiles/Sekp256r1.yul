@@ -1,7 +1,7 @@
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The contract used to emulate EIP7212's P256VERIFY precompile.
+ * @notice The contract used to emulate RIP-7212's P256VERIFY precompile.
  * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
  */
 object "Sekp256r1" {
