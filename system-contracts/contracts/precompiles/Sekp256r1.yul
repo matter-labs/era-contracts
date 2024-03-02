@@ -1,7 +1,7 @@
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The contract used to emulate EIP7212's P256VERIFY precompile.
+ * @notice The contract used to emulate RIP-7212's P256VERIFY precompile.
  * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
  */
 object "Sekp256r1" {
@@ -60,8 +60,7 @@ object "Sekp256r1" {
             let x := calldataload(96)
             let y := calldataload(128)
 
-            // No need for us to check whether the point is on curve as it is done in the internal precompile implementation.
-            // Also, no need to check the validity of `r` and `s` as it is done in the internal precompile implementation.
+            // The validity of the input as it is done in the internal precompile implementation.
 
             // Store the data in memory, so the sekp256r1 circuit will read it 
             mstore(0, digest)

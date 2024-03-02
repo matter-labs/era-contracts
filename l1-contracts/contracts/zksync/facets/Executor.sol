@@ -433,13 +433,14 @@ contract ExecutorFacet is Base, IExecutor {
     }
 
     function _batchMetaParameters() internal view returns (bytes memory) {
+        bytes32 l2DefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
         return
             abi.encodePacked(
                 s.zkPorterIsAvailable,
                 s.l2BootloaderBytecodeHash,
-                s.l2DefaultAccountBytecodeHash,
+                l2DefaultAccountBytecodeHash,
                 // VM 1.5.0 requires us to pass the EVM simulator code hash. For now it is the same as the default account.
-                s.l2DefaultAccountBytecodeHash
+                l2DefaultAccountBytecodeHash
             );
     }
 
