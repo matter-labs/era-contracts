@@ -89,7 +89,6 @@ const params = {
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
-  PADDED_FORCE_DEPLOY_KECCAK256_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployKeccak256"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 120kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 120k / 5 = 24k. This means that they will have
   // accoomdate 6528000 bytes of calldata for the uncompressed state diffs. Adding 120k on top leaves us with

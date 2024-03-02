@@ -236,24 +236,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         );
     }
 
-    /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. This function and `Bootloader:upgradeKeccakIfNeeded`
-    /// are to be removed once the upgrade is complete. Unlike a normal forced deployment, it does not update account information as it requires
-    /// updating a mapping, and so requires Keccak256 precompile to work already.
-    /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256
-    /// precompile.
-    function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
-        _ensureBytecodeIsKnown(_keccak256BytecodeHash);
-
-        _constructContract(
-            msg.sender,
-            address(KECCAK256_SYSTEM_CONTRACT),
-            _keccak256BytecodeHash,
-            msg.data[0:0],
-            false,
-            false
-        );
-    }
-
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     /// @dev We do not require `onlySystemCall` here, since the method is accessible only
     /// by `FORCE_DEPLOYER`.

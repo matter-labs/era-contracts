@@ -1,12 +1,8 @@
-import { hashBytecode } from "zksync-web3/build/src/utils";
-import type { CodeOracleTest, TransferTest, TransferTestRecipient, TransferTestReentrantRecipient } from "../typechain";
-import { CodeOracleTestFactory, KeccakTestFactory } from "../typechain";
+import type { TransferTest, TransferTestRecipient, TransferTestReentrantRecipient } from "../typechain";
 import { REAL_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
-import { getWallets, loadArtifact, publishBytecode, setCode, getCode, deployContract } from "./shared/utils";
-import { ethers, network } from "hardhat";
-import { readYulBytecode } from "../scripts/utils";
-import { Language } from "../scripts/constants";
-import type { BytesLike, Contract } from "ethers";
+import { getWallets, loadArtifact, setCode, getCode, deployContract } from "./shared/utils";
+import { ethers } from "hardhat";
+import type { Contract } from "ethers";
 import { expect } from "chai";
 import * as hre from "hardhat";
 import { prepareEnvironment } from "./shared/mocks";

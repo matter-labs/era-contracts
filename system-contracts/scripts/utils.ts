@@ -8,7 +8,6 @@ import { hashBytecode } from "zksync-web3/build/src/utils";
 import type { YulContractDescrption, ZasmContractDescrption } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
-import { getZksolcUrl, saltFromUrl } from "@matterlabs/hardhat-zksync-solc";
 import path from "path";
 import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
@@ -196,7 +195,7 @@ export async function filterPublishedFactoryDeps(
 export async function compilerLocation(compilerVersion: string, isCompilerPreRelease: boolean): Promise<string> {
   const compilersCache = await getCompilersDir();
 
-  let salt = "";
+  const salt = "";
 
   if (isCompilerPreRelease) {
     const url = hre.config.zksolc.settings.compilerPath;

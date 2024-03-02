@@ -1,17 +1,12 @@
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import type { CodeOracleTest } from "../typechain";
-import { CodeOracleTestFactory, KeccakTestFactory } from "../typechain";
 import { REAL_CODE_ORACLE_CONTRACT_ADDRESS } from "./shared/constants";
-import { getWallets, loadArtifact, publishBytecode, setCode, getCode, deployContract } from "./shared/utils";
-import { ethers, network } from "hardhat";
+import { publishBytecode, setCode, getCode, deployContract } from "./shared/utils";
+import { ethers } from "hardhat";
 import { readYulBytecode } from "../scripts/utils";
 import { Language } from "../scripts/constants";
-import type { BytesLike } from "ethers";
 import { expect } from "chai";
-import * as hre from "hardhat";
 import { prepareEnvironment } from "./shared/mocks";
-
-import { ec as EC } from "elliptic";
 
 describe("Sekp256r1 tests", function () {
   let oldCodeOracleCode: string;

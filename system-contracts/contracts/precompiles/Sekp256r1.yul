@@ -14,16 +14,6 @@ object "Sekp256r1" {
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @notice Group order of secp256r1, see https://eips.ethereum.org/EIPS/eip-7212
-            function SECP256K1_GROUP_SIZE() -> ret {
-                ret := 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
-            }
-
-            /// @notice Curve prime field modulus, see https://eips.ethereum.org/EIPS/eip-7212
-            function PRIME_FIELD_MODULUS() -> ret {
-                ret := 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff
-            }
-
             /// @dev The gas cost of processing sekp256r1 circuit precompile.
             function SEKP256_VERIFY_GAS_COST() -> ret {
                 ret := 12000
@@ -60,21 +50,18 @@ object "Sekp256r1" {
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
 
+            if iszero(eq(calldatasize(), 160)) {
+                return(0, 0)
+            }
+
             let digest := calldataload(0)
             let r := calldataload(32)
             let s := calldataload(64)
             let x := calldataload(96)
             let y := calldataload(128)
 
-            // Validate the input by the yellow paper rules (Appendix E. Precompiled contracts)
-            let sIsInvalid := or(eq(s, 0), gt(s, sub(SECP256K1_GROUP_SIZE(), 1)))
-            let rIsInvalid := or(eq(r, 0), gt(r, sub(SECP256K1_GROUP_SIZE(), 1)))
-
-            if or(sIsInvalid, rIsInvalid) {
-                return(0, 0)
-            }
-
-            // No need for us to check whether the point is on curve as it is done in the internal precompile implementation
+            // No need for us to check whether the point is on curve as it is done in the internal precompile implementation.
+            // Also, no need to check the validity of `r` and `s` as it is done in the internal precompile implementation.
 
             // Store the data in memory, so the sekp256r1 circuit will read it 
             mstore(0, digest)
@@ -101,6 +88,13 @@ object "Sekp256r1" {
                 return(0, 0)
             }
             default {
+                // The circuits might write `0` to the memory, while providing `internalSuccess` as `1`, so
+                // we double check here.
+                let writtenValue := mload(32)
+                if eq(writtenValue, 0) {
+                    return(0, 0)
+                }
+
                 return(32, 32)
             }
         }

@@ -25,7 +25,7 @@ contract GasBoundCaller {
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
     /// that if a subcall is not trusted, it can consume lots of pubdata in the process. This function ensures that
     /// no more than  `_maxTotalGas` will be allowed to be spent by the call. To be sure, this function uses some margin
-    /// (`BOUND_CALL_OVERHEAD`) to ensure that the call will not exceed the limit, so it may actually spend a bit less than 
+    /// (`BOUND_CALL_OVERHEAD`) to ensure that the call will not exceed the limit, so it may actually spend a bit less than
     /// `_maxTotalGas` in the end.
     /// @dev The entire `gas` passed to this function could be used, regardless
     /// of the `_maxTotalGas` parameter. In other words, `max(gas(), _maxTotalGas)` is the maximum amount of gas that can be spent by this function.
@@ -33,20 +33,16 @@ contract GasBoundCaller {
     /// @param _to The address of the contract to call.
     /// @param _maxTotalGas The maximum amount of gas that can be spent by the call.
     /// @param _data The calldata for the call.
-    function gasBoundCall(
-        address _to,
-        uint256 _maxTotalGas,
-        bytes calldata _data
-    ) external payable {
+    function gasBoundCall(address _to, uint256 _maxTotalGas, bytes calldata _data) external payable {
         // We expect that the `_maxTotalGas` at least includes the `gas` required for the call.
         // This require is more of a safety protection for the users that call this function with incorrect parameters.
         //
         // Ultimately, the entire `gas` sent to this call can be spent on compute regardless of the `_maxTotalGas` parameter.
         require(_maxTotalGas >= gasleft(), "Gas limit is too low");
 
-        // At the start of the execution we deduce how much gas be spent on things that will be 
-        // paid for later on by the transaction. 
-        // The `expectedForCompute` variable is an upper bound of how much this contract can spend on compute and 
+        // At the start of the execution we deduce how much gas be spent on things that will be
+        // paid for later on by the transaction.
+        // The `expectedForCompute` variable is an upper bound of how much this contract can spend on compute and
         // MUST be higher or equal to the `gas` passed into the call.
         uint256 expectedForCompute = gasleft() + CALL_ENTRY_OVERHEAD;
 
@@ -57,7 +53,7 @@ contract GasBoundCaller {
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
-        // Since the revert is propagated, the pubdata publushed wouldn't change and so no 
+        // Since the revert is propagated, the pubdata publushed wouldn't change and so no
         // other checks are needed.
         bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
 
@@ -71,7 +67,7 @@ contract GasBoundCaller {
 
         uint256 pubdataPrice = SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
-        // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so 
+        // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
         uint256 pubdataCost = pubdataPrice * uint256(pubdataSpent);
 
@@ -83,7 +79,7 @@ contract GasBoundCaller {
 
         assembly {
             // We just relay the return data from the call.
-            return (add(returnData, 0x20), mload(returnData))
+            return(add(returnData, 0x20), mload(returnData))
         }
     }
 }

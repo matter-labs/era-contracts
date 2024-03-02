@@ -1,18 +1,9 @@
-import { hashBytecode } from "zksync-web3/build/src/utils";
-import type { KeccakTest } from "../typechain";
-import { KeccakTestFactory } from "../typechain";
-import {
-  REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-  REAL_KECCAK256_CONTRACT_ADDRESS,
-  REAL_SEKP256_R1_CONTRACT_ADDRESS,
-} from "./shared/constants";
-import { getWallets, loadArtifact, publishBytecode, setCode, getCode } from "./shared/utils";
-import { ethers, network } from "hardhat";
+import { REAL_SEKP256_R1_CONTRACT_ADDRESS } from "./shared/constants";
+import { getWallets, setCode, getCode } from "./shared/utils";
+import { ethers } from "hardhat";
 import { readYulBytecode } from "../scripts/utils";
 import { Language } from "../scripts/constants";
-import type { BytesLike } from "ethers";
 import { expect } from "chai";
-import * as hre from "hardhat";
 import { prepareEnvironment } from "./shared/mocks";
 
 import { ec as EC } from "elliptic";
@@ -130,7 +121,7 @@ describe("Sekp256r1 tests", function () {
     }
   });
 
-  it("Should return 0 when params are valid, but signature is not correct", async () => {
+  it("Should reject when params are valid, but signature is not correct", async () => {
     for (const param of ["digest", "r", "s"]) {
       const result = await getWallets()[0].call({
         to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
@@ -138,8 +129,18 @@ describe("Sekp256r1 tests", function () {
         data: compileSignature({ [param]: ONE }),
       });
 
-      expect(result).to.eq(ethers.constants.HashZero);
+      expect(result).to.eq("0x");
     }
+  });
+
+  it("Should reject when calldata is too long", async () => {
+    const result = await getWallets()[0].call({
+      to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+      // The signature is valid and yet the input is too long
+      data: compileSignature({}) + '00',
+    });
+
+    expect(result).to.eq("0x");
   });
 
   after(async () => {
