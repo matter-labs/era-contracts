@@ -104,7 +104,6 @@ interface IGetters is IZkSyncStateTransitionBase {
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool);
 
-
     /// @return the baseTokenGasPriceMultiplierNominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
     function baseTokenGasPriceMultiplierNominator() external view returns (uint128);
 

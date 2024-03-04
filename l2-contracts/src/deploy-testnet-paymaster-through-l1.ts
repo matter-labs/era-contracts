@@ -9,7 +9,10 @@ import * as hre from "hardhat";
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("deploy-testnet-paymaster-through-l1").description("Deploys the testnet paymaster to L2");
+  program
+    .version("0.1.0")
+    .name("deploy-testnet-paymaster-through-l1")
+    .description("Deploys the testnet paymaster to L2");
 
   program
     .option("--private-key <private-key>")

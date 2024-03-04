@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import type { BigNumberish, BytesLike } from "ethers";
+import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
@@ -19,7 +19,8 @@ import {
 import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from "../../src.ts/deploy-process";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
-import { ethTestConfig, ProposedUpgrade, VerifierParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import type { ProposedUpgrade, VerifierParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
@@ -807,8 +808,6 @@ function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): St
   };
 }
 
-
-
 function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
   return {
     txType: SYSTEM_UPGRADE_TX_TYPE,
@@ -831,8 +830,6 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
   };
 }
 
-
-
 function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
   return {
     recursionNodeLevelVkHash: ethers.constants.HashZero,
@@ -841,8 +838,6 @@ function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
     ...params,
   };
 }
-
-
 
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
 

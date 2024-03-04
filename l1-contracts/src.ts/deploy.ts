@@ -15,7 +15,7 @@ import {
   getNumberFromEnv,
   PubdataPricingMode,
   hashL2Bytecode,
-  DIAMOND_CUT_DATA_ABI_STRING
+  DIAMOND_CUT_DATA_ABI_STRING,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -416,15 +416,16 @@ export class Deployer {
     }
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const calldata = alreadyInitialized ? 
-      proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
-        this.addresses.Bridges.ERC20BridgeProxy,
-        this.addresses.Bridges.ERC20BridgeImplementation
-      ]) : proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
-        this.addresses.Bridges.ERC20BridgeProxy,
-        this.addresses.Bridges.ERC20BridgeImplementation,
-        l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
-      ]);
+    const calldata = alreadyInitialized
+      ? proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+          this.addresses.Bridges.ERC20BridgeProxy,
+          this.addresses.Bridges.ERC20BridgeImplementation,
+        ])
+      : proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
+          this.addresses.Bridges.ERC20BridgeProxy,
+          this.addresses.Bridges.ERC20BridgeImplementation,
+          l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
+        ]);
 
     await this.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
     if (this.verbose) {
@@ -641,12 +642,7 @@ export class Deployer {
     const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode(
-      [
-        DIAMOND_CUT_DATA_ABI_STRING,
-      ],
-      [diamondCutData]
-    );
+    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const tx = await bridgehub.createNewChain(
       inputChainId,
