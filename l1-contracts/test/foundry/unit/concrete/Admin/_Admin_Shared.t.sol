@@ -10,6 +10,8 @@ import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
 import {Base} from "solpp/zksync/facets/Base.sol";
 import {Governance} from "solpp/governance/Governance.sol";
 import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
+import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
+import {Utils} from "../Utils/Utils.sol";
 
 contract GettersMock is Base {
     function getFeeParams() public returns (FeeParams memory) {
@@ -25,6 +27,7 @@ contract AdminTest is Test {
     AdminFacet internal adminFacet;
     AdminFacet internal proxyAsAdmin;
     GettersMock internal proxyAsGettersMock;
+    GettersFacet internal proxyAsGetters;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory dcSelectors = new bytes4[](11);
@@ -85,10 +88,11 @@ contract AdminTest is Test {
 
         adminFacet = new AdminFacet();
         GettersMock gettersMock = new GettersMock();
+        GettersFacet getters = new GettersFacet();
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(adminFacet),
             action: Diamond.Action.Add,
@@ -101,7 +105,12 @@ contract AdminTest is Test {
             isFreezable: false,
             selectors: getGettersMockSelectors()
         });
-
+        facetCuts[2] = Diamond.FacetCut({
+            facet: address(getters),
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getGettersSelectors()
+        });
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(diamondInit),
@@ -111,5 +120,6 @@ contract AdminTest is Test {
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGettersMock = GettersMock(address(diamondProxy));
+        proxyAsGetters = GettersFacet(address(diamondProxy));
     }
 }

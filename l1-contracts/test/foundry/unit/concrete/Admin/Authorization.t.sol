@@ -31,6 +31,24 @@ contract AuthorizationTest is AdminTest {
         require(currentFeeParamsHash == correctNewFeeParamsHash, "Fee params were not changed correctly");
     }
 
+    function test_changePubdataPricingMode() public {
+        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Rollup, "Initial pubdata pricing mode is not Rollup");
+        
+        FeeParams memory newParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Validium,
+            batchOverheadL1Gas: 1_000,
+            maxPubdataPerBatch: 1_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99,
+            minimalL2GasPrice: 500_000_000
+        });
+        vm.prank(governor);
+        proxyAsAdmin.changeFeeParams(newParams);
+
+        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Rollup, "Pubdata pricing mode was not changed correctly");
+
+    }
+
     function test_changeFeeParams_RevertWhen_PriorityTxMaxPubdataHigherThanMaxPubdataPerBatch() public {
         FeeParams memory newParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
