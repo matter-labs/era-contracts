@@ -377,6 +377,35 @@ contract ExperimentalBridgeTest is Test {
         ) == randomResultantBool);
     }
 
+    function test_l2TransactionBaseCost(
+        uint256 mockChainId,
+        uint256 mockGasPrice,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        uint256 mockL2TxnCost
+    ) public {
+        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(
+                mockChainContract.l2TransactionBaseCost.selector,
+                mockGasPrice,
+                mockL2GasLimit,
+                mockL2GasPerPubdataByteLimit
+            ),
+            abi.encode(mockL2TxnCost)
+        );
+
+        assertTrue(bridgeHub.l2TransactionBaseCost(
+            mockChainId,
+            mockGasPrice,
+            mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit
+        ) == mockL2TxnCost);
+        vm.clearMockedCalls();
+    }
+
 /////////////////////////////////////////////////////////
 // INTERNAL UTILITY FUNCTIONS
 /////////////////////////////////////////////////////////
