@@ -16,7 +16,7 @@ import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol"
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS} from "solpp/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "solpp/common/Config.sol";
 
 //import {UtilsFacet} from "l1-contracts/test/foundry/unit/concrete/Utils/UtilsFacet.sol";
 
@@ -50,6 +50,13 @@ contract ExperimentalBridgeTest is Test {
         vm.expectRevert(bytes("1B"));
         bridgeHub.initialize(bridgeOwner);
 
+        vm.store(address(mockChainContract), 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4, bytes32(uint256(1)));  
+        bytes32 bridgehubLocation = bytes32(uint256(36));
+        vm.store(address(mockChainContract), bridgehubLocation, bytes32(uint256(uint160(address(bridgeHub)))));
+        bytes32 baseTokenGasPriceNominatorLocation = bytes32(uint256(40));
+        vm.store(address(mockChainContract), baseTokenGasPriceNominatorLocation, bytes32(uint256(1)));
+        bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
+        vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
         // The ownership can only be transfered by the current owner to a new owner via the two-step approach
         
         // Default owner calls transferOwnership
@@ -589,7 +596,7 @@ contract ExperimentalBridgeTest is Test {
         l2TxnReqDirect.l2Value = mockL2Value;
         l2TxnReqDirect.l2Calldata = mockL2Calldata;
         l2TxnReqDirect.l2GasLimit = mockL2GasLimit;
-        l2TxnReqDirect.l2GasPerPubdataByteLimit = mockL2GasPerPubdataByteLimit;
+        l2TxnReqDirect.l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         l2TxnReqDirect.factoryDeps = mockFactoryDeps;
         l2TxnReqDirect.refundRecipient = mockRefundRecipient;
 
