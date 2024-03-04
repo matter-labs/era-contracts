@@ -9,6 +9,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
+import {DummyStateTransition} from "solpp/dev-contracts/test/DummyStateTransition.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
 import {L2Message, L2Log, TxStatus} from "solpp/common/Messaging.sol";
@@ -18,12 +19,14 @@ contract ExperimentalBridgeTest is Test {
     Bridgehub bridgeHub;
     address public bridgeOwner;
     DummyStateTransitionManagerWBH mockSTM;
+    DummyStateTransition mockChainContract;
     TestnetERC20Token testToken;
 
     function setUp() public {
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
+        mockChainContract = new DummyStateTransition();
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
 
         // test if the ownership of the bridgeHub is set correctly or not
@@ -241,6 +244,47 @@ contract ExperimentalBridgeTest is Test {
 */
 
     function test_proveL2MessageInclusion(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) public {
+        mockChainId = bound(mockChainId, 2, type(uint48).max);
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        
+        mockSTM.setStateTransition(mockChainId, address(mockChainContract));
+
+        // We need to set the stateTransitionManager of the mockChainId to mockSTM 
+        // There is no function to do that in the bridgeHub
+        // So, perhaps we will have to mockCall the getState
+
+
+        assertTrue(!(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract)));
+
+
+        // L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
+
+        // vm.mockCall(
+        //     address(mockChainContract),
+        //     abi.encodeWithSelector(
+        //         mockChainContract.proveL2MessageInclusion.selector,
+        //         mockBatchNumber,
+        //         mockIndex,
+        //         l2Message,
+        //         mockProof 
+        //     ),
+        //     abi.encode(true)
+        // );
+
+        // assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
+        // vm.clearMockedCalls();
+    }
+
+    function test_proveL2MessageInclusion_old(
         uint256 mockChainId,
         uint256 mockBatchNumber,
         uint256 mockIndex,
