@@ -220,7 +220,6 @@ contract MailboxFacet is Base, IMailbox {
             _l2GasLimit,
             _l2GasPerPubdataByteLimit,
             _factoryDeps,
-            false,
             _refundRecipient
         );
     }
@@ -233,7 +232,6 @@ contract MailboxFacet is Base, IMailbox {
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
-        bool _isFree,
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
@@ -246,7 +244,7 @@ contract MailboxFacet is Base, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
         {
-            params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _l2GasPerPubdataByteLimit);
+            params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, _l2GasPerPubdataByteLimit);
             uint256 baseCost = params.l2GasPrice * _l2GasLimit;
             require(msg.value >= baseCost + _l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
         }
