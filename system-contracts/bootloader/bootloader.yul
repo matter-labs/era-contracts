@@ -1665,7 +1665,7 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("compressor call failed", 0)
                     debugReturndata()
-                    nearCallPanic()
+                    assertionError("Compressor failed")
                 }
 
                 let returnedBytecodeHash := mload(0)
