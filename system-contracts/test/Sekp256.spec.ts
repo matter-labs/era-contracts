@@ -1,4 +1,4 @@
-import { REAL_SEKP256_R1_CONTRACT_ADDRESS } from "./shared/constants";
+import { REAL_P256VERIFY_CONTRACT_ADDRESS } from "./shared/constants";
 import { getWallets, setCode, getCode } from "./shared/utils";
 import { ethers } from "hardhat";
 import { readYulBytecode } from "../scripts/utils";
@@ -8,10 +8,10 @@ import { prepareEnvironment } from "./shared/mocks";
 
 import { ec as EC } from "elliptic";
 
-describe("Sekp256r1 tests", function () {
+describe("P256Verify tests", function () {
   const ONE = "0x0000000000000000000000000000000000000000000000000000000000000001";
 
-  let oldSekp256Code: string;
+  let oldP256VerifyCode: string;
 
   let correctDigest: string;
   let correctX: string;
@@ -36,16 +36,16 @@ describe("Sekp256r1 tests", function () {
   before(async () => {
     await prepareEnvironment();
 
-    oldSekp256Code = await getCode(REAL_SEKP256_R1_CONTRACT_ADDRESS);
+    oldP256VerifyCode = await getCode(REAL_P256VERIFY_CONTRACT_ADDRESS);
 
-    const testedSekp256R1Code = readYulBytecode({
-      codeName: "Sekp256r1",
+    const testedP256VerifyCode = readYulBytecode({
+      codeName: "P256Verify",
       path: "precompiles",
       lang: Language.Yul,
       address: ethers.constants.AddressZero,
     });
 
-    await setCode(REAL_SEKP256_R1_CONTRACT_ADDRESS, testedSekp256R1Code);
+    await setCode(REAL_P256VERIFY_CONTRACT_ADDRESS, testedP256VerifyCode);
 
     const ec = new EC("p256");
 
@@ -69,7 +69,7 @@ describe("Sekp256r1 tests", function () {
 
   it("Should correctly verify valid signature", async () => {
     const result = await getWallets()[0].call({
-      to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+      to: REAL_P256VERIFY_CONTRACT_ADDRESS,
       data: compileSignature({}),
     });
 
@@ -78,7 +78,7 @@ describe("Sekp256r1 tests", function () {
 
   it("Should reject invalid input", async () => {
     const result = await getWallets()[0].call({
-      to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+      to: REAL_P256VERIFY_CONTRACT_ADDRESS,
       data: "0xdeadbeef",
     });
 
@@ -89,7 +89,7 @@ describe("Sekp256r1 tests", function () {
     // Note that digest : 0 is a valid input
     for (const param of ["x", "y", "r", "s"]) {
       const result = await getWallets()[0].call({
-        to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+        to: REAL_P256VERIFY_CONTRACT_ADDRESS,
         data: compileSignature({ [param]: ethers.constants.HashZero }),
       });
 
@@ -101,7 +101,7 @@ describe("Sekp256r1 tests", function () {
     const groupSize = "0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
     for (const param of ["r", "s"]) {
       const result = await getWallets()[0].call({
-        to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+        to: REAL_P256VERIFY_CONTRACT_ADDRESS,
         data: compileSignature({ [param]: groupSize }),
       });
 
@@ -112,7 +112,7 @@ describe("Sekp256r1 tests", function () {
   it("Should reject bad x/y", async () => {
     for (const param of ["x", "y"]) {
       const result = await getWallets()[0].call({
-        to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+        to: REAL_P256VERIFY_CONTRACT_ADDRESS,
         // This will ensure that (x,y) is not a valid point on the curve
         data: compileSignature({ [param]: ONE }),
       });
@@ -124,7 +124,7 @@ describe("Sekp256r1 tests", function () {
   it("Should reject when params are valid, but signature is not correct", async () => {
     for (const param of ["digest", "r", "s"]) {
       const result = await getWallets()[0].call({
-        to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+        to: REAL_P256VERIFY_CONTRACT_ADDRESS,
         // "1" is a valid number, but it will lead to invalid signature
         data: compileSignature({ [param]: ONE }),
       });
@@ -135,7 +135,7 @@ describe("Sekp256r1 tests", function () {
 
   it("Should reject when calldata is too long", async () => {
     const result = await getWallets()[0].call({
-      to: REAL_SEKP256_R1_CONTRACT_ADDRESS,
+      to: REAL_P256VERIFY_CONTRACT_ADDRESS,
       // The signature is valid and yet the input is too long
       data: compileSignature({}) + '00',
     });
@@ -144,6 +144,6 @@ describe("Sekp256r1 tests", function () {
   });
 
   after(async () => {
-    await setCode(REAL_SEKP256_R1_CONTRACT_ADDRESS, oldSekp256Code);
+    await setCode(REAL_P256VERIFY_CONTRACT_ADDRESS, oldP256VerifyCode);
   });
 });

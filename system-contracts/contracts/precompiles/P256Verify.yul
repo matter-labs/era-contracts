@@ -1,21 +1,21 @@
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The contract used to emulate RIP-7212's P256VERIFY precompile.
+ * @notice The contract that emulates RIP-7212's P256VERIFY precompile.
  * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
  */
-object "Sekp256r1" {
+object "P256Verify" {
     code {
         return(0, 0)
     }
-    object "Sekp256r1_deployed" {
+    object "P256Verify_deployed" {
         code {
             ////////////////////////////////////////////////////////////////
             //                      CONSTANTS
             ////////////////////////////////////////////////////////////////
 
-            /// @dev The gas cost of processing sekp256r1 circuit precompile.
-            function SEKP256_VERIFY_GAS_COST() -> ret {
+            /// @dev The gas cost of processing V circuit precompile.
+            function P256_VERIFY_GAS_COST() -> ret {
                 ret := 12000
             }
 
@@ -62,7 +62,7 @@ object "Sekp256r1" {
 
             // The validity of the input as it is done in the internal precompile implementation.
 
-            // Store the data in memory, so the sekp256r1 circuit will read it 
+            // Store the data in memory, so the secp256r1 circuit will read it 
             mstore(0, digest)
             mstore(32, r)
             mstore(64, s)
@@ -74,11 +74,11 @@ object "Sekp256r1" {
                 5, // input length in words (the signed digest, r, s, x, y)
                 0, // output offset in words
                 1, // output length in words (success)
-                0  // No special meaning, sekp256r1 circuit doesn't check this value
+                0  // No special meaning, secp256r1 circuit doesn't check this value
             )
-            let gasToPay := SEKP256_VERIFY_GAS_COST()
+            let gasToPay := P256_VERIFY_GAS_COST()
 
-            // Check whether the call is successfully handled by the sekp256r1 circuit
+            // Check whether the call is successfully handled by the secp256r1 circuit
             let success := precompileCall(precompileParams, gasToPay)
             let internalSuccess := mload(0)
 

@@ -149,9 +149,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
-  sekp256r1: {
+  p256Verify: {
     address: "0x0000000000000000000000000000000000000100",
-    codeName: "Sekp256r1",
+    codeName: "P256Verify",
     lang: Language.Yul,
     path: "precompiles",
   },
