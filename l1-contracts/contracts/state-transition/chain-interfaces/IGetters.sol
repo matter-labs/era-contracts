@@ -106,10 +106,10 @@ interface IGetters is IZkSyncStateTransitionBase {
 
 
     /// @return the baseTokenGasPriceMultiplierNominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
-    function baseTokenGasPriceMultiplierNominator() external view returns (uin128);
+    function baseTokenGasPriceMultiplierNominator() external view returns (uint128);
 
     /// @return the baseTokenGasPriceMultiplierDenominator, used to compare the baseTokenPrice to ether for L1->L2 transactions
-    function baseTokenGasPriceMultiplierDenominator() external view returns (uin128);
+    function baseTokenGasPriceMultiplierDenominator() external view returns (uint128);
 
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE

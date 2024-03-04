@@ -63,13 +63,13 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function baseTokenGasPriceMultiplierNominator() external view returns (uin128) {
-        return baseTokenGasPriceMultiplierNominator;
+    function baseTokenGasPriceMultiplierNominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierNominator;
     }
 
     /// @inheritdoc IGetters
-    function baseTokenGasPriceMultiplierDenominator() external view returns (uin128) {
-        return baseTokenGasPriceMultiplierDenominator;
+    function baseTokenGasPriceMultiplierDenominator() external view returns (uint128) {
+        return s.baseTokenGasPriceMultiplierDenominator;
     }
 
     /// @inheritdoc IGetters
