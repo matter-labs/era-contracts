@@ -1,3 +1,4 @@
+// hardhat import should be the first import in the file
 import * as hre from "hardhat";
 
 // We need to import it in order to access correct typing for Hardhat config

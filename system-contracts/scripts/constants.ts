@@ -144,7 +144,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     path: "precompiles",
   },
   codeOracle: {
-    address: "0x0000000000000000000000000000000000008011",
+    address: "0x0000000000000000000000000000000000008012",
     codeName: "CodeOracle",
     lang: Language.Yul,
     path: "precompiles",
@@ -154,6 +154,11 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "P256Verify",
     lang: Language.Yul,
     path: "precompiles",
+  },
+  pubdataChunkPublisher: {
+    address: "0x0000000000000000000000000000000000008011",
+    codeName: "PubdataChunkPublisher",
+    lang: Language.Solidity,
   },
 } as const;
 

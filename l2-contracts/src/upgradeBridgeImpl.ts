@@ -1,4 +1,6 @@
+// hardhat import should be the first import in the file
 import * as hre from "hardhat";
+
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
