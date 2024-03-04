@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-// solhint-disable max-line-length
-
 import {Vm} from "forge-std/Test.sol";
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IExecutor.sol";
 
-// solhint-enable max-line-length
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "solpp/common/Config.sol";
+import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {L2_BOOTLOADER_ADDRESS} from "solpp/common/L2ContractAddresses.sol";
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {
@@ -18,13 +19,12 @@ contract ExecutingTest is ExecutorTest {
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils
-            .constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-            );
+        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 
@@ -101,22 +101,22 @@ contract ExecutingTest is ExecutorTest {
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
-        correctL2Logs[uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             chainedPriorityTxHash
         );
-        correctL2Logs[uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32(uint256(1))
         );
 
@@ -158,22 +158,22 @@ contract ExecutingTest is ExecutorTest {
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs();
-        correctL2Logs[uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(Utils.SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
-        correctL2Logs[uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             chainedPriorityTxHash
         );
-        correctL2Logs[uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
+        correctL2Logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(Utils.SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32(uint256(1))
         );
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;

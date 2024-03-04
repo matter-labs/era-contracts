@@ -1,14 +1,22 @@
 import { artifacts } from "hardhat";
 
 import { Interface } from "ethers/lib/utils";
+import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy";
-import { IZkSyncFactory } from "../../l1-contracts/typechain/IZkSyncFactory";
+import { ADDRESS_ONE, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
+import { web3Provider } from "../../l1-contracts/scripts/utils";
 
 import type { BigNumber, BytesLike, Wallet } from "ethers";
 import { ethers } from "ethers";
 import type { Provider } from "zksync-web3";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, sleep } from "zksync-web3/build/src/utils";
+import { IERC20Factory } from "zksync-web3/build/typechain";
+
+import * as fs from "fs";
+import * as path from "path";
+
+export const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
@@ -18,8 +26,20 @@ const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate
 const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 
+export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+
+export const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+}
+
+export function unapplyL1ToL2Alias(address: string): string {
+  // We still add ADDRESS_MODULO to avoid negative numbers
+  return ethers.utils.hexlify(
+    ethers.BigNumber.from(address).sub(L1_TO_L2_ALIAS_OFFSET).add(ADDRESS_MODULO).mod(ADDRESS_MODULO)
+  );
 }
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
@@ -72,40 +92,53 @@ export function computeL2Create2Address(
 }
 
 export async function create2DeployFromL1(
+  chainId: ethers.BigNumberish,
   wallet: ethers.Wallet,
   bytecode: ethers.BytesLike,
   constructor: ethers.BytesLike,
   create2Salt: ethers.BytesLike,
   l2GasLimit: ethers.BigNumberish,
-  gasPrice?: ethers.BigNumberish
+  gasPrice?: ethers.BigNumberish,
+  extraFactoryDeps?: ethers.BytesLike[]
 ) {
-  const zkSyncAddress = deployedAddressesFromEnv().ZkSync.DiamondProxy;
-  const zkSync = IZkSyncFactory.connect(zkSyncAddress, wallet);
+  const bridgehubAddress = deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
+  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
 
   const deployerSystemContracts = new Interface(artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
-  gasPrice ??= await zkSync.provider.getGasPrice();
-  const expectedCost = await zkSync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-
-  return await zkSync.requestL2Transaction(
-    DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    0,
-    calldata,
+  gasPrice ??= await bridgehub.provider.getGasPrice();
+  const expectedCost = await bridgehub.l2TransactionBaseCost(
+    chainId,
+    gasPrice,
     l2GasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    [bytecode],
-    wallet.address,
-    { value: expectedCost, gasPrice }
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
   );
-}
 
-export function getNumberFromEnv(envName: string): string {
-  const number = process.env[envName];
-  if (!/^([1-9]\d*|0)$/.test(number)) {
-    throw new Error(`Incorrect number format number in ${envName} env: ${number}`);
+  const baseTokenAddress = await bridgehub.baseToken(chainId);
+  const baseTokenBridge = deployedAddressesFromEnv().Bridges.SharedBridgeProxy;
+  const baseToken = IERC20Factory.connect(baseTokenAddress, wallet);
+  const ethIsBaseToken = ADDRESS_ONE == baseTokenAddress;
+
+  if (!ethIsBaseToken) {
+    const tx = await baseToken.approve(baseTokenBridge, expectedCost);
+    await tx.wait();
   }
-  return number;
+  const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
+  return await bridgehub.requestL2TransactionDirect(
+    {
+      chainId,
+      l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+      mintValue: expectedCost,
+      l2Value: 0,
+      l2Calldata: calldata,
+      l2GasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: factoryDeps,
+      refundRecipient: wallet.address,
+    },
+    { value: ethIsBaseToken ? expectedCost : 0, gasPrice }
+  );
 }
 
 export async function awaitPriorityOps(
@@ -131,6 +164,12 @@ export async function awaitPriorityOps(
   }
 }
 
+export type TxInfo = {
+  data: string;
+  target: string;
+  value?: string;
+};
+
 export async function getL1TxInfo(
   deployer: Deployer,
   to: string,
@@ -139,8 +178,8 @@ export async function getL1TxInfo(
   gasPrice: BigNumber,
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
-) {
-  const zksync = deployer.zkSyncContract(ethers.Wallet.createRandom().connect(provider));
+): Promise<TxInfo> {
+  const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
   const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
     to,
     0,
@@ -158,9 +197,8 @@ export async function getL1TxInfo(
   );
 
   return {
-    to: zksync.address,
+    target: zksync.address,
     data: l1Calldata,
     value: neededValue.toString(),
-    gasPrice: gasPrice.toString(),
   };
 }

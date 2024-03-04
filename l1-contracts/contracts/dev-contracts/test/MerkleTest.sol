@@ -2,9 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/libraries/Merkle.sol";
+import "../../state-transition/libraries/Merkle.sol";
 
 contract MerkleTest {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function calculateRoot(
         bytes32[] calldata _path,
         uint256 _index,

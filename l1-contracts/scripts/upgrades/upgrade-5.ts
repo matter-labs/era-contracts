@@ -1,9 +1,13 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import { ethers } from "hardhat";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
@@ -116,10 +120,10 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
-      const zkSyncContract = deployer.zkSyncContract(deployWallet);
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

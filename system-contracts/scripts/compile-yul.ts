@@ -3,7 +3,7 @@ import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
 import { Command } from "commander";
 
-const COMPILER_VERSION = "1.3.14";
+const COMPILER_VERSION = "1.3.18";
 const IS_COMPILER_PRE_RELEASE = false;
 
 export async function compileYul(paths: CompilerPaths, file: string) {
@@ -34,6 +34,7 @@ async function main() {
   program.command("compile-precompiles").action(async () => {
     await compileYulFolder("contracts-preprocessed");
     await compileYulFolder("contracts-preprocessed/precompiles");
+    await compileYulFolder("contracts-preprocessed/precompiles/test-contracts");
   });
 
   await program.parseAsync(process.argv);

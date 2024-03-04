@@ -7,7 +7,7 @@ import "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/IPaymasterFlow.sol";
 import "../interfaces/IContractDeployer.sol";
-import {ETH_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
 import "./RLPEncoder.sol";
 import "./EfficientCall.sol";
 
@@ -21,7 +21,7 @@ uint8 constant EIP_2930_TX_TYPE = 0x01;
 /// @dev The type id of EIP1559 transactions.
 uint8 constant EIP_1559_TX_TYPE = 0x02;
 
-/// @notice Structure used to represent zkSync transaction.
+/// @notice Structure used to represent a zkSync transaction.
 struct Transaction {
     // The type of the transaction.
     uint256 txType;
@@ -90,9 +90,9 @@ library TransactionHelper {
     /// @param _addr The address of the token
     /// @return `true` or `false` based on whether the token is Ether.
     /// @dev This method assumes that address is Ether either if the address is 0 (for convenience)
-    /// or if the address is the address of the L2EthToken system contract.
+    /// or if the address is the address of the L2BaseToken system contract.
     function isEthToken(uint256 _addr) internal pure returns (bool) {
-        return _addr == uint256(uint160(address(ETH_TOKEN_SYSTEM_CONTRACT))) || _addr == 0;
+        return _addr == uint256(uint160(address(BASE_TOKEN_SYSTEM_CONTRACT))) || _addr == 0;
     }
 
     /// @notice Calculate the suggested signed hash of the transaction,

@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-// solhint-disable max-line-length
-
-import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 
-// solhint-enable max-line-length
+import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
+
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondCutTestContract} from "solpp/dev-contracts/test/DiamondCutTestContract.sol";
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
+import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;
@@ -21,26 +22,29 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
-    address private governor;
+    address private admin;
+    address private stateTransitionManager;
     address private randomSigner;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory dcSelectors = new bytes4[](10);
-        dcSelectors[0] = adminFacet.setPendingGovernor.selector;
-        dcSelectors[1] = adminFacet.acceptGovernor.selector;
-        dcSelectors[2] = adminFacet.setPendingAdmin.selector;
-        dcSelectors[3] = adminFacet.acceptAdmin.selector;
-        dcSelectors[4] = adminFacet.setValidator.selector;
-        dcSelectors[5] = adminFacet.setPorterAvailability.selector;
-        dcSelectors[6] = adminFacet.setPriorityTxMaxGasLimit.selector;
-        dcSelectors[7] = adminFacet.executeUpgrade.selector;
-        dcSelectors[8] = adminFacet.freezeDiamond.selector;
-        dcSelectors[9] = adminFacet.unfreezeDiamond.selector;
-        return dcSelectors;
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = adminFacet.setPendingAdmin.selector;
+        selectors[1] = adminFacet.acceptAdmin.selector;
+        selectors[2] = adminFacet.setValidator.selector;
+        selectors[3] = adminFacet.setPorterAvailability.selector;
+        selectors[4] = adminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = adminFacet.changeFeeParams.selector;
+        selectors[6] = adminFacet.setTokenMultiplier.selector;
+        selectors[7] = adminFacet.upgradeChainFromVersion.selector;
+        selectors[8] = adminFacet.executeUpgrade.selector;
+        selectors[9] = adminFacet.freezeDiamond.selector;
+        selectors[10] = adminFacet.unfreezeDiamond.selector;
+        return selectors;
     }
 
     function setUp() public {
-        governor = makeAddr("governor");
+        admin = makeAddr("admin");
+        stateTransitionManager = address(new DummyStateTransitionManager());
         randomSigner = makeAddr("randomSigner");
 
         diamondCutTestContract = new DiamondCutTestContract();
@@ -68,21 +72,39 @@ contract UpgradeLogicTest is DiamondCutTest {
             recursionCircuitsSetVksHash: 0
         });
 
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            0x03752D8252d67f99888E741E3fB642803B29B155,
-            governor,
-            governor,
-            0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            0,
-            0x0000000000000000000000000000000000000000000000000000000000000000,
-            dummyVerifierParams,
-            false,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            0x0100000000000000000000000000000000000000000000000000000000000000,
-            500000, // priority tx max L2 gas limit
-            0
-        );
+        InitializeData memory params = InitializeData({
+            // TODO REVIEW
+            chainId: 1,
+            bridgehub: makeAddr("bridgehub"),
+            stateTransitionManager: stateTransitionManager,
+            protocolVersion: 0,
+            admin: admin,
+            validatorTimelock: makeAddr("validatorTimelock"),
+            baseToken: makeAddr("baseToken"),
+            baseTokenBridge: makeAddr("baseTokenBridge"),
+            storedBatchZero: bytes32(0),
+            // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
+            // genesisIndexRepeatedStorageChanges: 0,
+            // genesisBatchCommitment: bytes32(0),
+            verifier: IVerifier(0x03752D8252d67f99888E741E3fB642803B29B155), // verifier
+            verifierParams: dummyVerifierParams,
+            // zkPorterIsAvailable: false,
+            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+            priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+            // initialProtocolVersion: 0,
+            feeParams: FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            }),
+            blobVersionedHashRetriever: address(0)
+        });
+
+        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -98,12 +120,12 @@ contract UpgradeLogicTest is DiamondCutTest {
     function test_RevertWhen_EmergencyFreezeWhenUnauthurizedGovernor() public {
         vm.startPrank(randomSigner);
 
-        vm.expectRevert(abi.encodePacked("1g"));
+        vm.expectRevert(abi.encodePacked("StateTransition Chain: Only by admin or state transition manager"));
         proxyAsAdmin.freezeDiamond();
     }
 
     function test_RevertWhen_DoubleFreezingByGovernor() public {
-        vm.startPrank(governor);
+        vm.startPrank(admin);
 
         proxyAsAdmin.freezeDiamond();
 
@@ -112,7 +134,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     }
 
     function test_RevertWhen_UnfreezingWhenNotFrozen() public {
-        vm.startPrank(governor);
+        vm.startPrank(admin);
 
         vm.expectRevert(abi.encodePacked("a7"));
         proxyAsAdmin.unfreezeDiamond();
@@ -133,7 +155,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
 
@@ -164,7 +186,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: bytes("")
         });
 
-        vm.startPrank(governor);
+        vm.startPrank(stateTransitionManager);
 
         proxyAsAdmin.executeUpgrade(diamondCutData);
         proxyAsAdmin.executeUpgrade(diamondCutData);

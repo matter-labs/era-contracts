@@ -2,11 +2,16 @@
   "name": "era-contracts",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "l1-contracts",
-    "l2-contracts",
-    "system-contracts"
-  ],
+  "workspaces": {
+    "packages": [
+      "l1-contracts",
+      "l2-contracts",
+      "system-contracts"
+    ],
+    "nohoist": [
+      "**/@openzeppelin/**"
+    ]
+  },
   "devDependencies": {
     "@matterlabs/eslint-config-typescript": "^1.1.2",
     "@matterlabs/prettier-config": "^1.0.3",

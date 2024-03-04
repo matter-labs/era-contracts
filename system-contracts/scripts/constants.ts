@@ -106,9 +106,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "MsgValueSimulator",
     lang: Language.Solidity,
   },
-  l2EthToken: {
+  L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2EthToken",
+    codeName: "L2BaseToken",
     lang: Language.Solidity,
   },
   systemContext: {
@@ -142,6 +142,11 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "Keccak256",
     lang: Language.Yul,
     path: "precompiles",
+  },
+  pubdataChunkPublisher: {
+    address: "0x0000000000000000000000000000000000008011",
+    codeName: "PubdataChunkPublisher",
+    lang: Language.Solidity,
   },
 } as const;
 

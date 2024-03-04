@@ -1,25 +1,27 @@
 import { expect } from "chai";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import { Action, facetCut, diamondCut, getAllSelectors } from "../../src.ts/diamondCut";
+import { Action, diamondCut, facetCut, getAllSelectors } from "../../src.ts/diamondCut";
 import type {
+  AdminFacet,
+  DiamondInit,
   DiamondProxy,
   DiamondProxyTest,
-  AdminFacet,
+  ExecutorFacet,
   GettersFacet,
   MailboxFacet,
-  DiamondInit,
 } from "../../typechain";
 import {
+  AdminFacetFactory,
+  DiamondInitFactory,
   DiamondProxyFactory,
   DiamondProxyTestFactory,
-  AdminFacetFactory,
+  ExecutorFacetFactory,
   GettersFacetFactory,
   MailboxFacetFactory,
-  DiamondInitFactory,
   TestnetERC20TokenFactory,
 } from "../../typechain";
-import { getCallRevertReason } from "./utils";
+import { defaultFeeParams, getCallRevertReason } from "./utils";
 
 describe("Diamond proxy tests", function () {
   let proxy: DiamondProxy;
@@ -27,12 +29,15 @@ describe("Diamond proxy tests", function () {
   let adminFacet: AdminFacet;
   let gettersFacet: GettersFacet;
   let mailboxFacet: MailboxFacet;
+  let executorFacet: ExecutorFacet;
   let diamondProxyTest: DiamondProxyTest;
   let governor: ethers.Signer;
+  let owner: ethers.Signer;
   let governorAddress: string;
+  const chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
 
   before(async () => {
-    [governor] = await hardhat.ethers.getSigners();
+    [owner, governor] = await hardhat.ethers.getSigners();
     governorAddress = await governor.getAddress();
 
     const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
@@ -51,8 +56,13 @@ describe("Diamond proxy tests", function () {
     const mailboxFacetContract = await mailboxFacetFactory.deploy();
     mailboxFacet = MailboxFacetFactory.connect(mailboxFacetContract.address, mailboxFacetContract.signer);
 
+    const executorFactory = await hardhat.ethers.getContractFactory("ExecutorFacet");
+    const executorContract = await executorFactory.deploy();
+    executorFacet = ExecutorFacetFactory.connect(executorContract.address, executorContract.signer);
+
     const diamondProxyTestFactory = await hardhat.ethers.getContractFactory("DiamondProxyTest");
     const diamondProxyTestContract = await diamondProxyTestFactory.deploy();
+
     diamondProxyTest = DiamondProxyTestFactory.connect(
       diamondProxyTestContract.address,
       diamondProxyTestContract.signer
@@ -61,6 +71,7 @@ describe("Diamond proxy tests", function () {
     const facetCuts = [
       facetCut(adminFacet.address, adminFacet.interface, Action.Add, false),
       facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
+      facetCut(executorFacet.address, executorFacet.interface, Action.Add, true),
       facetCut(mailboxFacet.address, mailboxFacet.interface, Action.Add, true),
     ];
 
@@ -69,28 +80,33 @@ describe("Diamond proxy tests", function () {
       recursionLeafLevelVkHash: ethers.constants.HashZero,
       recursionCircuitsSetVksHash: ethers.constants.HashZero,
     };
+
     const diamondInitCalldata = diamondInit.interface.encodeFunctionData("initialize", [
       {
-        verifier: "0x03752D8252d67f99888E741E3fB642803B29B155",
-        governor: governorAddress,
+        chainId,
+        bridgehub: "0x0000000000000000000000000000000000000000",
+        stateTransitionManager: await owner.getAddress(),
+        protocolVersion: 0,
         admin: governorAddress,
-        genesisBatchHash: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
-        genesisIndexRepeatedStorageChanges: 0,
-        genesisBatchCommitment: ethers.constants.HashZero,
+        validatorTimelock: governorAddress,
+        baseToken: "0x0000000000000000000000000000000000000001",
+        baseTokenBridge: "0x0000000000000000000000000000000000000001",
+        storedBatchZero: "0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21",
+        verifier: "0x0000000000000000000000000000000000000001",
         verifierParams: dummyVerifierParams,
-        zkPorterIsAvailable: false,
         l2BootloaderBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         l2DefaultAccountBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
-        priorityTxMaxGasLimit: 500000,
-        initialProtocolVersion: 0,
+        priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
+        feeParams: defaultFeeParams(),
+        blobVersionedHashRetriever: ethers.constants.AddressZero,
       },
     ]);
 
     const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitCalldata);
 
     const proxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
-    const chainId = hardhat.network.config.chainId;
-    const proxyContract = await proxyFactory.deploy(chainId, diamondCutData);
+    const ethChainId = hardhat.network.config.chainId;
+    const proxyContract = await proxyFactory.deploy(ethChainId, diamondCutData);
     proxy = DiamondProxyFactory.connect(proxyContract.address, proxyContract.signer);
   });
 
@@ -155,13 +171,17 @@ describe("Diamond proxy tests", function () {
     await proxy.fallback({ data: adminFacetExecuteCalldata });
   });
 
-  it("should revert on calling a freezable faucet when diamondStorage is frozen", async () => {
-    const mailboxFacetSelector0 = getAllSelectors(mailboxFacet.interface)[0];
-    const revertReason = await getCallRevertReason(proxy.fallback({ data: mailboxFacetSelector0 }));
+  it("should revert on calling a freezable facet when diamondStorage is frozen", async () => {
+    const executorFacetSelector3 = getAllSelectors(executorFacet.interface)[3];
+    const revertReason = await getCallRevertReason(
+      proxy.fallback({
+        data: executorFacetSelector3 + "0000000000000000000000000000000000000000000000000000000000000000",
+      })
+    );
     expect(revertReason).equal("q1");
   });
 
-  it("should be able to call an unfreezable faucet when diamondStorage is frozen", async () => {
+  it("should be able to call an unfreezable facet when diamondStorage is frozen", async () => {
     const gettersFacetSelector1 = getAllSelectors(gettersFacet.interface)[1];
     await proxy.fallback({ data: gettersFacetSelector1 });
   });

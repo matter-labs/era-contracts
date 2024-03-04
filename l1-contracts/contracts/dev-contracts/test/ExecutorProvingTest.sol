@@ -1,9 +1,14 @@
 pragma solidity 0.8.20;
 
-import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
-import {VerifierParams} from "../../zksync/Storage.sol";
+import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
+import {VerifierParams} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {PubdataSource} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment,
@@ -14,26 +19,17 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
     ) external view returns (bytes32) {
-        return _createBatchCommitment(_newBatchData, _stateDiffHash);
+        return _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
     }
 
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    )
-        external
-        pure
-        returns (
-            uint256 numberOfLayer1Txs,
-            bytes32 chainedPriorityTxsHash,
-            bytes32 previousBatchHash,
-            bytes32 stateDiffHash,
-            bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp
-        )
-    {
+    ) external pure returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 

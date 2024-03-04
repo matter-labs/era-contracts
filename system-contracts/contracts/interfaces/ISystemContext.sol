@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 
 /**
  * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
  * @notice Contract that stores some of the context variables, that may be either
  * block-scoped, tx-scoped or system-wide.
  */

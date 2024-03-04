@@ -7,7 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -63,6 +63,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Sends L2ToL1Log.
+    /// @param _isService The `isService` flag.
+    /// @param _key The `key` part of the L2Log.
+    /// @param _value The `value` part of the L2Log.
     /// @dev Can be called only by a system contract.
     function sendL2ToL1Log(
         bool _isService,
@@ -109,6 +112,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @notice Public functionality to send messages to L1.
+    /// @param _message The message intended to be sent to L1.
     function sendToL1(bytes calldata _message) external override returns (bytes32 hash) {
         uint256 gasBeforeMessageHashing = gasleft();
         hash = EfficientCall.keccak(_message);
@@ -156,6 +160,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     }
 
     /// @dev Can be called only by KnownCodesStorage system contract.
+    /// @param _bytecodeHash Hash of bytecode being published to L1.
     function requestBytecodeL1Publication(
         bytes32 _bytecodeHash
     ) external override onlyCallFrom(address(KNOWN_CODE_STORAGE_CONTRACT)) {
@@ -272,8 +277,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check State Diffs
         /// encoding is as follows:
-        /// header (1 byte version, 3 bytes total len of compressed, 1 byte enumeration index size, 2 bytes number of initial writes)
-        /// body (N bytes of initial writes [32 byte derived key || compressed value], M bytes repeated writes [enumeration index || compressed value])
+        /// header (1 byte version, 3 bytes total len of compressed, 1 byte enumeration index size)
+        /// body (`compressedStateDiffSize` bytes, 4 bytes number of state diffs, `numberOfStateDiffs` * `STATE_DIFF_ENTRY_SIZE` bytes for the uncompressed state diffs)
         /// encoded state diffs: [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
         require(
             uint256(uint8(bytes1(_totalL2ToL1PubdataAndStateDiffs[calldataPtr]))) ==
@@ -312,6 +317,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         /// Check for calldata strict format
         require(calldataPtr == _totalL2ToL1PubdataAndStateDiffs.length, "Extra data in the totalL2ToL1Pubdata array");
+
+        PUBDATA_CHUNK_PUBLISHER.chunkAndPublishPubdata(totalL2ToL1Pubdata);
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), l2ToL1LogsTreeRoot);

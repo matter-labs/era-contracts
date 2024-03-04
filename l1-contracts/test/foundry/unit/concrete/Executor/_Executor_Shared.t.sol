@@ -4,21 +4,27 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS, ERA_CHAIN_ID} from "solpp/common/Config.sol";
+import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
+import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
+import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
+import {DummyEraBaseTokenBridge} from "solpp/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
+    address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
     ExecutorFacet internal executor;
     GettersFacet internal getters;
@@ -33,17 +39,18 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
-        selectors[0] = admin.setPendingGovernor.selector;
-        selectors[1] = admin.acceptGovernor.selector;
-        selectors[2] = admin.setPendingAdmin.selector;
-        selectors[3] = admin.acceptAdmin.selector;
-        selectors[4] = admin.setValidator.selector;
-        selectors[5] = admin.setPorterAvailability.selector;
-        selectors[6] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[7] = admin.executeUpgrade.selector;
-        selectors[8] = admin.freezeDiamond.selector;
-        selectors[9] = admin.unfreezeDiamond.selector;
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = admin.setPendingAdmin.selector;
+        selectors[1] = admin.acceptAdmin.selector;
+        selectors[2] = admin.setValidator.selector;
+        selectors[3] = admin.setPorterAvailability.selector;
+        selectors[4] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = admin.changeFeeParams.selector;
+        selectors[6] = admin.setTokenMultiplier.selector;
+        selectors[7] = admin.upgradeChainFromVersion.selector;
+        selectors[8] = admin.executeUpgrade.selector;
+        selectors[9] = admin.freezeDiamond.selector;
+        selectors[10] = admin.unfreezeDiamond.selector;
         return selectors;
     }
 
@@ -59,8 +66,8 @@ contract ExecutorTest is Test {
     function getGettersSelectors() public view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](28);
         selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getGovernor.selector;
-        selectors[2] = getters.getPendingGovernor.selector;
+        selectors[1] = getters.getAdmin.selector;
+        selectors[2] = getters.getPendingAdmin.selector;
         selectors[3] = getters.getTotalBlocksCommitted.selector;
         selectors[4] = getters.getTotalBlocksVerified.selector;
         selectors[5] = getters.getTotalBlocksExecuted.selector;
@@ -100,35 +107,71 @@ contract ExecutorTest is Test {
         return selectors;
     }
 
+    function defaultFeeParams() private pure returns (FeeParams memory feeParams) {
+        feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+    }
+
     constructor() {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
+        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
         executor = new ExecutorFacet();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet();
 
+        DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
+
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
         address dummyAddress = makeAddr("dummyAddress");
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            dummyAddress, //verifier
-            owner,
-            owner,
-            0,
-            0,
-            0,
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
-            false,
-            dummyHash,
-            dummyHash,
-            1000000,
-            0
-        );
+
+        genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: bytes32(""),
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: bytes32("")
+        });
+
+        InitializeData memory params = InitializeData({
+            // TODO REVIEW
+            chainId: ERA_CHAIN_ID,
+            bridgehub: makeAddr("bridgehub"),
+            stateTransitionManager: address(stateTransitionManager),
+            protocolVersion: 0,
+            admin: owner,
+            validatorTimelock: validator,
+            baseToken: ETH_TOKEN_ADDRESS,
+            baseTokenBridge: address(new DummyEraBaseTokenBridge()),
+            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
+            verifier: IVerifier(dummyAddress), // verifier
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: 0,
+                recursionLeafLevelVkHash: 0,
+                recursionCircuitsSetVksHash: 0
+            }),
+            l2BootloaderBytecodeHash: dummyHash,
+            l2DefaultAccountBytecodeHash: dummyHash,
+            priorityTxMaxGasLimit: 1000000,
+            feeParams: defaultFeeParams(),
+            blobVersionedHashRetriever: blobVersionedHashRetriever
+        });
+
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -170,23 +213,13 @@ contract ExecutorTest is Test {
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
 
-        vm.prank(owner);
-        admin.setValidator(validator, true);
+        // Initiate the token multiplier to enable L1 -> L2 transactions.
+        vm.prank(address(stateTransitionManager));
+        admin.setTokenMultiplier(1, 1);
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
         proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
-
-        genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
-            batchNumber: 0,
-            batchHash: bytes32(""),
-            indexRepeatedStorageChanges: 0,
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            timestamp: 0,
-            commitment: bytes32("")
-        });
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
@@ -204,7 +237,10 @@ contract ExecutorTest is Test {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
-            totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
+            pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
