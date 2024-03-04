@@ -80,10 +80,10 @@ object "Bootloader" {
                 ret := {{GUARANTEED_PUBDATA_BYTES}}
             }
 
-            /// @dev The maximal gasPerPubdata, which allows users to still be 
-            /// able to send `GUARANTEED_PUBDATA_PER_TX` onchain.
+            /// @dev The maximal allowed gasPerPubdata, we want it multiplied by the u32::MAX 
+            /// (i.e. the maximal possible value of the pubdata counter) to be a safe JS integer with a good enough margin.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
-                ret := div(MAX_GAS_PER_TRANSACTION(), GUARANTEED_PUBDATA_PER_TX())
+                ret := 1048576
             }
 
             /// @dev The overhead for the interaction with L1.
