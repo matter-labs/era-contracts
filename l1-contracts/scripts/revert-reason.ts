@@ -1,7 +1,9 @@
+// hardhat import should be the first import in the file
+import * as hardhat from "hardhat";
+
 import * as chalk from "chalk";
 import { ethers } from "ethers";
 import { Interface } from "ethers/lib/utils";
-import * as hardhat from "hardhat";
 import { web3Url } from "./utils";
 
 const erc20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);

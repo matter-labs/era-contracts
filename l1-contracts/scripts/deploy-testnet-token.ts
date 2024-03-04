@@ -1,8 +1,10 @@
+// hardhat import should be the first import in the file
+import * as hardhat from "hardhat";
+
 import "@nomiclabs/hardhat-ethers";
 import { ArgumentParser } from "argparse";
 import { Wallet } from "ethers";
 import * as fs from "fs";
-import * as hardhat from "hardhat";
 import * as path from "path";
 import { web3Provider } from "./utils";
 

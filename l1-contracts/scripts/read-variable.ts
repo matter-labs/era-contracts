@@ -1,6 +1,8 @@
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import { Command } from "commander";
 import { BigNumber, ethers } from "ethers";
-import * as hre from "hardhat";
 import { web3Provider } from "./utils";
 
 const provider = web3Provider();

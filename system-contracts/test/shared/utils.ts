@@ -1,5 +1,6 @@
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
+import { BigNumber } from "ethers";
 import type { BytesLike } from "ethers";
 import * as hre from "hardhat";
 import { ethers } from "hardhat";
@@ -9,7 +10,11 @@ import { Provider, utils, Wallet } from "zksync-web3";
 import { Language } from "../../scripts/constants";
 import { readYulBytecode, readZasmBytecode } from "../../scripts/utils";
 import { AccountCodeStorageFactory, ContractDeployerFactory } from "../../typechain";
-import { REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS, REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./constants";
+import {
+  REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+  REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  TWO_IN_256,
+} from "./constants";
 
 const RICH_WALLETS = [
   {
@@ -166,4 +171,74 @@ export async function setConstructingCodeHash(address: string, bytecode: string)
   const bytecodeHash = utils.hashBytecode(bytecode);
   bytecodeHash[1] = 1;
   await accountCodeStorage.storeAccountConstructingCodeHash(address, bytecodeHash);
+}
+
+export interface StateDiff {
+  key: BytesLike;
+  index: number;
+  initValue: BigNumber;
+  finalValue: BigNumber;
+}
+
+export function encodeStateDiffs(stateDiffs: StateDiff[]): string {
+  const rawStateDiffs = [];
+  for (const stateDiff of stateDiffs) {
+    rawStateDiffs.push(
+      ethers.utils.solidityPack(
+        ["address", "bytes32", "bytes32", "uint64", "uint256", "uint256", "bytes"],
+        [
+          ethers.constants.AddressZero,
+          ethers.constants.HashZero,
+          stateDiff.key,
+          stateDiff.index,
+          stateDiff.initValue,
+          stateDiff.finalValue,
+          "0x" + "00".repeat(116),
+        ]
+      )
+    );
+  }
+  return ethers.utils.hexlify(ethers.utils.concat(rawStateDiffs));
+}
+
+export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: StateDiff[]): string {
+  let numInitial = 0;
+  const initial = [];
+  const repeated = [];
+  for (const stateDiff of stateDiffs) {
+    const addition = stateDiff.finalValue.sub(stateDiff.initValue).add(TWO_IN_256).mod(TWO_IN_256);
+    const subtraction = stateDiff.initValue.sub(stateDiff.finalValue).add(TWO_IN_256).mod(TWO_IN_256);
+    let op = 3;
+    let min = stateDiff.finalValue;
+    if (addition.lt(min)) {
+      min = addition;
+      op = 1;
+    }
+    if (subtraction.lt(min)) {
+      min = subtraction;
+      op = 2;
+    }
+    if (min.gte(BigNumber.from(2).pow(248))) {
+      min = stateDiff.finalValue;
+      op = 0;
+    }
+    let len = 0;
+    const minHex = min.eq(0) ? "0x" : min.toHexString();
+    if (op > 0) {
+      len = (minHex.length - 2) / 2;
+    }
+    const metadata = (len << 3) + op;
+    if (stateDiff.index === 0) {
+      numInitial += 1;
+      initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, minHex]));
+    } else {
+      const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
+      repeated.push(
+        ethers.utils.solidityPack([enumerationIndexType, "uint8", "bytes"], [stateDiff.index, metadata, minHex])
+      );
+    }
+  }
+  return ethers.utils.hexlify(
+    ethers.utils.concat([ethers.utils.solidityPack(["uint16"], [numInitial]), ...initial, ...repeated])
+  );
 }

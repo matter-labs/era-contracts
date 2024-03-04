@@ -63,7 +63,8 @@ contract L1WethBridgeTest is Test {
             l2DefaultAccountBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 10000000,
             initialProtocolVersion: 0,
-            feeParams: defaultFeeParams()
+            feeParams: defaultFeeParams(),
+            blobVersionedHashRetriever: address(0)
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);

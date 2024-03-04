@@ -1,4 +1,6 @@
+// hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
+
 import { deployedAddressesFromEnv } from "../scripts/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -48,7 +48,7 @@ function TEST_simple_transaction() {
     // We'll test the transaction from 0.json
     let txDataOffset := testing_txDataOffset(0)
     let innerTxDataOffset := add(txDataOffset, 0x20)
-    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xc350, "Invalid pubdata limit")
+    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0x5F5E100, "Invalid pubdata limit")
 }
 
 function TEST_getTransactionUpfrontOverhead() {
@@ -97,4 +97,15 @@ function TEST_getFeeParams_LowPubdataPrice() {
 
     testing_assertEq(baseFee, l2GasPrice, "Invalid base fee")
     testing_assertEq(gasPricePerPubdata, div(veryLowL1GasPrice, l2GasPrice), "Invalid gasPricePerPubdata")
+}
+
+function TEST_systemLogKeys() {
+    // Test that the values for various system log keys are correct
+    let chainedPriorityTxnHashLogKey := chainedPriorityTxnHashLogKey()
+    let numberOfLayer1TxsLogKey := numberOfLayer1TxsLogKey()
+    let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
+
+    testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
+    testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
+    testing_assertEq(protocolUpgradeTxHashKey, 9, "Invalid protocol upgrade txn hash log key")
 }

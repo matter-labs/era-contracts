@@ -399,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 24000000 / 32 VM words.
+            /// @dev The memory page consists of 30000000 / 32 VM words.
             /// Each execution result is a single boolean, but 
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 
             function MAX_MEM_SIZE() -> ret {
-                ret := 24000000
+                ret := 30000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -687,7 +687,7 @@ object "Bootloader" {
             /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
             /// @param addr The address of the account to get the code hash of.
             /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
-            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failer is user providing not
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
             /// enough gas.
             function getRawCodeHash(addr, assertSuccess) -> ret {
                 mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
@@ -3655,7 +3655,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 7
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////

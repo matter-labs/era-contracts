@@ -1,7 +1,9 @@
 // This script deploys the contracts required both for production and
 // for testing of the contracts required for the `withdrawal-helpers` library
 
+// hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
+
 import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
 import * as fs from "fs";

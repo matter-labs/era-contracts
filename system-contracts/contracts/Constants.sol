@@ -13,6 +13,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
+import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -67,6 +68,10 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
 
+IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x11)
+);
+
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
@@ -84,7 +89,7 @@ bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
-/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the 110k - 120k, it is better to
+/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, it is better to
 /// allow the operator to provide any reasonably large value in order to avoid unneeded constraints on the operator.
 uint256 constant MAX_ALLOWED_PUBDATA_PER_BATCH = 520000;
 
@@ -96,12 +101,14 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
+    BLOB_ONE_HASH_KEY,
+    BLOB_TWO_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
-/// While formally a tree of any length is acceptable, the node supports only a constant length of 2048 leaves.
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 2048;
+/// While formally a tree of any length is acceptable, the node supports only a constant length of 4096 leaves.
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 4096;
 
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
@@ -126,3 +133,11 @@ uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
 uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;
 /// @dev The offset of the final value in a storage diff.
 uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
+
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
+
+/// @dev Max number of blobs currently supported
+uint256 constant MAX_NUMBER_OF_BLOBS = 2;
