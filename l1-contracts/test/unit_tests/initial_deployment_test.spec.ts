@@ -6,11 +6,10 @@ import * as hardhat from "hardhat";
 import type { Bridgehub, StateTransitionManager } from "../../typechain";
 import { BridgehubFactory, StateTransitionManagerFactory } from "../../typechain";
 
-import { ethTestConfig, initialTestnetDeploymentProcess } from "../../src.ts/deploy-process";
-import type { Deployer } from "../../src.ts/deploy";
+import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
+import { ethTestConfig } from "../../src.ts/utils";
 
-// todo I had trouble making this work, there is some importation error
-// import {deploySharedBridgeOnL2ThroughL1} from "../../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
+import type { Deployer } from "../../src.ts/deploy";
 
 describe("Initial deployment", function () {
   let bridgehub: Bridgehub;

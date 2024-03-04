@@ -6,6 +6,9 @@ import "../../state-transition/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierTest is Verifier {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function _loadVerificationKey() internal pure override {
         assembly {
             // gate setup commitments

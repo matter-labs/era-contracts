@@ -122,6 +122,17 @@ library Utils {
             });
     }
 
+    function createProofInput() public view returns (IExecutor.ProofInput memory) {
+        uint256[] memory recursiveAggregationInput;
+        uint256[] memory serializedProof;
+
+        return
+            IExecutor.ProofInput({
+                recursiveAggregationInput: recursiveAggregationInput,
+                serializedProof: serializedProof
+            });
+    }
+
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {
         bytes memory result;
         for (uint256 i = 0; i < data.length; i++) {
@@ -381,4 +392,7 @@ library Utils {
                 _blobCommitments[1]
             );
     }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }

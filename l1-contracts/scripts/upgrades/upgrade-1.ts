@@ -1,7 +1,7 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { deployedAddressesFromEnv } from "../../src.ts/deploy";
-import { getNumberFromEnv } from "../utils";
+import { deployedAddressesFromEnv } from "../../src.ts/deploy-utils";
+import { getNumberFromEnv } from "../../src.ts/utils";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish, BytesLike } from "ethers";
 import { ethers } from "hardhat";

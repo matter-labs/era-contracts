@@ -17,4 +17,7 @@ contract MerkleTreeNoSort is MurkyBase {
             _hash := keccak256(0x0, 0x40)
         }
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

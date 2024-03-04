@@ -200,7 +200,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
-                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch");
+                require(msg.value == _request.mintValue, "Bridgehub: msg.value mismatch 1");
             } else {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
             }
@@ -246,10 +246,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
             address token = baseToken[_request.chainId];
             uint256 baseTokenMsgValue;
             if (token == ETH_TOKEN_ADDRESS) {
-                require(msg.value == _request.mintValue + _request.secondBridgeValue, "Bridgehub: msg.value mismatch");
+                require(
+                    msg.value == _request.mintValue + _request.secondBridgeValue,
+                    "Bridgehub: msg.value mismatch 2"
+                );
                 baseTokenMsgValue = _request.mintValue;
             } else {
-                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 2");
+                require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
                 baseTokenMsgValue = 0;
             }
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(

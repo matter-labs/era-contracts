@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import type { BigNumberish, BytesLike } from "ethers";
+import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
@@ -16,12 +16,11 @@ import {
   StateTransitionManagerFactory,
 } from "../../typechain";
 
-import {
-  initialTestnetDeploymentProcess,
-  ethTestConfig,
-  L2_BOOTLOADER_BYTECODE_HASH,
-  L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-} from "../../src.ts/deploy-process";
+import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from "../../src.ts/deploy-process";
+import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
+
+import type { ProposedUpgrade, VerifierParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/utils";
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
@@ -809,35 +808,6 @@ function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): St
   };
 }
 
-interface L2CanonicalTransaction {
-  txType: BigNumberish;
-  from: BigNumberish;
-  to: BigNumberish;
-  gasLimit: BigNumberish;
-  gasPerPubdataByteLimit: BigNumberish;
-  maxFeePerGas: BigNumberish;
-  maxPriorityFeePerGas: BigNumberish;
-  paymaster: BigNumberish;
-  nonce: BigNumberish;
-  value: BigNumberish;
-  // In the future, we might want to add some
-  // new fields to the struct. The `txData` struct
-  // is to be passed to account and any changes to its structure
-  // would mean a breaking change to these accounts. In order to prevent this,
-  // we should keep some fields as "reserved".
-  // It is also recommended that their length is fixed, since
-  // it would allow easier proof integration (in case we will need
-  // some special circuit for preprocessing transactions).
-  reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
-  data: BytesLike;
-  signature: BytesLike;
-  factoryDeps: BigNumberish[];
-  paymasterInput: BytesLike;
-  // Reserved dynamic type for the future use-case. Using it should be avoided,
-  // But it is still here, just in case we want to enable some additional functionality.
-  reservedDynamic: BytesLike;
-}
-
 function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
   return {
     txType: SYSTEM_UPGRADE_TX_TYPE,
@@ -860,12 +830,6 @@ function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2Can
   };
 }
 
-interface VerifierParams {
-  recursionNodeLevelVkHash: BytesLike;
-  recursionLeafLevelVkHash: BytesLike;
-  recursionCircuitsSetVksHash: BytesLike;
-}
-
 function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
   return {
     recursionNodeLevelVkHash: ethers.constants.HashZero,
@@ -875,29 +839,12 @@ function buildVerifierParams(params: Partial<VerifierParams>): VerifierParams {
   };
 }
 
-interface ProposedUpgrade {
-  // The tx for the upgrade call to the l2 system upgrade contract
-  l2ProtocolUpgradeTx: L2CanonicalTransaction;
-  factoryDeps: BytesLike[];
-  executeUpgradeTx: boolean;
-  bootloaderHash: BytesLike;
-  defaultAccountHash: BytesLike;
-  verifier: string;
-  verifierParams: VerifierParams;
-  l1ContractsUpgradeCalldata: BytesLike;
-  postUpgradeCalldata: BytesLike;
-  upgradeTimestamp: ethers.BigNumber;
-  newProtocolVersion: BigNumberish;
-  newAllowList: string;
-}
-
 type PartialProposedUpgrade = Partial<ProposedUpgrade>;
 
 function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedUpgrade {
   const newProtocolVersion = proposedUpgrade.newProtocolVersion || 0;
   return {
     l2ProtocolUpgradeTx: buildL2CanonicalTransaction({ nonce: newProtocolVersion }),
-    executeUpgradeTx: false,
     bootloaderHash: ethers.constants.HashZero,
     defaultAccountHash: ethers.constants.HashZero,
     verifier: ethers.constants.AddressZero,
@@ -907,7 +854,6 @@ function buildProposeUpgrade(proposedUpgrade: PartialProposedUpgrade): ProposedU
     upgradeTimestamp: ethers.constants.Zero,
     factoryDeps: [],
     newProtocolVersion,
-    newAllowList: ethers.constants.AddressZero,
     ...proposedUpgrade,
   };
 }

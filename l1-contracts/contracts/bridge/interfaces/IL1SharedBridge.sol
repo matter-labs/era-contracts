@@ -10,7 +10,7 @@ import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL1SharedBridge {
-    event DepositInitiatedSharedBridge(
+    event LegacyDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed l2DepositTxHash,
         address indexed from,
@@ -19,11 +19,18 @@ interface IL1SharedBridge {
         uint256 amount
     );
 
-    event BridgehubDepositInitiatedSharedBridge(
+    event BridgehubDepositInitiated(
         uint256 indexed chainId,
         bytes32 indexed txDataHash,
         address indexed from,
         address to,
+        address l1Token,
+        uint256 amount
+    );
+
+    event BridgehubDepositBaseTokenInitiated(
+        uint256 indexed chainId,
+        address indexed from,
         address l1Token,
         uint256 amount
     );

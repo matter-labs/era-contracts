@@ -17,3 +17,5 @@ typechain/
 yarn-debug.log*
 yarn-error.log*
 l1-contracts/yarn-error.log*
+l1-contracts/lcov.info
+l1-contracts/report/*

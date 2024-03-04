@@ -1,8 +1,11 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { initializeErc20Bridge } from "../src.ts/shared-bridge-initialize";
+// import { initializeErc20Bridge } from "../src.ts/shared-bridge-initialize";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 
@@ -48,7 +51,7 @@ async function main() {
         verbose: true,
       });
       deployer.chainId = parseInt(chainId) || 270;
-      await initializeErc20Bridge(deployer, deployWallet, gasPrice, cmd.erc20Bridge);
+      // await initializeErc20Bridge(deployer, deployWallet, gasPrice, cmd.erc20Bridge);
     });
 
   await program.parseAsync(process.argv);

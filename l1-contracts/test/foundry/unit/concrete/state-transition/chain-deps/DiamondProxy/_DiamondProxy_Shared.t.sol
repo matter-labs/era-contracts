@@ -20,6 +20,9 @@ contract TestFacet is ZkSyncStateTransitionBase {
     function func() public pure returns (bool) {
         return true;
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }
 
 contract DiamondInitTest is Test {
@@ -143,4 +146,7 @@ contract DiamondInitTest is Test {
 
         assertEq(testFacet.func(), true);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

@@ -43,7 +43,9 @@
     "deploy-shared-bridge-on-l2": "ts-node scripts/deploy-shared-bridge-on-l2.ts",
     "deploy-shared-bridge-on-l2-through-l1": "ts-node src/deploy-shared-bridge-on-l2-through-l1.ts",
     "publish-bridge-preimages": "ts-node src/publish-bridge-preimages.ts",
-    "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts"
+    "deploy-l2-weth": "ts-node src/deploy-l2-weth.ts",
+    "upgrade-bridge-contracts": "ts-node src/upgrade-bridge-impl.ts",
+    "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3"

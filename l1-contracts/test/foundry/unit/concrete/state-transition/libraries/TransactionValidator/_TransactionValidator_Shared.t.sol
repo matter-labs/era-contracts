@@ -53,4 +53,7 @@ contract TransactionValidatorSharedTest is Test {
     function getOverheadForTransaction(uint256 _encodingLength) public pure returns (uint256) {
         return TransactionValidator.getOverheadForTransaction(_encodingLength);
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

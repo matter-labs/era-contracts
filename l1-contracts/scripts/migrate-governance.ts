@@ -1,7 +1,8 @@
 /// Temporary script that generated the needed calldata for the migration of the governance.
 
 // hardhat import should be the first import in the file
-import * as hre from "hardhat";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 
 import { Command } from "commander";
 import { BigNumber, ethers, Wallet } from "ethers";
@@ -77,7 +78,7 @@ async function main() {
         verbose: true,
       });
 
-      const expectedDeployedBytecode = hre.artifacts.readArtifactSync("Governance").deployedBytecode;
+      const expectedDeployedBytecode = hardhat.artifacts.readArtifactSync("Governance").deployedBytecode;
 
       const isBytecodeCorrect =
         (await provider.getCode(userProvidedAddress)).toLowerCase() === expectedDeployedBytecode.toLowerCase();

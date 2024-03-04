@@ -150,6 +150,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             chainBalance[_chainId][_l1Token] += _amount;
         }
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _l1Token, _amount);
     }
 
     /// @dev Transfers tokens from the depositor address to the smart contract address.
@@ -208,7 +209,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 txDataHash: txDataHash
             });
         }
-        emit BridgehubDepositInitiatedSharedBridge(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
+        emit BridgehubDepositInitiated(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
@@ -580,7 +581,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
 
-        emit DepositInitiatedSharedBridge(ERA_CHAIN_ID, l2TxHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit LegacyDepositInitiated(ERA_CHAIN_ID, l2TxHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
     }
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.

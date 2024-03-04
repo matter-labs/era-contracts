@@ -1,3 +1,7 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";

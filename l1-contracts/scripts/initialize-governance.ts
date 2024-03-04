@@ -1,16 +1,15 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-
-import * as fs from "fs";
-import * as path from "path";
+import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function main() {
   const program = new Command();
