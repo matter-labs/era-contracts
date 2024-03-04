@@ -45,7 +45,7 @@ contract AuthorizationTest is AdminTest {
         vm.prank(governor);
         proxyAsAdmin.changeFeeParams(newParams);
 
-        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Rollup, "Pubdata pricing mode was not changed correctly");
+        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Validium, "Pubdata pricing mode was not changed correctly");
 
     }
 
