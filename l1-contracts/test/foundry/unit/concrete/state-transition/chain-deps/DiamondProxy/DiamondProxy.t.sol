@@ -77,7 +77,7 @@ contract DiamondProxyTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
         vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success,) = address(diamondProxy).call("");
+        (bool success, ) = address(diamondProxy).call("");
         assertEq(success, false);
     }
 
@@ -93,7 +93,7 @@ contract DiamondProxyTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
         vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success,) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+        (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
         assertEq(success, false);
     }
 
