@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import {Test} from "forge-std/Test.sol";
+import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";           
+
 
 
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
@@ -15,6 +16,7 @@ import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 import {L2Message, L2Log, TxStatus} from "solpp/common/Messaging.sol";
 
 contract ExperimentalBridgeTest is Test {
+    using stdStorage for StdStorage;
 
     Bridgehub bridgeHub;
     address public bridgeOwner;
@@ -260,59 +262,40 @@ contract ExperimentalBridgeTest is Test {
 
         // We need to set the stateTransitionManager of the mockChainId to mockSTM 
         // There is no function to do that in the bridgeHub
-        // So, perhaps we will have to mockCall the getState
+        // So, perhaps we will have to manually set the values in the stateTransitionManager mapping via a foundry cheatcode
+        assertTrue(!(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM)));
 
+        stdstore
+            .target(address(bridgeHub))
+            .sig("stateTransitionManager(uint256)")
+            .with_key(mockChainId)
+            .checked_write(address(mockSTM));
 
-        assertTrue(!(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract)));
+        // Now the following statements should be true as well:
+        assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
+        assertTrue(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract));
 
-
-        // L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
-
-        // vm.mockCall(
-        //     address(mockChainContract),
-        //     abi.encodeWithSelector(
-        //         mockChainContract.proveL2MessageInclusion.selector,
-        //         mockBatchNumber,
-        //         mockIndex,
-        //         l2Message,
-        //         mockProof 
-        //     ),
-        //     abi.encode(true)
-        // );
-
-        // assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
-        // vm.clearMockedCalls();
-    }
-
-    function test_proveL2MessageInclusion_old(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addStateTransitionManager(address(mockSTM));
-        vm.stopPrank();
-
+        // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
         L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
 
+        // Since we have used random data for the `bridgeHub.proveL2MessageInclusion` function which basically forwards the call
+        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
-            address(bridgeHub),
+            address(mockChainContract),
             abi.encodeWithSelector(
-                bridgeHub.proveL2MessageInclusion.selector,
-                mockChainId,
+                mockChainContract.proveL2MessageInclusion.selector,
                 mockBatchNumber,
                 mockIndex,
                 l2Message,
-                mockProof    
-             ),
+                mockProof 
+            ),
             abi.encode(true)
         );
 
+        assertTrue(true);
+
         assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
+        vm.clearMockedCalls();
     }
 
     function test_proveL2LogInclusion(
@@ -403,6 +386,10 @@ contract ExperimentalBridgeTest is Test {
         ) == randomResultantBool);
     }
 
+/////////////////////////////////////////////////////////
+// INTERNAL UTILITY FUNCTIONS
+/////////////////////////////////////////////////////////
+
     function _createMockL2Message(
         uint16 randomTxNumInBatch,
         address randomSender,
@@ -463,5 +450,40 @@ contract ExperimentalBridgeTest is Test {
         mockSTM.setInitialCutHash(diamondCutData);
 
         return abi.encode(diamondCutData);
+    }
+
+/////////////////////////////////////////////////////////
+// OLDER (HIGH-LEVEL MOCKED) TESTS
+////////////////////////////////////////////////////////
+
+    function test_proveL2MessageInclusion_old(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes memory randomData
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL2MessageInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Message,
+                mockProof    
+             ),
+            abi.encode(true)
+        );
+
+        assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
     }
 }
