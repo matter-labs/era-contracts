@@ -254,22 +254,7 @@ contract ExperimentalBridgeTest is Test {
         address randomSender,
         bytes memory randomData
     ) public {
-        mockChainId = bound(mockChainId, 2, type(uint48).max);
-        vm.prank(bridgeOwner);
-        bridgeHub.addStateTransitionManager(address(mockSTM));
-        
-        mockSTM.setStateTransition(mockChainId, address(mockChainContract));
-
-        // We need to set the stateTransitionManager of the mockChainId to mockSTM 
-        // There is no function to do that in the bridgeHub
-        // So, perhaps we will have to manually set the values in the stateTransitionManager mapping via a foundry cheatcode
-        assertTrue(!(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM)));
-
-        stdstore
-            .target(address(bridgeHub))
-            .sig("stateTransitionManager(uint256)")
-            .with_key(mockChainId)
-            .checked_write(address(mockSTM));
+        mockChainId = _setUpStateTransitionForChainId(mockChainId);
 
         // Now the following statements should be true as well:
         assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
@@ -292,8 +277,6 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(true)
         );
 
-        assertTrue(true);
-
         assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
         vm.clearMockedCalls();
     }
@@ -310,10 +293,13 @@ contract ExperimentalBridgeTest is Test {
         bytes32 randomKey,
         bytes32 randomValue
     ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addStateTransitionManager(address(mockSTM));
-        vm.stopPrank();
+        mockChainId = _setUpStateTransitionForChainId(mockChainId);
 
+        // Now the following statements should be true as well:
+        assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
+        assertTrue(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract));
+
+        // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
         L2Log memory l2Log = _createMockL2Log(
             randomL2ShardId,
             randomIsService,
@@ -323,20 +309,22 @@ contract ExperimentalBridgeTest is Test {
             randomValue
         );
 
+        // Since we have used random data for the `bridgeHub.proveL2LogInclusion` function which basically forwards the call
+        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
-            address(bridgeHub),
+            address(mockChainContract),
             abi.encodeWithSelector(
-                bridgeHub.proveL2LogInclusion.selector,
-                mockChainId,
+                mockChainContract.proveL2LogInclusion.selector,
                 mockBatchNumber,
                 mockIndex,
                 l2Log,
-                mockProof    
-             ),
+                mockProof 
+            ),
             abi.encode(true)
         );
 
         assertTrue(bridgeHub.proveL2LogInclusion(mockChainId,mockBatchNumber,mockIndex,l2Log,mockProof));
+        vm.clearMockedCalls();
     }
 
     function test_proveL1ToL2TransactionStatus(
@@ -452,6 +440,27 @@ contract ExperimentalBridgeTest is Test {
         return abi.encode(diamondCutData);
     }
 
+    function _setUpStateTransitionForChainId(uint256 mockChainId) internal returns(uint256 mockChainIdInRange) {
+        mockChainId = bound(mockChainId, 2, type(uint48).max);
+        mockChainIdInRange = mockChainId;
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+
+        // We need to set the stateTransitionManager of the mockChainId to mockSTM 
+        // There is no function to do that in the bridgeHub
+        // So, perhaps we will have to manually set the values in the stateTransitionManager mapping via a foundry cheatcode
+        assertTrue(!(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM)));
+
+        stdstore
+            .target(address(bridgeHub))
+            .sig("stateTransitionManager(uint256)")
+            .with_key(mockChainId)
+            .checked_write(address(mockSTM));
+
+        // Now in the StateTransitionManager that has been set for our mockChainId, we set the stateTransition contract as our mockChainContract
+        mockSTM.setStateTransition(mockChainId, address(mockChainContract));
+    }
+
 /////////////////////////////////////////////////////////
 // OLDER (HIGH-LEVEL MOCKED) TESTS
 ////////////////////////////////////////////////////////
@@ -485,5 +494,46 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId,mockBatchNumber,mockIndex,l2Message,mockProof));
+    }
+
+    function test_proveL2LogInclusion_old(
+        uint256 mockChainId,
+        uint256 mockBatchNumber,
+        uint256 mockIndex,
+        bytes32[] memory mockProof,
+        uint8 randomL2ShardId,
+        bool randomIsService,
+        uint16 randomTxNumInBatch,
+        address randomSender,
+        bytes32 randomKey,
+        bytes32 randomValue
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        L2Log memory l2Log = _createMockL2Log(
+            randomL2ShardId,
+            randomIsService,
+            randomTxNumInBatch,
+            randomSender,
+            randomKey,
+            randomValue
+        );
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL2LogInclusion.selector,
+                mockChainId,
+                mockBatchNumber,
+                mockIndex,
+                l2Log,
+                mockProof    
+             ),
+            abi.encode(true)
+        );
+
+        assertTrue(bridgeHub.proveL2LogInclusion(mockChainId,mockBatchNumber,mockIndex,l2Log,mockProof));
     }
 }
