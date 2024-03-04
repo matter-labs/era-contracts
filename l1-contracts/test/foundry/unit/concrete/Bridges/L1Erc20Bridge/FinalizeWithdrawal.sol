@@ -34,16 +34,14 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
 
         assertFalse(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
 
-        dummySharedBridge.setDataToBeReturnedInFinalizeWithdrawal(
-            alice, address(token), amount
-        );
+        dummySharedBridge.setDataToBeReturnedInFinalizeWithdrawal(alice, address(token), amount);
 
         vm.prank(alice);
         vm.expectEmit(true, true, true, true, address(bridge));
         emit WithdrawalFinalized(alice, address(token), amount);
         bytes32[] memory merkleProof;
         bridge.finalizeWithdrawal(l2BatchNumber, l2MessageIndex, 0, "", merkleProof);
-        
+
         // withdrawal finalization should be handled in the shared bridge, so it shouldn't
         // change in the  L1 ERC20 bridge after finalization.
         assertFalse(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
