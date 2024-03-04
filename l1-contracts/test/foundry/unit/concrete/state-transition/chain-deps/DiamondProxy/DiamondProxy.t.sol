@@ -25,7 +25,7 @@ contract TestFacet is ZkSyncStateTransitionBase {
     function test() internal virtual {}
 }
 
-contract DiamondInitTest is Test {
+contract DiamondProxyTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
@@ -77,7 +77,7 @@ contract DiamondInitTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
         vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call("");
+        (bool success,) = address(diamondProxy).call("");
         assertEq(success, false);
     }
 
@@ -93,7 +93,7 @@ contract DiamondInitTest is Test {
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
         vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+        (bool success,) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
         assertEq(success, false);
     }
 
@@ -147,6 +147,29 @@ contract DiamondInitTest is Test {
         assertEq(testFacet.func(), true);
     }
 
-    // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test_revertWhen_removeFunctions() public {
+        Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](3);
+        cuts[0] = facetCuts[0];
+        cuts[1] = facetCuts[1];
+        cuts[2] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: true,
+            selectors: getTestFacetSelectors()
+        });
+
+        InitializeData memory initializeData = Utils.makeInitializeData();
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: cuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+        TestFacet testFacet = TestFacet(address(diamondProxy));
+
+        vm.expectRevert(bytes("F"));
+        testFacet.func();
+    }
 }
