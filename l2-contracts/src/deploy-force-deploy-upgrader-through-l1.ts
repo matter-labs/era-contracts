@@ -13,7 +13,7 @@ async function main() {
 
   program
     .version("0.1.0")
-    .name("deploy-force-deploy-upgrader")
+    .name("deploy-force-deploy-upgrader-through-l1")
     .option("--chain-id <chain-id>")
     .description("Deploys the force deploy upgrader contract to L2");
 

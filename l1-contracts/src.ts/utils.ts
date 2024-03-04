@@ -15,11 +15,14 @@ export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.j
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.json").REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
+export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+export const DIAMOND_CUT_DATA_ABI_STRING =
+  "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -120,4 +123,53 @@ export interface FeeParams {
   maxL2GasPerBatch: number;
   priorityTxMaxPubdata: number;
   minimalL2GasPrice: BigNumberish;
+}
+
+export interface ProposedUpgrade {
+  // The tx for the upgrade call to the l2 system upgrade contract
+  l2ProtocolUpgradeTx: L2CanonicalTransaction;
+  factoryDeps: BytesLike[];
+  bootloaderHash: BytesLike;
+  defaultAccountHash: BytesLike;
+  verifier: string;
+  verifierParams: VerifierParams;
+  l1ContractsUpgradeCalldata: BytesLike;
+  postUpgradeCalldata: BytesLike;
+  upgradeTimestamp: ethers.BigNumber;
+  newProtocolVersion: BigNumberish;
+}
+
+export interface VerifierParams {
+  recursionNodeLevelVkHash: BytesLike;
+  recursionLeafLevelVkHash: BytesLike;
+  recursionCircuitsSetVksHash: BytesLike;
+}
+
+export interface L2CanonicalTransaction {
+  txType: BigNumberish;
+  from: BigNumberish;
+  to: BigNumberish;
+  gasLimit: BigNumberish;
+  gasPerPubdataByteLimit: BigNumberish;
+  maxFeePerGas: BigNumberish;
+  maxPriorityFeePerGas: BigNumberish;
+  paymaster: BigNumberish;
+  nonce: BigNumberish;
+  value: BigNumberish;
+  // In the future, we might want to add some
+  // new fields to the struct. The `txData` struct
+  // is to be passed to account and any changes to its structure
+  // would mean a breaking change to these accounts. In order to prevent this,
+  // we should keep some fields as "reserved".
+  // It is also recommended that their length is fixed, since
+  // it would allow easier proof integration (in case we will need
+  // some special circuit for preprocessing transactions).
+  reserved: [BigNumberish, BigNumberish, BigNumberish, BigNumberish];
+  data: BytesLike;
+  signature: BytesLike;
+  factoryDeps: BigNumberish[];
+  paymasterInput: BytesLike;
+  // Reserved dynamic type for the future use-case. Using it should be avoided,
+  // But it is still here, just in case we want to enable some additional functionality.
+  reservedDynamic: BytesLike;
 }
