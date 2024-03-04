@@ -179,8 +179,6 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(randomAddress), "after call from the bridgeowner, this randomAddress should be the registered sharedBridge");
     }
 
-
-/*
     uint256 newChainId;
     address admin;
     function test_createNewChain(
@@ -219,31 +217,39 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         bytes memory _newChainInitData = _createNewChainInitData(isFreezable, mockSelectors, mockInitAddress, mockInitCalldata);
 
-        emit log_named_bytes32("ICH", mockSTM.initialCutHash());
-
-        emit log_named_bytes32("createNewChain function selector", mockSTM.createNewChain.selector);
+        // bridgeHub.createNewChain => stateTransitionManager.createNewChain => this function sets the stateTransition mapping 
+        // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockSTM
+        mockSTM.setStateTransition(chainId, address(mockChainContract));
+        assertTrue(mockSTM.stateTransition(chainId) == address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockSTM),
-            abi.encodeWithSelector(mockSTM.createNewChain.selector, chainId, address(mockSTM), address(testToken), uint256(chainId * 2), admin, _newChainInitData),
+            abi.encodeWithSelector(
+                mockSTM.createNewChain.selector, 
+                chainId, 
+                address(testToken), 
+                address(mockSharedBridge),
+                admin, 
+                _newChainInitData
+            ),
             bytes('')
         );
-        bridgeHub.createNewChain(
-            chainId,
-            address(mockSTM),
-            address(testToken),
-            uint256(chainId * 2),
-            admin,
-            _newChainInitData
-        );
+
+        newChainId= bridgeHub.createNewChain(
+                        chainId,
+                        address(mockSTM),
+                        address(testToken),
+                        uint256(chainId * 2),
+                        admin,
+                        _newChainInitData
+                    );
         vm.stopPrank();
+        vm.clearMockedCalls();
 
         assertTrue(bridgeHub.stateTransitionManager(newChainId) == address(mockSTM));
         assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
     }
-
-*/
 
     function test_proveL2MessageInclusion(
         uint256 mockChainId,
@@ -336,9 +342,7 @@ contract ExperimentalBridgeTest is Test {
         bytes32[] memory randomMerkleProof,
         bool randomResultantBool
     ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addStateTransitionManager(address(mockSTM));
-        vm.stopPrank();
+        randomChainId = _setUpStateTransitionForChainId(randomChainId);
 
         TxStatus txStatus;
 
@@ -349,10 +353,9 @@ contract ExperimentalBridgeTest is Test {
         }
 
         vm.mockCall(
-            address(bridgeHub),
+            address(mockChainContract),
             abi.encodeWithSelector(
-                bridgeHub.proveL1ToL2TransactionStatus.selector,
-                randomChainId,
+                mockChainContract.proveL1ToL2TransactionStatus.selector,
                 randomL2TxHash,
                 randomL2BatchNumber,
                 randomL2MessageIndex,
@@ -535,5 +538,52 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(bridgeHub.proveL2LogInclusion(mockChainId,mockBatchNumber,mockIndex,l2Log,mockProof));
+    }
+
+    function test_proveL1ToL2TransactionStatus_old (
+        uint256 randomChainId,
+        bytes32 randomL2TxHash,
+        uint256 randomL2BatchNumber,
+        uint256 randomL2MessageIndex,
+        uint16 randomL2TxNumberInBatch,
+        bytes32[] memory randomMerkleProof,
+        bool randomResultantBool
+    ) public {
+        vm.startPrank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(address(mockSTM));
+        vm.stopPrank();
+
+        TxStatus txStatus;
+
+        if (randomChainId % 2 == 0) {
+            txStatus = TxStatus.Failure;
+        } else {
+            txStatus = TxStatus.Success;
+        }
+
+        vm.mockCall(
+            address(bridgeHub),
+            abi.encodeWithSelector(
+                bridgeHub.proveL1ToL2TransactionStatus.selector,
+                randomChainId,
+                randomL2TxHash,
+                randomL2BatchNumber,
+                randomL2MessageIndex,
+                randomL2TxNumberInBatch,
+                randomMerkleProof,
+                txStatus
+            ),
+            abi.encode(randomResultantBool)
+        );
+
+        assertTrue(bridgeHub.proveL1ToL2TransactionStatus(
+            randomChainId, 
+            randomL2TxHash,
+            randomL2BatchNumber,
+            randomL2MessageIndex,
+            randomL2TxNumberInBatch,
+            randomMerkleProof,
+            txStatus
+        ) == randomResultantBool);
     }
 }
