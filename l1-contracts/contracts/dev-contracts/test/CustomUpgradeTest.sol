@@ -2,10 +2,13 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/libraries/Diamond.sol";
+import "../../state-transition/libraries/Diamond.sol";
 import "../../upgrades/BaseZkSyncUpgrade.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     event Test();
 
     /// @notice Placeholder function for custom logic for upgrading L1 contract.

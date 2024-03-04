@@ -2,9 +2,12 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/libraries/PriorityQueue.sol";
+import "../../state-transition/libraries/PriorityQueue.sol";
 
 contract PriorityQueueTest {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     using PriorityQueue for PriorityQueue.Queue;
 
     PriorityQueue.Queue priorityQueue;

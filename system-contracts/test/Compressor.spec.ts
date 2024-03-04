@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import * as zksync from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
+import * as zksync from "zksync-ethers";
 import type { Compressor } from "../typechain";
 import { CompressorFactory } from "../typechain";
 import {

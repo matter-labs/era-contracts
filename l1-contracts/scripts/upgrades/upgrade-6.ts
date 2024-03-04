@@ -1,14 +1,17 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish } from "ethers";
 import { ethers } from "hardhat";
-import { Provider, Wallet } from "zksync-web3";
+import { Provider, Wallet } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
-import * as fs from "fs";
-import * as path from "path";
-import { applyL1ToL2Alias, hashBytecode } from "zksync-web3/build/src/utils";
+import { ethTestConfig } from "../../src.ts/utils";
+import { applyL1ToL2Alias, hashBytecode } from "zksync-ethers/build/src/utils";
 
 type ForceDeployment = {
   bytecodeHash: string;
@@ -51,8 +54,6 @@ async function prepareCalldata(
 }
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 const zksProvider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -65,7 +66,7 @@ async function getCalldata(
 ) {
   // Generate wallet with random private key to load main contract governor.
   const randomWallet = new Wallet(ethers.utils.randomBytes(32), zksProvider, provider);
-  let governor = await (await randomWallet.getMainContract()).getGovernor();
+  let governor = await (await randomWallet.getMainContract()).getAdmin();
   // Apply L1 to L2 mask if needed.
   if (ethers.utils.hexDataLength(await provider.getCode(governor)) != 0) {
     governor = applyL1ToL2Alias(governor);
@@ -138,10 +139,10 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
-      const zkSyncContract = deployer.zkSyncContract(deployWallet);
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;

@@ -11,6 +11,9 @@ pragma solidity 0.8.20;
 /// @author Andreas Bigger <andreas@nascent.xyz>
 /// @author Matt Solomon <matt@mattsolomon.dev>
 contract Multicall3 {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     struct Call {
         address target;
         bytes callData;

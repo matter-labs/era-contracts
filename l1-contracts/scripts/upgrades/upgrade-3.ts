@@ -1,8 +1,12 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
+
 import { Command } from "commander";
 import { diamondCut } from "../../src.ts/diamondCut";
 import { Wallet } from "ethers";
 import { ethers } from "hardhat";
-import { Provider } from "zksync-web3";
+import { Provider } from "zksync-ethers";
 import "@nomiclabs/hardhat-ethers";
 import { web3Provider } from "../utils";
 import { Deployer } from "../../src.ts/deploy";
@@ -41,7 +45,7 @@ const ZERO_ADDRESS = ethers.constants.AddressZero;
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("force-deploy-upgrade-2");
+  program.version("0.1.0").name("force-deploy-upgrade-3");
 
   program
     .command("prepare-calldata")
@@ -82,11 +86,14 @@ async function main() {
 
       const deployer = new Deployer({
         deployWallet,
-        governorAddress: ZERO_ADDRESS,
+        ownerAddress: ZERO_ADDRESS,
         verbose: true,
       });
 
-      const zkSyncContract = IOldDiamondCutFactory.connect(deployer.addresses.ZkSync.DiamondProxy, deployWallet);
+      const zkSyncContract = IOldDiamondCutFactory.connect(
+        deployer.addresses.StateTransition.DiamondProxy,
+        deployWallet
+      );
 
       // Get address of the diamond init contract
       const diamondUpgradeAddress = cmd.diamondUpgradeAddress;
