@@ -74,7 +74,7 @@ describe("Keccak256 tests", function () {
       const expectedOutput = ethers.utils.keccak256(input);
       const result = await getWallets()[0].call({
         to: REAL_KECCAK256_CONTRACT_ADDRESS,
-        data: input
+        data: input,
       });
 
       expect(expectedOutput).to.eq(result);

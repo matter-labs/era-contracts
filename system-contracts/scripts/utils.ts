@@ -1,5 +1,7 @@
 import * as hre from "hardhat";
 
+// We need to import it in order to access correct typing for Hardhat config
+import "@matterlabs/hardhat-zksync-solc";
 import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";

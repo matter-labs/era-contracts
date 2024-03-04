@@ -137,7 +137,7 @@ describe("P256Verify tests", function () {
     const result = await getWallets()[0].call({
       to: REAL_P256VERIFY_CONTRACT_ADDRESS,
       // The signature is valid and yet the input is too long
-      data: compileSignature({}) + '00',
+      data: compileSignature({}) + "00",
     });
 
     expect(result).to.eq("0x");
