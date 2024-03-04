@@ -31,7 +31,7 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
 
         uint256 depositedAmountAfterDeposit = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(depositedAmountAfterDeposit, amount);
-        
+
         vm.prank(alice);
         vm.expectEmit(true, true, true, true, address(bridge));
         emit ClaimedFailedDeposit(alice, address(token), amount);

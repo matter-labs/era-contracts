@@ -70,7 +70,7 @@ contract DepositTest is L1Erc20BridgeTest {
         emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
         bytes32 txHash = bridge.deposit(randomSigner, address(token), amount, 0, 0, address(0));
         assertEq(txHash, dummyL2DepositTxHash);
-        
+
         uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(amount, depositedAmount);
     }

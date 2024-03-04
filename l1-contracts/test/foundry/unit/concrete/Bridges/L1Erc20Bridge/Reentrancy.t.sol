@@ -38,7 +38,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
             .with_key(address(token))
             .with_key(dummyL2DepositTxHash)
             .checked_write(amount);
-        
+
         vm.prank(alice);
         bytes32[] memory merkleProof;
         vm.expectRevert(bytes("r1"));
@@ -115,7 +115,7 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         _claimFailedDepositExpectRevertOnReentrancy();
     }
 
-        function test_finalizeWithdrawalReenterDeposit() public {
+    function test_finalizeWithdrawalReenterDeposit() public {
         reenterL1ERC20Bridge.setFunctionToCall(ReenterL1ERC20Bridge.FunctionToCall.Deposit);
         _finalizeWithdrawalExpectRevertOnReentrancy();
     }
