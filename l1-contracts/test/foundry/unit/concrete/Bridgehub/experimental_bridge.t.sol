@@ -9,11 +9,16 @@ import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
+import {L2TransactionRequestDirect} from "solpp/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyStateTransition} from "solpp/dev-contracts/test/DummyStateTransition.sol";
+import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 
-import {L2Message, L2Log, TxStatus} from "solpp/common/Messaging.sol";
+import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS} from "solpp/common/Config.sol";
+
+//import {UtilsFacet} from "l1-contracts/test/foundry/unit/concrete/Utils/UtilsFacet.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -22,13 +27,16 @@ contract ExperimentalBridgeTest is Test {
     address public bridgeOwner;
     DummyStateTransitionManagerWBH mockSTM;
     DummyStateTransition mockChainContract;
+    DummySharedBridge mockSharedBridge;
     TestnetERC20Token testToken;
+    //UtilsFacet utils;
 
     function setUp() public {
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyStateTransition();
+        mockChainContract = new DummyStateTransition(address(bridgeHub));
+        mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
 
         // test if the ownership of the bridgeHub is set correctly or not
@@ -190,7 +198,6 @@ contract ExperimentalBridgeTest is Test {
         bytes memory mockInitCalldata
     ) public {
         address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
-        address mockSharedBridge = makeAddr("MOCK_SHARED_BRIDGE");
         admin = makeAddr("NEW_CHAIN_ADMIN");
         Diamond.DiamondCutData memory dcData;
 
@@ -198,7 +205,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setDeployer(deployerAddress);
         bridgeHub.addStateTransitionManager(address(mockSTM));
         bridgeHub.addToken(address(testToken));
-        bridgeHub.setSharedBridge(mockSharedBridge);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
         vm.stopPrank();
 
         if(randomCaller != deployerAddress && randomCaller != bridgeOwner) {
@@ -406,6 +413,60 @@ contract ExperimentalBridgeTest is Test {
         vm.clearMockedCalls();
     }
 
+    function test_requestL2TransactionDirect_ETHCase(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps,
+        address mockRefundRecipient,
+        bytes[] memory mockRefundRecipientBH
+    ) public {
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect(
+            mockChainId,
+            mockMintValue,
+            mockL2Contract,
+            mockL2Value,
+            mockL2Calldata,
+            mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps,
+            mockRefundRecipient
+        );
+
+        l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
+
+        assertTrue(!(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS));
+        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true);
+        assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
+
+        _setUpSharedBridge();
+
+        address randomCaller = makeAddr("RANDOM_CALLER");
+        vm.deal(randomCaller, l2TxnReqDirect.mintValue);
+
+        assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+        BridgehubL2TransactionRequest memory bhL2TxnRequest = _createBhL2TxnRequest(mockRefundRecipientBH);
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(
+                mockChainContract.bridgehubRequestL2Transaction.selector,
+                bhL2TxnRequest
+            ),
+            abi.encode(canonicalHash)
+        );
+
+        vm.prank(randomCaller);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+
+        assertTrue(resultantHash == canonicalHash);
+    }
+
 /////////////////////////////////////////////////////////
 // INTERNAL UTILITY FUNCTIONS
 /////////////////////////////////////////////////////////
@@ -491,6 +552,64 @@ contract ExperimentalBridgeTest is Test {
 
         // Now in the StateTransitionManager that has been set for our mockChainId, we set the stateTransition contract as our mockChainContract
         mockSTM.setStateTransition(mockChainId, address(mockChainContract));
+    }
+
+    function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH) internal {
+        address baseToken = tokenIsETH ? ETH_TOKEN_ADDRESS : address(testToken);
+        
+        stdstore
+            .target(address(bridgeHub))
+            .sig("baseToken(uint256)")
+            .with_key(mockChainId)
+            .checked_write(baseToken);
+            
+    }
+
+    function _setUpSharedBridge() internal {
+        vm.prank(bridgeOwner);
+        bridgeHub.setSharedBridge(address(mockSharedBridge));
+    }
+
+    function _createMockL2TransactionRequestDirect(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps,
+        address mockRefundRecipient
+    ) internal returns(L2TransactionRequestDirect memory) {
+        L2TransactionRequestDirect memory l2TxnReqDirect;
+
+        l2TxnReqDirect.chainId = mockChainId;
+        l2TxnReqDirect.mintValue = mockMintValue;
+        l2TxnReqDirect.l2Contract = mockL2Contract;
+        l2TxnReqDirect.l2Value = mockL2Value;
+        l2TxnReqDirect.l2Calldata = mockL2Calldata;
+        l2TxnReqDirect.l2GasLimit = mockL2GasLimit;
+        l2TxnReqDirect.l2GasPerPubdataByteLimit = mockL2GasPerPubdataByteLimit;
+        l2TxnReqDirect.factoryDeps = mockFactoryDeps;
+        l2TxnReqDirect.refundRecipient = mockRefundRecipient;
+
+        return l2TxnReqDirect;
+    }
+
+    function _createBhL2TxnRequest(bytes[] memory mockFactoryDepsBH) internal returns(BridgehubL2TransactionRequest memory) {
+        BridgehubL2TransactionRequest memory bhL2TxnRequest;
+
+        bhL2TxnRequest.sender = makeAddr("BH_L2_REQUEST_SENDER");
+        bhL2TxnRequest.contractL2 = makeAddr("BH_L2_REQUEST_CONTRACT");
+        bhL2TxnRequest.mintValue = block.timestamp;
+        bhL2TxnRequest.l2Value = block.timestamp * 2;
+        bhL2TxnRequest.l2Calldata = abi.encode("mock L2 Calldata");
+        bhL2TxnRequest.l2GasLimit = block.timestamp * 3;
+        bhL2TxnRequest.l2GasPerPubdataByteLimit = block.timestamp * 4;
+        bhL2TxnRequest.factoryDeps = mockFactoryDepsBH;
+        bhL2TxnRequest.refundRecipient = makeAddr("BH_L2_REQUEST_REFUND_RECIPIENT");
+
+        return bhL2TxnRequest;
     }
 
 /////////////////////////////////////////////////////////
