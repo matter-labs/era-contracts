@@ -83,6 +83,7 @@ async function main() {
 
       const pubdataPricingMode = cmd.validiumMode ? PubdataPricingMode.Validium : PubdataPricingMode.Rollup;
 
+      await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice, nonce: nonce++ });
       await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
       await deployer.deployZkSyncContract(pubdataPricingMode, create2Salt, gasPrice, nonce + 1);
       await deployer.deployBridgeContracts(create2Salt, gasPrice); // Do not pass nonce, since it was increment after deploying zkSync contracts
