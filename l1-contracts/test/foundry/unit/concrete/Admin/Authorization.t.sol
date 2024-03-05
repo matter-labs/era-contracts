@@ -32,8 +32,11 @@ contract AuthorizationTest is AdminTest {
     }
 
     function test_changePubdataPricingMode() public {
-        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Rollup, "Initial pubdata pricing mode is not Rollup");
-        
+        require(
+            proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Rollup,
+            "Initial pubdata pricing mode is not Rollup"
+        );
+
         FeeParams memory newParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Validium,
             batchOverheadL1Gas: 1_000,
@@ -45,8 +48,10 @@ contract AuthorizationTest is AdminTest {
         vm.prank(governor);
         proxyAsAdmin.changeFeeParams(newParams);
 
-        require(proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Validium, "Pubdata pricing mode was not changed correctly");
-
+        require(
+            proxyAsGetters.getPubdataPricingMode() == PubdataPricingMode.Validium,
+            "Pubdata pricing mode was not changed correctly"
+        );
     }
 
     function test_changeFeeParams_RevertWhen_PriorityTxMaxPubdataHigherThanMaxPubdataPerBatch() public {
