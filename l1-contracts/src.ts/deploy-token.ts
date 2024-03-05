@@ -37,11 +37,7 @@ export async function deployContracts(tokens: TokenDescription[], wallet: Wallet
 }
 
 function getTestAddresses(mnemonic: string): string[] {
-  return Array.from(
-    { length: 10 },
-    (_, i) =>
-      Wallet.fromMnemonic(mnemonic as string, `m/44'/60'/0'/0/${i}`).address
-  );
+  return Array.from({ length: 10 }, (_, i) => Wallet.fromMnemonic(mnemonic as string, `m/44'/60'/0'/0/${i}`).address);
 }
 
 function unwrapToken(token: TokenDescription): L1Token {
@@ -55,7 +51,12 @@ function unwrapToken(token: TokenDescription): L1Token {
   return token;
 }
 
-export async function mintTokens(tokens: TokenDescription[], wallet: Wallet, nonce: number, mnemonic: string): Promise<L1Token[]> {
+export async function mintTokens(
+  tokens: TokenDescription[],
+  wallet: Wallet,
+  nonce: number,
+  mnemonic: string
+): Promise<L1Token[]> {
   const targetAddresses = [wallet.address, ...getTestAddresses(mnemonic)];
 
   const results = [];

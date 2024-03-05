@@ -4,7 +4,6 @@ import * as hardhat from "hardhat";
 
 // import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
-import type { Contract } from "ethers";
 import { Wallet } from "ethers";
 import { web3Provider } from "./utils";
 
