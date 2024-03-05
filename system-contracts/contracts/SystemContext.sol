@@ -97,6 +97,13 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         gasPrice = _gasPrice;
     }
 
+    /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata. 
+    /// @dev This value does not have any impact on the execution and purely serves as a way for users
+    /// to access the current gas price for the pubdata.
+    function setGasPerPubdataByte(uint256 _gasPerPubdataByte) external onlyCallFromBootloader {
+        gasPerPubdataByte = _gasPerPubdataByte;
+    }
+
     /// @notice The method that emulates `blockhash` opcode in EVM.
     /// @dev Just like the blockhash in the EVM, it returns bytes32(0),
     /// when queried about hashes that are older than 256 blocks ago.

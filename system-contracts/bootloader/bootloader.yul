@@ -602,9 +602,13 @@ object "Bootloader" {
                         let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
                         sendToL1Native(true, protocolUpgradeTxHashKey(), canonicalL1TxHash)
 
+                        setGasPerPubdataByte(userProvidedPubdataPrice)
+
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, false)
                     }
                     case 255 {
+                        setGasPerPubdataByte(userProvidedPubdataPrice)
+                        
                         // This is an L1->L2 transaction.
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true)
                     }
@@ -613,6 +617,8 @@ object "Bootloader" {
                         if lt(userProvidedPubdataPrice, gasPerPubdata) {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
+                        
+                        setGasPerPubdataByte(gasPerPubdata)
                         
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
@@ -2743,6 +2749,17 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("Failed to set gas price", newGasPrice)
                     nearCallPanic()
+                }
+            }
+
+            /// @dev Sets the gas per pubdata byte value in the `SystemContext` contract. 
+            /// @notice Note that it has not actual impact on the execution of the contract.
+            function setGasPerPubdataByte(newGasPerPubdata) {
+                let success := setContextVal({{RIGHT_PADDED_SET_GAS_PER_PUBDATA_BYTE}}, newGasPerPubdata)
+
+                if iszero(success) {
+                    debugLog("setGasPerPubdataByte failed", newGasPerPubdata)
+                    assertionError("setGasPerPubdataByte failed")
                 }
             }
 
