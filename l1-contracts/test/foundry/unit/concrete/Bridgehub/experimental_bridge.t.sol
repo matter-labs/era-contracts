@@ -7,7 +7,7 @@ import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect} from "solpp/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "solpp/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyStateTransition} from "solpp/dev-contracts/test/DummyStateTransition.sol";
 import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol";
@@ -482,9 +482,61 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(resultantHash == canonicalHash);
     }
 
+    // function test_requestL2TransactionTwoBridges(
+    //     uint256 chainId,
+    //     uint256 mintValue,
+    //     uint256 l2Value,
+    //     uint256 l2GasLimit,
+    //     uint256 l2GasPerPubdataByteLimit,
+    //     address refundRecipient,
+    //     address secondBridgeAddress,
+    //     uint256 secondBridgeValue,
+    //     bytes memory secondBridgeCalldata
+    // ) public {
+    //     L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter(
+    //         chainId,
+    //         mintValue,
+    //         l2Value,
+    //         l2GasLimit,
+    //         l2GasPerPubdataByteLimit,
+    //         refundRecipient,
+    //         secondBridgeAddress,
+    //         secondBridgeValue,
+    //         secondBridgeCalldata
+    //     );
+    //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
+    //     assertTrue(true);
+    // }
+
 /////////////////////////////////////////////////////////
 // INTERNAL UTILITY FUNCTIONS
 /////////////////////////////////////////////////////////
+
+    function _createMockL2TransactionRequestTwoBridgesOuter(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 l2Value,
+        uint256 l2GasLimit,
+        uint256 l2GasPerPubdataByteLimit,
+        address refundRecipient,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) internal returns(L2TransactionRequestTwoBridgesOuter memory) {
+        L2TransactionRequestTwoBridgesOuter memory l2Req;
+
+        l2Req.chainId = chainId;
+        l2Req.mintValue = mintValue;
+        l2Req.l2Value = l2Value;
+        l2Req.l2GasLimit = l2GasLimit;
+        l2Req.l2GasPerPubdataByteLimit = l2GasPerPubdataByteLimit;
+        l2Req.refundRecipient = refundRecipient;
+        l2Req.secondBridgeAddress = secondBridgeAddress;
+        l2Req.secondBridgeValue = secondBridgeValue;
+        l2Req.secondBridgeCalldata = secondBridgeCalldata;
+
+        return l2Req;
+    }
 
     function _createMockL2Message(
         uint16 randomTxNumInBatch,
