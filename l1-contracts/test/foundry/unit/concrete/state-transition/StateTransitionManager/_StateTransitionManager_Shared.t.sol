@@ -26,9 +26,14 @@ contract StateTransitionManagerTest is Test {
     GenesisUpgrade internal genesisUpgradeContract;
     address internal bridgehub;
     address internal diamondInit;
-    address internal constant governor = address(0x101010101010101010101);
-    address internal constant admin = address(0x202020202020202020202);
-    address internal constant validator = address(0x0000000000000000000000000000000000004234);
+    address internal constant governor = address(0x1010101);
+    address internal constant admin = address(0x2020202);
+    address internal constant baseToken = address(0x3030303);
+    address internal constant sharedBridge = address(0x4040404);
+    address internal constant validator = address(0x5050505);
+    address internal constant newChainAdmin = address(0x6060606);
+    uint256 chainId = block.chainid;
+
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {

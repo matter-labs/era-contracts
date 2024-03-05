@@ -29,11 +29,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
 
     function testSuccessfulBatchReverting() public {
         // Creating new chain
-
-        address baseToken = address(0x3030303);
-        address sharedBridge = address(0x4040404);
-        address newChainAdmin = bridgehub;
-        uint256 chainId = block.chainid;
+        address newChainAdmin = bridgehub; // check why setting chain admin as bridge increases coverage
 
         vm.stopPrank();
         vm.startPrank(bridgehub);

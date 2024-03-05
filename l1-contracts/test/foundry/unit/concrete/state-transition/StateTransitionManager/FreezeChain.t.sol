@@ -8,11 +8,6 @@ import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol
 
 contract freezeChainTest is StateTransitionManagerTest {
     function testFreezingChain() public {
-        address baseToken = address(0x3030303);
-        address sharedBridge = address(0x4040404);
-        address admin = bridgehub;
-        uint256 chainId = block.chainid;
-
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
