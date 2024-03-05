@@ -7,7 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -148,7 +148,8 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
             3 *
             keccakGasCost(64) +
-            gasSpentOnMessageHashing;
+            gasSpentOnMessageHashing + 
+            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit L1MessageSent(msg.sender, hash, _message);
@@ -170,7 +171,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
 
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`
-        uint256 gasToPay = sha256GasCost(bytecodeLen) + keccakGasCost(64);
+        uint256 gasToPay = sha256GasCost(bytecodeLen) + 
+            keccakGasCost(64) + 
+            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit BytecodeL1PublicationRequested(_bytecodeHash);
