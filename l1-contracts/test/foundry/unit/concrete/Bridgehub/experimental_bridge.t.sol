@@ -464,8 +464,7 @@ contract ExperimentalBridgeTest is Test {
         vm.mockCall(
             address(mockChainContract),
             abi.encodeWithSelector(
-                mockChainContract.bridgehubRequestL2Transaction.selector,
-                bhL2TxnRequest
+                mockChainContract.bridgehubRequestL2Transaction.selector
             ),
             abi.encode(canonicalHash)
         );
@@ -475,12 +474,12 @@ contract ExperimentalBridgeTest is Test {
         mockChainContract.setBridgeHubAddress(address(bridgeHub));
         assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
 
-        vm.txGasPrice(1 ether);
+        vm.txGasPrice(0.05 ether);
 
-        //vm.prank(randomCaller);
+        vm.prank(randomCaller);
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
-        // assertTrue(resultantHash == canonicalHash);
+        assertTrue(resultantHash == canonicalHash);
     }
 
 /////////////////////////////////////////////////////////
