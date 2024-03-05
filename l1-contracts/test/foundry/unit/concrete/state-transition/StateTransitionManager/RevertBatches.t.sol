@@ -27,10 +27,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
     ExecutorFacet internal executorFacet;
     GettersFacet internal gettersFacet;
 
-    function testSuccessfulBatchReverting() public {
-        // Creating new chain
-        address newChainAdmin = bridgehub; // check why setting chain admin as bridge increases coverage
-
+    function test_SuccessfulBatchReverting() public {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
@@ -41,6 +38,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
             newChainAdmin,
             abi.encode(getDiamondCutData(diamondInit))
         );
+
         address newChainAddress = chainContractAddress.stateTransition(chainId);
 
         executorFacet = ExecutorFacet(address(newChainAddress));
@@ -48,6 +46,9 @@ contract revertBatchesTest is StateTransitionManagerTest {
         adminFacet = AdminFacet(address(newChainAddress));
 
         // Initital setup for loge & commits
+        vm.stopPrank();
+        vm.startPrank(newChainAdmin);
+
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: bytes32(""),
@@ -92,6 +93,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransaction(
             expectedSystemContractUpgradeTxHash
         );
+
         correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,

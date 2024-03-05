@@ -7,7 +7,7 @@ import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 
 contract freezeChainTest is StateTransitionManagerTest {
-    function testFreezingChain() public {
+    function test_FreezingChain() public {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 

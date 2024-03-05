@@ -5,7 +5,7 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 
 contract setInitialCutHashTest is StateTransitionManagerTest {
-    function testSettingInitialCutHash() public {
+    function test_SettingInitialCutHash() public {
         bytes32 initialCutHash = keccak256(abi.encode(getDiamondCutData(address(diamondInit))));
         address randomDiamondInit = address(0x303030303030303030303);
 

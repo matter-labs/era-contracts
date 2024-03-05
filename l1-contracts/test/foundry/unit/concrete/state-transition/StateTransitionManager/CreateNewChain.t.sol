@@ -6,7 +6,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
-    function testRevertWhenInitialDiamondCutHashMismatch() public {
+    function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
 
         vm.stopPrank();
@@ -16,7 +16,7 @@ contract createNewChainTest is StateTransitionManagerTest {
         chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(initialDiamondCutData));
     }
 
-    function testRevertWhenCalledNotByBridgehub() public {
+    function test_RevertWhen_CalledNotByBridgehub() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(diamondInit);
 
         vm.expectRevert(bytes("StateTransition: only bridgehub"));
@@ -24,7 +24,7 @@ contract createNewChainTest is StateTransitionManagerTest {
         chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(initialDiamondCutData));
     }
 
-    function testSuccessfulCreationOfNewChain() public {
+    function test_SuccessfulCreationOfNewChain() public {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 

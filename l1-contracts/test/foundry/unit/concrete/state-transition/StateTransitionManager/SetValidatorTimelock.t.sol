@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 
 contract setValidatorTimelockTest is StateTransitionManagerTest {
-    function testSettingValidatorTimelock() public {
+    function test_SettingValidatorTimelock() public {
         assertEq(
             chainContractAddress.validatorTimelock(),
             validator,

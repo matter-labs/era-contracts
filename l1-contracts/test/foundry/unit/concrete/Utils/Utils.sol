@@ -7,6 +7,8 @@ import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
 import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
@@ -95,47 +97,12 @@ library Utils {
     function createSystemLogsWithUpgradeTransaction(
         bytes32 _expectedSystemContractUpgradeTxHash
     ) public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](10);
-        logs[0] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
-            bytes32("")
-        );
-        logs[1] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
-            0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
-        );
-        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32(""));
-        logs[3] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            bytes32("")
-        );
-        logs[4] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[5] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            keccak256("")
-        );
-        logs[6] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32("")
-        );
-        logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
-        logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
-        logs[9] = constructL2Log(
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs();
+        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
+        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
+            logs[i] = logsWithoutUpgradeTx[i];
+        }
+        logs[logsWithoutUpgradeTx.length] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
@@ -193,6 +160,31 @@ library Utils {
         return result;
     }
 
+    function getAdminSelectors() public view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = AdminFacet.setPendingAdmin.selector;
+        selectors[1] = AdminFacet.acceptAdmin.selector;
+        selectors[2] = AdminFacet.setValidator.selector;
+        selectors[3] = AdminFacet.setPorterAvailability.selector;
+        selectors[4] = AdminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = AdminFacet.changeFeeParams.selector;
+        selectors[6] = AdminFacet.setTokenMultiplier.selector;
+        selectors[7] = AdminFacet.upgradeChainFromVersion.selector;
+        selectors[8] = AdminFacet.executeUpgrade.selector;
+        selectors[9] = AdminFacet.freezeDiamond.selector;
+        selectors[10] = AdminFacet.unfreezeDiamond.selector;
+        return selectors;
+    }
+
+    function getExecutorSelectors() public view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](4);
+        selectors[0] = ExecutorFacet.commitBatches.selector;
+        selectors[1] = ExecutorFacet.proveBatches.selector;
+        selectors[2] = ExecutorFacet.executeBatches.selector;
+        selectors[3] = ExecutorFacet.revertBatches.selector;
+        return selectors;
+    }
+
     function getGettersSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
@@ -223,6 +215,7 @@ library Utils {
         selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
         selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
         return selectors;
     }
 
