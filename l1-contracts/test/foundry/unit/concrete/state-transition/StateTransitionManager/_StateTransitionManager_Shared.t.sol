@@ -86,14 +86,12 @@ contract StateTransitionManagerTest is Test {
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
-            "" // add here initialize
+            abi.encodeCall(chainContractAddress.initialize, stmInitializeData)
         );
         chainContractAddress = StateTransitionManager(address(transparentUpgradeableProxy));
 
         vm.stopPrank();
         vm.startPrank(governor);
-
-        chainContractAddress.initialize(stmInitializeData); // Move this to initializer
     }
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
