@@ -34,6 +34,20 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "MailboxFacet";
 
+    /// @inheritdoc IMailbox
+    function transferEthToSharedBridge() external onlyBaseTokenBridge {
+        require(s.chainId == ERA_CHAIN_ID, "transferEthToSharedBridge only available for Era on mailbox");
+
+        uint256 amount = address(this).balance;
+        bool callSuccess;
+        address sharedBridgeAddress = s.baseTokenBridge;
+        // Low-level assembly call, to avoid any memory copying (save gas)
+        assembly {
+            callSuccess := call(gas(), sharedBridgeAddress, amount, 0, 0, 0, 0)
+        }
+        require(callSuccess, "ShB: transferEthToSharedBridge failed");
+    }
+
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest memory _request
