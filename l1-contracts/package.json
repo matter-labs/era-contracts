@@ -56,6 +56,7 @@
   "scripts": {
     "build": "hardhat compile",
     "clean": "hardhat clean",
+    "clean:foundry": "forge clean",
     "test": "hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:foundry": "hardhat solpp && forge test",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",
