@@ -38,7 +38,7 @@ describe("L1Messenger tests", () => {
     // setup
     stateDiffsSetupData = await setupStateDiffs();
     logData = setupLogData(l1MessengerAccount, l1Messenger);
-    bytecodeData = await setupBytecodeData(l1Messenger.address);
+    bytecodeData = await setupBytecodeData(ethers.constants.AddressZero);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
