@@ -12,14 +12,12 @@ import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
  * @notice The contract that allows to limit the final gas expenditure of the call.
  */
 contract GasBoundCaller {
-    // TODO: cover the constants below with tests.
-
     /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` ergs are used for the O(1) operations at the start
     /// of execution of the contract, such as abi decoding the parameters, jumping to the correct function, etc.
-    uint256 constant CALL_ENTRY_OVERHEAD = 100;
+    uint256 constant CALL_ENTRY_OVERHEAD = 800;
     /// @notice We assume that no more than `CALL_RETURN_OVERHEAD` ergs are used for the O(1) operations at the end of the execution,
     /// as such relaying the return.
-    uint256 constant CALL_RETURN_OVERHEAD = 50;
+    uint256 constant CALL_RETURN_OVERHEAD = 200;
 
     /// @notice The function that implements limiting of the total gas expenditure of the call.
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
@@ -34,17 +32,17 @@ contract GasBoundCaller {
     /// @param _maxTotalGas The maximum amount of gas that can be spent by the call.
     /// @param _data The calldata for the call.
     function gasBoundCall(address _to, uint256 _maxTotalGas, bytes calldata _data) external payable {
-        // We expect that the `_maxTotalGas` at least includes the `gas` required for the call.
-        // This require is more of a safety protection for the users that call this function with incorrect parameters.
-        //
-        // Ultimately, the entire `gas` sent to this call can be spent on compute regardless of the `_maxTotalGas` parameter.
-        require(_maxTotalGas >= gasleft(), "Gas limit is too low");
-
         // At the start of the execution we deduce how much gas be spent on things that will be
         // paid for later on by the transaction.
         // The `expectedForCompute` variable is an upper bound of how much this contract can spend on compute and
         // MUST be higher or equal to the `gas` passed into the call.
         uint256 expectedForCompute = gasleft() + CALL_ENTRY_OVERHEAD;
+
+        // We expect that the `_maxTotalGas` at least includes the `gas` required for the call.
+        // This require is more of a safety protection for the users that call this function with incorrect parameters.
+        //
+        // Ultimately, the entire `gas` sent to this call can be spent on compute regardless of the `_maxTotalGas` parameter.
+        require(_maxTotalGas >= gasleft(), "Gas limit is too low");
 
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
