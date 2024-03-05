@@ -126,6 +126,13 @@ contract StateTransitionManagerTest is Test {
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
+    function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal {
+        vm.stopPrank();
+        vm.startPrank(bridgehub);
+
+        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, newChainAdmin, abi.encode(_diamondCut));
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

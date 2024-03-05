@@ -28,16 +28,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
     GettersFacet internal gettersFacet;
 
     function test_SuccessfulBatchReverting() public {
-        vm.stopPrank();
-        vm.startPrank(bridgehub);
-
-        chainContractAddress.createNewChain(
-            chainId,
-            baseToken,
-            sharedBridge,
-            newChainAdmin,
-            abi.encode(getDiamondCutData(diamondInit))
-        );
+        createNewChain(getDiamondCutData(diamondInit));
 
         address newChainAddress = chainContractAddress.stateTransition(chainId);
 

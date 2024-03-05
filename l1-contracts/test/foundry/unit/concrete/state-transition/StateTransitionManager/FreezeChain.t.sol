@@ -8,16 +8,7 @@ import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol
 
 contract freezeChainTest is StateTransitionManagerTest {
     function test_FreezingChain() public {
-        vm.stopPrank();
-        vm.startPrank(bridgehub);
-
-        chainContractAddress.createNewChain(
-            chainId,
-            baseToken,
-            sharedBridge,
-            admin,
-            abi.encode(getDiamondCutData(diamondInit))
-        );
+        createNewChain(getDiamondCutData(diamondInit));
 
         address newChainAddress = chainContractAddress.stateTransition(chainId);
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
