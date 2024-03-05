@@ -8,7 +8,7 @@ import { Language } from "../scripts/constants";
 import { expect } from "chai";
 import { prepareEnvironment } from "./shared/mocks";
 
-describe("P256Verifyy tests", function () {
+describe("CodeOracle tests", function () {
   let oldCodeOracleCode: string;
   let testedCodeOracleCode: string;
 
