@@ -5,19 +5,22 @@ import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 
 import type { BigNumberish } from "ethers";
-// import type { Wallet } from "ethers";
+import { BigNumber, ethers } from "ethers";
 
-import { ethers } from "ethers";
-
-// import type { FacetCut, DiamondCut } from "./diamondCut";
-// import { getFacetCutsForUpgrade } from "./diamondCut";
+import type { DiamondCut } from "./diamondCut";
+import { getFacetCutsForUpgrade } from "./diamondCut";
 
 import type { Deployer } from "./deploy";
 
-// import { Interface } from "ethers/lib/utils";
-// import { Diamond, Verifier } from "../typechain";
-// import { Address } from "zksync-ethers/build/src/types";
-// import { L2CanonicalTransaction, ProposedUpgrade, VerifierParams, SYSTEM_UPGRADE_L2_TX_TYPE } from "./utils";
+import { Interface } from "ethers/lib/utils";
+import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
+
+import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
+
+const SYSTEM_UPGRADE_TX_TYPE = 254;
+const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
+// const CONTRACT_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008006";
+// const COMPLEX_UPGRADE_ADDRESS = "0x000000000000000000000000000000000000800f";
 
 export async function upgradeToHyperchains(
   deployer: Deployer,
@@ -32,17 +35,17 @@ export async function upgradeToHyperchains(
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
   // but this requires the sharedBridge to be deployed.
   // kl to: (is this needed?) disable shared bridge deposits until L2Bridge is upgraded.
-  //   await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice, create2Salt, nonce);
+  await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice, create2Salt, nonce);
 
   // the L2Bridge and L1ERC20Bridge should be updated relatively in sync, as new messages might not be parsed correctly by the old bridge.
   // however new bridges can parse old messages. L1->L2 messages are faster, so L2 side is upgraded first.
   // until we integrate Era into the Bridgehub, txs will not work.
-  //   await upgradeL2Bridge(deployer, gasPrice, create2Salt, nonce);
+  await upgradeL2Bridge(deployer, gasPrice, create2Salt, nonce);
   // kl todo add both bridge address to L2Bridge, so that it can receive txs from both bridges
   // kl todo: enable L1SharedBridge deposits if disabled.
-  //   await upgradeL1ERC20Bridge(deployer, gasPrice, create2Salt, nonce);
+  await upgradeL1ERC20Bridge(deployer, gasPrice, create2Salt, nonce);
   // // note, withdrawals will not work until this step, but deposits will
-  //   await migrateBridges(deployer, gasPrice, create2Salt, nonce);
+  await migrateBridges(deployer, gasPrice, create2Salt, nonce);
 }
 
 async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
@@ -93,71 +96,127 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
 }
 
-// async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
-//   deployer: Deployer,
-//   gasPrice: BigNumberish,
-//   create2Salt?: string,
-//   nonce?: number
-// ) {
-// era facet cut
-//   const defaultUpgrade = new Interface(hardhat.artifacts.readArtifactSync("DefaultUpgrade").abi);
-// const verifierParams: VerifierParams = {recursionNodeLevelVkHash: ethers.constants.HashZero , recursionLeafLevelVkHash:  ethers.constants.HashZero, recursionCircuitsSetVksHash: ethers.constants.HashZero };
-// const l2ProtocolUpgradeTx : L2CanonicalTransaction = {txType: SYSTEM_UPGRADE_L2_TX_TYPE, from: L2_F, to: , gasLimit: , gasPerPubdataByteLimit:, maxFeePerGas:, maxPriorityFeePerGas:, paymaster: , nonce: , value: , reserved: , data: , signature: , factoryDeps: , paymasterInput: , reservedDynamic: } ;
-// const proposedUpgrade : ProposedUpgrade = {l2ProtocolUpgradeTx , factoryDeps: [] , bootloaderHash: ethers.constants.HashZero , defaultAccountHash: ethers.constants.HashZero, verifier: ethers.constants.AddressZero, verifierParams: , l1ContractsUpgradeCalldata: , postUpgradeCalldata: , upgradeTimestamp: , newProtocolVersion: };
-// const defaultUpgradeData  = defaultUpgrade.encodeFunctionData("upgrade", [proposedUpgrade]);
+async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
+  deployer: Deployer,
+  gasPrice: BigNumberish,
+  create2Salt?: string,
+  nonce?: number
+) {
+  // era facet cut
+  const defaultUpgrade = new Interface(hardhat.artifacts.readArtifactSync("DefaultUpgrade").abi);
+  const verifierParams: VerifierParams = {
+    recursionNodeLevelVkHash: ethers.constants.HashZero,
+    recursionLeafLevelVkHash: ethers.constants.HashZero,
+    recursionCircuitsSetVksHash: ethers.constants.HashZero,
+  };
 
-// const facetCuts = await getFacetCutsForUpgrade(deployer.deployWallet, deployer.addresses.StateTransition.DiamondProxy, deployer.addresses.StateTransition.AdminFacet, deployer.addresses.StateTransition.GettersFacet, deployer.addresses.StateTransition.MailboxFacet, deployer.addresses.StateTransition.ExecutorFacet);
-// const diamondCut : DiamondCut = {facetCuts, initAddress: deployer.addresses.StateTransition.DefaultUpgrade, initCalldata: defaultUpgradeData}
+  const toAddress: string = ethers.constants.AddressZero;
+  const calldata: string = ethers.constants.HashZero;
+  const l2ProtocolUpgradeTx: L2CanonicalTransaction = {
+    txType: SYSTEM_UPGRADE_TX_TYPE,
+    from: FORCE_DEPLOYER_ADDRESS,
+    to: toAddress,
+    gasLimit: 72_000_000,
+    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    maxFeePerGas: 0,
+    maxPriorityFeePerGas: 0,
+    paymaster: 0,
+    nonce,
+    value: 0,
+    reserved: [0, 0, 0, 0],
+    data: calldata,
+    signature: "0x",
+    factoryDeps: [],
+    paymasterInput: "0x",
+    reservedDynamic: "0x",
+  };
+  const upgradeTimestamp = BigNumber.from(100);
 
-// const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("IAdmin").abi);
-// const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
+  const proposedUpgrade: ProposedUpgrade = {
+    l2ProtocolUpgradeTx,
+    factoryDeps: [],
+    bootloaderHash: ethers.constants.HashZero,
+    defaultAccountHash: ethers.constants.HashZero,
+    verifier: ethers.constants.AddressZero,
+    verifierParams: verifierParams,
+    l1ContractsUpgradeCalldata: ethers.constants.HashZero,
+    postUpgradeCalldata: ethers.constants.HashZero,
+    upgradeTimestamp: upgradeTimestamp,
+    newProtocolVersion: 24,
+  };
+  const defaultUpgradeData = defaultUpgrade.encodeFunctionData("upgrade", [proposedUpgrade]);
 
-// const call :  {target: string, value: BigNumberish, data: string} = {target : deployer.addresses.StateTransition.DiamondProxy, value : "0", data}
-// const predecessor = ethers.constants.HashZero; // kl todo, we might want to have a proper predecessor on mainnet
-// const salt = ethers.constants.HashZero;
+  const facetCuts = await getFacetCutsForUpgrade(
+    deployer.deployWallet,
+    deployer.addresses.StateTransition.DiamondProxy,
+    deployer.addresses.StateTransition.AdminFacet,
+    deployer.addresses.StateTransition.GettersFacet,
+    deployer.addresses.StateTransition.MailboxFacet,
+    deployer.addresses.StateTransition.ExecutorFacet
+  );
+  const diamondCut: DiamondCut = {
+    facetCuts,
+    initAddress: deployer.addresses.StateTransition.DefaultUpgrade,
+    initCalldata: defaultUpgradeData,
+  };
 
-// const operation = {calls: [call], predecessor, salt}
+  const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("IAdmin").abi);
+  const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
 
-// const governanceContract = deployer.governanceContract(deployer.deployWallet);
-// await governanceContract.scheduleTransparent(operation, 0);
-// await governanceContract.execute(operation);
-// // bridgehub set Era
-// const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-// // kl todo
-// // STM set era diamond
-// const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
-// kl todo
-// }
+  const call: { target: string; value: BigNumberish; data: string } = {
+    target: deployer.addresses.StateTransition.DiamondProxy,
+    value: "0",
+    data,
+  };
+  const predecessor = ethers.constants.HashZero; // kl todo, we might want to have a proper predecessor on mainnet
+  const salt = ethers.constants.HashZero;
 
-// async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
-//   // upgrade L2 bridge contract, we do this directly via the L2
-//   // set initializeChainGovernance in L1SharedBridge
-// }
+  const operation = { calls: [call], predecessor, salt };
 
-// async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
-//   // upgrade old contracts
-//   await deployer.upgradeL1ERC20Bridge(true);
-// }
+  const governanceContract = deployer.governanceContract(deployer.deployWallet);
+  await governanceContract.scheduleTransparent(operation, 0);
+  await governanceContract.execute(operation);
+  //   // bridgehub set Era
+  //   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+  //   // kl todo
+  //   // STM set era diamond
+  //   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  //   // kl todo
+}
 
-// async function migrateBridges(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
-//   migrateEthFromMailboxAndChainBalance(deployer, gasPrice, create2Salt, nonce);
-//   migrateAssetsFromL1ERC20BridgeAndChainBalance(deployer, gasPrice, create2Salt, nonce);
-// }
+async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
+  // upgrade L2 bridge contract, we do this directly via the L2
+  // set initializeChainGovernance in L1SharedBridge
+  console.log(deployer, gasPrice, create2Salt, nonce);
+}
 
-// async function migrateAssetsFromL1ERC20BridgeAndChainBalance(
-//   deployer: Deployer,
-//   gasPrice: BigNumberish,
-//   create2Salt?: string,
-//   nonce?: number
-// ) {
-//   // migrate assets from L1 ERC20 bridge
-// }
+async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
+  // upgrade old contracts
+  await deployer.upgradeL1ERC20Bridge(true);
+  console.log(deployer, gasPrice, create2Salt, nonce);
+}
 
-// async function migrateEthFromMailboxAndChainBalance(
-//   deployer: Deployer,
-//   gasPrice: BigNumberish,
-//   create2Salt?: string,
-//   nonce?: number
-// ) {
-//   // migrate eth from mailbox
-// }
+async function migrateBridges(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
+  migrateEthFromMailboxAndChainBalance(deployer, gasPrice, create2Salt, nonce);
+  migrateAssetsFromL1ERC20BridgeAndChainBalance(deployer, gasPrice, create2Salt, nonce);
+}
+
+async function migrateAssetsFromL1ERC20BridgeAndChainBalance(
+  deployer: Deployer,
+  gasPrice: BigNumberish,
+  create2Salt?: string,
+  nonce?: number
+) {
+  // migrate assets from L1 ERC20 bridge
+  console.log(deployer, gasPrice, create2Salt, nonce);
+}
+
+async function migrateEthFromMailboxAndChainBalance(
+  deployer: Deployer,
+  gasPrice: BigNumberish,
+  create2Salt?: string,
+  nonce?: number
+) {
+  // migrate eth from mailbox
+  console.log(deployer, gasPrice, create2Salt, nonce);
+}
