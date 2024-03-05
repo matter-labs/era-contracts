@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../../Utils/Utils.sol";
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK } from "solpp/common/Config.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "solpp/common/Config.sol";
 import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
@@ -15,7 +15,6 @@ import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 
 contract revertBatchesTest is StateTransitionManagerTest {
-
     // Items for logs & commits
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
@@ -29,7 +28,6 @@ contract revertBatchesTest is StateTransitionManagerTest {
     GettersFacet internal gettersFacet;
 
     function testSuccessfulBatchReverting() public {
-
         // Creating new chain
 
         address baseToken = address(0x3030303);
@@ -40,7 +38,13 @@ contract revertBatchesTest is StateTransitionManagerTest {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, newChainAdmin, abi.encode(getDiamondCutData(diamondInit)));
+        chainContractAddress.createNewChain(
+            chainId,
+            baseToken,
+            sharedBridge,
+            newChainAdmin,
+            abi.encode(getDiamondCutData(diamondInit))
+        );
         address newChainAddress = chainContractAddress.stateTransition(chainId);
 
         executorFacet = ExecutorFacet(address(newChainAddress));
@@ -58,7 +62,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
             timestamp: 0,
             commitment: bytes32("")
         });
-        
+
         adminFacet.setTokenMultiplier(1, 1);
 
         uint256[] memory recursiveAggregationInput;
@@ -89,7 +93,9 @@ contract revertBatchesTest is StateTransitionManagerTest {
         currentTimestamp = block.timestamp;
 
         bytes32 expectedSystemContractUpgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
-        bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransaction(expectedSystemContractUpgradeTxHash);
+        bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransaction(
+            expectedSystemContractUpgradeTxHash
+        );
         correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,

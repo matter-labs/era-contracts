@@ -12,23 +12,29 @@ contract freezeChainTest is StateTransitionManagerTest {
         address sharedBridge = address(0x4040404);
         address admin = bridgehub;
         uint256 chainId = block.chainid;
-        
+
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(getDiamondCutData(diamondInit)));
+        chainContractAddress.createNewChain(
+            chainId,
+            baseToken,
+            sharedBridge,
+            admin,
+            abi.encode(getDiamondCutData(diamondInit))
+        );
 
         address newChainAddress = chainContractAddress.stateTransition(chainId);
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
 
-        vm.stopPrank();   
+        vm.stopPrank();
         vm.startPrank(governor);
 
         chainContractAddress.freezeChain(block.chainid);
 
-        // Repeated call should revert 
+        // Repeated call should revert
         vm.expectRevert(bytes.concat("q1")); // storage frozen
         chainContractAddress.freezeChain(block.chainid);
 

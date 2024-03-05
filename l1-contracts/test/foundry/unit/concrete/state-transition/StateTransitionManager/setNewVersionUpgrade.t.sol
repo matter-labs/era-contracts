@@ -7,7 +7,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 contract setNewVersionUpgradeTest is StateTransitionManagerTest {
     function testSettingNewVersionUpgrade() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
-        
+
         address randomDiamondInit = address(0x303030303030303030303);
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));

@@ -92,7 +92,9 @@ library Utils {
         return logs;
     }
 
-    function createSystemLogsWithUpgradeTransaction(bytes32 _expectedSystemContractUpgradeTxHash) public pure returns (bytes[] memory) {
+    function createSystemLogsWithUpgradeTransaction(
+        bytes32 _expectedSystemContractUpgradeTxHash
+    ) public pure returns (bytes[] memory) {
         bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
@@ -133,7 +135,12 @@ library Utils {
         );
         logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
         logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
-        logs[9] = constructL2Log(true, L2_BOOTLOADER_ADDRESS, uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY), _expectedSystemContractUpgradeTxHash);
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            _expectedSystemContractUpgradeTxHash
+        );
         return logs;
     }
 

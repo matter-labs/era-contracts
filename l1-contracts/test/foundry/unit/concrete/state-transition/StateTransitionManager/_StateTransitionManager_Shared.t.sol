@@ -25,12 +25,12 @@ contract StateTransitionManagerTest is Test {
     StateTransitionManager internal chainContractAddress;
     GenesisUpgrade internal genesisUpgradeContract;
     address internal bridgehub;
-    address internal diamondInit; 
+    address internal diamondInit;
     address internal constant governor = address(0x101010101010101010101);
     address internal constant admin = address(0x202020202020202020202);
-    address internal validator = address(0x0000000000000000000000000000000000004234);
+    address internal constant validator = address(0x0000000000000000000000000000000000004234);
     Diamond.FacetCut[] internal facetCuts;
-    
+
     function setUp() public {
         bridgehub = makeAddr("bridgehub");
 
@@ -72,10 +72,28 @@ contract StateTransitionManagerTest is Test {
             })
         );
 
+        StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
+            governor: address(0),
+            validatorTimelock: validator,
+            genesisUpgrade: address(genesisUpgradeContract),
+            genesisBatchHash: bytes32(""),
+            genesisIndexRepeatedStorageChanges: 0,
+            genesisBatchCommitment: bytes32(""),
+            diamondCut: getDiamondCutData(address(diamondInit)),
+            protocolVersion: 0
+        });
+
+        vm.expectRevert(bytes.concat("StateTransition: governor zero"));
+        TransparentUpgradeableProxy transparentUpgradeableProxyReverting = new TransparentUpgradeableProxy(
+            address(stateTransitionManager),
+            admin,
+            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)
+        );
+
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
             governor: governor,
             validatorTimelock: validator,
-            genesisUpgrade:  address(genesisUpgradeContract), 
+            genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
             genesisIndexRepeatedStorageChanges: 0,
             genesisBatchCommitment: bytes32(""),
@@ -86,7 +104,7 @@ contract StateTransitionManagerTest is Test {
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
-            abi.encodeCall(chainContractAddress.initialize, stmInitializeData)
+            abi.encodeCall(StateTransitionManager.initialize, stmInitializeData)
         );
         chainContractAddress = StateTransitionManager(address(transparentUpgradeableProxy));
 
@@ -153,17 +171,12 @@ contract StateTransitionManagerTest is Test {
         return selectors;
     }
 
-    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {    
+    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
 
         bytes memory initCalldata = abi.encode(initializeData);
 
-        return
-            Diamond.DiamondCutData({
-                facetCuts: facetCuts,
-                initAddress: _diamondInit,
-                initCalldata: initCalldata
-            });
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }
 
     // add this to be excluded from coverage report
