@@ -602,13 +602,9 @@ object "Bootloader" {
                         let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
                         sendToL1Native(true, protocolUpgradeTxHashKey(), canonicalL1TxHash)
 
-                        setGasPerPubdataByte(userProvidedPubdataPrice)
-
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, false)
                     }
                     case 255 {
-                        setGasPerPubdataByte(userProvidedPubdataPrice)
-                        
                         // This is an L1->L2 transaction.
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, true)
                     }
@@ -617,8 +613,6 @@ object "Bootloader" {
                         if lt(userProvidedPubdataPrice, gasPerPubdata) {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
-                        
-                        setGasPerPubdataByte(gasPerPubdata)
                         
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
@@ -944,7 +938,7 @@ object "Bootloader" {
                 let gasUsedOnPreparation := 0
                 let canonicalL1TxHash := 0
 
-                canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset)
+                canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset, gasPerPubdata, basePubdataSpent)
 
                 let refundGas := 0
                 let success := 0
@@ -1077,10 +1071,18 @@ object "Bootloader" {
 
             /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.
             /// @param txDataOffset The offset to the transaction's information
+            /// @param gasPerPubdata The price per each pubdata byte in L2 gas
+            /// @param basePubdataSpent The amount of pubdata spent at the start of the transaction
             /// @return canonicalL1TxHash The hash of processed L1->L2 transaction
             /// @return gasUsedOnPreparation The number of L2 gas used in the preparation stage
-            function l1TxPreparation(txDataOffset) -> canonicalL1TxHash, gasUsedOnPreparation {
+            function l1TxPreparation(
+                txDataOffset,
+                gasPerPubdata,
+                basePubdataSpent
+            ) -> canonicalL1TxHash, gasUsedOnPreparation {
                 let innerTxDataOffset := add(txDataOffset, 32)
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
                 
                 let gasBeforePreparation := gas()
                 debugLog("gasBeforePreparation", gasBeforePreparation)
@@ -1287,6 +1289,8 @@ object "Bootloader" {
 
                 // Appending the transaction's hash to the current L2 block
                 appendTransactionHash(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), false)
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
 
                 checkEnoughGas(gasLimitForTx)
 
@@ -2754,12 +2758,27 @@ object "Bootloader" {
 
             /// @dev Sets the gas per pubdata byte value in the `SystemContext` contract. 
             /// @notice Note that it has not actual impact on the execution of the contract.
-            function setGasPerPubdataByte(newGasPerPubdata) {
-                let success := setContextVal({{RIGHT_PADDED_SET_GAS_PER_PUBDATA_BYTE}}, newGasPerPubdata)
+            function setPubdataInfo(
+                newGasPerPubdata,
+                basePubdataSpent
+            ) {
+                mstore(0, {{RIGHT_PADDED_SET_PUBDATA_INFO}})
+                mstore(4, newGasPerPubdata)
+                mstore(36, basePubdataSpent)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    68,
+                    0,
+                    0
+                )
 
                 if iszero(success) {
-                    debugLog("setGasPerPubdataByte failed", newGasPerPubdata)
-                    assertionError("setGasPerPubdataByte failed")
+                    debugLog("setPubdataInfo failed", newGasPerPubdata)
+                    assertionError("setPubdataInfo failed")
                 }
             }
 

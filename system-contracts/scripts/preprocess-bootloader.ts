@@ -60,7 +60,7 @@ const params = {
   RIGHT_PADDED_POST_TRANSACTION_SELECTOR: getPaddedSelector("IPaymaster", "postTransaction"),
   RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector("SystemContext", "setTxOrigin"),
   RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector("SystemContext", "setGasPrice"),
-  RIGHT_PADDED_SET_GAS_PER_PUBDATA_BYTE: getPaddedSelector("SystemContext", "setGasPerPubdataByte"),
+  RIGHT_PADDED_SET_PUBDATA_INFO: getPaddedSelector("SystemContext", "setPubdataInfo"),
   RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "incrementTxNumberInBatch"),
   RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "resetTxNumberInBatch"),
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),

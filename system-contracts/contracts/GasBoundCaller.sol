@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 
@@ -47,7 +46,7 @@ contract GasBoundCaller {
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
 
-        uint32 pubdataPublishedBefore = SystemContractHelper.getZkSyncMeta().pubdataPublished;
+        uint32 pubdataPublishedBefore = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
@@ -55,7 +54,7 @@ contract GasBoundCaller {
         // other checks are needed.
         bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
 
-        uint32 pubdataPublishedAfter = SystemContractHelper.getZkSyncMeta().pubdataPublished;
+        uint32 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
         // some of the previously created state diffs
