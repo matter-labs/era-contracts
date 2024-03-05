@@ -46,6 +46,8 @@ export async function initialTestnetDeploymentProcess(
   const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
+  // deploy the verifier first
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
   await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName);
   return deployer;
