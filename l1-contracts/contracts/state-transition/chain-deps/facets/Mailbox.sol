@@ -34,13 +34,10 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "MailboxFacet";
 
-    event Debugger(string);
-
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest memory _request
     ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
-        emit Debugger("1");
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
@@ -224,12 +221,11 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        emit Debugger("2");
         address l2Sender = _request.sender;
         if (l2Sender != tx.origin) {
             l2Sender = AddressAliasHelper.applyL1ToL2Alias(_request.sender);
         }
-        emit Debugger("3");
+
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
         // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
@@ -247,7 +243,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
         params.refundRecipient = _request.refundRecipient;
 
-        emit Debugger("4");
         canonicalTxHash = _requestL2Transaction(
             _request.mintValue,
             params,
@@ -256,7 +251,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             false
         );
     }
-    event DebugNumber(uint256);
+
     function _requestL2Transaction(
         uint256 _mintValue,
         WritePriorityOpParams memory _params,
@@ -264,19 +259,16 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes[] memory _factoryDeps,
         bool _isFree
     ) internal returns (bytes32 canonicalTxHash) {
-        emit Debugger("5");
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
         _params.txId = s.priorityQueue.getTotalPriorityTxs();
 
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
-        emit Debugger("6");
-        emit DebugNumber(tx.gasprice);
-        emit DebugNumber(_params.l2GasPricePerPubdata);
+
         _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
         require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
-        emit Debugger("7");
+
         // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
         address refundRecipient = _params.refundRecipient == address(0) ? _params.sender : _params.refundRecipient;
         // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
@@ -288,7 +280,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
         _params.valueToMint = _mintValue;
-        emit Debugger("8");
+
         canonicalTxHash = _writePriorityOp(_params, _calldata, _factoryDeps);
     }
 
@@ -324,11 +316,10 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes memory _calldata,
         bytes[] memory _factoryDeps
     ) internal returns (bytes32 canonicalTxHash) {
-        emit Debugger("9");
         L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams, _calldata, _factoryDeps);
 
         bytes memory transactionEncoding = abi.encode(transaction);
-        emit Debugger("10");
+
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
@@ -337,7 +328,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
 
         canonicalTxHash = keccak256(transactionEncoding);
-        emit Debugger("11");
+
         s.priorityQueue.pushBack(
             PriorityOperation({
                 canonicalTxHash: canonicalTxHash,
