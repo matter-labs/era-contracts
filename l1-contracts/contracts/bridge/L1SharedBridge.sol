@@ -112,6 +112,27 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
+    /// @dev tranfer tokens from legacy erc20 bridge and set chainBalance as part of migration process
+    function transferTokenFromERC20Bridge(address _token) external onlyOwner {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            IMailbox(ERA_DIAMOND_PROXY).transferEthToSharedBridge();
+        } else {
+            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
+            uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
+            require(amount > 0, "ShB: 0 amount to transfer");
+            legacyBridge.tranferTokenToSharedBridge(_token, amount);
+            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
+            require(balanceAfter - balanceBefore == amount, "ShB: wrong amount transferred");
+            chainBalance[ERA_CHAIN_ID][_token] = chainBalance[ERA_CHAIN_ID][_token] + amount;
+        }
+    }
+
+    /// @dev only used to receive funds from Era diamond Proxy as part of migration process
+    function receive() external payable {
+        require(msg.sender == ERA_DIAMOND_PROXY, "ShB: not era diamond proxy");
+        chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] = chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] + msg.value;
+    }
+
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
         l2BridgeAddress[_chainId] = _l2BridgeAddress;
@@ -227,7 +248,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain it is an ERC20
+            bytes memory name = bytes("Ether");
+            bytes memory symbol = bytes("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }
 
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));

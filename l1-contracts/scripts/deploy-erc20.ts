@@ -8,7 +8,7 @@ import { Wallet } from "ethers";
 import { web3Provider } from "./utils";
 
 import type { TokenDescription } from "../src.ts/deploy-token";
-import { deployTokens } from "../src.ts/deploy-token";
+import { deployTokens, deployContracts, mintTokens } from "../src.ts/deploy-token";
 
 import { ethTestConfig } from "../src.ts/utils";
 
@@ -54,7 +54,10 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-      console.log(JSON.stringify(await deployTokens(tokens, wallet, ethTestConfig.mnemonic, true, false), null, 2));
+      const nonce = await deployContracts(tokens, wallet);
+      const result = await mintTokens(tokens, wallet, nonce, ethTestConfig.mnemonic);
+
+      console.log(JSON.stringify(result, null, 2));
     });
 
   await program.parseAsync(process.argv);

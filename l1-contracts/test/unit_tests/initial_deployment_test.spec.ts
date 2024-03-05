@@ -11,9 +11,6 @@ import { ethTestConfig } from "../../src.ts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
 
-// todo I had trouble making this work, there is some importation error
-// import {deploySharedBridgeOnL2ThroughL1} from "../../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
-
 describe("Initial deployment", function () {
   let bridgehub: Bridgehub;
   let stateTransition: StateTransitionManager;

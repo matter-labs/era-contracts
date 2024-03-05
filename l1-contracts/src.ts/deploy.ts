@@ -15,6 +15,7 @@ import {
   getNumberFromEnv,
   PubdataPricingMode,
   hashL2Bytecode,
+  DIAMOND_CUT_DATA_ABI_STRING,
 } from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
@@ -408,18 +409,23 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeImplementation = contractAddress;
   }
 
-  public async upgradeL1ERC20Bridge() {
+  public async upgradeL1ERC20Bridge(alreadyInitialized: boolean = false) {
     if (process.env.CHAIN_ETH_NETWORK === "localhost") {
       // we need to wait here for a new block
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
     const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const calldata = proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
-      this.addresses.Bridges.ERC20BridgeProxy,
-      this.addresses.Bridges.ERC20BridgeImplementation,
-      l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
-    ]);
+    const calldata = alreadyInitialized
+      ? proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+          this.addresses.Bridges.ERC20BridgeProxy,
+          this.addresses.Bridges.ERC20BridgeImplementation,
+        ])
+      : proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
+          this.addresses.Bridges.ERC20BridgeProxy,
+          this.addresses.Bridges.ERC20BridgeImplementation,
+          l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
+        ]);
 
     await this.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
     if (this.verbose) {
@@ -611,8 +617,7 @@ export class Deployer {
     await this.deployAdminFacet(create2Salt, { gasPrice, nonce: nonce + 1 });
     await this.deployMailboxFacet(create2Salt, { gasPrice, nonce: nonce + 2 });
     await this.deployGettersFacet(create2Salt, { gasPrice, nonce: nonce + 3 });
-    await this.deployVerifier(create2Salt, { gasPrice, nonce: nonce + 4 });
-    await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 5 });
+    await this.deployStateTransitionDiamondInit(create2Salt, { gasPrice, nonce: nonce + 4 });
   }
 
   public async registerStateTransitionManager() {
@@ -637,12 +642,7 @@ export class Deployer {
     const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
-    const initialDiamondCut = new ethers.utils.AbiCoder().encode(
-      [
-        "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)",
-      ],
-      [diamondCutData]
-    );
+    const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
 
     const tx = await bridgehub.createNewChain(
       inputChainId,
