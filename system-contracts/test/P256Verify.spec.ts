@@ -7,9 +7,11 @@ import { expect } from "chai";
 import { prepareEnvironment } from "./shared/mocks";
 
 import { ec as EC } from "elliptic";
+import { BigNumber } from "ethers";
 
 describe("P256Verify tests", function () {
   const ONE = "0x0000000000000000000000000000000000000000000000000000000000000001";
+  const P256_GROUP_ORDER = '0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551';
 
   let oldP256VerifyCode: string;
 
@@ -73,7 +75,7 @@ describe("P256Verify tests", function () {
       data: compileSignature({}),
     });
 
-    expect(ethers.BigNumber.from(result).eq(1)).to.be.true;
+    expect(result).to.eq(ONE);
   });
 
   it("Should reject invalid input", async () => {
@@ -141,6 +143,17 @@ describe("P256Verify tests", function () {
     });
 
     expect(result).to.eq("0x");
+  });
+
+  it("Malleability is permitted", async () => {    
+    const newS = BigNumber.from(P256_GROUP_ORDER).sub(correctS);
+    const result = await getWallets()[0].call({
+      to: REAL_P256VERIFY_CONTRACT_ADDRESS,
+      // The signature is valid and yet the input is too long
+      data: compileSignature({s: ethers.utils.hexZeroPad(newS.toHexString(), 32)}),
+    });
+
+    expect(result).to.eq(ONE);
   });
 
   after(async () => {

@@ -8,7 +8,7 @@ import { Language } from "../scripts/constants";
 import { expect } from "chai";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 
-describe.only("GasBoundCaller tests", function () {
+describe("GasBoundCaller tests", function () {
 
   let tester: GasBoundCallerTester;
   let systemContext: SystemContext;
