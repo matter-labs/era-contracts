@@ -196,17 +196,14 @@ export async function filterPublishedFactoryDeps(
   return [bytecodesToDeploy, currentLength];
 }
 
-export async function getSolcLocation() {
-  const osDirName = CompilerDownloader.getCompilerPlatform();
-  const SOLC_VERSION = hre.config.solidity.compilers[0].version;
-  const solcCompilersDir = `${await getCompilersDir()}/${osDirName}`;
+export async function getSolcLocation(): Promise<string> {
+  const compilersCache = await getCompilersDir();
+  const compilerPlatform = CompilerDownloader.getCompilerPlatform();
+  const downloader = new CompilerDownloader(compilerPlatform, compilersCache);
 
-  const solcBinaryPreffixWithoutCommit = `solc-${osDirName}-v${SOLC_VERSION}`;
-  const solcBinaryNameWithCommit = fs
-    .readdirSync(solcCompilersDir)
-    .find((file) => file.startsWith(solcBinaryPreffixWithoutCommit));
+  const solcVersion = hre.config.solidity.compilers[0].version;
 
-  return `${solcCompilersDir}/${solcBinaryNameWithCommit}`;
+  return (await downloader.getCompiler(solcVersion))!.compilerPath;
 }
 
 export async function compilerLocation(compilerVersion: string, isCompilerPreRelease: boolean): Promise<string> {
