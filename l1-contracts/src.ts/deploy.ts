@@ -52,7 +52,7 @@ export class Deployer {
   public deployWallet: Wallet;
   public verbose: boolean;
   public chainId: number;
-  private ownerAddress: string;
+  public ownerAddress: string;
 
   constructor(config: DeployerConfig) {
     this.deployWallet = config.deployWallet;
@@ -151,7 +151,7 @@ export class Deployer {
     this.addresses.Create2Factory = create2Factory.address;
   }
 
-  private async deployViaCreate2(
+  public async deployViaCreate2(
     contractName: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     args: any[],
@@ -631,7 +631,13 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(baseTokenAddress: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?) {
+  public async registerHyperchain(
+    baseTokenAddress: string,
+    extraFacets?: FacetCut[],
+    gasPrice?: BigNumberish,
+    nonce?,
+    predefinedChainId?: string
+  ) {
     const gasLimit = 10_000_000;
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -639,7 +645,7 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     const stateTransitionManager = this.stateTransitionManagerContract(this.deployWallet);
 
-    const inputChainId = getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
+    const inputChainId = predefinedChainId || getNumberFromEnv("CHAIN_ETH_ZKSYNC_NETWORK_ID");
     const admin = process.env.CHAIN_ADMIN_ADDRESS || this.ownerAddress;
     const diamondCutData = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
     const initialDiamondCut = new ethers.utils.AbiCoder().encode([DIAMOND_CUT_DATA_ABI_STRING], [diamondCutData]);
@@ -663,13 +669,6 @@ export class Deployer {
 
     nonce++;
 
-    const diamondProxyAddress =
-      "0x" +
-      receipt.logs
-        .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
-        .topics[2].slice(26);
-
-    this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
     this.addresses.BaseToken = baseTokenAddress;
 
     if (this.verbose) {
@@ -677,8 +676,19 @@ export class Deployer {
       console.log(`Hyperchain registration tx hash: ${receipt.transactionHash}`);
 
       console.log(`CHAIN_ETH_ZKSYNC_NETWORK_ID=${parseInt(chainId, 16)}`);
-      console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
+
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
+    }
+    if (!predefinedChainId) {
+      const diamondProxyAddress =
+        "0x" +
+        receipt.logs
+          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
+          .topics[2].slice(26);
+      this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
+      if (this.verbose) {
+        console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${diamondProxyAddress}`);
+      }
     }
     this.chainId = parseInt(chainId, 16);
 

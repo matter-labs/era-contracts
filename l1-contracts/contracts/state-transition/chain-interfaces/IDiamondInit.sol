@@ -41,6 +41,23 @@ struct InitializeData {
     address blobVersionedHashRetriever;
 }
 
+/// @param verifier address of Verifier contract
+/// @param verifierParams Verifier config parameters that describes the circuit to be verified
+/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
+/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+/// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
+/// @param feeParams Fee parameters to be used for L1->L2 transactions
+/// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
+struct InitializeDataNewChain {
+    IVerifier verifier;
+    VerifierParams verifierParams;
+    bytes32 l2BootloaderBytecodeHash;
+    bytes32 l2DefaultAccountBytecodeHash;
+    uint256 priorityTxMaxGasLimit;
+    FeeParams feeParams;
+    address blobVersionedHashRetriever;
+}
+
 interface IDiamondInit {
     function initialize(InitializeData calldata _initData) external returns (bytes32);
 }

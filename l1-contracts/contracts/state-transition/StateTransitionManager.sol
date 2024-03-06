@@ -16,7 +16,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, ERA_DIAMOND_PROXY, ERA_CHAIN_ID} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
@@ -196,6 +196,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
+        if (_chainId == ERA_CHAIN_ID) {
+            // era was already deployed
+            stateTransition[ERA_CHAIN_ID] = ERA_DIAMOND_PROXY;
+            // no need for setChainIdUpgrade
+            emit StateTransitionNewChain(_chainId, ERA_DIAMOND_PROXY);
+            return;
+        }
+
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 

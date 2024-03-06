@@ -7,11 +7,13 @@ import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
 import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
+import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -92,6 +94,23 @@ library Utils {
         return logs;
     }
 
+    function createSystemLogsWithUpgradeTransaction(
+        bytes32 _expectedSystemContractUpgradeTxHash
+    ) public pure returns (bytes[] memory) {
+        bytes[] memory logsWithoutUpgradeTx = createSystemLogs();
+        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
+        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
+            logs[i] = logsWithoutUpgradeTx[i];
+        }
+        logs[logsWithoutUpgradeTx.length] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
+            _expectedSystemContractUpgradeTxHash
+        );
+        return logs;
+    }
+
     function createStoredBatchInfo() public pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
@@ -141,6 +160,31 @@ library Utils {
         return result;
     }
 
+    function getAdminSelectors() public view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = AdminFacet.setPendingAdmin.selector;
+        selectors[1] = AdminFacet.acceptAdmin.selector;
+        selectors[2] = AdminFacet.setValidator.selector;
+        selectors[3] = AdminFacet.setPorterAvailability.selector;
+        selectors[4] = AdminFacet.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = AdminFacet.changeFeeParams.selector;
+        selectors[6] = AdminFacet.setTokenMultiplier.selector;
+        selectors[7] = AdminFacet.upgradeChainFromVersion.selector;
+        selectors[8] = AdminFacet.executeUpgrade.selector;
+        selectors[9] = AdminFacet.freezeDiamond.selector;
+        selectors[10] = AdminFacet.unfreezeDiamond.selector;
+        return selectors;
+    }
+
+    function getExecutorSelectors() public view returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](4);
+        selectors[0] = ExecutorFacet.commitBatches.selector;
+        selectors[1] = ExecutorFacet.proveBatches.selector;
+        selectors[2] = ExecutorFacet.executeBatches.selector;
+        selectors[3] = ExecutorFacet.revertBatches.selector;
+        return selectors;
+    }
+
     function getGettersSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](29);
         selectors[0] = GettersFacet.getVerifier.selector;
@@ -171,6 +215,7 @@ library Utils {
         selectors[25] = GettersFacet.getTotalBatchesCommitted.selector;
         selectors[26] = GettersFacet.getTotalBatchesVerified.selector;
         selectors[27] = GettersFacet.getTotalBatchesExecuted.selector;
+        selectors[28] = GettersFacet.getL2SystemContractsUpgradeTxHash.selector;
         return selectors;
     }
 
@@ -316,6 +361,19 @@ library Utils {
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
+                feeParams: makeFeeParams(),
+                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+            });
+    }
+
+    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
+        return
+            InitializeDataNewChain({
+                verifier: makeVerifier(),
+                verifierParams: makeVerifierParams(),
+                l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
+                priorityTxMaxGasLimit: 80000000,
                 feeParams: makeFeeParams(),
                 blobVersionedHashRetriever: address(0x23746765237749923040872834)
             });
