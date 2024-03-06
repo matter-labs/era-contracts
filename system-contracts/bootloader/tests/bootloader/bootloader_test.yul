@@ -48,7 +48,7 @@ function TEST_simple_transaction() {
     // We'll test the transaction from 0.json
     let txDataOffset := testing_txDataOffset(0)
     let innerTxDataOffset := add(txDataOffset, 0x20)
-    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0x5F5E100, "Invalid pubdata limit")
+    testing_assertEq(getGasPerPubdataByteLimit(innerTxDataOffset), 0xC350, "Invalid pubdata limit")
 }
 
 function TEST_getTransactionUpfrontOverhead() {
@@ -66,8 +66,8 @@ function TEST_getFeeParams_HighPubdataPrice() {
     // Under very large L1 gas price, the L2 base fee will start rising to ensure the 
     // boundary on the gasLimit
 
-    // 15k gwei L1 pubdata price
-    let veryHighL1PubdataPrice := 15000000000000
+    // 150k gwei L1 pubdata price
+    let veryHighL1PubdataPrice := 150000000000000
     // 0.1 gwei L2 base fee
     let l2GasPrice := 100000000
 
@@ -77,7 +77,7 @@ function TEST_getFeeParams_HighPubdataPrice() {
         l2GasPrice
     )
 
-    testing_assertEq(baseFee, div(veryHighL1PubdataPrice, MAX_L2_GAS_PER_PUBDATA()), "Invalid base fee")
+    testing_assertEq(baseFee, ceilDiv(veryHighL1PubdataPrice, MAX_L2_GAS_PER_PUBDATA()), "Invalid base fee")
     testing_assertEq(gasPricePerPubdata, MAX_L2_GAS_PER_PUBDATA(), "Invalid gasPricePerPubdata")
 }
 
