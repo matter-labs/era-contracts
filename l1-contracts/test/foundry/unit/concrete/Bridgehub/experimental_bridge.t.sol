@@ -447,13 +447,14 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomL2MessageIndex,
         uint16 randomL2TxNumberInBatch,
         bytes32[] memory randomMerkleProof,
-        bool randomResultantBool
+        bool randomResultantBool,
+        bool txStatusBool
     ) public {
         randomChainId = _setUpStateTransitionForChainId(randomChainId);
 
         TxStatus txStatus;
 
-        if (randomChainId % 2 == 0) {
+        if (txStatusBool) {
             txStatus = TxStatus.Failure;
         } else {
             txStatus = TxStatus.Success;
