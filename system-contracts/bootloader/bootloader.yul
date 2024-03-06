@@ -539,6 +539,12 @@ object "Bootloader" {
                 ret := 1000000
             }
 
+            /// @dev The maximal amount of pubdata that can be safely used by a transaction. 
+            /// If a transaction uses more pubdata than this, it will be reverted.
+            function MAX_PUBDATA_FOR_TX() -> ret {
+                ret := 120000
+            }
+
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
                 switch or(eq(x, 0), eq(y, 0))
@@ -925,7 +931,7 @@ object "Bootloader" {
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                let basePubdataSpent := getPubdataSpent()
+                let basePubdataSpent := getPubdataCounter()
 
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
                     innerTxDataOffset,
@@ -1146,7 +1152,7 @@ object "Bootloader" {
                 transactionIndex,
                 gasPerPubdata
             ) {
-                let basePubdataSpent := getPubdataSpent()
+                let basePubdataSpent := getPubdataCounter()
 
                 debugLog("baseSepnt", basePubdataSpent)
 
@@ -2701,28 +2707,34 @@ object "Bootloader" {
                 ret := verbatim_0i_1o("meta")
             }
 
-            function getPubdataSpent() -> ret {
+            function getPubdataCounter() -> ret {
                 ret := and($llvm_NoInline_llvm$_getMeta(), 0xFFFFFFFF)     
+            }
+
+            function getCurrentPubdataSpent(basePubdataSpent) -> ret {
+                let currentPubdataCounter := getPubdataCounter()
+                debugLog("basePubdata", basePubdataSpent)
+                debugLog("currentPubdata", currentPubdataCounter)
+                ret := sub(currentPubdataCounter, basePubdataSpent)
+                if gt(basePubdataSpent, currentPubdataCounter) {
+                    ret := 0
+                }
             }
 
             function getErgsSpentForPubdata(
                 basePubdataSpent,
                 gasPerPubdata,  
             ) -> ret {
-                let currentPubdataCounter := getPubdataSpent()
-                debugLog("basePubdata", basePubdataSpent)
-                debugLog("currentPubdata", currentPubdataCounter)
-                let spentPubdata := sub(currentPubdataCounter, basePubdataSpent)
-                if gt(basePubdataSpent, currentPubdataCounter) {
-                    spentPubdata := 0
-                }
-
-                ret := safeMul(spentPubdata, gasPerPubdata, "mul: getErgsSpentForPubdata")
+                ret := safeMul(getCurrentPubdataSpent(basePubdataSpent), gasPerPubdata, "mul: getErgsSpentForPubdata")
             }
 
             /// @dev Compares the amount of spent ergs on the pubdatawith the allowed amount.
-            /// @dev If the spent ergs on pubdata are too high it will either reject or revert 
-            /// the transaction depending on the `rejectTransaction` flag.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param computeGas The amount of gas spent on the computation.
+            /// @param reservedGas The amount of gas reserved for the pubdata.
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
+            /// @return ret Whether the amout of pubdata spent so far is valid and 
+            /// and can be covered by the user.
             function isNotEnoughGasForPubdata(
                 basePubdataSpent,
                 computeGas,
@@ -2732,8 +2744,11 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
+                
+                let notEnoughGas := lt(allowedGasLimit, spentErgs)
+                let tooMuchPubdata := gt(getCurrentPubdataSpent(basePubdataSpent), MAX_PUBDATA_FOR_TX())
 
-                ret := lt(allowedGasLimit, spentErgs)
+                ret := or(notEnoughGas, tooMuchPubdata)
             }
 
             /// @dev Set the new value for the tx origin context value
