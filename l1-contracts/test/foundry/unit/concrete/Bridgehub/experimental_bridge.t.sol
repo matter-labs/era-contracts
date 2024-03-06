@@ -482,31 +482,31 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(resultantHash == canonicalHash);
     }
 
-    // function test_requestL2TransactionTwoBridges(
-    //     uint256 chainId,
-    //     uint256 mintValue,
-    //     uint256 l2Value,
-    //     uint256 l2GasLimit,
-    //     uint256 l2GasPerPubdataByteLimit,
-    //     address refundRecipient,
-    //     address secondBridgeAddress,
-    //     uint256 secondBridgeValue,
-    //     bytes memory secondBridgeCalldata
-    // ) public {
-    //     L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter(
-    //         chainId,
-    //         mintValue,
-    //         l2Value,
-    //         l2GasLimit,
-    //         l2GasPerPubdataByteLimit,
-    //         refundRecipient,
-    //         secondBridgeAddress,
-    //         secondBridgeValue,
-    //         secondBridgeCalldata
-    //     );
-    //     _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
-    //     assertTrue(true);
-    // }
+    function test_requestL2TransactionTwoBridges(
+        uint256 chainId,
+        uint256 mintValue,
+        uint256 l2Value,
+        uint256 l2GasLimit,
+        uint256 l2GasPerPubdataByteLimit,
+        address refundRecipient,
+        address secondBridgeAddress,
+        uint256 secondBridgeValue,
+        bytes memory secondBridgeCalldata
+    ) public {
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter(
+            chainId,
+            mintValue,
+            l2Value,
+            l2GasLimit,
+            l2GasPerPubdataByteLimit,
+            refundRecipient,
+            secondBridgeAddress,
+            secondBridgeValue,
+            secondBridgeCalldata
+        );
+        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
+        assertTrue(true);
+    }
 
 /////////////////////////////////////////////////////////
 // INTERNAL UTILITY FUNCTIONS
