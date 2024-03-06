@@ -39,35 +39,35 @@ contract DummySharedBridge {
     }
 
     function depositLegacyErc20Bridge(
-        address _msgSender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256 _l2TxGasLimit,
-        uint256 _l2TxGasPerPubdataByte,
-        address _refundRecipient
+        address, //_msgSender,
+        address, //_l2Receiver,
+        address, //_l1Token,
+        uint256, //_amount,
+        uint256, //_l2TxGasLimit,
+        uint256, //_l2TxGasPerPubdataByte,
+        address //_refundRecipient
     ) external payable returns (bytes32 txHash) {
         txHash = dummyL2DepositTxHash;
     }
 
     function claimFailedDepositLegacyErc20Bridge(
-        address _depositSender,
-        address _l1Token,
-        uint256 _amount,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
+        address, //_depositSender,
+        address, //_l1Token,
+        uint256, //_amount,
+        bytes32, //_l2TxHash,
+        uint256, //_l2BatchNumber,
+        uint256, //_l2MessageIndex,
+        uint16, //_l2TxNumberInBatch,
+        bytes32[] calldata // _merkleProof
     ) external {}
 
     function finalizeWithdrawalLegacyErc20Bridge(
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes calldata _message,
-        bytes32[] calldata _merkleProof
-    ) external returns (address l1Receiver, address l1Token, uint256 amount) {
+        uint256, //_l2BatchNumber,
+        uint256, //_l2MessageIndex,
+        uint16, //_l2TxNumberInBatch,
+        bytes calldata, //_message,
+        bytes32[] calldata //_merkleProof
+    ) external view returns (address l1Receiver, address l1Token, uint256 amount) {
         l1Receiver = l1ReceiverReturnInFinalizeWithdrawal;
         l1Token = l1TokenReturnInFinalizeWithdrawal;
         amount = amountReturnInFinalizeWithdrawal;
@@ -108,10 +108,10 @@ contract DummySharedBridge {
     }
 
     function bridgehubDeposit(
-        uint256 _chainId,
-        address _prevMsgSender,
+        uint256, //_chainId,
+        address, //_prevMsgSender,
         uint256, // l2Value, needed for Weth deposits in the future
-        bytes calldata _data
+        bytes calldata //_data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
         // Request the finalization of the deposit on the L2 side
         bytes memory l2TxCalldata = bytes("0xabcd123");

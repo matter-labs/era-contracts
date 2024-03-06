@@ -33,7 +33,22 @@ interface IStateTransitionManager {
         uint256 indexed _protocolVersion
     );
 
+    /// @notice pendingAdmin is changed
+    /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
+    event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
+
+    /// @notice Admin changed
+    event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
+
     function bridgehub() external view returns (address);
+
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
+    function setPendingAdmin(address _newPendingAdmin) external;
+
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
+    function acceptAdmin() external;
 
     function stateTransition(uint256 _chainId) external view returns (address);
 

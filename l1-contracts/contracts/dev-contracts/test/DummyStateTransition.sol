@@ -18,7 +18,7 @@ contract DummyStateTransition is MailboxFacet {
         s.baseTokenGasPriceMultiplierDenominator = denominator;
     }
 
-    function getBridgeHubAddress() public returns (address) {
+    function getBridgeHubAddress() public view returns (address) {
         return s.bridgehub;
     }
 

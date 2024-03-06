@@ -47,6 +47,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 => bytes32) public upgradeCutHash;
 
+    /// @dev used to manage non critical updates
+    address public admin;
+
+    /// @dev used to accept the admin role
+    address private pendingAdmin;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub) reentrancyGuardInitializer {
@@ -56,6 +62,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         require(msg.sender == bridgehub, "StateTransition: only bridgehub");
+        _;
+    }
+
+    /// @notice the admin can call, for non-critical updates
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
         _;
     }
 
@@ -94,8 +106,30 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
+    /// @inheritdoc IStateTransitionManager
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @inheritdoc IStateTransitionManager
+    function acceptAdmin() external {
+        address currentPendingAdmin = pendingAdmin;
+        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = admin;
+        admin = pendingAdmin;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, pendingAdmin);
+    }
+
     /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         validatorTimelock = _validatorTimelock;
     }
 
@@ -128,7 +162,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev reverts batches on the specified chain
-    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
     }
 

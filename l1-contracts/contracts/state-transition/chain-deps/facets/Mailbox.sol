@@ -257,12 +257,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
         params.refundRecipient = _request.refundRecipient;
 
-        canonicalTxHash = _requestL2Transaction(
-            _request.mintValue,
-            params,
-            _request.l2Calldata,
-            _request.factoryDeps
-        );
+        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _request.l2Calldata, _request.factoryDeps);
     }
 
     function _requestL2Transaction(

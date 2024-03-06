@@ -28,8 +28,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice chainID => baseToken contract address, storing baseToken
     mapping(uint256 _chainId => address) public baseToken;
 
-    /// @notice used as an alternative to deployChains
-    address public deployer;
+    /// @dev used to manage non critical updates
+    address public admin;
+
+    /// @dev used to accept the admin role
+    address private pendingAdmin;
 
     /// @notice to avoid parity hack
     constructor() reentrancyGuardInitializer {}
@@ -39,9 +42,31 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         _transferOwnership(_owner);
     }
 
-    modifier onlyOwnerOrDeployer() {
-        require(msg.sender == deployer || msg.sender == owner(), "Bridgehub: not owner or deployer");
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
         _;
+    }
+
+    /// @inheritdoc IBridgehub
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @inheritdoc IBridgehub
+    function acceptAdmin() external {
+        address currentPendingAdmin = pendingAdmin;
+        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = admin;
+        admin = pendingAdmin;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
     ///// Getters
@@ -52,11 +77,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     }
 
     //// Registry
-
-    /// @notice used to change deployer
-    function setDeployer(address _newDeployer) external onlyOwner {
-        deployer = _newDeployer;
-    }
 
     /// @notice State Transition can be any contract with the appropriate interface/functionality
     function addStateTransitionManager(address _stateTransitionManager) external onlyOwner {
@@ -98,7 +118,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256, //_salt
         address _admin,
         bytes calldata _initData
-    ) external onlyOwnerOrDeployer nonReentrant returns (uint256 chainId) {
+    ) external onlyOwnerOrAdmin nonReentrant returns (uint256 chainId) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 
