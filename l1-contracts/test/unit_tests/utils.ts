@@ -1,3 +1,4 @@
+import * as hardhat from "hardhat";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import type { Address } from "zksync-ethers/build/src/types";
@@ -7,8 +8,11 @@ import type { IBridgehub } from "../../typechain/IBridgehub";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import type { FeeParams } from "../../src.ts/utils";
+import type { ExecutorFacet } from "../../typechain";
+
+import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
 import { ADDRESS_ONE, PubdataPricingMode } from "../../src.ts/utils";
+
 export const CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 export const IERC20_INTERFACE = require("@openzeppelin/contracts/build/contracts/IERC20");
@@ -346,4 +350,89 @@ export async function depositERC20(
       value: ethIsBaseToken ? neededValue : 0,
     }
   );
+}
+
+export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
+  return {
+    txType: SYSTEM_UPGRADE_TX_TYPE,
+    from: ethers.constants.AddressZero,
+    to: ethers.constants.AddressZero,
+    gasLimit: 5000000,
+    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    maxFeePerGas: 0,
+    maxPriorityFeePerGas: 0,
+    paymaster: 0,
+    nonce: 0,
+    value: 0,
+    reserved: [0, 0, 0, 0],
+    data: "0x",
+    signature: "0x",
+    factoryDeps: [],
+    paymasterInput: "0x",
+    reservedDynamic: "0x",
+    ...tx,
+  };
+}
+
+export type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
+  batchNumber: BigNumberish;
+};
+
+export async function buildCommitBatchInfoWithUpgrade(
+  prevInfo: StoredBatchInfo,
+  info: CommitBatchInfoWithTimestamp,
+  upgradeTxHash: string
+): Promise<CommitBatchInfo> {
+  const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
+  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
+  systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
+    true,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
+    packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
+  );
+
+  return {
+    timestamp,
+    indexRepeatedStorageChanges: 0,
+    newStateRoot: ethers.utils.randomBytes(32),
+    numberOfLayer1Txs: 0,
+    priorityOperationsHash: EMPTY_STRING_KECCAK,
+    systemLogs: ethers.utils.hexConcat(systemLogs),
+    pubdataCommitments: `0x${"0".repeat(130)}`,
+    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
+    eventsQueueStateHash: ethers.utils.randomBytes(32),
+    ...info,
+  };
+}
+
+export async function makeExecutedEqualCommitted(
+  proxyExecutor: ExecutorFacet,
+  prevBatchInfo: StoredBatchInfo,
+  batchesToProve: StoredBatchInfo[],
+  batchesToExecute: StoredBatchInfo[]
+) {
+  batchesToExecute = [...batchesToProve, ...batchesToExecute];
+
+  await (
+    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
+      recursiveAggregationInput: [],
+      serializedProof: [],
+    })
+  ).wait();
+
+  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
+}
+
+export function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
+  return {
+    batchNumber: commitInfo.batchNumber,
+    batchHash: commitInfo.newStateRoot,
+    indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
+    numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
+    priorityOperationsHash: commitInfo.priorityOperationsHash,
+    l2LogsTreeRoot: ethers.constants.HashZero,
+    timestamp: commitInfo.timestamp,
+    commitment: commitment,
+  };
 }

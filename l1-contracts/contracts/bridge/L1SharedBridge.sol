@@ -112,10 +112,11 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev tranfer tokens from legacy erc20 bridge and set chainBalance as part of migration process
-    function transferTokenFromERC20Bridge(address _token) external onlyOwner {
+    /// @dev tranfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
+    function transferFundsFromLegacy(address _token) external onlyOwner {
         if (_token == ETH_TOKEN_ADDRESS) {
             IMailbox(ERA_DIAMOND_PROXY).transferEthToSharedBridge();
+            // chainBalance increased in receive
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
@@ -128,7 +129,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     /// @dev only used to receive funds from Era diamond Proxy as part of migration process
-    function receive() external payable {
+    receive() external payable {
         require(msg.sender == ERA_DIAMOND_PROXY, "ShB: not era diamond proxy");
         chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] = chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] + msg.value;
     }

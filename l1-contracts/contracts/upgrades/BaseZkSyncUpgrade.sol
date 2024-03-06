@@ -63,8 +63,8 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     /// @notice The main function that will be provided by the upgrade proxy
     /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
     /// @param _proposedUpgrade The upgrade to be executed.
-    /// @return The hash of the L2 system contract upgrade transaction.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
+    /// @return txHash The hash of the L2 system contract upgrade transaction.
+    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -76,7 +76,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
-        bytes32 txHash = _setL2SystemContractUpgrade(
+        txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
             _proposedUpgrade.newProtocolVersion

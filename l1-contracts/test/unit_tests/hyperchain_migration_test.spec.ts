@@ -7,12 +7,47 @@ import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 
 import { upgradeToHyperchains } from "../../src.ts/hyperchain-upgrade";
+import {  Action, FacetCut, facetCut } from "../../src.ts/diamondCut";
+
+import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
+import {
+  AdminFacetFactory,
+  DummyAdminFacetFactory,
+  ExecutorFacetFactory,
+  GettersFacetFactory,
+  StateTransitionManagerFactory,
+} from "../../typechain";
+import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
+import {
+  buildL2CanonicalTransaction,
+  buildCommitBatchInfoWithUpgrade,
+  genesisStoredBatchInfo,
+  EMPTY_STRING_KECCAK,
+  makeExecutedEqualCommitted,
+  getBatchStoredInfo,
+} from "./utils";
 
 // note this test presumes that it is ok to start out with the new contracts, and upgrade them to themselves
 describe("Hyperchain migration test", function () {
   let owner: ethers.Signer;
   let deployer: Deployer;
   let gasPrice;
+
+  let proxyExecutor: ExecutorFacet;
+  let proxyAdmin: AdminFacet;
+  let proxyGetters: GettersFacet;
+
+  let stateTransitionManager: StateTransitionManager;
+
+  let batch1InfoChainIdUpgrade: CommitBatchInfo;
+  let storedBatch1InfoChainIdUpgrade: StoredBatchInfo;
+
+  let verifier: string;
+  const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
+  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  // let priorityOperationsHash: string;
+  let initialProtocolVersion = 0;
+  let extraFacet : FacetCut;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
@@ -33,10 +68,49 @@ describe("Hyperchain migration test", function () {
 
     await owner.sendTransaction(tx);
 
-    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, []);
+    const dummyAdminFacetFactory = await hardhat.ethers.getContractFactory("DummyAdminFacet");
+    const dummyAdminfFacetContract = await dummyAdminFacetFactory.deploy();
+    extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
+
+    deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    chainId = deployer.chainId;
+    verifier = deployer.addresses.StateTransition.Verifier;
+
+    proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
+    const dummyAdminFacet = DummyAdminFacetFactory.connect(
+      deployer.addresses.StateTransition.DiamondProxy,
+      deployWallet
+    );
+
+    stateTransitionManager = StateTransitionManagerFactory.connect(
+      deployer.addresses.StateTransition.StateTransitionProxy,
+      deployWallet
+    );
+
+    await (await dummyAdminFacet.dummySetValidator(await deployWallet.getAddress())).wait();
+    // do initial setChainIdUpgrade
+    const upgradeTxHash = await proxyGetters.getL2SystemContractsUpgradeTxHash();
+    batch1InfoChainIdUpgrade = await buildCommitBatchInfoWithUpgrade(
+      genesisStoredBatchInfo(),
+      {
+        batchNumber: 1,
+        priorityOperationsHash: EMPTY_STRING_KECCAK,
+        numberOfLayer1Txs: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      },
+      upgradeTxHash
+    );
+    console.log("committing batch1InfoChainIdUpgrade")
+    const commitReceipt = await (
+      await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
+    ).wait();
+    const commitment = commitReceipt.events[0].args.commitment;
+    storedBatch1InfoChainIdUpgrade = getBatchStoredInfo(batch1InfoChainIdUpgrade, commitment);
+    await makeExecutedEqualCommitted(proxyExecutor, genesisStoredBatchInfo(), [storedBatch1InfoChainIdUpgrade], []);
   });
 
   it("Start upgrade", async () => {
-    await upgradeToHyperchains(deployer, gasPrice);
+    await upgradeToHyperchains(deployer, gasPrice, [extraFacet]);
   });
 });
