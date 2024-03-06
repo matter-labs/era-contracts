@@ -193,7 +193,7 @@ library Utils {
     function _batchMetaParameters() internal pure returns (bytes memory) {
         // Used in __Executor_Shared.t.sol
         bytes8 dummyHash = 0x1234567890123456;
-        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash));
+        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash), bytes32(dummyHash));
     }
 
     function _batchAuxiliaryOutput(
