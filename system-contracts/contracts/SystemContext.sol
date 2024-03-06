@@ -19,7 +19,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:
     /// - Store the latest 256 hashes (and strictly rely that we do not accidentally override the hash of the block 256 blocks ago)
-    /// - Store the latest 257 blocks's hashes.
+    /// - Store the latest 257 blocks' hashes.
     uint256 internal constant MINIBLOCK_HASHES_TO_STORE = 257;
 
     /// @notice The chainId of the network. It is set at the genesis.

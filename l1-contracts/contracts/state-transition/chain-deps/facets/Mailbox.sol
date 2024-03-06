@@ -208,7 +208,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for eth base token");
+        require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for era token");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -261,8 +261,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             _request.mintValue,
             params,
             _request.l2Calldata,
-            _request.factoryDeps,
-            false
+            _request.factoryDeps
         );
     }
 
@@ -270,8 +269,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         uint256 _mintValue,
         WritePriorityOpParams memory _params,
         bytes memory _calldata,
-        bytes[] memory _factoryDeps,
-        bool _isFree
+        bytes[] memory _factoryDeps
     ) internal returns (bytes32 canonicalTxHash) {
         require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
         _params.txId = s.priorityQueue.getTotalPriorityTxs();
@@ -279,7 +277,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
 
-        _params.l2GasPrice = _isFree ? 0 : _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
+        _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
         uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
         require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 

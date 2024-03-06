@@ -75,12 +75,6 @@
     "initialize-governance": "ts-node scripts/initialize-governance.ts",
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
     "display-governance": "ts-node scripts/display-governance.ts",
-    "upgrade-1": "ts-node scripts/upgrades/upgrade-1.ts",
-    "upgrade-2": "ts-node scripts/upgrades/upgrade-2.ts",
-    "upgrade-3": "ts-node scripts/upgrades/upgrade-3.ts",
-    "upgrade-4": "ts-node scripts/upgrades/upgrade-4.ts",
-    "upgrade-5": "ts-node scripts/upgrades/upgrade-5.ts",
-    "upgrade-6": "ts-node scripts/upgrades/upgrade-6.ts",
     "upgrade-system": "ts-node upgrade-system/index.ts"
   },
   "dependencies": {
