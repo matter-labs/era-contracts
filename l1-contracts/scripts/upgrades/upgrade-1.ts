@@ -1,8 +1,8 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { deployedAddressesFromEnv } from "../src.ts/deploy";
-import { getNumberFromEnv } from "./utils";
-import { diamondCut } from "../src.ts/diamondCut";
+import { deployedAddressesFromEnv } from "../../src.ts/deploy-utils";
+import { getNumberFromEnv } from "../../src.ts/utils";
+import { diamondCut } from "../../src.ts/diamondCut";
 import type { BigNumberish, BytesLike } from "ethers";
 import { ethers } from "hardhat";
 
@@ -43,7 +43,7 @@ async function main() {
         factoryDeps,
         priorityTxMaxGasLimit,
       ]);
-      const upgradeParam = diamondCut([], l1Contracts.ZkSync.DiamondUpgradeInit, upgradeInitData);
+      const upgradeParam = diamondCut([], l1Contracts.StateTransition.DiamondUpgradeInit, upgradeInitData);
 
       // Get transaction data of the `proposeDiamondCut`
       const proposeDiamondCut = await diamondCutFacet.interface.encodeFunctionData("proposeDiamondCut", [

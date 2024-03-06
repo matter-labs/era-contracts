@@ -79,6 +79,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
+    /// @notice Set the chainId origin.
+    /// @param _newChainId The chainId
+    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
+        chainId = _newChainId;
+    }
+
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 
