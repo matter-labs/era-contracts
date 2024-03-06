@@ -675,7 +675,7 @@ contract ExperimentalBridgeTest is Test {
         testToken.transfer(address(this), l2TxnReqDirect.mintValue);
         assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
         testToken.approve(address(mockSharedBridge), l2TxnReqDirect.mintValue);
-        
+
         resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
 
         assertEq(canonicalHash, resultantHash);
