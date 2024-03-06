@@ -199,10 +199,7 @@ export async function filterPublishedFactoryDeps(
 export async function getSolcLocation(): Promise<string> {
   const compilersCache = await getCompilersDir();
   const compilerPlatform = CompilerDownloader.getCompilerPlatform();
-  const downloader = new CompilerDownloader(
-      compilerPlatform,
-      compilersCache
-  );
+  const downloader = new CompilerDownloader(compilerPlatform, compilersCache);
 
   const solcVersion = hre.config.solidity.compilers[0].version;
 
