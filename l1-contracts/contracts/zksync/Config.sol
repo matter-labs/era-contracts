@@ -97,3 +97,7 @@ uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 10000;
 /// @dev It is expected that the L1 contracts will enforce that the L2 gas price will be high enough to compensate
 /// the operator in case the batch is closed because of the memory for transactions being filled up.
 uint256 constant MEMORY_OVERHEAD_GAS = 10;
+
+/// @dev The maximal allowed bytecode size. While the `zk_evm` could in theory support any bytecods size up to 2^16
+/// words, the `CodeOracle` precompile can only support bytecodes up to 2^20 bytes.
+uint256 constant MAX_ALLOWED_BYTECODE_SIZE = (1 << 20);

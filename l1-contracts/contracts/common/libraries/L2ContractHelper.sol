@@ -40,13 +40,13 @@ library L2ContractHelper {
         uint8 version = uint8(_bytecodeHash[0]);
         require(version == 1 && _bytecodeHash[1] == bytes1(0), "zf"); // Incorrectly formatted bytecodeHash
 
-        require(_bytecodeLen(_bytecodeHash) % 2 == 1, "uy"); // Code length in words must be odd
+        require(bytecodeLen(_bytecodeHash) % 2 == 1, "uy"); // Code length in words must be odd
     }
 
     /// @notice Returns the length of the bytecode associated with the given hash.
     /// @param _bytecodeHash The hash of the bytecode.
     /// @return codeLengthInWords The length of the bytecode in words.
-    function _bytecodeLen(bytes32 _bytecodeHash) private pure returns (uint256 codeLengthInWords) {
+    function bytecodeLen(bytes32 _bytecodeHash) internal pure returns (uint256 codeLengthInWords) {
         codeLengthInWords = uint256(uint8(_bytecodeHash[2])) * 256 + uint256(uint8(_bytecodeHash[3]));
     }
 

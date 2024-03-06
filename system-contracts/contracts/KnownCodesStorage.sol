@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT} from "./Constants.sol";
+import {COMPRESSOR_CONTRACT, L1_MESSENGER_CONTRACT, MAX_ALLOWED_BYTECODE_SIZE} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -76,5 +76,6 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
         require(version == 1 && _bytecodeHash[1] == bytes1(0), "Incorrectly formatted bytecodeHash");
 
         require(Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 1, "Code length in words must be odd");
+        require(Utils.bytecodeLenInWords(_bytecodeHash) * 32 <= MAX_ALLOWED_BYTECODE_SIZE, "Code is too long");
     }
 }

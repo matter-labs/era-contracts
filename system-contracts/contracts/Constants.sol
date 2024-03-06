@@ -155,3 +155,7 @@ uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+
+/// @dev The maximal allowed bytecode size. While the `zk_evm` could in theory support any bytecods size up to 2^16
+/// words, the `CodeOracle` precompile can only support bytecodes up to 2^20 bytes.
+uint256 constant MAX_ALLOWED_BYTECODE_SIZE = (1 << 20);
