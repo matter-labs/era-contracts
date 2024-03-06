@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.20;
 
+import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../../common/Config.sol";
+
 contract DummySharedBridge {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
@@ -88,4 +91,29 @@ contract DummySharedBridge {
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _l1Token, _amount);
     }
+
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _prevMsgSender,
+        uint256, // l2Value, needed for Weth deposits in the future
+        bytes calldata _data
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
+            // Request the finalization of the deposit on the L2 side
+            bytes memory l2TxCalldata = bytes("0xabcd123");
+            bytes32 txDataHash = bytes32("0x1212121212abf");
+
+            request = L2TransactionRequestTwoBridgesInner({
+                magicValue: TWO_BRIDGES_MAGIC_VALUE,
+                l2Contract: address(0xCAFE),
+                l2Calldata: l2TxCalldata,
+                factoryDeps: new bytes[](0),
+                txDataHash: txDataHash
+            });
+    }
+
+    function bridgehubConfirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external {}
 }

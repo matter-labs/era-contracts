@@ -26,8 +26,8 @@ contract ExperimentalBridgeTest is Test {
     DummyStateTransitionManagerWBH mockSTM;
     DummyStateTransition mockChainContract;
     DummySharedBridge mockSharedBridge;
+    DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
-    //UtilsFacet utils;
 
     function setUp() public {
         bridgeHub = new Bridgehub();
@@ -35,6 +35,7 @@ contract ExperimentalBridgeTest is Test {
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
         mockChainContract = new DummyStateTransition(address(bridgeHub));
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
+        mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
 
         // test if the ownership of the bridgeHub is set correctly or not
@@ -482,14 +483,13 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(resultantHash == canonicalHash);
     }
 
-    function test_requestL2TransactionTwoBridges(
+    function test_requestL2TransactionTwoBridges_ETHCase(
         uint256 chainId,
         uint256 mintValue,
         uint256 l2Value,
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        address secondBridgeAddress,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
     ) public {
@@ -500,11 +500,37 @@ contract ExperimentalBridgeTest is Test {
             l2GasLimit,
             l2GasPerPubdataByteLimit,
             refundRecipient,
-            secondBridgeAddress,
             secondBridgeValue,
             secondBridgeCalldata
         );
+
+        l2TxnReq2BridgeOut.chainId = _setUpStateTransitionForChainId(l2TxnReq2BridgeOut.chainId);
+        
         _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true);
+        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+
+        _setUpSharedBridge();
+        assertTrue(bridgeHub.getStateTransition(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+
+        uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue; 
+        address randomCaller = makeAddr("RANDOM_CALLER");
+        vm.deal(randomCaller, callerMsgValue);
+
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(
+                mockChainContract.bridgehubRequestL2Transaction.selector
+            ),
+            abi.encode(canonicalHash)
+        );
+
+        vm.prank(randomCaller);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+
         assertTrue(true);
     }
 
@@ -519,11 +545,14 @@ contract ExperimentalBridgeTest is Test {
         uint256 l2GasLimit,
         uint256 l2GasPerPubdataByteLimit,
         address refundRecipient,
-        address secondBridgeAddress,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
     ) internal returns(L2TransactionRequestTwoBridgesOuter memory) {
         L2TransactionRequestTwoBridgesOuter memory l2Req;
+
+        // Don't let the mintValue + secondBridgeValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionTwoBridges_ETHCase
+        mintValue = bound(mintValue, 1, (type(uint256).max)/2);
+        secondBridgeValue = bound(secondBridgeValue, 1, (type(uint256).max)/2);
 
         l2Req.chainId = chainId;
         l2Req.mintValue = mintValue;
@@ -531,7 +560,7 @@ contract ExperimentalBridgeTest is Test {
         l2Req.l2GasLimit = l2GasLimit;
         l2Req.l2GasPerPubdataByteLimit = l2GasPerPubdataByteLimit;
         l2Req.refundRecipient = refundRecipient;
-        l2Req.secondBridgeAddress = secondBridgeAddress;
+        l2Req.secondBridgeAddress = address(mockSecondSharedBridge);
         l2Req.secondBridgeValue = secondBridgeValue;
         l2Req.secondBridgeCalldata = secondBridgeCalldata;
 
