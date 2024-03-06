@@ -43,4 +43,8 @@ contract ReenterL1ERC20Bridge {
             revert("Unset function to call");
         }
     }
+
+    receive() external payable {
+        // revert("Receive not allowed");
+    }
 }

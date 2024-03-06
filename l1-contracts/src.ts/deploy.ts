@@ -547,26 +547,6 @@ export class Deployer {
     this.addresses.StateTransition.DiamondInit = contractAddress;
   }
 
-  public async deployDiamondUpgradeInit(
-    create2Salt: string,
-    contractVersion: number,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2(
-      `DiamondUpgradeInit${contractVersion}`,
-      [],
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.StateTransition.DiamondUpgradeInit = contractAddress;
-  }
-
   public async deployDefaultUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("DefaultUpgrade", [], create2Salt, ethTxOptions);

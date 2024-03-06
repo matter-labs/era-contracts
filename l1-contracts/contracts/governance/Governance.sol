@@ -80,7 +80,7 @@ contract Governance is IGovernance, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns whether an id corresponds to a registered operation. This
-    /// includes both Waiting, Ready, and Done operations.
+    /// includes Waiting, Ready, and Done operations.
     function isOperation(bytes32 _id) public view returns (bool) {
         return getOperationState(_id) != OperationState.Unset;
     }
