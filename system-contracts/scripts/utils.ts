@@ -201,9 +201,11 @@ export async function getSolcLocation() {
   const SOLC_VERSION = hre.config.solidity.compilers[0].version;
   const solcCompilersDir = `${await getCompilersDir()}/${osDirName}`;
 
-  const solcBinaryPreffixWithoutCommit = `solc-${osDirName}-v${SOLC_VERSION}`; 
-  const solcBinaryNameWithCommit = fs.readdirSync(solcCompilersDir).find((file) => file.startsWith(solcBinaryPreffixWithoutCommit));
-  
+  const solcBinaryPreffixWithoutCommit = `solc-${osDirName}-v${SOLC_VERSION}`;
+  const solcBinaryNameWithCommit = fs
+    .readdirSync(solcCompilersDir)
+    .find((file) => file.startsWith(solcBinaryPreffixWithoutCommit));
+
   return `${solcCompilersDir}/${solcBinaryNameWithCommit}`;
 }
 
