@@ -384,6 +384,16 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.baseToken(newChainId) == address(testToken));
     }
 
+    function test_getStateTransition(uint256 mockChainId) public {
+        mockChainId = _setUpStateTransitionForChainId(mockChainId);
+
+        // Now the following statements should be true as well:
+        assertTrue(bridgeHub.stateTransitionManager(mockChainId) == address(mockSTM));
+        address returnedStateTransition = bridgeHub.getStateTransition(mockChainId);
+
+        assertEq(returnedStateTransition, address(mockChainContract));
+    }
+
     function test_proveL2MessageInclusion(
         uint256 mockChainId,
         uint256 mockBatchNumber,
@@ -600,6 +610,61 @@ contract ExperimentalBridgeTest is Test {
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         assertTrue(resultantHash == canonicalHash);
+    }
+
+    function test_requestL2TransactionDirect_NonETHCase(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps,
+        address mockRefundRecipient
+    ) public {
+        if (mockFactoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+            mockFactoryDeps = _restrictArraySize(mockFactoryDeps, MAX_NEW_FACTORY_DEPS);
+        }
+
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect(
+            mockChainId,
+            mockMintValue,
+            mockL2Contract,
+            mockL2Value,
+            mockL2Calldata,
+            mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps,
+            mockRefundRecipient
+        );
+
+        l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false);
+
+        assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        mockChainContract.setFeeParams();
+        mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
+
+        vm.txGasPrice(0.05 ether);
+
+        address randomCaller = makeAddr("RANDOM_CALLER");
+        vm.deal(randomCaller, 1 ether);
+
+        vm.prank(randomCaller);
+        vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
     }
 
     function test_requestL2TransactionTwoBridges_ETHCase(
