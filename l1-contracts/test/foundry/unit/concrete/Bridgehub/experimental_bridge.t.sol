@@ -72,21 +72,23 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
-        assertEq(address(0), bridgeHub.deployer());
+        assertEq(address(0), bridgeHub.admin());
         vm.prank(bridgeHub.owner());
-        bridgeHub.setDeployer(randomDeployer);
+        bridgeHub.setPendingAdmin(randomDeployer);
+        vm.prank(randomDeployer);
+        bridgeHub.acceptAdmin();
 
-        assertEq(randomDeployer, bridgeHub.deployer());
+        assertEq(randomDeployer, bridgeHub.admin());
     }
 
     function test_randomCallerCannotSetDeployer(address randomCaller, address randomDeployer) public {
-        if (randomCaller != bridgeHub.owner()) {
+        if (randomCaller != bridgeHub.owner() && randomCaller != bridgeHub.admin()) {
             vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.setDeployer(randomDeployer);
+            vm.expectRevert(bytes("Bridgehub: not owner or admin"));
+            bridgeHub.setPendingAdmin(randomDeployer);
 
             // The deployer shouldn't have changed.
-            assertEq(address(0), bridgeHub.deployer());
+            assertEq(address(0), bridgeHub.admin());
         }
     }
 
@@ -220,7 +222,7 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addToken(address randomCaller, address randomAddress) public {
+    function test_addToken(address , address randomAddress) public {
         assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
@@ -327,10 +329,13 @@ contract ExperimentalBridgeTest is Test {
     ) public {
         address deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         admin = makeAddr("NEW_CHAIN_ADMIN");
-        Diamond.DiamondCutData memory dcData;
+        // Diamond.DiamondCutData memory dcData;
 
+        vm.prank(bridgeOwner);
+        bridgeHub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgeHub.acceptAdmin();
         vm.startPrank(bridgeOwner);
-        bridgeHub.setDeployer(deployerAddress);
         bridgeHub.addStateTransitionManager(address(mockSTM));
         bridgeHub.addToken(address(testToken));
         bridgeHub.setSharedBridge(address(mockSharedBridge));
@@ -338,7 +343,7 @@ contract ExperimentalBridgeTest is Test {
 
         if (randomCaller != deployerAddress && randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
-            vm.expectRevert(bytes("Bridgehub: not owner or deployer"));
+            vm.expectRevert(bytes("Bridgehub: not owner or admin"));
             bridgeHub.createNewChain(chainId, address(mockSTM), address(testToken), uint256(123), admin, bytes(""));
         }
 
@@ -591,7 +596,8 @@ contract ExperimentalBridgeTest is Test {
 
         assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-        BridgehubL2TransactionRequest memory bhL2TxnRequest = _createBhL2TxnRequest(mockRefundRecipientBH);
+        //BridgehubL2TransactionRequest memory bhL2TxnRequest = 
+        _createBhL2TxnRequest(mockRefundRecipientBH);
 
         vm.mockCall(
             address(mockChainContract),
@@ -725,7 +731,8 @@ contract ExperimentalBridgeTest is Test {
         );
 
         vm.prank(randomCaller);
-        bytes32 resultantHash = bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(
+        //bytes32 resultantHash = 
+        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(
             l2TxnReq2BridgeOut
         );
 
@@ -745,7 +752,7 @@ contract ExperimentalBridgeTest is Test {
         address refundRecipient,
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
-    ) internal returns (L2TransactionRequestTwoBridgesOuter memory) {
+    ) internal view returns (L2TransactionRequestTwoBridgesOuter memory) {
         L2TransactionRequestTwoBridgesOuter memory l2Req;
 
         // Don't let the mintValue + secondBridgeValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionTwoBridges_ETHCase
@@ -769,7 +776,7 @@ contract ExperimentalBridgeTest is Test {
         uint16 randomTxNumInBatch,
         address randomSender,
         bytes memory randomData
-    ) internal returns (L2Message memory) {
+    ) internal pure returns (L2Message memory) {
         L2Message memory l2Message;
 
         l2Message.txNumberInBatch = randomTxNumInBatch;
@@ -786,7 +793,7 @@ contract ExperimentalBridgeTest is Test {
         address randomSender,
         bytes32 randomKey,
         bytes32 randomValue
-    ) internal returns (L2Log memory) {
+    ) internal pure returns (L2Log memory) {
         L2Log memory l2Log;
 
         l2Log.l2ShardId = randomL2ShardId;
@@ -802,8 +809,8 @@ contract ExperimentalBridgeTest is Test {
     function _createNewChainInitData(
         bool isFreezable,
         bytes4[] memory mockSelectors,
-        address mockInitAddress,
-        bytes memory mockInitCalldata
+        address ,//mockInitAddress,
+        bytes memory //mockInitCalldata
     ) internal returns (bytes memory) {
         bytes4[] memory singleSelector = new bytes4[](1);
         singleSelector[0] = bytes4(0xabcdef12);
@@ -868,10 +875,10 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
+        uint256 , //mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
-    ) internal returns (L2TransactionRequestDirect memory) {
+    ) internal pure returns (L2TransactionRequestDirect memory) {
         L2TransactionRequestDirect memory l2TxnReqDirect;
 
         l2TxnReqDirect.chainId = mockChainId;
@@ -905,7 +912,7 @@ contract ExperimentalBridgeTest is Test {
         return bhL2TxnRequest;
     }
 
-    function _restrictArraySize(bytes[] memory longArray, uint256 newSize) internal returns (bytes[] memory) {
+    function _restrictArraySize(bytes[] memory longArray, uint256 newSize) internal pure returns (bytes[] memory) {
         bytes[] memory shortArray = new bytes[](newSize);
 
         for (uint i; i < newSize; i++) {

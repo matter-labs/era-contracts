@@ -121,10 +121,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
 
         address previousAdmin = admin;
-        admin = pendingAdmin;
+        admin = currentPendingAdmin;
         delete pendingAdmin;
 
-        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewPendingAdmin(currentPendingAdmin, address(0));
         emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
