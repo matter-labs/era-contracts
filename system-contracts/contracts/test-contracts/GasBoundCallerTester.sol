@@ -14,37 +14,39 @@ contract GasBoundCallerTester is GasBoundCaller {
     uint256 public lastRecordedGasLeft;
 
     function testEntryOverheadInner(
-        address _to, 
-        uint256 _maxTotalGas, 
+        address _to,
+        uint256 _maxTotalGas,
         uint256 _expectedGas,
         bytes calldata _data
     ) external payable {
         // `2/3` to ensure that the constant is good with sufficient overhead
-        require(gasleft() + 2 * CALL_ENTRY_OVERHEAD / 3 >= _expectedGas, "Entry overhead is incorrect");
+        require(gasleft() + (2 * CALL_ENTRY_OVERHEAD) / 3 >= _expectedGas, "Entry overhead is incorrect");
 
         lastRecordedGasLeft = gasleft();
     }
 
     function testEntryOverhead(
-        address _to, 
-        uint256 _maxTotalGas, 
+        address _to,
+        uint256 _maxTotalGas,
         uint256 _expectedGas,
         bytes calldata _data
     ) external payable {
         this.testEntryOverheadInner{gas: _expectedGas}(_to, _maxTotalGas, _expectedGas, _data);
     }
 
-    function testReturndataOverheadInner(bool _shouldReturn, uint256 _len) external { 
+    function testReturndataOverheadInner(bool _shouldReturn, uint256 _len) external {
         if (_shouldReturn) {
             assembly {
-                return (0, _len)
+                return(0, _len)
             }
         } else {
-            (bool success, bytes memory returnData) = address(this).call(abi.encodeWithSignature("testReturndataOverheadInner(bool,uint256)", true, _len));
+            (bool success, bytes memory returnData) = address(this).call(
+                abi.encodeWithSignature("testReturndataOverheadInner(bool,uint256)", true, _len)
+            );
             require(success, "Call failed");
 
             // `2/3` to ensure that the constant is good with sufficient overhead
-            SystemContractHelper.burnGas(uint32(gasleft() - 2 * CALL_RETURN_OVERHEAD / 3), 0);
+            SystemContractHelper.burnGas(uint32(gasleft() - (2 * CALL_RETURN_OVERHEAD) / 3), 0);
             assembly {
                 // We just relay the return data from the call.
                 return(add(returnData, 0x20), mload(returnData))
@@ -64,8 +66,8 @@ contract GasBoundCallerTester is GasBoundCaller {
 
     function gasBoundCallRelayer(
         uint256 _gasToPass,
-        address _to, 
-        uint256 _maxTotalGas, 
+        address _to,
+        uint256 _maxTotalGas,
         bytes calldata _data
     ) external payable {
         this.gasBoundCall{gas: _gasToPass}(_to, _maxTotalGas, _data);

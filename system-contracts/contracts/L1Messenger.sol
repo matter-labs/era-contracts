@@ -148,8 +148,9 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
             3 *
             keccakGasCost(64) +
-            gasSpentOnMessageHashing + 
-            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
+            gasSpentOnMessageHashing +
+            COMPUTATIONAL_PRICE_FOR_PUBDATA *
+            pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit L1MessageSent(msg.sender, hash, _message);
@@ -171,9 +172,10 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
 
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`
-        uint256 gasToPay = sha256GasCost(bytecodeLen) + 
-            keccakGasCost(64) + 
-            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
+        uint256 gasToPay = sha256GasCost(bytecodeLen) +
+            keccakGasCost(64) +
+            COMPUTATIONAL_PRICE_FOR_PUBDATA *
+            pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit BytecodeL1PublicationRequested(_bytecodeHash);
