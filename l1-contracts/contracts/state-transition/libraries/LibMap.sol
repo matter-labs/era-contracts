@@ -61,6 +61,4 @@ library LibMap {
             _map.map[mapIndex] = (newValueXorOldValue << bitOffset) ^ mapValue;
         }
     }
-
 }
-

@@ -318,6 +318,4 @@ contract L1SharedBridgeLegacyTest is Test {
             merkleProof
         );
     }
-
 }
-

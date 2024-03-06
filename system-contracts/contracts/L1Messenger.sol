@@ -335,6 +335,4 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         chainedMessagesHash = bytes32(0);
         chainedL1BytecodesRevealDataHash = bytes32(0);
     }
-
 }
-

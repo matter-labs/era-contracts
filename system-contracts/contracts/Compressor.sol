@@ -252,6 +252,4 @@ contract Compressor is ICompressor, ISystemContract {
         number = uint256(bytes32(_calldataSlice));
         number >>= (256 - (_calldataSlice.length * 8));
     }
-
 }
-

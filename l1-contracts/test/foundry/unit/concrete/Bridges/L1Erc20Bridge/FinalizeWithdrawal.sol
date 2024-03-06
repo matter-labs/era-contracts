@@ -46,6 +46,4 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         // change in the  L1 ERC20 bridge after finalization.
         assertFalse(bridge.isWithdrawalFinalized(l2BatchNumber, l2MessageIndex));
     }
-
 }
-

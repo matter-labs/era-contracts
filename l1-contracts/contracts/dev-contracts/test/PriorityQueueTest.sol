@@ -34,6 +34,4 @@ contract PriorityQueueTest {
     function popFront() external returns (PriorityOperation memory operation) {
         return PriorityQueue.popFront(priorityQueue);
     }
-
 }
-

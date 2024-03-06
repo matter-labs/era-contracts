@@ -282,6 +282,4 @@ contract ExecutingTest is GovernanceTest {
         vm.expectRevert("Proposed delay is less than minimum delay");
         governance.scheduleTransparent(op, 0);
     }
-
 }
-

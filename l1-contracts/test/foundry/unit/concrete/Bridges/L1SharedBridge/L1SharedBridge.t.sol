@@ -636,6 +636,4 @@ contract L1SharedBridgeTest is Test {
             merkleProof
         );
     }
-
 }
-

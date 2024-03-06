@@ -77,6 +77,4 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
 
         require(Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 1, "Code length in words must be odd");
     }
-
 }
-

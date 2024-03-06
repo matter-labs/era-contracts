@@ -135,6 +135,4 @@ contract StateTransitionManagerTest is Test {
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
-
 }
-

@@ -167,6 +167,4 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(success, "mk");
         proxy = BeaconProxy(abi.decode(returndata, (address)));
     }
-
 }
-

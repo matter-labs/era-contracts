@@ -51,4 +51,3 @@ contract ProveL2LogInclusionTest is BridgehubMailboxTest {
     //     assertEq(res, false, "L2 log should not be included");
     // }
 }
-

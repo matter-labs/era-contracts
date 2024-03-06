@@ -44,6 +44,4 @@ library Merkle {
             result := keccak256(0x00, 0x40)
         }
     }
-
 }
-

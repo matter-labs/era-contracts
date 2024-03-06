@@ -1704,6 +1704,4 @@ contract Verifier is IVerifier {
             return(0, 32)
         }
     }
-
 }
-

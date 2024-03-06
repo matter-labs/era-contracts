@@ -121,4 +121,3 @@ contract RequestL2TransactionTest is BridgehubMailboxTest {
     // assertEq(canonicalTxHash, expectedCanonicalTxHash, "Canonical transaction hash should be returned");
     // }
 }
-

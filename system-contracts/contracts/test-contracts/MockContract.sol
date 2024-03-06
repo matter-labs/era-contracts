@@ -65,6 +65,4 @@ contract MockContract {
             }
         }
     }
-
 }
-

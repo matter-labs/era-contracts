@@ -70,6 +70,4 @@ library L2ContractHelper {
 
         return address(uint160(uint256(data)));
     }
-
 }
-

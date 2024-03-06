@@ -205,4 +205,3 @@ interface IExecutor is IZkSyncStateTransitionBase {
     /// @dev It has the name "BlocksRevert" and not "BatchesRevert" due to backward compatibility considerations
     event BlocksRevert(uint256 totalBatchesCommitted, uint256 totalBatchesVerified, uint256 totalBatchesExecuted);
 }
-

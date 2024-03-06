@@ -376,6 +376,4 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
-
 }
-

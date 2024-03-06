@@ -48,4 +48,3 @@ contract ProveL2MessageInclusionTest is BridgehubMailboxTest {
     //     assertEq(res, false, "L2 message should not be included");
     // }
 }
-

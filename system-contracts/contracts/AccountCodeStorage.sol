@@ -136,6 +136,4 @@ contract AccountCodeStorage is IAccountCodeStorage {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
     }
-
 }
-

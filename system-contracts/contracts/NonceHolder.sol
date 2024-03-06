@@ -180,6 +180,4 @@ contract NonceHolder is INonceHolder, ISystemContract {
         deploymentNonce = _rawMinNonce / DEPLOY_NONCE_MULTIPLIER;
         minNonce = _rawMinNonce % DEPLOY_NONCE_MULTIPLIER;
     }
-
 }
-

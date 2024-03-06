@@ -486,6 +486,4 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
         hash = batchHashes[_blockNumber];
     }
-
 }
-

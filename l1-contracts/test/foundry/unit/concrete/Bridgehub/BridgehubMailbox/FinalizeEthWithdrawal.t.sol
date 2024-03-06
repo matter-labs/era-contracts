@@ -96,4 +96,3 @@ contract FinalizeEthWithdrawalTest is BridgehubMailboxTest {
     //     );
     // }
 }
-

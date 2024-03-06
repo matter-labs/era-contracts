@@ -52,6 +52,4 @@ contract SeflUpgradesTest is GovernanceTest {
         assertTrue(securityCouncilBefore != securityCouncilAfter);
         assertTrue(newSecurityCouncil == securityCouncilAfter);
     }
-
 }
-

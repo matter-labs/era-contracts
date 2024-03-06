@@ -41,6 +41,4 @@ contract UnfreezeDiamondTest is AdminTest {
 
     //     assertEq(utilsFacet.util_getIsFrozen(), false);
     // }
-
 }
-

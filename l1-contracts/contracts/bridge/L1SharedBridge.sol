@@ -660,6 +660,4 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             _merkleProof
         );
     }
-
 }
-

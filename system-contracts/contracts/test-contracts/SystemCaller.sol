@@ -73,6 +73,4 @@ contract SystemCaller {
             }
         }
     }
-
 }
-

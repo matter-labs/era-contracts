@@ -111,6 +111,4 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     // TODO
     // function test_successfulUpgrade() public {}
-
 }
-

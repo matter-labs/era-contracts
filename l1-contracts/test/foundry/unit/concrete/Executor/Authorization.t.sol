@@ -66,6 +66,4 @@ contract AuthorizationTest is ExecutorTest {
         vm.expectRevert(bytes.concat("StateTransition Chain: not validator"));
         executor.executeBatches(storedBatchInfoArray);
     }
-
 }
-

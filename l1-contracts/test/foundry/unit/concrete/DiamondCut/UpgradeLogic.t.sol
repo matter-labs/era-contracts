@@ -191,6 +191,4 @@ contract UpgradeLogicTest is DiamondCutTest {
         proxyAsAdmin.executeUpgrade(diamondCutData);
         proxyAsAdmin.executeUpgrade(diamondCutData);
     }
-
 }
-

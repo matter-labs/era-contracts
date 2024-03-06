@@ -260,6 +260,4 @@ contract Governance is IGovernance, Ownable2Step {
 
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
     receive() external payable {}
-
 }
-

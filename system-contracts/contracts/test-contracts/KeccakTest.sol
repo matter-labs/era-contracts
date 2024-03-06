@@ -168,6 +168,4 @@ contract KeccakTest {
             false
         );
     }
-
 }
-
