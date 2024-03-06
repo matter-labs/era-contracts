@@ -41,7 +41,11 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, s.feeParams.pubdataPricingMode);
+        LogProcessingOutput memory logOutput = _processL2Logs(
+            _newBatch,
+            _expectedSystemContractUpgradeTxHash,
+            s.feeParams.pubdataPricingMode
+        );
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);

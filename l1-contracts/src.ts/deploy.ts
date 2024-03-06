@@ -712,7 +712,7 @@ export class Deployer {
       console.log(`BaseTokenMultiplier set, gas used: ${receipt3.gasUsed.toString()}`);
     }
 
-    if (validiumMode){
+    if (validiumMode) {
       const tx4 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
       const receipt4 = await tx4.wait();
       if (this.verbose) {
