@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.20;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../../common/Config.sol";
 
@@ -71,6 +73,8 @@ contract DummySharedBridge {
         amount = amountReturnInFinalizeWithdrawal;
     }
 
+    event Debugger(uint);
+
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         address _prevMsgSender,
@@ -79,13 +83,28 @@ contract DummySharedBridge {
     ) external payable {
         if (_l1Token == address(1)) {
             require(msg.value == _amount, "L1SharedBridge: msg.value not equal to amount");
+        } else {
+            // The Bridgehub also checks this, but we want to be sure
+            require(msg.value == 0, "ShB m.v > 0 b d.it");
+            uint256 amount = _depositFunds(_prevMsgSender, IERC20(_l1Token), _amount); // note if _prevMsgSender is this contract, this will return 0. This does not happen.
+            require(amount == _amount, "3T"); // The token has non-standard transfer logic
         }
 
         if (!hyperbridgingEnabled[_chainId]) {
             chainBalance[_chainId][_l1Token] += _amount;
         }
+
+        emit Debugger(5);
         // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
         emit BridgehubDepositBaseTokenInitiated(_chainId, _prevMsgSender, _l1Token, _amount);
+    }
+
+    function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
+        uint256 balanceBefore = _token.balanceOf(address(this));
+        _token.transferFrom(_from, address(this), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(this));
+
+        return balanceAfter - balanceBefore;
     }
 
     function bridgehubDeposit(

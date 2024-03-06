@@ -642,6 +642,7 @@ contract ExperimentalBridgeTest is Test {
         l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false);
+        _setUpSharedBridge();
 
         assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
@@ -665,6 +666,19 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(randomCaller);
         vm.expectRevert("Bridgehub: non-eth bridge with msg.value");
         bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+
+        // Now, let's call the same function with zero msg.value
+        testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
+
+        vm.prank(randomCaller);
+        testToken.transfer(address(this), l2TxnReqDirect.mintValue);
+        assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
+        testToken.approve(address(mockSharedBridge), l2TxnReqDirect.mintValue);
+        
+        resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
+
+        assertEq(canonicalHash, resultantHash);
     }
 
     function test_requestL2TransactionTwoBridges_ETHCase(
