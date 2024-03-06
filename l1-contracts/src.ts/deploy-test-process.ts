@@ -67,7 +67,7 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
-  await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName);
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }
 
@@ -92,8 +92,13 @@ export async function initialEraTestnetDeploymentProcess(
   deployer.addresses.Create2Factory = "0x1bba393e38a2CD88638F972D67D73599c094f814"; // this should already be deployed, we need to fix it to fix ERA diamond address
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   await deployer.deployDiamondProxy(extraFacets, {});
-
-  await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
+  const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  const tx0 = await stateTransitionManager.registerAlreadyDeployedStateTransition(
+    deployer.chainId,
+    deployer.addresses.StateTransition.DiamondProxy
+  );
+  await tx0.wait();
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
   return deployer;
 }
 

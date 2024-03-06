@@ -121,10 +121,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
 
         address previousAdmin = admin;
-        admin = pendingAdmin;
+        admin = currentPendingAdmin;
         delete pendingAdmin;
 
-        emit NewPendingAdmin(pendingAdmin, address(0));
+        emit NewPendingAdmin(currentPendingAdmin, address(0));
         emit NewAdmin(previousAdmin, pendingAdmin);
     }
 
@@ -222,6 +222,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
+    function registerAlreadyDeployedStateTransition(
+        uint256 _chainId,
+        address _stateTransitionContract
+    ) external onlyOwner {
+        stateTransition[_chainId] = _stateTransitionContract;
+        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+    }
+
     /// @notice called by Bridgehub when a chain registers
     function createNewChain(
         uint256 _chainId,
@@ -230,11 +238,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
-        if (_chainId == ERA_CHAIN_ID) {
-            // era was already deployed
-            stateTransition[ERA_CHAIN_ID] = ERA_DIAMOND_PROXY;
-            // no need for setChainIdUpgrade
-            emit StateTransitionNewChain(_chainId, ERA_DIAMOND_PROXY);
+        if (stateTransition[_chainId] != address(0)) {
+            // StateTransition chain already registered
             return;
         }
 

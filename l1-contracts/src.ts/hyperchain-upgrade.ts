@@ -163,8 +163,15 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
 
   // register Era in Bridgehub, STM
+  const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
+
+  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
+    EraLegacyChainId,
+    deployer.addresses.StateTransition.DiamondProxy
+  );
+  await tx0.wait();
   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
-  bridgehub.createNewChain(
+  const tx = await bridgehub.createNewChain(
     EraLegacyChainId,
     deployer.addresses.StateTransition.StateTransitionProxy,
     ETH_ADDRESS_IN_CONTRACTS,
@@ -173,6 +180,8 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     ethers.constants.HashZero,
     { gasPrice }
   );
+
+  await tx.wait();
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
@@ -188,19 +197,29 @@ async function upgradeL1ERC20Bridge(deployer: Deployer) {
 
 async function migrateAssets(deployer: Deployer) {
   // migrate assets from L1 ERC20 bridge
-  console.log("transferring Eth");
+  if (deployer.verbose) {
+    console.log("transferring Eth");
+  }
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const ethTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
     ETH_ADDRESS_IN_CONTRACTS,
+    deployer.addresses.StateTransition.DiamondProxy,
+    deployer.chainId,
   ]);
   ethTransferData;
   //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
 
-  console.log("transferring Dai");
+  if (deployer.verbose) {
+    console.log("transferring Dai");
+  }
 
   const tokens = getTokens();
   const altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
-  const daiTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [altTokenAddress]);
+  const daiTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
+    altTokenAddress,
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    deployer.chainId,
+  ]);
   daiTransferData;
   //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);
 }

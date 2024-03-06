@@ -39,13 +39,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(s.chainId == ERA_CHAIN_ID, "transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
-        bool callSuccess;
         address sharedBridgeAddress = s.baseTokenBridge;
-        // Low-level assembly call, to avoid any memory copying (save gas)
-        assembly {
-            callSuccess := call(gas(), sharedBridgeAddress, amount, 0, 0, 0, 0)
-        }
-        require(callSuccess, "ShB: transferEthToSharedBridge failed");
+        IL1SharedBridge(sharedBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub

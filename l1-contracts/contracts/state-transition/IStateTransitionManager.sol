@@ -79,6 +79,8 @@ interface IStateTransitionManager {
         bytes calldata _diamondCut
     ) external;
 
+    function registerAlreadyDeployedStateTransition(uint256 _chainId, address _stateTransitionContract) external;
+
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,

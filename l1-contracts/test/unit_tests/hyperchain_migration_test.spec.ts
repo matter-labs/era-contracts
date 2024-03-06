@@ -79,7 +79,7 @@ describe("Hyperchain migration test", function () {
       },
       upgradeTxHash
     );
-    console.log("committing batch1InfoChainIdUpgrade");
+    // console.log("committing batch1InfoChainIdUpgrade");
     const commitReceipt = await (
       await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
     ).wait();
