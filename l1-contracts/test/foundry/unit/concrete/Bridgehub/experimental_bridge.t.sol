@@ -68,12 +68,15 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgeHub.owner(), bridgeOwner);
     }
 
-    function test_ownerCanSetDeployer(address randomCaller, address randomDeployer) public {
-        /**
-            Case I: A random address tries to call the `setDeployer` method and the call fails with the error: `Ownable: caller is not the owner`
-            Case II: The bridgeHub owner calls the `setDeployer` method on `randomDeployer` and it becomes the deployer
-        */
-        
+    function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
+        assertEq(address(0), bridgeHub.deployer());
+        vm.prank(bridgeHub.owner());
+        bridgeHub.setDeployer(randomDeployer);
+
+        assertEq(randomDeployer, bridgeHub.deployer());
+    }
+
+    function test_randomCallerCannotSetDeployer(address randomCaller, address randomDeployer) public {
         if(randomCaller != bridgeHub.owner()) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
@@ -81,11 +84,6 @@ contract ExperimentalBridgeTest is Test {
 
             // The deployer shouldn't have changed.
             assertEq(address(0), bridgeHub.deployer());
-        } else { 
-            vm.prank(randomCaller);
-            bridgeHub.setDeployer(randomDeployer);
-
-            assertEq(randomDeployer, bridgeHub.deployer());
         }
     }
 
