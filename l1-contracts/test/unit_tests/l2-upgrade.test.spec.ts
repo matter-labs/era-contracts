@@ -31,7 +31,6 @@ import {
   SYSTEM_LOG_KEYS,
   constructL2Log,
   createSystemLogs,
-  createSystemLogsWithUpgrade,
   genesisStoredBatchInfo,
   getCallRevertReason,
   packBatchTimestampAndBatchTimestamp,

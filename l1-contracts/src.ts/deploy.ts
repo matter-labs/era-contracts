@@ -631,7 +631,13 @@ export class Deployer {
     }
   }
 
-  public async registerHyperchain(baseTokenAddress: string, extraFacets?: FacetCut[], gasPrice?: BigNumberish, nonce?, predefinedChainId?:string) {
+  public async registerHyperchain(
+    baseTokenAddress: string,
+    extraFacets?: FacetCut[],
+    gasPrice?: BigNumberish,
+    nonce?,
+    predefinedChainId?: string
+  ) {
     const gasLimit = 10_000_000;
 
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
@@ -662,7 +668,6 @@ export class Deployer {
       .topics[1];
 
     nonce++;
-    
 
     this.addresses.BaseToken = baseTokenAddress;
 
@@ -674,7 +679,7 @@ export class Deployer {
 
       console.log(`CONTRACTS_BASE_TOKEN_ADDR=${baseTokenAddress}`);
     }
-    if (!predefinedChainId){
+    if (!predefinedChainId) {
       const diamondProxyAddress =
         "0x" +
         receipt.logs

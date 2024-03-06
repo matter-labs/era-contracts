@@ -7,19 +7,13 @@ import { ethTestConfig } from "../../src.ts/utils";
 import type { Deployer } from "../../src.ts/deploy";
 
 import { upgradeToHyperchains } from "../../src.ts/hyperchain-upgrade";
-import {  Action, FacetCut, facetCut } from "../../src.ts/diamondCut";
+import type { FacetCut } from "../../src.ts/diamondCut";
+import { Action, facetCut } from "../../src.ts/diamondCut";
 
-import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
+import type { ExecutorFacet, GettersFacet } from "../../typechain";
+import { DummyAdminFacetFactory, ExecutorFacetFactory, GettersFacetFactory } from "../../typechain";
+import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
 import {
-  AdminFacetFactory,
-  DummyAdminFacetFactory,
-  ExecutorFacetFactory,
-  GettersFacetFactory,
-  StateTransitionManagerFactory,
-} from "../../typechain";
-import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
-import {
-  buildL2CanonicalTransaction,
   buildCommitBatchInfoWithUpgrade,
   genesisStoredBatchInfo,
   EMPTY_STRING_KECCAK,
@@ -34,20 +28,12 @@ describe("Hyperchain migration test", function () {
   let gasPrice;
 
   let proxyExecutor: ExecutorFacet;
-  let proxyAdmin: AdminFacet;
   let proxyGetters: GettersFacet;
-
-  let stateTransitionManager: StateTransitionManager;
 
   let batch1InfoChainIdUpgrade: CommitBatchInfo;
   let storedBatch1InfoChainIdUpgrade: StoredBatchInfo;
 
-  let verifier: string;
-  const noopUpgradeTransaction = buildL2CanonicalTransaction({ txType: 0 });
-  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
-  // let priorityOperationsHash: string;
-  let initialProtocolVersion = 0;
-  let extraFacet : FacetCut;
+  let extraFacet: FacetCut;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
@@ -73,19 +59,11 @@ describe("Hyperchain migration test", function () {
     extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
 
     deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
-    chainId = deployer.chainId;
-    verifier = deployer.addresses.StateTransition.Verifier;
 
     proxyExecutor = ExecutorFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     proxyGetters = GettersFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
-    proxyAdmin = AdminFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
     const dummyAdminFacet = DummyAdminFacetFactory.connect(
       deployer.addresses.StateTransition.DiamondProxy,
-      deployWallet
-    );
-
-    stateTransitionManager = StateTransitionManagerFactory.connect(
-      deployer.addresses.StateTransition.StateTransitionProxy,
       deployWallet
     );
 
@@ -101,7 +79,7 @@ describe("Hyperchain migration test", function () {
       },
       upgradeTxHash
     );
-    console.log("committing batch1InfoChainIdUpgrade")
+    console.log("committing batch1InfoChainIdUpgrade");
     const commitReceipt = await (
       await proxyExecutor.commitBatches(genesisStoredBatchInfo(), [batch1InfoChainIdUpgrade])
     ).wait();
@@ -111,6 +89,6 @@ describe("Hyperchain migration test", function () {
   });
 
   it("Start upgrade", async () => {
-    await upgradeToHyperchains(deployer, gasPrice, [extraFacet]);
+    await upgradeToHyperchains(deployer, gasPrice);
   });
 });

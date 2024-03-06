@@ -8,7 +8,7 @@ import type { BigNumberish, Wallet } from "ethers";
 import type { FacetCut } from "./diamondCut";
 
 import { SYSTEM_CONFIG } from "../scripts/utils";
-import { testConfigPath } from "../src.ts/utils";
+import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode } from "../src.ts/utils";
 import { Deployer } from "./deploy";
 import { Interface } from "ethers/lib/utils";
 import { deployTokens, getTokens } from "./deploy-token";
@@ -19,16 +19,11 @@ import {
   initialBridgehubDeployment,
   registerHyperchain,
 } from "./deploy-process";
-import {
-  getNumberFromEnv,
-  getHashFromEnv,
-  PubdataPricingMode,
-} from "./utils";
-import { diamondCut, getCurrentFacetCutsForAdd, facetCut , Action} from "./diamondCut";
+import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import * as fs from "fs";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION } from "../test/unit_tests/utils";
-import { DummyAdminFacet } from "../typechain";
+// import { DummyAdminFacet } from "../typechain";
 
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
@@ -96,7 +91,7 @@ export async function initialEraTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
   deployer.addresses.Create2Factory = "0x1bba393e38a2CD88638F972D67D73599c094f814"; // this should already be deployed, we need to fix it to fix ERA diamond address
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
-  await deployer.deployDiamondProxy( extraFacets, {});
+  await deployer.deployDiamondProxy(extraFacets, {});
 
   await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
   return deployer;
@@ -115,7 +110,7 @@ class EraDeployer extends Deployer {
     );
 
     const adminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet", dummyAdminAddress);
-    let facetCuts: FacetCut[] = [facetCut(adminFacet.address, adminFacet.interface, Action.Add, false)];
+    const facetCuts: FacetCut[] = [facetCut(adminFacet.address, adminFacet.interface, Action.Add, false)];
     const contractAddress = await this.deployViaCreate2(
       "DiamondProxy",
       [chainId, diamondCut(facetCuts, ethers.constants.AddressZero, "0x")],
@@ -140,7 +135,7 @@ class EraDeployer extends Deployer {
         this.addresses.StateTransition.AdminFacet,
         this.addresses.StateTransition.GettersFacet,
         this.addresses.StateTransition.MailboxFacet,
-        this.addresses.StateTransition.ExecutorFacet,
+        this.addresses.StateTransition.ExecutorFacet
       )
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
@@ -191,10 +186,6 @@ class EraDeployer extends Deployer {
       },
     ]);
 
-    return diamondCut(
-      facetCuts,
-      this.addresses.StateTransition.DiamondInit,
-      diamondInitCalldata
-    );
+    return diamondCut(facetCuts, this.addresses.StateTransition.DiamondInit, diamondInitCalldata);
   }
 }

@@ -3,9 +3,15 @@ import { ethers, Wallet } from "ethers";
 import * as hardhat from "hardhat";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet  } from "../../typechain";
-import { L1SharedBridgeFactory, BridgehubFactory, TestnetERC20TokenFactory } from "../../typechain";
-import { MailboxFacetFactory, GettersFacetFactory, MockExecutorFacetFactory } from "../../typechain";
+import type { Bridgehub, L1SharedBridge, GettersFacet, MockExecutorFacet } from "../../typechain";
+import {
+  L1SharedBridgeFactory,
+  BridgehubFactory,
+  TestnetERC20TokenFactory,
+  MailboxFacetFactory,
+  GettersFacetFactory,
+  MockExecutorFacetFactory,
+} from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
@@ -64,7 +70,6 @@ describe("Legacy Era tests", function () {
 
     await owner.sendTransaction(tx);
 
-
     const mockExecutorFactory = await hardhat.ethers.getContractFactory("MockExecutorFacet");
     const mockExecutorContract = await mockExecutorFactory.deploy();
     const extraFacet = facetCut(mockExecutorContract.address, mockExecutorContract.interface, Action.Add, true);
@@ -86,7 +91,7 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
-       // The L1SharedBridge is compiled with the ERA_DIAMOND_PROXY address in hardhat config, so we update the shared bridge
+    // The L1SharedBridge is compiled with the ERA_DIAMOND_PROXY address in hardhat config, so we update the shared bridge
     // because all the varaibles are already set in the proxy, this is upgrade works.
     const sharedBridgeTestFactory = await hardhat.ethers.getContractFactory("L1SharedBridgeTest");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
@@ -212,9 +217,7 @@ describe("Legacy Era tests", function () {
     expect(revertReason).equal("ShB withd w proof");
   });
 
-
   /////////// Mailbox. Note we have these two together because we need to fix ERA Diamond proxy Address
-
 
   /// we have this here as calling through the bridgehub does not work
   it("Should not accept bytecode that is too long", async () => {

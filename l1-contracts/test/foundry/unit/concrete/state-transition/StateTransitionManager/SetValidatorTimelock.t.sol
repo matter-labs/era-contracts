@@ -14,6 +14,10 @@ contract setValidatorTimelockTest is StateTransitionManagerTest {
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
         chainContractAddress.setValidatorTimelock(newValidatorTimelock);
 
-        assertEq(chainContractAddress.validatorTimelock(), newValidatorTimelock, "Validator timelock update was not successful");
+        assertEq(
+            chainContractAddress.validatorTimelock(),
+            newValidatorTimelock,
+            "Validator timelock update was not successful"
+        );
     }
 }
