@@ -119,7 +119,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             IMailbox(_target).transferEthToSharedBridge();
             uint256 balanceAfter = address(this).balance;
             require(balanceAfter > balanceBefore, "ShB: 0 eth transferred");
-            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] = chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] + balanceAfter - balanceBefore;
+            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
+                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
+                balanceAfter -
+                balanceBefore;
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
@@ -131,9 +134,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         }
     }
 
-   function receiveEth(uint256 _chainId) external payable {
+    function receiveEth(uint256 _chainId) external payable {
         require(bridgehub.getStateTransition(_chainId) == msg.sender, "receiveEth not state transition");
-   }
+    }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {

@@ -33,7 +33,7 @@ contract TestExecutorFacet is ExecutorFacet {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) external pure returns (LogProcessingOutput memory logOutput) {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataPricingMode.Rollup);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
     // add this to be excluded from coverage report

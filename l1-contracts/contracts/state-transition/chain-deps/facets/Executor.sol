@@ -43,13 +43,15 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(
             _newBatch,
-            _expectedSystemContractUpgradeTxHash,
-            s.feeParams.pubdataPricingMode
+            _expectedSystemContractUpgradeTxHash
         );
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (pubdataSource == uint8(PubdataSource.Blob)) {
+        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+            // skipping data validation for validium, we just check that the
+            require(logOutput.pubdataHash == 0x00, "v0h");
+        } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
             blobHashes[0] = logOutput.blob1Hash;
@@ -129,8 +131,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        PubdataPricingMode pubdataPricingMode
+        bytes32 _expectedSystemContractUpgradeTxHash
     ) internal pure returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
@@ -156,9 +157,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                if (pubdataPricingMode == PubdataPricingMode.Rollup) {
-                    logOutput.pubdataHash = logValue;
-                }
+                logOutput.pubdataHash = logValue;
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 logOutput.stateDiffHash = logValue;

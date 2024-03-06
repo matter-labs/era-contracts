@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.20;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
@@ -26,9 +28,9 @@ contract ExecutorProvingTest is ExecutorFacet {
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,
-        PubdataPricingMode pubdataPricingMode
+        PubdataPricingMode
     ) external pure returns (LogProcessingOutput memory logOutput) {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataPricingMode);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
     /// Sets the DefaultAccount Hash and Bootloader Hash.

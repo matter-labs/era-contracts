@@ -165,7 +165,10 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   // register Era in Bridgehub, STM
   const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
-  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(EraLegacyChainId, deployer.addresses.StateTransition.DiamondProxy)
+  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
+    EraLegacyChainId,
+    deployer.addresses.StateTransition.DiamondProxy
+  );
   await tx0.wait();
   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   const tx = await bridgehub.createNewChain(
@@ -178,7 +181,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     { gasPrice }
   );
 
-    await tx.wait();
+  await tx.wait();
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
@@ -195,13 +198,13 @@ async function upgradeL1ERC20Bridge(deployer: Deployer) {
 async function migrateAssets(deployer: Deployer) {
   // migrate assets from L1 ERC20 bridge
   if (deployer.verbose) {
-      console.log("transferring Eth");
+    console.log("transferring Eth");
   }
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const ethTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
     ETH_ADDRESS_IN_CONTRACTS,
     deployer.addresses.StateTransition.DiamondProxy,
-    deployer.chainId
+    deployer.chainId,
   ]);
   ethTransferData;
   //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
@@ -215,7 +218,7 @@ async function migrateAssets(deployer: Deployer) {
   const daiTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
     altTokenAddress,
     deployer.addresses.Bridges.ERC20BridgeProxy,
-    deployer.chainId
+    deployer.chainId,
   ]);
   daiTransferData;
   //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);

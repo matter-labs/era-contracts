@@ -93,7 +93,11 @@ export async function initialEraTestnetDeploymentProcess(
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   await deployer.deployDiamondProxy(extraFacets, {});
   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
-  const tx0 = await stateTransitionManager.registerAlreadyDeployedStateTransition(deployer.chainId, deployer.addresses.StateTransition.DiamondProxy);
+  const tx0 = await stateTransitionManager.registerAlreadyDeployedStateTransition(
+    deployer.chainId,
+    deployer.addresses.StateTransition.DiamondProxy
+  );
+  await tx0.wait();
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
   return deployer;
 }
