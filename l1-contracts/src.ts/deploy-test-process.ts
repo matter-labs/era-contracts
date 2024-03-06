@@ -67,7 +67,7 @@ export async function initialTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
-  await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName);
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }
 
@@ -93,7 +93,7 @@ export async function initialEraTestnetDeploymentProcess(
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   await deployer.deployDiamondProxy(extraFacets, {});
 
-  await registerHyperchain(deployer, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
+  await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName, deployer.chainId.toString());
   return deployer;
 }
 

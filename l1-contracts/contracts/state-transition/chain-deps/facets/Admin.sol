@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
-import {FeeParams} from "../ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
@@ -84,6 +84,12 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
 
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
+    }
+
+    function setValidiumMode(PubdataPricingMode _validiumMode) external onlyAdmin {
+        require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is committed
+        s.feeParams.pubdataPricingMode = _validiumMode;
+        emit ValidiumModeStatusUpdate(_validiumMode);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -9,7 +9,7 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {VerifierParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     function createBatchCommitment(
@@ -33,7 +33,7 @@ contract TestExecutorFacet is ExecutorFacet {
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
     ) external pure returns (LogProcessingOutput memory logOutput) {
-        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, PubdataPricingMode.Rollup);
     }
 
     // add this to be excluded from coverage report

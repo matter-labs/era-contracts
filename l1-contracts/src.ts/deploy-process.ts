@@ -98,6 +98,7 @@ export async function initialBridgehubDeployment(
 
 export async function registerHyperchain(
   deployer: Deployer,
+  validiumMode: boolean,
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,
   baseTokenName?: string,
@@ -112,5 +113,5 @@ export async function registerHyperchain(
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
     await deployer.registerToken(baseTokenAddress);
   }
-  await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice, null, chainId);
+  await deployer.registerHyperchain(baseTokenAddress, validiumMode, extraFacets, gasPrice, null, chainId);
 }
