@@ -113,26 +113,27 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     /// @dev tranfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
-    function transferFundsFromLegacy(address _token) external onlyOwner {
+    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
         if (_token == ETH_TOKEN_ADDRESS) {
-            IMailbox(ERA_DIAMOND_PROXY).transferEthToSharedBridge();
-            // chainBalance increased in receive
+            uint256 balanceBefore = address(this).balance;
+            IMailbox(_target).transferEthToSharedBridge();
+            uint256 balanceAfter = address(this).balance;
+            require(balanceAfter > balanceBefore, "ShB: 0 eth transferred");
+            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] = chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] + balanceAfter - balanceBefore;
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
             require(amount > 0, "ShB: 0 amount to transfer");
-            legacyBridge.tranferTokenToSharedBridge(_token, amount);
+            IL1ERC20Bridge(_target).tranferTokenToSharedBridge(_token, amount);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             require(balanceAfter - balanceBefore == amount, "ShB: wrong amount transferred");
-            chainBalance[ERA_CHAIN_ID][_token] = chainBalance[ERA_CHAIN_ID][_token] + amount;
+            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + amount;
         }
     }
 
-    /// @dev only used to receive funds from Era diamond Proxy as part of migration process
-    receive() external payable {
-        require(msg.sender == ERA_DIAMOND_PROXY, "ShB: not era diamond proxy");
-        chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] = chainBalance[ERA_CHAIN_ID][ETH_TOKEN_ADDRESS] + msg.value;
-    }
+   function receiveEth(uint256 _chainId) external payable {
+        require(bridgehub.getStateTransition(_chainId) == msg.sender, "receiveEth not state transition");
+   }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(uint256 _chainId, address _l2BridgeAddress) external onlyOwner {
