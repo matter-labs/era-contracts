@@ -134,4 +134,6 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         reenterL1ERC20Bridge.setFunctionToCall(ReenterL1ERC20Bridge.FunctionToCall.ClaimFailedDeposit);
         _finalizeWithdrawalExpectRevertOnReentrancy();
     }
+
 }
+

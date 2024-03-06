@@ -27,4 +27,6 @@ contract GettersTest is L1Erc20BridgeTest {
         address token = bridge.l2TokenAddress(daiOnEthereum);
         assertEq(token, daiOnEra);
     }
+
 }
+

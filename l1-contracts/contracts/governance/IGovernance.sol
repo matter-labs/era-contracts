@@ -82,3 +82,4 @@ interface IGovernance {
     /// @notice Emitted when the operation with specified id is cancelled.
     event OperationCancelled(bytes32 indexed _id);
 }
+

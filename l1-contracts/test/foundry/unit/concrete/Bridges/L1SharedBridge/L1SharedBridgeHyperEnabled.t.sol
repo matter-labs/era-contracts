@@ -605,4 +605,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             merkleProof
         );
     }
+
 }
+

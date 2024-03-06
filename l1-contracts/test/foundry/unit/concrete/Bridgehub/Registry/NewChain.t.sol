@@ -248,4 +248,6 @@ contract NewChainTest is RegistryTest {
     //     assertEq(bridgehub.getStateTransition(chainId), chainContractAddress, "saved chainContract address is wrong");
     //     assertEq(resChainId, chainId, "returned chainId is wrong");
     // }
+
 }
+

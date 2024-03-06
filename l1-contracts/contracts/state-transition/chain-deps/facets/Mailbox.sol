@@ -374,4 +374,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             }
         }
     }
+
 }
+

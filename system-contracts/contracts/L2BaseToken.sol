@@ -140,4 +140,6 @@ contract L2BaseToken is IBaseToken, ISystemContract {
     function decimals() external pure override returns (uint8) {
         return 18;
     }
+
 }
+

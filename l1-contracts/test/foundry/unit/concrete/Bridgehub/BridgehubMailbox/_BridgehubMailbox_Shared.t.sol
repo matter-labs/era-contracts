@@ -24,4 +24,6 @@ contract BridgehubMailboxTest is BridgehubTest {
     //     bridgehub.addStateTransition(chainStateTransition);
     //     bridgehub.createNewChain(chainId, chainStateTransition, chainGovernor, getDiamondCutData());
     // }
+
 }
+

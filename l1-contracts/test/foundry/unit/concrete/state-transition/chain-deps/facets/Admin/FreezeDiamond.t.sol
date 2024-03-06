@@ -41,4 +41,6 @@ contract FreezeDiamondTest is AdminTest {
 
     //     assertEq(utilsFacet.util_getIsFrozen(), true);
     // }
+
 }
+

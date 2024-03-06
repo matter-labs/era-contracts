@@ -45,4 +45,6 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
+
 }
+

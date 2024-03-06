@@ -16,4 +16,6 @@ contract Deployable {
         }
         emit Deployed(msg.value, data);
     }
+
 }
+

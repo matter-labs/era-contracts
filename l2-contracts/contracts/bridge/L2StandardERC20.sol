@@ -183,4 +183,6 @@ contract L2StandardERC20 is ERC20PermitUpgradeable, IL2StandardToken, ERC1967Upg
     function decodeUint8(bytes memory _input) external pure returns (uint8 result) {
         (result) = abi.decode(_input, (uint8));
     }
+
 }
+

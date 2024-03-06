@@ -94,4 +94,6 @@ library Utils {
         // Setting the length
         hashedBytecode = hashedBytecode | bytes32(lengthInWords << 224);
     }
+
 }
+

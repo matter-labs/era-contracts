@@ -42,4 +42,6 @@ contract ImmutableSimulator is IImmutableSimulator {
             }
         }
     }
+
 }
+

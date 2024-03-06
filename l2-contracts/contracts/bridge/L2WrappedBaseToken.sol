@@ -113,4 +113,6 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     receive() external payable {
         depositTo(msg.sender);
     }
+
 }
+

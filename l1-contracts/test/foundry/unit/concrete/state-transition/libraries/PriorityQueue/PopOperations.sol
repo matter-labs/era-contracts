@@ -70,4 +70,6 @@ contract PopOperationsTest is PriorityQueueSharedTest {
         vm.expectRevert(bytes.concat("s"));
         priorityQueue.popFront();
     }
+
 }
+

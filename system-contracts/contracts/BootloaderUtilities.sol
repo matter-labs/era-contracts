@@ -317,4 +317,6 @@ contract BootloaderUtilities is IBootloaderUtilities {
                 )
             );
     }
+
 }
+
