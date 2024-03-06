@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -473,21 +473,43 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
         return
-            abi.encode(
+            abi.encodePacked(
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
-                // for each blob we have:
-                // linear hash (hash of preimage from system logs) and
-                // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
-                // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
-                // If we only utilize a single blob, _blobHash[1] and _blobCommitments[1] will be bytes32(0)
-                _blobHashes[0],
-                _blobCommitments[0],
-                _blobHashes[1],
-                _blobCommitments[1]
+                _encodeBlobAuxilaryOutput(_blobCommitments, _blobHashes)
             );
+    }
+
+    /// @dev Encodes the commitment to blobs to be used in the auxiliary output of the batch commitment
+    /// @param _blobCommitments - the commitments to the blobs
+    /// @param _blobHashes - the hashes of the blobs
+    /// @param blobAuxOutputWords - The circuit commitment to the blobs split into 32-byte words
+    function _encodeBlobAuxilaryOutput(
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
+        // These invariants should be checked by the caller of this function, but we double check
+        // just in case.
+        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
+        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+
+        // for each blob we have:
+        // linear hash (hash of preimage from system logs) and
+        // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+        // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
+        // If we only utilize a single blob, _blobHash[1] and _blobCommitments[1] will be bytes32(0)
+        // 
+        // For now, only up to 2 blobs are supported by the contract, while 16 are required by the circuits.
+        // All the unfilled blobs will have their commitment as 0.
+    
+        blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
+
+        for (uint i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            blobAuxOutputWords[i * 2] = _blobHashes[i];
+            blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
     }
 
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo

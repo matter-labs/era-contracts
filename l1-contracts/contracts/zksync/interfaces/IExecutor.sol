@@ -62,6 +62,11 @@ uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 /// @dev Max number of blobs currently supported
 uint256 constant MAX_NUMBER_OF_BLOBS = 2;
 
+/// @dev The number of blobs that must be present in the commitment to a batch.
+/// It represents the maximal number of blobs that circuits can support and can be larger 
+/// than the maximal number of blobs supported by the contract (`MAX_NUMBER_OF_BLOBS`).
+uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
+
 /// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
