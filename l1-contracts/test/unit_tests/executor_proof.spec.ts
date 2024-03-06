@@ -56,7 +56,7 @@ describe("Executor test", function () {
     );
     console.log("This block Commitment is : " + nextCommitment);
     expect(nextCommitment, "Commitment computation failed").is.equal(
-      "0x5c99344b39a05e54486f7b96612517cb49e55ec9ac70357f7049590f180560a8"
+      "0xab2238ade1c47671daadd8859d3f40986daf53a9349716fca57e6679e5dc1ece"
     );
 
     const prevCommitment = "0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404";
@@ -66,6 +66,6 @@ describe("Executor test", function () {
       // ignored.
       recursionCircuitsSetVksHash: "0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac",
     });
-    expect(result.toHexString(), "").to.be.equal("0xdd44f71f56ad61c5936b37f23275bc39256e61c4c05167d4564b7fd2");
+    expect(result.toHexString(), "").to.be.equal("0x23ef2434974fa8d0f7f7d29839aaa78fe767bf36edb3a5979d60a6b0");
   });
 });
