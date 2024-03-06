@@ -1,4 +1,3 @@
-import { hashBytecode } from "zksync-web3/build/src/utils";
 import type { KeccakTest } from "../typechain";
 import { KeccakTestFactory } from "../typechain";
 import { REAL_KECCAK256_CONTRACT_ADDRESS } from "./shared/constants";

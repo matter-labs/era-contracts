@@ -1,22 +1,12 @@
-import { hashBytecode } from "zksync-web3/build/src/utils";
+import type { SystemContext, GasBoundCallerTester } from "../typechain";
+import { GasBoundCallerTesterFactory, SystemContextFactory } from "../typechain";
 import {
-  GasBoundCallerTesterFactory,
-  type CodeOracleTest,
-  type GasBoundCaller,
-  type GasBoundCallerTester,
-  SystemContext,
-  SystemContextFactory,
-} from "../typechain";
-import {
-  REAL_CODE_ORACLE_CONTRACT_ADDRESS,
   REAL_SYSTEM_CONTEXT_ADDRESS,
   TEST_GAS_BOUND_CALLER_ADDRESS,
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
 } from "./shared/constants";
-import { publishBytecode, setCode, getCode, deployContract, deployContractOnAddress, getWallets } from "./shared/utils";
+import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers } from "hardhat";
-import { readYulBytecode } from "../scripts/utils";
-import { Language } from "../scripts/constants";
 import { expect } from "chai";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 
