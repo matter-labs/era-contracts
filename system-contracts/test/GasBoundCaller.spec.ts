@@ -1,8 +1,6 @@
 import type { SystemContext, GasBoundCallerTester } from "../typechain";
 import { GasBoundCallerTesterFactory, SystemContextFactory } from "../typechain";
-import {
-  REAL_SYSTEM_CONTEXT_ADDRESS
-} from "./shared/constants";
+import { REAL_SYSTEM_CONTEXT_ADDRESS } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers } from "hardhat";
 import { expect } from "chai";
@@ -14,9 +12,9 @@ describe("GasBoundCaller tests", function () {
   before(async () => {
     await prepareEnvironment();
 
-    // Note, that while the gas bound caller itself does not need to be in kernel space, 
+    // Note, that while the gas bound caller itself does not need to be in kernel space,
     // it does help a lot for easier testing, so the tester is in kernel space.
-    const GAS_BOUND_CALLER_TESTER_ADDRESS = '0x000000000000000000000000000000000000ffff';
+    const GAS_BOUND_CALLER_TESTER_ADDRESS = "0x000000000000000000000000000000000000ffff";
     await deployContractOnAddress(GAS_BOUND_CALLER_TESTER_ADDRESS, "GasBoundCallerTester");
 
     tester = GasBoundCallerTesterFactory.connect(GAS_BOUND_CALLER_TESTER_ADDRESS, getWallets()[0]);

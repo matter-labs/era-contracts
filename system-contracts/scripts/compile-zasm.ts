@@ -1,6 +1,6 @@
 // hardhat import should be the first import in the file
 import type { CompilerPaths } from "./utils";
-import { spawn, compilerLocation, prepareCompilerPaths, getSolcLocation } from "./utils";
+import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
 
 const COMPILER_VERSION = "1.3.18";
