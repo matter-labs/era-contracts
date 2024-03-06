@@ -50,7 +50,7 @@ contract GasBoundCaller {
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
-        // Since the revert is propagated, the pubdata publushed wouldn't change and so no
+        // Since the revert is propagated, the pubdata published wouldn't change and so no
         // other checks are needed.
         bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
 
