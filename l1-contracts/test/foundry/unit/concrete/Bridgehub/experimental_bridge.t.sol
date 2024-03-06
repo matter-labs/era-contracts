@@ -222,7 +222,7 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addToken(address , address randomAddress) public {
+    function test_addToken(address, address randomAddress) public {
         assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
@@ -596,7 +596,7 @@ contract ExperimentalBridgeTest is Test {
 
         assertTrue(bridgeHub.getStateTransition(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-        //BridgehubL2TransactionRequest memory bhL2TxnRequest = 
+        //BridgehubL2TransactionRequest memory bhL2TxnRequest =
         _createBhL2TxnRequest(mockRefundRecipientBH);
 
         vm.mockCall(
@@ -731,10 +731,8 @@ contract ExperimentalBridgeTest is Test {
         );
 
         vm.prank(randomCaller);
-        //bytes32 resultantHash = 
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(
-            l2TxnReq2BridgeOut
-        );
+        //bytes32 resultantHash =
+        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
 
         assertTrue(true);
     }
@@ -809,7 +807,7 @@ contract ExperimentalBridgeTest is Test {
     function _createNewChainInitData(
         bool isFreezable,
         bytes4[] memory mockSelectors,
-        address ,//mockInitAddress,
+        address, //mockInitAddress,
         bytes memory //mockInitCalldata
     ) internal returns (bytes memory) {
         bytes4[] memory singleSelector = new bytes4[](1);
@@ -875,7 +873,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256 , //mockL2GasPerPubdataByteLimit,
+        uint256, //mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
     ) internal pure returns (L2TransactionRequestDirect memory) {
