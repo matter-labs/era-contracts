@@ -41,16 +41,14 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(
-            _newBatch,
-            _expectedSystemContractUpgradeTxHash
-        );
+        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
-            // skipping data validation for validium, we just check that the
+            // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
+            require(_newBatch.pubdataContents.length == 0);
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
