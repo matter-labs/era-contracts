@@ -6,7 +6,7 @@ import "hardhat-typechain";
 
 // This version of system contracts requires a pre release of the compiler
 const COMPILER_VERSION = "1.5.0";
-const PRE_RELEASE_VERSION = "prerelease-fd3027d-notag";
+const PRE_RELEASE_VERSION = "prerelease-a167aa3-code4rena";
 function getZksolcUrl(): string {
   // @ts-ignore
   const platform = { darwin: "macosx", linux: "linux", win32: "windows" }[process.platform];
