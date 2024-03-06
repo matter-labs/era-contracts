@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
 import {VerifierParams, PubdataPricingMode} from "../../zksync/Storage.sol";
 import {LogProcessingOutput} from "../../zksync/interfaces/IExecutor.sol";
-import {PubdataSource} from "../../zksync/interfaces/IExecutor.sol";
+import {PubdataSource, LogProcessingOutput} from "../../zksync/interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
@@ -30,14 +30,7 @@ contract ExecutorProvingTest is ExecutorFacet {
     )
         external
         pure
-        returns (
-            uint256 numberOfLayer1Txs,
-            bytes32 chainedPriorityTxsHash,
-            bytes32 previousBatchHash,
-            bytes32 stateDiffHash,
-            bytes32 l2LogsTreeRoot,
-            uint256 packedBatchAndL2BlockTimestamp
-        )
+        returns (LogProcessingOutput memory logOutput) 
     {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataPricingMode);
     }
