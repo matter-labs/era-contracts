@@ -1,14 +1,12 @@
 import type { SystemContext, GasBoundCallerTester } from "../typechain";
 import { GasBoundCallerTesterFactory, SystemContextFactory } from "../typechain";
 import {
-  REAL_SYSTEM_CONTEXT_ADDRESS,
-  TEST_GAS_BOUND_CALLER_ADDRESS,
-  TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
+  REAL_SYSTEM_CONTEXT_ADDRESS
 } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { prepareEnvironment, setResult } from "./shared/mocks";
+import { prepareEnvironment } from "./shared/mocks";
 
 describe("GasBoundCaller tests", function () {
   let tester: GasBoundCallerTester;
@@ -16,25 +14,13 @@ describe("GasBoundCaller tests", function () {
   before(async () => {
     await prepareEnvironment();
 
-    await deployContractOnAddress(TEST_GAS_BOUND_CALLER_ADDRESS, "GasBoundCallerTester");
+    // Note, that while the gas bound caller itself does not need to be in kernel space, 
+    // it does help a lot for easier testing, so the tester is in kernel space.
+    const GAS_BOUND_CALLER_TESTER_ADDRESS = '0x000000000000000000000000000000000000ffff';
+    await deployContractOnAddress(GAS_BOUND_CALLER_TESTER_ADDRESS, "GasBoundCallerTester");
 
-    tester = GasBoundCallerTesterFactory.connect(TEST_GAS_BOUND_CALLER_ADDRESS, getWallets()[0]);
-
-    const realSystemContext = SystemContextFactory.connect(REAL_SYSTEM_CONTEXT_ADDRESS, getWallets()[0]);
-    // It is assumed that it never changes within tests, so we use the same as the real one
-    const gasPerPubdata = await realSystemContext.gasPerPubdataByte();
-
-    if (gasPerPubdata.eq(0)) {
-      // If it is zero, some tests will start failing, so we need to double check.
-      throw new Error("Gas per pubdata is 0, this is unexpected");
-    }
-
-    await setResult("SystemContext", "gasPerPubdataByte", [], {
-      failure: false,
-      returnData: ethers.utils.defaultAbiCoder.encode(["uint256"], [gasPerPubdata]),
-    });
-
-    systemContext = SystemContextFactory.connect(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, getWallets()[0]);
+    tester = GasBoundCallerTesterFactory.connect(GAS_BOUND_CALLER_TESTER_ADDRESS, getWallets()[0]);
+    systemContext = SystemContextFactory.connect(REAL_SYSTEM_CONTEXT_ADDRESS, getWallets()[0]);
   });
 
   it("Test entry overhead", async () => {

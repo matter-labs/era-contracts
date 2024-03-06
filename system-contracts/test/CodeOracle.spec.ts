@@ -53,7 +53,9 @@ describe("CodeOracle tests", function () {
 
   it("Should refuse to decommit unknown code", async () => {
     // Just some valid zkEVM bytecode, but to skip publishing we re-use
-    // the code of the code oracle itself.
+    // the code of the code oracle itself. As of now we can not publish
+    // bytecodes of maximal theoretical length within the hardhat envrioment.
+    // The case of the maximal possible bytecode is tested separately inside the Rust code.
     const unknownLargeBytecode = generateLargeBytecode();
 
     const versionedHash = hashBytecode(unknownLargeBytecode);

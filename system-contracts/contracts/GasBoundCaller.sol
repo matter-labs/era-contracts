@@ -3,12 +3,14 @@
 pragma solidity 0.8.20;
 
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {REAL_SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice The contract that allows to limit the final gas expenditure of the call.
+ * @dev This contract MUST be deployed in the *user space*. It does not need any functionality that only
+ * system contracts have and it can relay call to any contract, breaking potential trust in system contracts.
  */
 contract GasBoundCaller {
     /// @notice We assume that no more than `CALL_ENTRY_OVERHEAD` ergs are used for the O(1) operations at the start
@@ -46,7 +48,7 @@ contract GasBoundCaller {
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
 
-        uint256 pubdataPublishedBefore = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        uint256 pubdataPublishedBefore = REAL_SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
@@ -54,7 +56,7 @@ contract GasBoundCaller {
         // other checks are needed.
         bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
 
-        uint256 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        uint256 pubdataPublishedAfter = REAL_SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
         // some of the previously created state diffs
@@ -62,7 +64,7 @@ contract GasBoundCaller {
             ? pubdataPublishedAfter - pubdataPublishedBefore
             : 0;
 
-        uint256 pubdataPrice = SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
+        uint256 pubdataPrice = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
         // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
