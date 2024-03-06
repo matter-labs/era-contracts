@@ -110,6 +110,9 @@ interface IMailbox is IZkSyncStateTransitionBase {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
+    /// @notice tranfer Eth to shared bridge as part of migration process
+    function transferEthToSharedBridge() external;
+
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation
     /// @param txHash keccak256 hash of encoded transaction representation

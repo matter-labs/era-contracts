@@ -128,7 +128,7 @@ contract L1SharedBridgeFailTest is Test {
             admin,
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
         );
-        sharedBridge = L1SharedBridge(address(sharedBridgeProxy));
+        sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
