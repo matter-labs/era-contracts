@@ -263,7 +263,7 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_setSharedBridge(address randomCaller) public {
+    function test_setSharedBridge(address randomAddress) public {
         assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(address(0)), "This random address is not registered as sharedBridge");
 
         vm.prank(bridgeOwner);
