@@ -87,7 +87,26 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    function test_addStateTransitionManager(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
+    function test_addStateTransitionManager(address randomAddressWithoutTheCorrectInterface) public {
+        bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+        
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+
+        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition already registered"));
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+    }
+
+    function test_addStateTransitionManager_cannotBeCalledByRandomAddress(address randomCaller, address randomAddressWithoutTheCorrectInterface) public {
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -109,11 +128,47 @@ contract ExperimentalBridgeTest is Test {
         vm.expectRevert(bytes("Bridgehub: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
 
+        // Definitely not by a random caller 
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert("Ownable: caller is not the owner");
+            bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        }
+
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isSTMRegistered);
     }
 
-    function test_removeStateTransitionManager(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
+    function test_removeStateTransitionManager(address randomAddressWithoutTheCorrectInterface) public {
+        bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+        
+        // A non-existent STM cannot be removed
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        // Let's first register our particular stateTransitionManager
+        vm.prank(bridgeOwner);
+        bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(isSTMRegistered);
+
+        // Only an address that has already been registered, can be removed.
+        vm.prank(bridgeOwner);
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+        isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        assertTrue(!isSTMRegistered);
+
+        // An already removed STM cannot be removed again
+        vm.prank(bridgeOwner);
+        vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
+        bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+    }
+
+    function test_removeStateTransitionManager_cannotBeCalledByRandomAddress(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
 
@@ -147,9 +202,38 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition not registered yet"));
         bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+
+        // Not possible by a randomcaller as well
+        if(randomCaller != bridgeOwner) {
+            vm.prank(randomCaller);
+            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+            bridgeHub.removeStateTransitionManager(randomAddressWithoutTheCorrectInterface);
+        }
     }
 
     function test_addToken(address randomCaller, address randomAddress) public {
+        assertTrue(!bridgeHub.tokenIsRegistered(randomAddress), "This random address is not registered as a token");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.addToken(randomAddress);
+
+        assertTrue(bridgeHub.tokenIsRegistered(randomAddress), "after call from the bridgeowner, this randomAddress should be a registered token");
+        
+        if(randomAddress != address(testToken)) {
+            // Testing to see if an actual ERC20 implementation can also be added or not
+            vm.prank(bridgeOwner);
+            bridgeHub.addToken(address(testToken));
+
+            assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
+        }
+
+        // An already registered token cannot be registered again
+        vm.prank(bridgeOwner);
+        vm.expectRevert("Bridgehub: token already registered");
+        bridgeHub.addToken(randomAddress);
+    }
+
+    function test_addToken_cannotBeCalledByRandomAddress(address randomAddress, address randomCaller) public {
         if(randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
@@ -170,9 +254,25 @@ contract ExperimentalBridgeTest is Test {
 
             assertTrue(bridgeHub.tokenIsRegistered(address(testToken)));
         }
+
+        // An already registered token cannot be registered again by randomCaller
+        if(randomCaller != bridgeOwner) {
+            vm.prank(bridgeOwner);
+            vm.expectRevert("Bridgehub: token already registered");
+            bridgeHub.addToken(randomAddress);
+        }
     }
 
-    function test_setSharedBridge(address randomCaller, address randomAddress) public {
+    function test_setSharedBridge(address randomCaller) public {
+        assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(address(0)), "This random address is not registered as sharedBridge");
+
+        vm.prank(bridgeOwner);
+        bridgeHub.setSharedBridge(randomAddress);
+
+        assertTrue(bridgeHub.sharedBridge() == IL1SharedBridge(randomAddress), "after call from the bridgeowner, this randomAddress should be the registered sharedBridge");
+    }
+
+    function test_setSharedBridge_cannotBeCalledByRandomAddress(address randomCaller, address randomAddress) public {
         if(randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
