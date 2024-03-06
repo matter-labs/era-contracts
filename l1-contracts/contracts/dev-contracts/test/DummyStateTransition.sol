@@ -4,8 +4,7 @@ pragma solidity 0.8.20;
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
-contract DummyStateTransition is MailboxFacet{
-
+contract DummyStateTransition is MailboxFacet {
     constructor(address bridgeHubAddress) {
         s.bridgehub = bridgeHubAddress;
     }
@@ -19,7 +18,7 @@ contract DummyStateTransition is MailboxFacet{
         s.baseTokenGasPriceMultiplierDenominator = denominator;
     }
 
-    function getBridgeHubAddress() public returns(address) {
+    function getBridgeHubAddress() public returns (address) {
         return s.bridgehub;
     }
 
@@ -40,5 +39,4 @@ contract DummyStateTransition is MailboxFacet{
                 minimalL2GasPrice: 250_000_000
             });
     }
-
 }

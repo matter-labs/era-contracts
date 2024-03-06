@@ -30,11 +30,7 @@ contract DummySharedBridge {
         dummyL2DepositTxHash = _dummyL2DepositTxHash;
     }
 
-    function setDataToBeReturnedInFinalizeWithdrawal(
-        address _l1Receiver,
-        address _l1Token,
-        uint256 _amount
-    ) external {
+    function setDataToBeReturnedInFinalizeWithdrawal(address _l1Receiver, address _l1Token, uint256 _amount) external {
         l1ReceiverReturnInFinalizeWithdrawal = _l1Receiver;
         l1TokenReturnInFinalizeWithdrawal = _l1Token;
         amountReturnInFinalizeWithdrawal = _amount;
@@ -98,22 +94,18 @@ contract DummySharedBridge {
         uint256, // l2Value, needed for Weth deposits in the future
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request) {
-            // Request the finalization of the deposit on the L2 side
-            bytes memory l2TxCalldata = bytes("0xabcd123");
-            bytes32 txDataHash = bytes32("0x1212121212abf");
+        // Request the finalization of the deposit on the L2 side
+        bytes memory l2TxCalldata = bytes("0xabcd123");
+        bytes32 txDataHash = bytes32("0x1212121212abf");
 
-            request = L2TransactionRequestTwoBridgesInner({
-                magicValue: TWO_BRIDGES_MAGIC_VALUE,
-                l2Contract: address(0xCAFE),
-                l2Calldata: l2TxCalldata,
-                factoryDeps: new bytes[](0),
-                txDataHash: txDataHash
-            });
+        request = L2TransactionRequestTwoBridgesInner({
+            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+            l2Contract: address(0xCAFE),
+            l2Calldata: l2TxCalldata,
+            factoryDeps: new bytes[](0),
+            txDataHash: txDataHash
+        });
     }
 
-    function bridgehubConfirmL2Transaction(
-        uint256 _chainId,
-        bytes32 _txDataHash,
-        bytes32 _txHash
-    ) external {}
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external {}
 }
