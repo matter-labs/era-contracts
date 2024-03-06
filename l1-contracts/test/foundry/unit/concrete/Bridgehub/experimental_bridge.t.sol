@@ -45,7 +45,6 @@ contract ExperimentalBridgeTest is Test {
         assertEq(defaultOwner, address(this));
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
-        // @follow-up Is this the intended behavior? @Vlad @kalman
         vm.expectRevert(bytes("1B"));
         bridgeHub.initialize(bridgeOwner);
 
@@ -90,9 +89,6 @@ contract ExperimentalBridgeTest is Test {
         }
     }
 
-    // @follow-up Concern:
-    // 1. Addresses that do not implement the correct interface or any interface whatsoever (EOAs and address(0)) can also be added as a StateTransitionManager
-    // 2. After being added, if the contracts are upgradable, they can change their logic to include malicious code as well.
     function test_addStateTransitionManager(address randomAddressWithoutTheCorrectInterface, address randomCaller) public {
         bool isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isSTMRegistered);
