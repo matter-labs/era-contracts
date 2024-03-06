@@ -18,6 +18,12 @@ object "CodeOracle" {
                 ret := 0x0000000000000000000000000000000000008004
             }
 
+            /// @notice The maximum value of the `uint32` type.
+            function UINT32_MAX() -> ret {
+                // 2^32 - 1
+                ret := 4294967295
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             ////////////////////////////////////////////////////////////////
@@ -62,6 +68,13 @@ object "CodeOracle" {
             function decommit(versionedHash, lenInWords) {
                 // The operation below are never expected to overflow since the `lenInWords` is a most 2 bytes long.
                 let gasCost := mul(decommmitCostPerWord(), lenInWords)
+
+                // The cost of the decommit operation can not exceed the maximum value of the `uint32` type.
+                // This should never happen in practice, since `lenInWords` is an u16 value, but we add this check 
+                // just in case.
+                if gt(gasCost, UINT32_MAX()) {
+                    gasCost := UINT32_MAX()
+                }
 
                 // We execute the `decommit` opcode that, given a versioned hash, unpacks the data into the memory.
                 // Note, that this memory does not necessarily have to be the memory of this contract. If an unpack 
