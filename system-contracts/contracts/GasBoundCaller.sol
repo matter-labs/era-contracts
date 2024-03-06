@@ -46,7 +46,7 @@ contract GasBoundCaller {
         // This is the amount of gas that can be spent *exclusively* on pubdata in addition to the `gas` provided to this function.
         uint256 pubdataAllowance = _maxTotalGas > expectedForCompute ? _maxTotalGas - expectedForCompute : 0;
 
-        uint32 pubdataPublishedBefore = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        uint256 pubdataPublishedBefore = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // We never permit system contract calls.
         // If the call fails, the `EfficientCall.call` will propagate the revert.
@@ -54,11 +54,11 @@ contract GasBoundCaller {
         // other checks are needed.
         bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
 
-        uint32 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
+        uint256 pubdataPublishedAfter = SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
         // some of the previously created state diffs
-        uint32 pubdataSpent = pubdataPublishedAfter > pubdataPublishedBefore
+        uint256 pubdataSpent = pubdataPublishedAfter > pubdataPublishedBefore
             ? pubdataPublishedAfter - pubdataPublishedBefore
             : 0;
 
@@ -66,7 +66,7 @@ contract GasBoundCaller {
 
         // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
-        uint256 pubdataCost = pubdataPrice * uint256(pubdataSpent);
+        uint256 pubdataCost = pubdataPrice * pubdataSpent;
 
         if (pubdataCost != 0) {
             // Here we double check that the additional cost is not higher than the maximum allowed.
