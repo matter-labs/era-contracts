@@ -63,16 +63,6 @@ async function main() {
         return;
       }
 
-      // Deploy diamond upgrade init contract if needed
-      const diamondUpgradeContractVersion = cmd.diamondUpgradeInit || 1;
-      if (diamondUpgradeContractVersion) {
-        await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
-          gasPrice,
-          nonce,
-        });
-        nonce++;
-      }
-
       await deployer.deployDefaultUpgrade(create2Salt, {
         gasPrice,
         nonce,

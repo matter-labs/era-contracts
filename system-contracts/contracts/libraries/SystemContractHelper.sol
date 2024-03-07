@@ -323,7 +323,7 @@ library SystemContractHelper {
     /// @return `true` or `false` based on whether the current call is a system call.
     function isSystemCall() internal view returns (bool) {
         uint256 callFlags = getCallFlags();
-        // When the system call is passed, the 2-bit it set to 1
+        // When the system call is passed, the 2-bit is set to 1
         return (callFlags & 2) != 0;
     }
 

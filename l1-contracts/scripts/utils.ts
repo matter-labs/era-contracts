@@ -178,7 +178,6 @@ export interface DeployedAddresses {
     GettersFacet: string;
     Verifier: string;
     DiamondInit: string;
-    DiamondUpgradeInit: string;
     DefaultUpgrade: string;
     DiamondProxy: string;
   };
@@ -202,7 +201,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
       GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
       DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
-      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
       DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
       DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
       Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
