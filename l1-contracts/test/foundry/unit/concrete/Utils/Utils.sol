@@ -474,7 +474,7 @@ library Utils {
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
     }
-    
+
     // add this to be excluded from coverage report
     function test() internal {}
 }
