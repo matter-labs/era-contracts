@@ -23,21 +23,6 @@ contract ExecuteUpgradeTest is AdminTest {
         vm.startPrank(nonStateTransitionManager);
         adminFacet.executeUpgrade(diamondCutData);
     }
-
-    // TODO
-    // function test_successfulUpgrade() public {
-    // address stateTransitionManager = utilsFacet.util_getStateTransitionManager();
-    // Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-    //     facetCuts: new Diamond.FacetCut[](0),
-    //     initAddress: address(0),
-    //     initCalldata: new bytes(0)
-    // });
-    // vm.mockCall(address(0), abi.encodeWithSelector(IDiamondLibrary.diamondCut.selector), abi.encode());
-    // vm.expectEmit(true, true, true, true, address(adminFacet));
-    // emit ExecuteUpgrade(diamondCutData);
-    // vm.startPrank(stateTransitionManager);
-    // adminFacet.executeUpgrade(diamondCutData);
-    // }
 }
 
 interface IDiamondLibrary {

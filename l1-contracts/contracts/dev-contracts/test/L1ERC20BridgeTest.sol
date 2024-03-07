@@ -12,8 +12,4 @@ contract L1ERC20BridgeTest is L1ERC20Bridge {
     function test() internal virtual {}
 
     constructor(IBridgehub _zkSync) L1ERC20Bridge(IL1SharedBridge(address(0))) {}
-
-    // function getBridgehub() public view returns (IBridgehub) {
-    //     return bridgehub;
-    // }
 }

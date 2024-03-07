@@ -16,29 +16,4 @@ contract FreezeDiamondTest is AdminTest {
         vm.startPrank(nonAdminOrStateTransitionManager);
         adminFacet.freezeDiamond();
     }
-
-    // function test_revertWhen_diamondIsAlreadyFrozen() public {
-    //     address governor = utilsFacet.util_getAdmin();
-
-    //     utilsFacet.util_setIsFrozen(true);
-
-    //     vm.expectRevert(bytes.concat("a9"));
-
-    //     vm.startPrank(governor);
-    //     adminFacet.freezeDiamond();
-    // }
-
-    // function test_successfulFreeze() public {
-    //     address governor = utilsFacet.util_getAdmin();
-
-    //     utilsFacet.util_setIsFrozen(false);
-
-    //     vm.expectEmit(true, true, true, true, address(adminFacet));
-    //     emit Freeze();
-
-    //     vm.startPrank(governor);
-    //     adminFacet.freezeDiamond();
-
-    //     assertEq(utilsFacet.util_getIsFrozen(), true);
-    // }
 }

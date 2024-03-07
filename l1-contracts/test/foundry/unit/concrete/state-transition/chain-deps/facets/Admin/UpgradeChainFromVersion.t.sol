@@ -108,7 +108,4 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.startPrank(admin);
         adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
     }
-
-    // TODO
-    // function test_successfulUpgrade() public {}
 }

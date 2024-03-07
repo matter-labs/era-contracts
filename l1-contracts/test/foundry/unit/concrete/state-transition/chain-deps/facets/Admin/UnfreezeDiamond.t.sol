@@ -27,18 +27,4 @@ contract UnfreezeDiamondTest is AdminTest {
         vm.startPrank(admin);
         adminFacet.unfreezeDiamond();
     }
-
-    // function test_successfulUnfreeze() public {
-    //     address governor = utilsFacet.util_getAdmin();
-
-    //     utilsFacet.util_setIsFrozen(true);
-
-    //     vm.expectEmit(true, true, true, true, address(adminFacet));
-    //     emit Unfreeze();
-
-    //     vm.startPrank(governor);
-    //     adminFacet.unfreezeDiamond();
-
-    //     assertEq(utilsFacet.util_getIsFrozen(), false);
-    // }
 }
