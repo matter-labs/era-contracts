@@ -6036,8 +6036,8 @@ dependencies = [
 
 [[package]]
 name = "zkevm-assembly"
-version = "1.3.2"
-source = "git+https://github.com/matter-labs/era-zkEVM-assembly.git?branch=v1.4.1#50282016d01bd2fd147021dd558209778db2268b"
+version = "1.4.1"
+source = "git+https://github.com/matter-labs/era-zkEVM-assembly.git?branch=v1.4.1#e59d5da67f18f8829c3cfaebb967265d73c168ed"
 dependencies = [
  "env_logger 0.9.3",
  "hex",
@@ -6174,7 +6174,7 @@ dependencies = [
  "test-log",
  "tracing",
  "zk_evm 1.3.3 (git+https://github.com/matter-labs/era-zk_evm.git?branch=v1.3.3)",
- "zkevm-assembly 1.3.2 (git+https://github.com/matter-labs/era-zkEVM-assembly.git?branch=v1.3.2)",
+ "zkevm-assembly 1.3.2",
 ]
 
 [[package]]
@@ -6197,7 +6197,7 @@ dependencies = [
  "structopt",
  "test-log",
  "tracing",
- "zkevm-assembly 1.3.2 (git+https://github.com/matter-labs/era-zkEVM-assembly.git?branch=v1.3.2)",
+ "zkevm-assembly 1.3.2",
 ]
 
 [[package]]
@@ -6226,7 +6226,7 @@ dependencies = [
  "test-log",
  "tracing",
  "walkdir",
- "zkevm-assembly 1.3.2 (git+https://github.com/matter-labs/era-zkEVM-assembly.git?branch=v1.4.1)",
+ "zkevm-assembly 1.4.1",
 ]
 
 [[package]]

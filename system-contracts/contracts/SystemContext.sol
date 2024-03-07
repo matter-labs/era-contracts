@@ -19,7 +19,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:
     /// - Store the latest 256 hashes (and strictly rely that we do not accidentally override the hash of the block 256 blocks ago)
-    /// - Store the latest 257 blocks's hashes.
+    /// - Store the latest 257 blocks' hashes.
     uint256 internal constant MINIBLOCK_HASHES_TO_STORE = 257;
 
     /// @notice The chainId of the network. It is set at the genesis.
@@ -78,6 +78,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
+
+    /// @notice Set the chainId origin.
+    /// @param _newChainId The chainId
+    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
+        chainId = _newChainId;
+    }
 
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;

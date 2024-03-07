@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import {Diamond} from "../zksync/libraries/Diamond.sol";
-import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {PubdataPricingMode, FeeParams} from "../zksync/Storage.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {PubdataPricingMode, FeeParams} from "../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

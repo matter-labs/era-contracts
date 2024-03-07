@@ -2,11 +2,12 @@
 pragma solidity 0.8.20;
 
 import {Vm} from "forge-std/Test.sol";
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {IExecutor} from "solpp/zksync/interfaces/IExecutor.sol";
-import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "solpp/zksync/Config.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+
+import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {POINT_EVALUATION_PRECOMPILE_ADDR} from "solpp/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "solpp/common/L2ContractAddresses.sol";
 
 contract CommittingTest is ExecutorTest {

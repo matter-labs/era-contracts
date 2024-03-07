@@ -4,7 +4,7 @@ import * as hre from "hardhat";
 import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { render, renderFile } from "template-file";
-import { utils } from "zksync-web3";
+import { utils } from "zksync-ethers";
 import { getRevertSelector, getTransactionUtils } from "./constants";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -70,13 +70,13 @@ const params = {
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
-  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2EthToken", "mint"),
+  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
-  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2EthToken", "transferFromTo"),
+  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
   SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector("IAccount", "validateTransaction"),
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),

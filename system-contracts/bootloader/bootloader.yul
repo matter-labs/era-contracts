@@ -706,7 +706,7 @@ object "Bootloader" {
                 ret := keccak256(txDataOffset, dataLength)
             }
 
-            /// @dev The purpose of this function is to make sure that the operator
+            /// @dev The purpose of this function is to make sure the operator
             /// gets paid for the transaction. Note, that the beneficiary of the payment is 
             /// bootloader.
             /// The operator will be paid at the end of the batch.
@@ -726,7 +726,7 @@ object "Bootloader" {
                     payer := from
 
                     // There is no paymaster, the user should pay for the execution.
-                    // Calling for the `payForTransaction` method of the account.
+                    // Calling the `payForTransaction` method of the account.
                     setHook(VM_HOOK_ACCOUNT_VALIDATION_ENTERED())
                     let res := accountPayForTx(from, txDataOffset)
                     setHook(VM_HOOK_NO_VALIDATION_ENTERED())
@@ -916,7 +916,6 @@ object "Bootloader" {
             /// @param transactionIndex The index of the transaction
             /// @param gasPerPubdata The price per pubdata to be used
             /// @param isPriorityOp Whether the transaction is a priority one
-            /// should be stored.
             function processL1Tx(
                 txDataOffset,
                 resultPtr,
@@ -1209,13 +1208,11 @@ object "Bootloader" {
                     gasPerPubdata
                 )
 
-                debugLog("refund", 0)
-
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
             }
 
-            /// @dev Calculates the L2 gas limit for the transaction's body, i.e. without intrinsic costs and overhead.
+            /// @dev Calculates the L2 gas limit for the transaction
             /// @param innerTxDataOffset The offset for the ABI-encoded Transaction struct fields.
             /// @param transactionIndex The index of the transaction within the batch.
             /// @param gasPerPubdata The price for a pubdata byte in L2 gas.
@@ -1643,7 +1640,7 @@ object "Bootloader" {
                 finalRefund := refundInGas
             }
 
-            /// @notice A function that transfers ETH directly through the L2EthToken system contract.
+            /// @notice A function that transfers ETH directly through the L2BaseToken system contract.
             /// Note, that unlike classical EVM transfers it does NOT call the recipient, but only changes the balance.
             function directETHTransfer(amount, recipient) {
                 let ptr := 0
@@ -1702,18 +1699,22 @@ object "Bootloader" {
             /// stores the position of the current bytecodeHash 
             function sendCompressedBytecode(dataInfoPtr, bytecodeHash) -> ret {
                 // Storing the right selector, ensuring that the operator cannot manipulate it
-                mstore(add(dataInfoPtr, 32), {{PUBLISH_COMPRESSED_BYTECODE_SELECTOR}})
+                mstore(safeAdd(dataInfoPtr, 32, "vmt"), {{PUBLISH_COMPRESSED_BYTECODE_SELECTOR}})
 
-                let calldataPtr := add(dataInfoPtr, 60)
-                let afterSelectorPtr := add(calldataPtr, 4)
+                let calldataPtr := safeAdd(dataInfoPtr, 60, "vty")
+                let afterSelectorPtr := safeAdd(calldataPtr, 4, "vtu")
 
-                let originalBytecodeOffset := add(mload(afterSelectorPtr), afterSelectorPtr)
+                let originalBytecodeOffset := safeAdd(mload(afterSelectorPtr), afterSelectorPtr, "vtr")
                 checkOffset(originalBytecodeOffset)
                 let potentialRawCompressedDataOffset := validateBytes(
                     originalBytecodeOffset
                 )
 
-                let rawCompressedDataOffset := add(mload(add(afterSelectorPtr, 32)), afterSelectorPtr)
+                if iszero(eq(originalBytecodeOffset, safeAdd(afterSelectorPtr, 64, "vtp"))) {
+                    assertionError("Compression calldata incorrect")
+                }
+
+                let rawCompressedDataOffset := safeAdd(mload(safeAdd(afterSelectorPtr, 32, "ewq")), afterSelectorPtr, "vbt")
                 checkOffset(rawCompressedDataOffset)
 
                 if iszero(eq(potentialRawCompressedDataOffset, rawCompressedDataOffset)) {
@@ -1726,8 +1727,6 @@ object "Bootloader" {
                 checkOffset(nextAfterCalldata)
 
                 let totalLen := safeSub(nextAfterCalldata, calldataPtr, "xqwf")
-                
-                // Note, that it is safe because the 
                 let success := call(
                     gas(),
                     BYTECODE_COMPRESSOR_ADDR(),
@@ -1738,8 +1737,7 @@ object "Bootloader" {
                     32
                 )
 
-                // If the transaction failed, the most likely reason is that there
-                // was not enough gas. That's why we do the nearCallPanic to stop the near call frame.
+                // If the transaction failed, either there was not enough gas or compression is malformed.
                 if iszero(success) {
                     debugLog("compressor call failed", 0)
                     debugReturndata()
@@ -2477,9 +2475,6 @@ object "Bootloader" {
                 let value := getValue(innerTxDataOffset)
                 debugLog("value", value)
                 let dataPtr := getDataPtr(innerTxDataOffset)
-                
-                let dataLength := mload(dataPtr)
-                let data := add(dataPtr, 32)
 
                 ret := msgValueSimulatorMimicCall(
                     to,
@@ -3386,14 +3381,14 @@ object "Bootloader" {
                 ret := lt(x, shl(32,1))
             }
 
-            /// @dev Accepts an uint32 and returns whether or not it is
+            /// @dev Accepts an uint64 and returns whether or not it is
             /// a valid uint64
             function validateUint64(x) -> ret {
                 ret := lt(x, shl(64,1))
             }
 
-            /// @dev Accepts an uint32 and returns whether or not it is
-            /// a valid uint64
+            /// @dev Accepts an uint128 and returns whether or not it is
+            /// a valid uint128
             function validateUint128(x) -> ret {
                 ret := lt(x, shl(128,1))
             }
