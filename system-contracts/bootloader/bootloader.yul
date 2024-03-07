@@ -1564,7 +1564,7 @@ object "Bootloader" {
                 finalRefund := refundInGas
             }
 
-            /// @notice A function that transfers ETH directly through the L2EthToken system contract.
+            /// @notice A function that transfers ETH directly through the L2BaseToken system contract.
             /// Note, that unlike classical EVM transfers it does NOT call the recipient, but only changes the balance.
             function directETHTransfer(amount, recipient) {
                 let ptr := 0

@@ -2,11 +2,9 @@
 
 pragma solidity 0.8.20;
 
-// solhint-disable max-line-length
-
 import {Test} from "forge-std/Test.sol";
 import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";
-import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
+import {SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
 
@@ -154,4 +152,7 @@ contract UtilsTest is Test {
             "log[8] should be correct"
         );
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

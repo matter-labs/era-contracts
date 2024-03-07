@@ -3,11 +3,12 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {Governance} from "../../../../../cache/solpp-generated-contracts/governance/Governance.sol";
-import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
-import {EventOnFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/EventOnFallback.sol";
-import {Forwarder} from "../../../../../cache/solpp-generated-contracts/dev-contracts/Forwarder.sol";
-import {RevertFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/RevertFallback.sol";
+
+import {EventOnFallback} from "solpp/dev-contracts/EventOnFallback.sol";
+import {Forwarder} from "solpp/dev-contracts/Forwarder.sol";
+import {Governance} from "solpp/governance/Governance.sol";
+import {IGovernance} from "solpp/governance/IGovernance.sol";
+import {RevertFallback} from "solpp/dev-contracts/RevertFallback.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;
@@ -61,4 +62,7 @@ contract GovernanceTest is Test, EventOnFallback {
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});
     }
+
+    // add this to be excluded from coverage report
+    function test() internal override {}
 }
