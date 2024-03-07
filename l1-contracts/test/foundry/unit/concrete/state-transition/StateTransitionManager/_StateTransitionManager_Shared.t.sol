@@ -90,7 +90,7 @@ contract StateTransitionManagerTest is Test {
         });
 
         vm.expectRevert(bytes.concat("StateTransition: governor zero"));
-        TransparentUpgradeableProxy transparentUpgradeableProxyReverting = new TransparentUpgradeableProxy(
+        new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
             abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)

@@ -57,7 +57,7 @@ contract GovernanceTest is Test, EventOnFallback {
         address _target,
         uint256 _value,
         bytes memory _data
-    ) internal returns (IGovernance.Operation memory) {
+    ) internal pure returns (IGovernance.Operation memory) {
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});

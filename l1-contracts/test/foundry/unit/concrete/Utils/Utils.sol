@@ -141,7 +141,7 @@ library Utils {
             });
     }
 
-    function createProofInput() public view returns (IExecutor.ProofInput memory) {
+    function createProofInput() public pure returns (IExecutor.ProofInput memory) {
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
 
@@ -160,7 +160,7 @@ library Utils {
         return result;
     }
 
-    function getAdminSelectors() public view returns (bytes4[] memory) {
+    function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);
         selectors[0] = AdminFacet.setPendingAdmin.selector;
         selectors[1] = AdminFacet.acceptAdmin.selector;
@@ -176,7 +176,7 @@ library Utils {
         return selectors;
     }
 
-    function getExecutorSelectors() public view returns (bytes4[] memory) {
+    function getExecutorSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = ExecutorFacet.commitBatches.selector;
         selectors[1] = ExecutorFacet.proveBatches.selector;
