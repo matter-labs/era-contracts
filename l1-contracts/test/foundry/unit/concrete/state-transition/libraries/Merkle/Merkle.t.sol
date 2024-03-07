@@ -63,4 +63,6 @@ contract MerkleTestTest is Test {
         vm.expectRevert(bytes("bt"));
         merkleTest.calculateRoot(proof, 0, leaf);
     }
+
 }
+

@@ -50,4 +50,6 @@ contract SetValidatorTest is AdminTest {
 
         assertEq(utilsFacet.util_getValidator(validator), isActive);
     }
+
 }
+

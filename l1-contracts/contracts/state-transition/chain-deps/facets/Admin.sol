@@ -148,4 +148,6 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
 
         emit Unfreeze();
     }
+
 }
+

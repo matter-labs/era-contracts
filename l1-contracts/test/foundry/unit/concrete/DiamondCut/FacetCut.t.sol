@@ -407,4 +407,6 @@ contract FacetCutTest is DiamondCutTest {
 
         diamondCutTestContract.diamondCut(diamondCutData);
     }
+
 }
+

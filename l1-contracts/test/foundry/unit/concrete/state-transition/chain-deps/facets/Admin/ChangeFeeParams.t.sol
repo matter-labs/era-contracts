@@ -83,4 +83,6 @@ contract ChangeFeeParamsTest is AdminTest {
         bytes32 currentFeeParamsHash = keccak256(abi.encode(utilsFacet.util_getFeeParams()));
         require(currentFeeParamsHash == newFeeParamsHash, "Fee params were not changed correctly");
     }
+
 }
+

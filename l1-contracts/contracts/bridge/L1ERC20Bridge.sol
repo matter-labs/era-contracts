@@ -224,4 +224,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         );
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
     }
+
 }
+

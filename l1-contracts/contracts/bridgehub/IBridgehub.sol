@@ -132,3 +132,4 @@ interface IBridgehub {
 
     event NewChain(uint256 indexed chainId, address stateTransitionManager, address indexed chainGovernance);
 }
+

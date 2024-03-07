@@ -40,4 +40,6 @@ contract InitializeTest is BridgehubTest {
     //     assertEq(address(bridgehub.getAllowList()), address(allowList));
     //     assertEq(bridgehub.getPriorityTxMaxGasLimit(), priorityTxMaxGasLimit);
     // }
+
 }
+

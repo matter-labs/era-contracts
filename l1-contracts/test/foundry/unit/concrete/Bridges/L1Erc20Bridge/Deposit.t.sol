@@ -91,4 +91,6 @@ contract DepositTest is L1Erc20BridgeTest {
         uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(amount, depositedAmount);
     }
+
 }
+

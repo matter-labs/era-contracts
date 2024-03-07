@@ -43,4 +43,6 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
 
         assertEq(utilsFacet.util_getPriorityTxMaxGasLimit(), newPriorityTxMaxGasLimit);
     }
+
 }
+

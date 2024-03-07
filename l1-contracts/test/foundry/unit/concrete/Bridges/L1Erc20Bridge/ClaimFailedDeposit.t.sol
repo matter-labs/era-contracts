@@ -41,4 +41,6 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
         uint256 depositedAmountAfterWithdrawal = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(depositedAmountAfterWithdrawal, 0);
     }
+
 }
+

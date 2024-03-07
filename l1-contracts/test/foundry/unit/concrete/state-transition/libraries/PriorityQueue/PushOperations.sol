@@ -25,4 +25,6 @@ contract PushOperationsTest is PriorityQueueSharedTest {
         assertEq(NUMBER_OPERATIONS, priorityQueue.getTotalPriorityTxs());
         assertFalse(priorityQueue.isEmpty());
     }
+
 }
+

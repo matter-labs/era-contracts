@@ -259,4 +259,6 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
         return s.l2SystemContractsUpgradeBatchNumber;
     }
+
 }
+

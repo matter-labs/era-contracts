@@ -34,3 +34,4 @@ contract WithdrawFundsTest is BridgehubMailboxTest {
     //     bridgehub.withdrawFunds(chainId, to, amount);
     // }
 }
+

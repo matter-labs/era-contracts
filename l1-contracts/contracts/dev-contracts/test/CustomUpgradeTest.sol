@@ -15,6 +15,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for upgrade, which may be interpreted differently for each upgrade.
     function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal override {
+        keccak256(_customCallDataForUpgrade); // called to supress compilation warning
         emit Test();
     }
 

@@ -16,11 +16,11 @@ contract DummyStateTransitionManagerForValidatorTimelock {
         stateTransitionChain = _stateTransition;
     }
 
-    function getChainAdmin(uint256) external returns (address) {
+    function getChainAdmin(uint256) external view returns (address) {
         return chainAdmin;
     }
 
-    function stateTransition(uint256) external returns (address) {
+    function stateTransition(uint256) external view returns (address) {
         return stateTransitionChain;
     }
 }

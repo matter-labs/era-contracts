@@ -161,7 +161,7 @@ contract L1SharedBridgeTest is Test {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, ETH_TOKEN_ADDRESS, amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit{value: amount}(
+        sharedBridge.bridgehubDeposit{value: amount}(
             chainId,
             alice,
             0,
@@ -182,7 +182,7 @@ contract L1SharedBridgeTest is Test {
         );
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, address(token), amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit(
+        sharedBridge.bridgehubDeposit(
             chainId,
             alice,
             0,
@@ -636,4 +636,6 @@ contract L1SharedBridgeTest is Test {
             merkleProof
         );
     }
+
 }
+

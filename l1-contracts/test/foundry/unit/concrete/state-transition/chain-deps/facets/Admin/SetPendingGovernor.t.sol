@@ -31,4 +31,6 @@ contract SetPendingAdminTest is AdminTest {
 
         assertEq(utilsFacet.util_getPendingAdmin(), newPendingAdmin);
     }
+
 }
+

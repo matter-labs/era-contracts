@@ -40,3 +40,4 @@ contract IsEthWithdrawalFinalizedTest is BridgehubMailboxTest {
     //     assertEq(res, false, "ETH withdrawal should not be finalized");
     // }
 }
+

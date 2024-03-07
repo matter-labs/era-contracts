@@ -326,8 +326,6 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_proveBatchesNotValidator() public {
-        uint256[] memory recursiveAggregationInput;
-        uint256[] memory serializedProof;
         IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
         IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
         IExecutor.ProofInput memory proof = Utils.createProofInput();
@@ -431,4 +429,6 @@ contract ValidatorTimelockTest is Test {
         vm.expectRevert(bytes("5c"));
         validator.executeBatchesSharedBridge(chainId, storedBatches);
     }
+
 }
+
