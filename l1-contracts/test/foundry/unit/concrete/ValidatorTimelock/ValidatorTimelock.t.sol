@@ -113,7 +113,7 @@ contract ValidatorTimelockTest is Test {
         assert(validator.executionDelay() == 20);
     }
 
-    function test_getCommittedBatchTimestampEmpty() public {
+    function test_getCommittedBatchTimestampEmpty() public view {
         assert(validator.getCommittedBatchTimestamp(chainId, lastBatchNumber) == 0);
     }
 
