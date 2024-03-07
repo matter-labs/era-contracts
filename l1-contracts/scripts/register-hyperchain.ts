@@ -66,6 +66,7 @@ async function main() {
     .option("--create2-salt <create2-salt>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
+    .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .action(async (cmd) => {
@@ -102,7 +103,7 @@ async function main() {
         await deployer.registerToken(baseTokenAddress);
       }
 
-      await deployer.registerHyperchain(baseTokenAddress, null, gasPrice);
+      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice);
     });
 
   await program.parseAsync(process.argv);

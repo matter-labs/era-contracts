@@ -613,6 +613,7 @@ export class Deployer {
 
   public async registerHyperchain(
     baseTokenAddress: string,
+    validiumMode: boolean,
     extraFacets?: FacetCut[],
     gasPrice?: BigNumberish,
     nonce?,
@@ -689,6 +690,14 @@ export class Deployer {
     const receipt3 = await tx3.wait();
     if (this.verbose) {
       console.log(`BaseTokenMultiplier set, gas used: ${receipt3.gasUsed.toString()}`);
+    }
+
+    if (validiumMode) {
+      const tx4 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
+      const receipt4 = await tx4.wait();
+      if (this.verbose) {
+        console.log(`Validium mode set, gas used: ${receipt4.gasUsed.toString()}`);
+      }
     }
   }
 

@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
+import {PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -186,6 +187,11 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function isEthWithdrawalFinalized(uint256 _l2BatchNumber, uint256 _l2MessageIndex) external view returns (bool) {
         return s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex];
+    }
+
+    /// @inheritdoc IGetters
+    function getPubdataPricingMode() external view returns (PubdataPricingMode) {
+        return s.feeParams.pubdataPricingMode;
     }
 
     /*//////////////////////////////////////////////////////////////

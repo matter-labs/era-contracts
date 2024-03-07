@@ -10,6 +10,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -44,7 +45,11 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (pubdataSource == uint8(PubdataSource.Blob)) {
+        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+            // skipping data validation for validium, we just check that the data is empty
+            require(logOutput.pubdataHash == 0x00, "v0h");
+            require(_newBatch.pubdataCommitments.length == 0);
+        } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
             blobHashes[0] = logOutput.blob1Hash;
