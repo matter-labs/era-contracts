@@ -65,6 +65,4 @@ contract ReenterGovernance {
             }
         }
     }
-
-    receive() external payable {}
 }

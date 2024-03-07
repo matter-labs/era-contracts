@@ -11,6 +11,4 @@ contract EventOnFallback {
     fallback() external payable {
         emit Called(msg.sender, msg.value, msg.data);
     }
-
-    receive() external payable {}
 }
