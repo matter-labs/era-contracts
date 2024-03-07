@@ -1,4 +1,5 @@
 // hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
@@ -6,12 +7,9 @@ import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 
-import * as fs from "fs";
-import * as path from "path";
 import { web3Provider } from "./utils";
 
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+import { ethTestConfig } from "../src.ts/utils";
 
 async function main() {
   const program = new Command();
@@ -40,7 +38,7 @@ async function main() {
       const deployer = new Deployer({ deployWallet, verbose: true });
       await deployer.deployAll();
 
-      const zkSyncContract = deployer.zkSyncContract(deployWallet);
+      const zkSyncContract = deployer.bridgehubContract(deployWallet);
       await (await zkSyncContract.setValidator(deployWallet.address, true)).wait();
 
       const tokenFactory = await hardhat.ethers.getContractFactory("TestnetERC20Token", deployWallet);

@@ -2,47 +2,46 @@
 
 pragma solidity 0.8.20;
 
-import {Base} from "../zksync/facets/Base.sol";
-import {IMailbox} from "../zksync/interfaces/IMailbox.sol";
-import {VerifierParams} from "../zksync/Storage.sol";
-import {IVerifier} from "../zksync/interfaces/IVerifier.sol";
+import {ZkSyncStateTransitionBase} from "../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
-import {TransactionValidator} from "../zksync/libraries/TransactionValidator.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE, MAX_NEW_FACTORY_DEPS, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../zksync/Config.sol";
+import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
+import {MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
+import {L2CanonicalTransaction} from "../common/Messaging.sol";
+
+/// @notice The struct that represents the upgrade proposal.
+/// @param l2ProtocolUpgradeTx The system upgrade transaction.
+/// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
+/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
+/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
+/// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
+/// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
+/// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
+/// in each upgrade. Usually empty.
+/// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
+/// upgrade. Usually empty.
+/// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
+/// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
+/// the previous protocol version.
+struct ProposedUpgrade {
+    L2CanonicalTransaction l2ProtocolUpgradeTx;
+    bytes[] factoryDeps;
+    bytes32 bootloaderHash;
+    bytes32 defaultAccountHash;
+    address verifier;
+    VerifierParams verifierParams;
+    bytes l1ContractsUpgradeCalldata;
+    bytes postUpgradeCalldata;
+    uint256 upgradeTimestamp;
+    uint256 newProtocolVersion;
+}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
-abstract contract BaseZkSyncUpgrade is Base {
-    /// @notice The struct that represents the upgrade proposal.
-    /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-    /// @param factoryDeps The list of factory deps for the l2ProtocolUpgradeTx.
-    /// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-    /// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-    /// @param verifier The address of the new verifier. If zero, the verifier will not be updated.
-    /// @param verifierParams The new verifier params. If all of its fields are 0, the params will not be updated.
-    /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
-    /// in each upgrade. Usually empty.
-    /// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
-    /// upgrade. Usually empty.
-    /// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-    /// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
-    /// the previous protocol version.
-    /// @param newAllowList The address of the new allowlist contract. If zero, it will not be updated.
-    struct ProposedUpgrade {
-        IMailbox.L2CanonicalTransaction l2ProtocolUpgradeTx;
-        bytes[] factoryDeps;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        address verifier;
-        VerifierParams verifierParams;
-        bytes l1ContractsUpgradeCalldata;
-        bytes postUpgradeCalldata;
-        uint256 upgradeTimestamp;
-        uint256 newProtocolVersion;
-        address newAllowList;
-    }
-
+abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -64,8 +63,8 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @notice The main function that will be provided by the upgrade proxy
     /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
     /// @param _proposedUpgrade The upgrade to be executed.
-    /// @return The hash of the L2 system contract upgrade transaction.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32) {
+    /// @return txHash The hash of the L2 system contract upgrade transaction.
+    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -77,7 +76,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
-        bytes32 txHash = _setL2SystemContractUpgrade(
+        txHash = _setL2SystemContractUpgrade(
             _proposedUpgrade.l2ProtocolUpgradeTx,
             _proposedUpgrade.factoryDeps,
             _proposedUpgrade.newProtocolVersion
@@ -179,7 +178,7 @@ abstract contract BaseZkSyncUpgrade is Base {
     /// @param _l2ProtocolUpgradeTx The L2 system contract upgrade transaction.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        IMailbox.L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
+        L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
         bytes[] calldata _factoryDeps,
         uint256 _newProtocolVersion
     ) internal returns (bytes32) {
@@ -211,7 +210,9 @@ abstract contract BaseZkSyncUpgrade is Base {
         _verifyFactoryDeps(_factoryDeps, _l2ProtocolUpgradeTx.factoryDeps);
 
         bytes32 l2ProtocolUpgradeTxHash = keccak256(encodedTransaction);
+
         s.l2SystemContractsUpgradeTxHash = l2ProtocolUpgradeTxHash;
+
         return l2ProtocolUpgradeTxHash;
     }
 
@@ -232,7 +233,7 @@ abstract contract BaseZkSyncUpgrade is Base {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal {
+    function _setNewProtocolVersion(uint256 _newProtocolVersion) internal virtual {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
             _newProtocolVersion > previousProtocolVersion,
@@ -244,6 +245,7 @@ abstract contract BaseZkSyncUpgrade is Base {
         );
 
         // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
+        // Note it is important to keep this check, as otherwise hyperchains might skip upgrades by overwriting
         require(s.l2SystemContractsUpgradeTxHash == bytes32(0), "Previous upgrade has not been finalized");
         require(
             s.l2SystemContractsUpgradeBatchNumber == 0,
