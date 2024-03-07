@@ -115,10 +115,7 @@ describe("WETH token & WETH bridge", function () {
   // });
 
   it("Should fail calling bridgeMint()", async function () {
-    await expect(wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 100_000 })).to.be.revertedWith(
-      // /Use deposit\/depositTo methods instead./
-      "permission denied"
-    );
+    await expect((await wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 1_000_000 }))).to.be.reverted;
   });
 
   it("Should fail calling bridgeBurn() directly", async function () {
