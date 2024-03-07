@@ -53,6 +53,7 @@ describe("ERC20Bridge", function () {
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"));
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
+      ethers.constants.AddressZero,
       beaconProxyBytecodeHash,
       governorWallet.address,
     ]);
