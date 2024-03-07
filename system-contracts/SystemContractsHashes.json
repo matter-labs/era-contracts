@@ -3,42 +3,42 @@
     "contractName": "AccountCodeStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/AccountCodeStorage.sol/AccountCodeStorage.json",
     "sourceCodePath": "contracts-preprocessed/AccountCodeStorage.sol",
-    "bytecodeHash": "0x01000075ef4b930073bb50bba0a45aa2f7868abb17bc983a0a0c4cbe6068e786",
+    "bytecodeHash": "0x010000756b99c25e87559bf8a2fe7ee65106b5e7136b3aaf5adf43e646efd162",
     "sourceCodeHash": "0xa4bb031f7c6e95044b3c69f15107141d8ee4f2fd637986955f3d5bde4444ff3f"
   },
   {
     "contractName": "BootloaderUtilities",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/BootloaderUtilities.sol/BootloaderUtilities.json",
     "sourceCodePath": "contracts-preprocessed/BootloaderUtilities.sol",
-    "bytecodeHash": "0x010007c90e61b6310fbae9adaa6f5d1d5eda3ce917159183f5890d372b7b8453",
+    "bytecodeHash": "0x010007c9e78c9655fc53474ab41641246782bc9468d2a40e210f1dc4a6e75507",
     "sourceCodeHash": "0xf48319ea1cfc95e6e2203b8186b21e3f3168136b92125e935b9bca81da42ad2a"
   },
   {
     "contractName": "ComplexUpgrader",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ComplexUpgrader.sol/ComplexUpgrader.json",
     "sourceCodePath": "contracts-preprocessed/ComplexUpgrader.sol",
-    "bytecodeHash": "0x010000551e2bdb5aa4cfd0495baf8b888585fa5aa698d994dc37f26be769f153",
+    "bytecodeHash": "0x010000557ec05876561494041d3d4a0160c2028de576eed576e61f7b35e096d5",
     "sourceCodeHash": "0x0aa5d7ed159e783acde47856b13801b7f2268ba39b2fa50807fe3d705c506e96"
   },
   {
     "contractName": "Compressor",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/Compressor.sol/Compressor.json",
     "sourceCodePath": "contracts-preprocessed/Compressor.sol",
-    "bytecodeHash": "0x0100016dc0bd6a2fb4d8c6724fb304816a2d93d5a08b5980f802d388d127b714",
+    "bytecodeHash": "0x0100016d1fcef700e8b7ef46796672557663133797e992e0279911b312b4aaf9",
     "sourceCodeHash": "0xe0e22aa80843159daff6f09ed907c42d0d0d55225d04ba35b211389e05264f39"
   },
   {
     "contractName": "ContractDeployer",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ContractDeployer.sol/ContractDeployer.json",
     "sourceCodePath": "contracts-preprocessed/ContractDeployer.sol",
-    "bytecodeHash": "0x010005558dd568acab2df5bb3a24d5f39bede5f065d7833d314836aa25bc555e",
+    "bytecodeHash": "0x010005554b9e0b4e0732540eda10460fa17c338789b18bc25160abf495533882",
     "sourceCodeHash": "0x37deef4ef277cf0d1e0c56194650beceaeaa2fa3f0e5d0165ef60b7f2fb6a859"
   },
   {
     "contractName": "DefaultAccount",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100055b876f4d9667ef3c0e0788e74ae92978736ec711ef5736c117c17f061f",
+    "bytecodeHash": "0x0100055bd421e13d184297b0b7acc3ff6d5d095b910329eb26e893b0d761c775",
     "sourceCodeHash": "0x7f7c2dc241f593353aea2eb4f42b3365d620b02a5c69d1359eca80c356b628f9"
   },
   {
@@ -52,56 +52,56 @@
     "contractName": "ImmutableSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/ImmutableSimulator.sol/ImmutableSimulator.json",
     "sourceCodePath": "contracts-preprocessed/ImmutableSimulator.sol",
-    "bytecodeHash": "0x0100003d122dbffc54eddfd3f6b73a497c78d9772c2e88e775f0235c84b9cfbf",
+    "bytecodeHash": "0x0100003d1ee5d8463e1fde03c04bbf72a4b2838b795462102532a9dd79bf0c9c",
     "sourceCodeHash": "0x30df621c72cb35b8820b902b91057f72d0214a0e4a6b7ad4c0847e674e8b9df8"
   },
   {
     "contractName": "KnownCodesStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/KnownCodesStorage.sol/KnownCodesStorage.json",
     "sourceCodePath": "contracts-preprocessed/KnownCodesStorage.sol",
-    "bytecodeHash": "0x0100007d70e79621fdd389100a29962e7939388c69505ebfcba1e53c9cfc319b",
+    "bytecodeHash": "0x0100007d9c52612bdfb331d414a09b87afeadf178ec99b546164fbbb12139de7",
     "sourceCodeHash": "0x51d388adc58f67ef975a94a7978caa60ed8a0df9d3bd9ac723dfcfc540286c70"
   },
   {
     "contractName": "L1Messenger",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L1Messenger.sol/L1Messenger.json",
     "sourceCodePath": "contracts-preprocessed/L1Messenger.sol",
-    "bytecodeHash": "0x010002af93bf9216a2bdbb908432e2897f83d24d9ca79e254bccda4285a8552e",
+    "bytecodeHash": "0x010002af91b07bc4af20f9df5201a2052d2854f10cbb7f59adf07ea3b1a597da",
     "sourceCodeHash": "0x85a2d5884c92a28c298e626f8c9b0cdba868f2e6fddfe199dacb7900b889131a"
   },
   {
     "contractName": "L2BaseToken",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/L2BaseToken.sol/L2BaseToken.json",
     "sourceCodePath": "contracts-preprocessed/L2BaseToken.sol",
-    "bytecodeHash": "0x01000101fc008431ffe686b9b813f6cb1510cdba7b38eac58167b19d9b4992be",
+    "bytecodeHash": "0x0100010176bd11461340780b8f023cb682fd7eca3ff3b8580b4c0a95c0ada497",
     "sourceCodeHash": "0x5cfb3a7f69db57a455682f339879a5d5ae679c8deff2ea6669b0a6d0fe538d6c"
   },
   {
     "contractName": "MsgValueSimulator",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/MsgValueSimulator.sol/MsgValueSimulator.json",
     "sourceCodePath": "contracts-preprocessed/MsgValueSimulator.sol",
-    "bytecodeHash": "0x010000637886818379b5463d48e75978b42345c1ba8a6518ddaaeb8f6006d6f1",
+    "bytecodeHash": "0x0100006391c951df8629ece2b60aaf8a05161a474075a02d14e8488e4020282d",
     "sourceCodeHash": "0xd052abaab1b0091c37d0763bba924ff5ed2be59f68cc29a850cb9b41de72bc06"
   },
   {
     "contractName": "NonceHolder",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/NonceHolder.sol/NonceHolder.json",
     "sourceCodePath": "contracts-preprocessed/NonceHolder.sol",
-    "bytecodeHash": "0x010000e5cc91c0e7f87185703d644512ad30f211a03b9feee985332de3279247",
+    "bytecodeHash": "0x010000e5b30074e7609e1b64136506c5e231f0eb4ba0fc9bbbd41153e8f2a16a",
     "sourceCodeHash": "0x91847512344ac5026e9fd396189c23ad9e253f22cb6e2fe65805c20c915797d4"
   },
   {
     "contractName": "PubdataChunkPublisher",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/PubdataChunkPublisher.sol/PubdataChunkPublisher.json",
     "sourceCodePath": "contracts-preprocessed/PubdataChunkPublisher.sol",
-    "bytecodeHash": "0x01000047e9de25747988cd116a56fea7df9f1f3aee7d711bd861cfc3177c2534",
+    "bytecodeHash": "0x0100004709ff3610040753b8ee8e2023986b79d5474ea386c6472edf3d640bca",
     "sourceCodeHash": "0x4ef08d1890c90e8c1aee092022c56bdef975b4ceb69da62a1a76830a35d703ed"
   },
   {
     "contractName": "SystemContext",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/SystemContext.sol/SystemContext.json",
     "sourceCodePath": "contracts-preprocessed/SystemContext.sol",
-    "bytecodeHash": "0x010001872c4830e7abbe40360018b36d1164b1e2ac1b45d48bbce839220c5797",
+    "bytecodeHash": "0x0100018762eaf56d87b493688e02957081292801b033f03def69aeafab8f636e",
     "sourceCodeHash": "0x821b7099c1ed4ad9209caa1a2de38e4550698ab330eff3907184230adba81d7f"
   },
   {
