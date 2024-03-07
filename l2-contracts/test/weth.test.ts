@@ -115,7 +115,7 @@ describe("WETH token & WETH bridge", function () {
   // });
 
   it("Should fail calling bridgeMint()", async function () {
-    await expect((await wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 1_000_000 }))).to.be.reverted;
+    await expect(await wethToken.bridgeMint(wallet.address, eth18, { gasLimit: 1_000_000 })).to.be.reverted;
   });
 
   it("Should fail calling bridgeBurn() directly", async function () {
