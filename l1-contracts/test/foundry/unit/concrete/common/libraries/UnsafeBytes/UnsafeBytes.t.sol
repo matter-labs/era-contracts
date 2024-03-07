@@ -59,6 +59,4 @@ contract UnsafeBytesTestTest is Test {
 
         assertEq(o7, bytesData.length, "offset should be end of bytes");
     }
-
 }
-

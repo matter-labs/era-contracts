@@ -267,6 +267,4 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
     function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
-
 }
-

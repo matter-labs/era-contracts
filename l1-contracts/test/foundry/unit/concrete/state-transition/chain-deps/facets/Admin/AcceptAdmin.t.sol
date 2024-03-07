@@ -32,6 +32,4 @@ contract AcceptAdminTest is AdminTest {
         assertEq(utilsFacet.util_getPendingAdmin(), address(0));
         assertEq(utilsFacet.util_getAdmin(), pendingAdmin);
     }
-
 }
-

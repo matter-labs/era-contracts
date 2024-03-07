@@ -148,6 +148,4 @@ contract ReentrancyTest is GovernanceTest {
         vm.expectRevert("Operation must be pending after execution");
         governance.executeInstant(op);
     }
-
 }
-

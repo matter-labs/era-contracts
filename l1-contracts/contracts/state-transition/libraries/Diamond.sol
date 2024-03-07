@@ -298,6 +298,4 @@ library Diamond {
             require(abi.decode(data, (bytes32)) == DIAMOND_INIT_SUCCESS_RETURN_VALUE, "lp1");
         }
     }
-
 }
-

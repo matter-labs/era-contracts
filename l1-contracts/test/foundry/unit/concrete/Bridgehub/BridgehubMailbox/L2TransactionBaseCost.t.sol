@@ -64,4 +64,3 @@ contract L2TransactionBaseCostTest is BridgehubMailboxTest {
     //     assertEq(baseCost, expectedBaseCost);
     // }
 }
-

@@ -98,4 +98,3 @@ contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     //     assertEq(res, false, "L1 to L2 transaction status should not be proven");
     // }
 }
-

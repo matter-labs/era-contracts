@@ -652,6 +652,4 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         require(success, "vc");
         versionedHash = abi.decode(data, (bytes32));
     }
-
 }
-

@@ -66,5 +66,5 @@ contract ReenterGovernance {
         }
     }
 
-    receive() external payable{}
+    receive() external payable {}
 }

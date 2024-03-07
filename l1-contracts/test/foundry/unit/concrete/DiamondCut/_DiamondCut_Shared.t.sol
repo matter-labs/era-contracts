@@ -10,4 +10,3 @@ contract DiamondCutTest is Test {
     DiamondCutTestContract internal diamondCutTestContract;
     GettersFacet internal gettersFacet;
 }
-

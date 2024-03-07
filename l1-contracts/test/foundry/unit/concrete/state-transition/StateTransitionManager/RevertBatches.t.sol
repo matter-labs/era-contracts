@@ -139,6 +139,4 @@ contract revertBatchesTest is StateTransitionManagerTest {
         uint256 totalBlocksVerified = gettersFacet.getTotalBlocksVerified();
         assertEq(totalBlocksVerified, 0, "totalBlocksVerified");
     }
-
 }
-

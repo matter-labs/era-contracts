@@ -286,6 +286,4 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         emit StateTransitionNewChain(_chainId, stateTransitionAddress);
     }
-
 }
-

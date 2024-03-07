@@ -17,4 +17,3 @@ contract DepositTest is BridgehubMailboxTest {
     //     bridgehub.deposit(chainId);
     // }
 }
-

@@ -79,6 +79,4 @@ library PriorityQueue {
         delete _queue.data[head];
         _queue.head = head + 1;
     }
-
 }
-

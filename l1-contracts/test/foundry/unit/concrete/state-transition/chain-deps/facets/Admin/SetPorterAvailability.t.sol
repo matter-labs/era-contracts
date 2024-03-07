@@ -47,6 +47,4 @@ contract SetPorterAvailabilityTest is AdminTest {
 
         assertEq(utilsFacet.util_getZkPorterAvailability(), isPorterAvailable);
     }
-
 }
-

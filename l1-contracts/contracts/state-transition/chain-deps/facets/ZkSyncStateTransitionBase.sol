@@ -54,4 +54,3 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
         _;
     }
 }
-

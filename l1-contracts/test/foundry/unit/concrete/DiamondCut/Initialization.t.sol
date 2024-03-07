@@ -71,6 +71,4 @@ contract InitializationTest is DiamondCutTest {
         vm.expectRevert(abi.encodePacked("lp1"));
         diamondCutTestContract.diamondCut(diamondCutData);
     }
-
 }
-

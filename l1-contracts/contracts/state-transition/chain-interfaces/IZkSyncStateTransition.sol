@@ -20,4 +20,3 @@ interface IZkSyncStateTransition is IAdmin, IExecutor, IGetters, IMailbox {
         bytes32 proposalSalt
     );
 }
-

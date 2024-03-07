@@ -161,6 +161,4 @@ contract VerifierTestTest is Test {
         bytes32 verificationKeyHash = verifier.verificationKeyHash();
         assertEq(verificationKeyHash, 0x6625fa96781746787b58306d414b1e25bd706d37d883a9b3acf57b2bd5e0de52);
     }
-
 }
-

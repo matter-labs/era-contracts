@@ -185,23 +185,13 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(address(token))
         );
         vm.expectRevert("ShB l2 bridge not deployed");
-        sharedBridge.bridgehubDeposit{value: amount}(
-            chainId,
-            alice,
-            0,
-            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
-        );
+        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
     function test_bridgehubDeposit_Erc_weth() public {
         vm.prank(bridgehubAddress);
         vm.expectRevert("ShB: WETH deposit not supported");
-        sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(l1WethAddress, amount, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(l1WethAddress, amount, bob));
     }
 
     function test_bridgehubDeposit_Eth_baseToken() public {
@@ -212,12 +202,7 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
         vm.expectRevert("ShB: baseToken deposit not supported");
-        sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
     function test_bridgehubDeposit_Eth_wrongDepositAmount() public {
@@ -231,12 +216,7 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(address(token))
         );
         vm.expectRevert("ShB wrong withdraw amount");
-        sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(ETH_TOKEN_ADDRESS, amount, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, amount, bob));
     }
 
     function test_bridgehubDeposit_Erc_msgValue() public {
@@ -251,12 +231,7 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
         vm.expectRevert("ShB m.v > 0 for BH d.it 2");
-        sharedBridge.bridgehubDeposit{value: amount}(
-            chainId,
-            alice,
-            0,
-            abi.encode(address(token), amount, bob)
-        );
+        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
     function test_bridgehubDeposit_Erc_wrongDepositAmount() public {
@@ -272,12 +247,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
         bytes memory message = bytes("5T");
         vm.expectRevert(message);
-        sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(address(token), amount, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
     function test_bridgehubDeposit_Eth() public {
@@ -289,12 +259,7 @@ contract L1SharedBridgeFailTest is Test {
         );
         bytes memory message = bytes("6T");
         vm.expectRevert(message);
-        sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
@@ -809,6 +774,4 @@ contract L1SharedBridgeFailTest is Test {
             address(1)
         );
     }
-
 }
-

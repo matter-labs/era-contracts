@@ -7,4 +7,3 @@ import {BridgehubTest} from "../_Bridgehub_Shared.t.sol";
 contract RegistryTest is BridgehubTest {
     address internal stateTransitionAddress;
 }
-
