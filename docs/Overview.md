@@ -181,7 +181,7 @@ enum SystemLogKey {
 When a batch is committed, we process L2 -> L1 system logs. Here are the invariants that are expected there:
 
 - In a given batch there will be either 7 or 8 system logs. The 8th log is only required for a protocol upgrade.
-- There will be a single log for each key that is containted within `SystemLogKey`
+- There will be a single log for each key that is contained within `SystemLogKey`
 - Three logs from the `L2_TO_L1_MESSENGER` with keys:
 - `L2_TO_L1_LOGS_TREE_ROOT_KEY`
 - `TOTAL_L2_TO_L1_PUBDATA_KEY`
@@ -251,12 +251,12 @@ the Alpha stage.
 This contract consists of four main functions `commitBatches`, `proveBatches`, `executeBatches`, and `revertBatches`, that
 can be called only by the validator.
 
-When the validator calls `commitBatches`, the same calldata will be propogated to the zkSync contract (`DiamondProxy` through
+When the validator calls `commitBatches`, the same calldata will be propagated to the zkSync contract (`DiamondProxy` through
 `call` where it invokes the `ExecutorFacet` through `delegatecall`), and also a timestamp is assigned to these batches to track
-the time these batches are commited by the validator to enforce a delay between committing and execution of batches. Then, the
-validator can prove the already commited batches regardless of the mentioned timestamp, and again the same calldata (related
-to the `proveBatches` function) will be propogated to the zkSync contract. After, the `delay` is elapsed, the validator
-is allowed to call `executeBatches` to propogate the same calldata to zkSync contract.
+the time these batches are committed by the validator to enforce a delay between committing and execution of batches. Then, the
+validator can prove the already committed batches regardless of the mentioned timestamp, and again the same calldata (related
+to the `proveBatches` function) will be propagated to the zkSync contract. After, the `delay` is elapsed, the validator
+is allowed to call `executeBatches` to propagate the same calldata to zkSync contract.
 
 ### L2 specifics
 
