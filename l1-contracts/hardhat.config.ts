@@ -56,7 +56,7 @@ const hardhatConfig = {
   DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
   DUMMY_VERIFIER: true,
   ERA_CHAIN_ID: 9,
-  ERA_DIAMOND_PROXY: "address(1231)",
+  ERA_DIAMOND_PROXY: "0x77AE03789270Ad12d3d47FCAf7234241FceeC532", // for some tests this has to be set based on era
   ERA_TOKEN_BEACON_ADDRESS: "address(1232)",
   ERA_ERC20_BRIDGE_ADDRESS: "address(1233)",
   ERA_WETH_ADDRESS: "address(1234)",
@@ -104,7 +104,7 @@ export default {
   },
   contractSizer: {
     runOnCompile: false,
-    except: ["dev-contracts", "zksync/upgrade-initializers", "zksync/libraries", "common/libraries"],
+    except: ["dev-contracts", "zksync/libraries", "common/libraries"],
   },
   paths: {
     sources: "./contracts",

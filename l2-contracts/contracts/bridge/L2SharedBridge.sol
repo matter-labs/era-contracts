@@ -34,6 +34,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
+    address private l1LegacyBridge;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
     constructor() {
@@ -46,6 +48,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
         address _l1Bridge,
+        address _l1LegecyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
@@ -61,8 +64,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
             l2TokenBeacon.transferOwnership(_aliasedOwner);
+        } else {
+            require(_l1LegecyBridge != address(0), "bf2");
+            // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
-        // else: l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
     }
 
     /// @notice Finalize the deposit and mint funds
@@ -79,7 +84,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         bytes calldata _data
     ) external payable override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
-        require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge, "mq");
+        require(
+            AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
+            "mq"
+        );
         require(msg.value == 0, "Value should be 0 for ERC20 bridge");
 
         address expectedL2Token = l2TokenAddress(_l1Token);

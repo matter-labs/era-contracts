@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {IZkSyncStateTransitionBase} from "../chain-interfaces/IZkSyncStateTransitionBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -38,6 +38,9 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Change the token multiplier for L1->L2 transactions
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
+
+    /// @notice Used to set to validium directly after genesis
+    function setValidiumMode(PubdataPricingMode _validiumMode) external;
 
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
@@ -72,6 +75,9 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
+
+    /// @notice Validium mode status changed
+    event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(

@@ -140,4 +140,6 @@ interface IL1SharedBridge {
     ) external payable;
 
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+
+    function receiveEth(uint256 _chainId) external payable;
 }

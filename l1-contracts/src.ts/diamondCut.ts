@@ -127,10 +127,14 @@ export async function getFacetCutsForUpgrade(
   adminAddress: string,
   gettersAddress: string,
   mailboxAddress: string,
-  executorAddress: string
+  executorAddress: string,
+  namesOfFacetsToBeRemoved?: string[]
 ) {
   const newFacetCuts = await getCurrentFacetCutsForAdd(adminAddress, gettersAddress, mailboxAddress, executorAddress);
-  const namesOfFacetsToBeRemoved = [...UNCONDITIONALLY_REMOVED_FACETS, ...Object.keys(newFacetCuts)];
+  namesOfFacetsToBeRemoved = namesOfFacetsToBeRemoved || [
+    ...UNCONDITIONALLY_REMOVED_FACETS,
+    ...Object.keys(newFacetCuts),
+  ];
   const oldFacetCuts = await getDeployedFacetCutsForRemove(wallet, zkSyncAddress, namesOfFacetsToBeRemoved);
   return [...oldFacetCuts, ...Object.values(newFacetCuts)];
 }

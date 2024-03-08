@@ -123,6 +123,7 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   // console.log("kl todo l2GovernorAddress", l2GovernorAddress, deployer.addresses.Governance)
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
+    ethers.constants.AddressZero,
     hashL2Bytecode(BEACON_PROXY_BYTECODE),
     l2GovernorAddress,
   ]);

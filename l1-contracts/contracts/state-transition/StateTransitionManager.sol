@@ -16,7 +16,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, ERA_DIAMOND_PROXY, ERA_CHAIN_ID} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
@@ -47,6 +47,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 => bytes32) public upgradeCutHash;
 
+    /// @dev used to manage non critical updates
+    address public admin;
+
+    /// @dev used to accept the admin role
+    address private pendingAdmin;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub) reentrancyGuardInitializer {
@@ -56,6 +62,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         require(msg.sender == bridgehub, "StateTransition: only bridgehub");
+        _;
+    }
+
+    /// @notice the admin can call, for non-critical updates
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
         _;
     }
 
@@ -94,8 +106,30 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
+    /// @inheritdoc IStateTransitionManager
+    function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
+        // Save previous value into the stack to put it into the event later
+        address oldPendingAdmin = pendingAdmin;
+        // Change pending admin
+        pendingAdmin = _newPendingAdmin;
+        emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
+    }
+
+    /// @inheritdoc IStateTransitionManager
+    function acceptAdmin() external {
+        address currentPendingAdmin = pendingAdmin;
+        require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
+
+        address previousAdmin = admin;
+        admin = currentPendingAdmin;
+        delete pendingAdmin;
+
+        emit NewPendingAdmin(currentPendingAdmin, address(0));
+        emit NewAdmin(previousAdmin, pendingAdmin);
+    }
+
     /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
+    function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         validatorTimelock = _validatorTimelock;
     }
 
@@ -127,8 +161,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
     }
 
+    /// @dev freezes the specified chain
+    function unfreezeChain(uint256 _chainId) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
+    }
+
     /// @dev reverts batches on the specified chain
-    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
     }
 
@@ -188,6 +227,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
+    function registerAlreadyDeployedStateTransition(
+        uint256 _chainId,
+        address _stateTransitionContract
+    ) external onlyOwner {
+        stateTransition[_chainId] = _stateTransitionContract;
+        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+    }
+
     /// @notice called by Bridgehub when a chain registers
     function createNewChain(
         uint256 _chainId,
@@ -196,6 +243,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
+        if (stateTransition[_chainId] != address(0)) {
+            // StateTransition chain already registered
+            return;
+        }
+
         // check not registered
         Diamond.DiamondCutData memory diamondCut = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 

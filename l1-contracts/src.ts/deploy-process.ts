@@ -57,16 +57,6 @@ export async function initialBridgehubDeployment(
     return;
   }
 
-  // Deploy diamond upgrade init contract if needed
-  const diamondUpgradeContractVersion = diamondUpgradeInit || 1;
-  if (diamondUpgradeContractVersion) {
-    await deployer.deployDiamondUpgradeInit(create2Salt, diamondUpgradeContractVersion, {
-      gasPrice,
-      nonce,
-    });
-    nonce++;
-  }
-
   await deployer.deployDefaultUpgrade(create2Salt, {
     gasPrice,
     nonce,
@@ -98,9 +88,11 @@ export async function initialBridgehubDeployment(
 
 export async function registerHyperchain(
   deployer: Deployer,
+  validiumMode: boolean,
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,
-  baseTokenName?: string
+  baseTokenName?: string,
+  chainId?: string
 ) {
   const testnetTokens = getTokens();
 
@@ -111,5 +103,5 @@ export async function registerHyperchain(
   if (!(await deployer.bridgehubContract(deployer.deployWallet).tokenIsRegistered(baseTokenAddress))) {
     await deployer.registerToken(baseTokenAddress);
   }
-  await deployer.registerHyperchain(baseTokenAddress, extraFacets, gasPrice);
+  await deployer.registerHyperchain(baseTokenAddress, validiumMode, extraFacets, gasPrice, null, chainId);
 }

@@ -2,7 +2,7 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
+import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
@@ -11,9 +11,46 @@ import { GAS_MULTIPLIER, web3Provider } from "./utils";
 import { ADDRESS_ONE } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
 
+const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
+
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+
+const getTokenAddress = async (name: string) => {
+  const tokens = getTokens();
+  const token = tokens.find((token: { symbol: string }) => token.symbol == name);
+  if (!token) {
+    throw new Error(`Token ${name} not found`);
+  }
+  if (!token.address) {
+    throw new Error(`Token ${name} has no address`);
+  }
+  return token.address;
+};
+
+// If base token is eth, we are ok, otherwise we need to check if token is deployed
+const checkTokenAddress = async (address: string) => {
+  if (address == ETH_TOKEN_ADDRESS) {
+    return;
+  } else if ((await provider.getCode(address)) == "0x") {
+    throw new Error(`Token ${address} is not deployed`);
+  }
+};
+
+// If:
+// * base token name is provided, we find its address
+// * base token address is provided, we use it
+// * neither is provided, we fallback to eth
+const chooseBaseTokenAddress = async (name?: string, address?: string) => {
+  if (name) {
+    return getTokenAddress(name);
+  } else if (address) {
+    return address;
+  } else {
+    return ETH_TOKEN_ADDRESS;
+  }
+};
 
 async function main() {
   const program = new Command();
@@ -29,6 +66,7 @@ async function main() {
     .option("--create2-salt <create2-salt>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
+    .option("--validium-mode")
     .option("--base-token-name <base-token-name>")
     .option("--base-token-address <base-token-address>")
     .action(async (cmd) => {
@@ -57,32 +95,15 @@ async function main() {
         verbose: true,
       });
 
-      let baseTokenAddress = cmd.baseTokenAddress ? cmd.baseTokenAddress : ADDRESS_ONE;
-      if (baseTokenAddress != ethers.constants.AddressZero && baseTokenAddress != ADDRESS_ONE) {
-        if ((await deployWallet.provider.getCode(cmd.baseTokenAddress)) == "0x") {
-          throw new Error(`Token ${cmd.baseTokenAddress} is not deployed`);
-        }
-        console.log(`Using base token at ${baseTokenAddress}`);
-      } else if (baseTokenAddress == ADDRESS_ONE) {
-        // base token is eth, we are ok.
-        console.log(`Using ETH as base token at ${baseTokenAddress}`);
-      } else if (cmd.baseTokenName) {
-        const tokens = getTokens();
-        const token = tokens.find((token: { symbol: string }) => token.symbol == cmd.baseTokenName);
-        if (!token) {
-          throw new Error(`Token ${cmd.baseTokenName} not found`);
-        } else if (!token.address) {
-          throw new Error(`Token ${cmd.baseTokenName} has no address`);
-        }
-        baseTokenAddress = token.address;
-        console.log(`Using base token ${cmd.baseTokenName} at ${baseTokenAddress}`);
-      }
+      const baseTokenAddress = await chooseBaseTokenAddress(cmd.baseTokenName, cmd.baseTokenAddress);
+      await checkTokenAddress(baseTokenAddress);
+      console.log(`Using base token address: ${baseTokenAddress}`);
 
       if (!(await deployer.bridgehubContract(deployWallet).tokenIsRegistered(baseTokenAddress))) {
         await deployer.registerToken(baseTokenAddress);
       }
 
-      await deployer.registerHyperchain(baseTokenAddress, null, gasPrice);
+      await deployer.registerHyperchain(baseTokenAddress, cmd.validiumMode, null, gasPrice);
     });
 
   await program.parseAsync(process.argv);

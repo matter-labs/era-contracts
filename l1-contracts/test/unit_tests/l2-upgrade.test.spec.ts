@@ -3,7 +3,7 @@ import type { BigNumberish } from "ethers";
 import { Wallet } from "ethers";
 import * as ethers from "ethers";
 import * as hardhat from "hardhat";
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT, hashBytecode } from "zksync-ethers/build/src/utils";
+import { hashBytecode } from "zksync-ethers/build/src/utils";
 
 import type { AdminFacet, ExecutorFacet, GettersFacet, StateTransitionManager } from "../../typechain";
 import {
@@ -19,11 +19,11 @@ import {
 import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from "../../src.ts/deploy-process";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
-import type { ProposedUpgrade, VerifierParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import type { ProposedUpgrade, VerifierParams } from "../../src.ts/utils";
 import { ethTestConfig } from "../../src.ts/utils";
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
-import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
+import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
 import {
   EMPTY_STRING_KECCAK,
   L2_BOOTLOADER_ADDRESS,
@@ -31,11 +31,13 @@ import {
   SYSTEM_LOG_KEYS,
   constructL2Log,
   createSystemLogs,
-  createSystemLogsWithUpgrade,
   genesisStoredBatchInfo,
   getCallRevertReason,
   packBatchTimestampAndBatchTimestamp,
-  SYSTEM_UPGRADE_TX_TYPE,
+  buildL2CanonicalTransaction,
+  buildCommitBatchInfoWithUpgrade,
+  makeExecutedEqualCommitted,
+  getBatchStoredInfo,
 } from "./utils";
 
 describe("L2 upgrade test", function () {
@@ -709,10 +711,6 @@ describe("L2 upgrade test", function () {
   });
 });
 
-type CommitBatchInfoWithTimestamp = Partial<CommitBatchInfo> & {
-  batchNumber: BigNumberish;
-};
-
 async function buildCommitBatchInfo(
   prevInfo: StoredBatchInfo,
   info: CommitBatchInfoWithTimestamp
@@ -764,69 +762,6 @@ async function buildCommitBatchInfoWithCustomLogs(
     bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
     eventsQueueStateHash: ethers.utils.randomBytes(32),
     ...info,
-  };
-}
-
-async function buildCommitBatchInfoWithUpgrade(
-  prevInfo: StoredBatchInfo,
-  info: CommitBatchInfoWithTimestamp,
-  upgradeTxHash: string
-): Promise<CommitBatchInfo> {
-  const timestamp = info.timestamp || (await hardhat.ethers.provider.getBlock("latest")).timestamp;
-  const systemLogs = createSystemLogsWithUpgrade(info.priorityOperationsHash, info.numberOfLayer1Txs, upgradeTxHash);
-  systemLogs[SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY] = constructL2Log(
-    true,
-    L2_SYSTEM_CONTEXT_ADDRESS,
-    SYSTEM_LOG_KEYS.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    packBatchTimestampAndBatchTimestamp(timestamp, timestamp)
-  );
-
-  return {
-    timestamp,
-    indexRepeatedStorageChanges: 0,
-    newStateRoot: ethers.utils.randomBytes(32),
-    numberOfLayer1Txs: 0,
-    priorityOperationsHash: EMPTY_STRING_KECCAK,
-    systemLogs: ethers.utils.hexConcat(systemLogs),
-    pubdataCommitments: `0x${"0".repeat(130)}`,
-    bootloaderHeapInitialContentsHash: ethers.utils.randomBytes(32),
-    eventsQueueStateHash: ethers.utils.randomBytes(32),
-    ...info,
-  };
-}
-
-function getBatchStoredInfo(commitInfo: CommitBatchInfo, commitment: string): StoredBatchInfo {
-  return {
-    batchNumber: commitInfo.batchNumber,
-    batchHash: commitInfo.newStateRoot,
-    indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
-    numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
-    priorityOperationsHash: commitInfo.priorityOperationsHash,
-    l2LogsTreeRoot: ethers.constants.HashZero,
-    timestamp: commitInfo.timestamp,
-    commitment: commitment,
-  };
-}
-
-function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {
-  return {
-    txType: SYSTEM_UPGRADE_TX_TYPE,
-    from: ethers.constants.AddressZero,
-    to: ethers.constants.AddressZero,
-    gasLimit: 5000000,
-    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-    maxFeePerGas: 0,
-    maxPriorityFeePerGas: 0,
-    paymaster: 0,
-    nonce: 0,
-    value: 0,
-    reserved: [0, 0, 0, 0],
-    data: "0x",
-    signature: "0x",
-    factoryDeps: [],
-    paymasterInput: "0x",
-    reservedDynamic: "0x",
-    ...tx,
   };
 }
 
@@ -955,22 +890,4 @@ async function executeCustomUpgrade(
     await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
-}
-
-async function makeExecutedEqualCommitted(
-  proxyExecutor: ExecutorFacet,
-  prevBatchInfo: StoredBatchInfo,
-  batchesToProve: StoredBatchInfo[],
-  batchesToExecute: StoredBatchInfo[]
-) {
-  batchesToExecute = [...batchesToProve, ...batchesToExecute];
-
-  await (
-    await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
-      recursiveAggregationInput: [],
-      serializedProof: [],
-    })
-  ).wait();
-
-  await (await proxyExecutor.executeBatches(batchesToExecute)).wait();
 }

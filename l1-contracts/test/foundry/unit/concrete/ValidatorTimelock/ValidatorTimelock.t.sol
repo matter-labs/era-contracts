@@ -113,7 +113,7 @@ contract ValidatorTimelockTest is Test {
         assert(validator.executionDelay() == 20);
     }
 
-    function test_getCommittedBatchTimestampEmpty() public {
+    function test_getCommittedBatchTimestampEmpty() public view {
         assert(validator.getCommittedBatchTimestamp(chainId, lastBatchNumber) == 0);
     }
 
@@ -326,8 +326,6 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_proveBatchesNotValidator() public {
-        uint256[] memory recursiveAggregationInput;
-        uint256[] memory serializedProof;
         IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
         IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
         IExecutor.ProofInput memory proof = Utils.createProofInput();

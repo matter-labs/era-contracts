@@ -125,7 +125,7 @@ contract L1SharedBridgeTest is Test {
             admin,
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
         );
-        sharedBridge = L1SharedBridge(address(sharedBridgeProxy));
+        sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
@@ -161,12 +161,7 @@ contract L1SharedBridgeTest is Test {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, ETH_TOKEN_ADDRESS, amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit{value: amount}(
-            chainId,
-            alice,
-            0,
-            abi.encode(ETH_TOKEN_ADDRESS, 0, bob)
-        );
+        sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
     function test_bridgehubDeposit_Erc() public {
@@ -182,12 +177,7 @@ contract L1SharedBridgeTest is Test {
         );
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, address(token), amount);
-        L2TransactionRequestTwoBridgesInner memory output = sharedBridge.bridgehubDeposit(
-            chainId,
-            alice,
-            0,
-            abi.encode(address(token), amount, bob)
-        );
+        sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
     function test_bridgehubConfirmL2Transaction() public {

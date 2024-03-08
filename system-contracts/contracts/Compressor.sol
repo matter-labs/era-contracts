@@ -28,6 +28,7 @@ contract Compressor is ICompressor, ISystemContract {
     ///    - 2 bytes: the length of the dictionary
     ///    - N bytes: the dictionary
     ///    - M bytes: the encoded data
+    /// @return bytecodeHash The hash of the original bytecode.
     /// @dev The dictionary is a sequence of 8-byte chunks, each of them has the associated index.
     /// @dev The encoded data is a sequence of 2-byte chunks, each of them is an index of the dictionary.
     /// @dev The compression algorithm works as follows:
@@ -39,6 +40,7 @@ contract Compressor is ICompressor, ISystemContract {
     ///         * The 2-byte index of the chunk in the dictionary is added to the encoded data.
     /// @dev Currently, the method may be called only from the bootloader because the server is not ready to publish bytecodes
     /// in internal transactions. However, in the future, we will allow everyone to publish compressed bytecodes.
+    /// @dev Read more about the compression: https://github.com/matter-labs/zksync-era/blob/main/docs/guides/advanced/compression.md
     function publishCompressedBytecode(
         bytes calldata _bytecode,
         bytes calldata _rawCompressedData
@@ -46,11 +48,14 @@ contract Compressor is ICompressor, ISystemContract {
         unchecked {
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
-            require(dictionary.length % 8 == 0, "Dictionary length should be a multiple of 8");
-            require(dictionary.length <= 2 ** 16 * 8, "Dictionary is too big");
             require(
                 encodedData.length * 4 == _bytecode.length,
                 "Encoded data length should be 4 times shorter than the original bytecode"
+            );
+
+            require(
+                dictionary.length / 8 <= encodedData.length / 2,
+                "Dictionary should have at most the same number of entries as the encoded data"
             );
 
             for (uint256 encodedDataPointer = 0; encodedDataPointer < encodedData.length; encodedDataPointer += 2) {

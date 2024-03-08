@@ -43,7 +43,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The stateTransitionManager smart contract.
     IStateTransitionManager public stateTransitionManager;
 
-    /// @dev The mapping of L2 batch number => timestamp when it was committed.
+    /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
     mapping(uint256 => LibMap.Uint32Map) internal committedBatchTimestamp;
 
     /// @dev The address that can commit/revert/validate/execute batches.

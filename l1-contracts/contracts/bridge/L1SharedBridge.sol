@@ -120,6 +120,32 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
+    /// @dev tranfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
+    function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
+        if (_token == ETH_TOKEN_ADDRESS) {
+            uint256 balanceBefore = address(this).balance;
+            IMailbox(_target).transferEthToSharedBridge();
+            uint256 balanceAfter = address(this).balance;
+            require(balanceAfter > balanceBefore, "ShB: 0 eth transferred");
+            chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] =
+                chainBalance[_targetChainId][ETH_TOKEN_ADDRESS] +
+                balanceAfter -
+                balanceBefore;
+        } else {
+            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
+            uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
+            require(amount > 0, "ShB: 0 amount to transfer");
+            IL1ERC20Bridge(_target).tranferTokenToSharedBridge(_token, amount);
+            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
+            require(balanceAfter - balanceBefore == amount, "ShB: wrong amount transferred");
+            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + amount;
+        }
+    }
+
+    function receiveEth(uint256 _chainId) external payable {
+        require(bridgehub.getStateTransition(_chainId) == msg.sender, "receiveEth not state transition");
+    }
+
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
     function initializeChainGovernance(
         uint256 _chainId,
@@ -238,7 +264,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function _getERC20Getters(address _token) internal view returns (bytes memory) {
         if (_token == ETH_TOKEN_ADDRESS) {
-            return abi.encode("Ether", "ETH", uint8(18)); // when depositing eth to a non-eth based chain it is an ERC20
+            bytes memory name = bytes("Ether");
+            bytes memory symbol = bytes("ETH");
+            bytes memory decimals = abi.encode(uint8(18));
+            return abi.encode(name, symbol, decimals); // when depositing eth to a non-eth based chain it is an ERC20
         }
 
         (, bytes memory data1) = _token.staticcall(abi.encodeCall(IERC20Metadata.name, ()));

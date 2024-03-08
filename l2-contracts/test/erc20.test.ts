@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import * as hre from "hardhat";
 import { Provider, Wallet } from "zksync-web3";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import { unapplyL1ToL2Alias } from "../src/utils";
+import { unapplyL1ToL2Alias } from "./test-utils";
 import { L2SharedBridgeFactory, L2StandardERC20Factory } from "../typechain";
 import type { L2SharedBridge, L2StandardERC20 } from "../typechain";
 
@@ -53,6 +53,7 @@ describe("ERC20Bridge", function () {
     const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"));
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
+      ethers.constants.AddressZero,
       beaconProxyBytecodeHash,
       governorWallet.address,
     ]);

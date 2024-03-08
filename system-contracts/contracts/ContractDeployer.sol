@@ -129,7 +129,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _salt The CREATE2 salt
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata
-    /// @dev In case of a revert, the zero address should be returned.
     function create2(
         bytes32 _salt,
         bytes32 _bytecodeHash,
@@ -143,7 +142,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _input The constructor calldata
     /// @dev This method also accepts nonce as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
-    /// @dev In case of a revert, the zero address should be returned.
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create(
@@ -159,7 +157,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
     /// @param _aaVersion The account abstraction version to use.
-    /// @dev In case of a revert, the zero address should be returned.
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create2Account(
@@ -182,7 +179,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _aaVersion The account abstraction version to use.
     /// @dev This method also accepts salt as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
-    /// @dev In case of a revert, the zero address should be returned.
     function createAccount(
         bytes32, // salt
         bytes32 _bytecodeHash,
