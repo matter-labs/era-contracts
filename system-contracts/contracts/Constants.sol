@@ -15,10 +15,16 @@ import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
 import {IBootloaderUtilities} from "./interfaces/IBootloaderUtilities.sol";
 import "./EvmInterpreter.sol";
 import "./EvmGasManager.sol";
+import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 
 /// @dev All the system contracts introduced by zkSync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
+
+/// @dev Unlike the value above, it is not overridden for the purpose of testing and 
+/// is identical to the constant value actually used as the system contracts offset on 
+/// mainnet. 
+uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
 
 /// @dev All the system contracts must be located in the kernel space,
 /// i.e. their addresses must be below 2^16.
@@ -28,6 +34,13 @@ address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
+
+
+/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// This variable is used to ensure the following:
+/// - That the long-term storage of the operator is compensated properly.
+/// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.
+uint256 constant COMPUTATIONAL_PRICE_FOR_PUBDATA = 80;
 
 /// @dev The maximal possible address of an L1-like precompie. These precompiles maintain the following properties:
 /// - Their extcodehash is EMPTY_STRING_KECCAK
@@ -52,6 +65,7 @@ IL1Messenger constant L1_MESSENGER_CONTRACT = IL1Messenger(address(SYSTEM_CONTRA
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
 IEthToken constant ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IEthToken constant REAL_ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -59,6 +73,7 @@ IEthToken constant ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(SYSTEM_CONTRACT
 address constant KECCAK256_SYSTEM_CONTRACT = address(0x8010);
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x0b)));
+ISystemContext constant REAL_SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0b)));
 
 IBootloaderUtilities constant BOOTLOADER_UTILITIES = IBootloaderUtilities(address(SYSTEM_CONTRACTS_OFFSET + 0x0c));
 
@@ -69,8 +84,12 @@ ICompressor constant COMPRESSOR_CONTRACT = ICompressor(address(SYSTEM_CONTRACTS_
 
 IComplexUpgrader constant COMPLEX_UPGRADER_CONTRACT = IComplexUpgrader(address(SYSTEM_CONTRACTS_OFFSET + 0x0f));
 
-EvmInterpreter constant EVM_INTERPRETER = EvmInterpreter(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x11)));
-EvmGasManager constant EVM_GAS_MANAGER = EvmGasManager(address(SYSTEM_CONTRACTS_OFFSET + 0x12));
+EvmInterpreter constant EVM_INTERPRETER = EvmInterpreter(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x13)));
+EvmGasManager constant EVM_GAS_MANAGER = EvmGasManager(address(SYSTEM_CONTRACTS_OFFSET + 0x14));
+
+IPubdataChunkPublisher constant PUBDATA_CHUNK_PUBLISHER = IPubdataChunkPublisher(
+    address(SYSTEM_CONTRACTS_OFFSET + 0x11)
+);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
@@ -92,7 +111,7 @@ bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
-/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the 110k - 120k, it is better to
+/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, it is better to
 /// allow the operator to provide any reasonably large value in order to avoid unneeded constraints on the operator.
 uint256 constant MAX_ALLOWED_PUBDATA_PER_BATCH = 520000;
 
@@ -104,12 +123,14 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     CHAINED_PRIORITY_TXN_HASH_KEY,
     NUMBER_OF_LAYER_1_TXS_KEY,
+    BLOB_ONE_HASH_KEY,
+    BLOB_TWO_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
-/// While formally a tree of any length is acceptable, the node supports only a constant length of 2048 leaves.
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 2048;
+/// While formally a tree of any length is acceptable, the node supports only a constant length of 4096 leaves.
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 4096;
 
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
@@ -134,3 +155,11 @@ uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
 uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;
 /// @dev The offset of the final value in a storage diff.
 uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
+
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
+
+/// @dev Max number of blobs currently supported
+uint256 constant MAX_NUMBER_OF_BLOBS = 2;

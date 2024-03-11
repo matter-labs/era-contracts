@@ -3,7 +3,7 @@ use multivm::vm_latest::{
     HistoryMode, SimpleMemory,
 };
 
-use multivm::zk_evm_1_4_1::{
+use multivm::zk_evm_latest::{
     aux_structures::MemoryPage,
     tracing::{BeforeExecutionData, VmLocalStateData},
     zkevm_opcode_defs::{FatPointer, Opcode, UMAOpcode},

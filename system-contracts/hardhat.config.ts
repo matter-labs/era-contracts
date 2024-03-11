@@ -4,14 +4,27 @@ import "@matterlabs/hardhat-zksync-solc";
 import "@nomiclabs/hardhat-ethers";
 import "hardhat-typechain";
 
-import { COMPILER_PATH } from "./scripts/constants";
+// This version of system contracts requires a pre release of the compiler
+const COMPILER_VERSION = "1.5.0";
+const PRE_RELEASE_VERSION = "prerelease-a167aa3-code4rena";
+function getZksolcUrl(): string {
+  // @ts-ignore
+  const platform = { darwin: "macosx", linux: "linux", win32: "windows" }[process.platform];
+  // @ts-ignore
+  const toolchain = { linux: "-musl", win32: "-gnu", darwin: "" }[process.platform];
+  const arch = process.arch === "x64" ? "amd64" : process.arch;
+  const ext = process.platform === "win32" ? ".exe" : "";
+
+  return `https://github.com/matter-labs/era-compiler-solidity/releases/download/${PRE_RELEASE_VERSION}/zksolc-${platform}-${arch}${toolchain}-v${COMPILER_VERSION}${ext}`;
+}
+
+console.log(`Using zksolc from ${getZksolcUrl()}`);
 
 export default {
   zksolc: {
     compilerSource: "binary",
-    // version: 'zksolc-macosx-arm64-vprerelease-0640c18-test-zkvm-v1.5.0',
     settings: {
-      compilerPath: COMPILER_PATH,
+      compilerPath: getZksolcUrl(),
       isSystem: true,
     },
   },
@@ -40,7 +53,7 @@ export default {
     },
     zkSyncTestNode: {
       url: "http://127.0.0.1:8011",
-      ethNetwork: "",
+      ethNetwork: "localhost",
       zksync: true,
     },
   },

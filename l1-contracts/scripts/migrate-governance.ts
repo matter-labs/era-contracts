@@ -1,10 +1,12 @@
 /// Temporary script that generated the needed calldata for the migration of the governance.
 
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import { Command } from "commander";
 import { BigNumber, ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
-import * as hre from "hardhat";
 import { Deployer } from "../src.ts/deploy";
 import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv, web3Provider } from "./utils";
 

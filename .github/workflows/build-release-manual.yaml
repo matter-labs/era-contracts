@@ -1,0 +1,60 @@
+name: Build and release(manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        type: string
+        description: SHA commit for build
+        required: false
+      prefix:
+        type: string
+        description: Prefix for release name
+        required: false
+        default: manual
+
+jobs:
+  build-contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Init
+        id: init
+        run: |
+          yarn
+          echo "release_tag=${{ inputs.prefix }}-${{ inputs.commit }}" >> $GITHUB_OUTPUT
+
+      - name: Build contracts
+        run: |
+          yarn l1 build
+          yarn l2 build
+          yarn sc build
+
+      - name: Prepare artifacts
+        run: |
+          tar -czvf l1-contracts.tar.gz ./l1-contracts
+          tar -czvf l2-contracts.tar.gz ./l2-contracts
+          tar -czvf system-contracts.tar.gz ./system-contracts
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.init.outputs.release_tag }}
+          fail_on_unmatched_files: true
+          target_commitish: ${{ inputs.commit }}
+          body: ""
+          files: |
+            l1-contracts.tar.gz
+            l2-contracts.tar.gz
+            system-contracts.tar.gz

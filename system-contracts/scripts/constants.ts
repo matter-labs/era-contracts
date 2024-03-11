@@ -1,8 +1,6 @@
 import type { BigNumberish, BytesLike } from "ethers";
 import { constants, ethers } from "ethers";
 
-export const COMPILER_PATH = `${process.env.ZKSYNC_HOME}/local-compiler/zksolc`;
-
 export const BOOTLOADER_FORMAL_ADDRESS = "0x0000000000000000000000000000000000008001";
 export const ETH_ADDRESS = constants.AddressZero;
 
@@ -146,17 +144,21 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     path: "precompiles",
   },
   codeOracle: {
-    address: "0x0000000000000000000000000000000000008011",
+    address: "0x0000000000000000000000000000000000008012",
     codeName: "CodeOracle",
     lang: Language.Yul,
     path: "precompiles",
   },
-  sekp256r1: {
-    // FIXME: ensure to double check EIP7212 address compatibility
-    address: "0x0000000000000000000000000000000000008100",
-    codeName: "Keccak256",
+  p256Verify: {
+    address: "0x0000000000000000000000000000000000000100",
+    codeName: "P256Verify",
     lang: Language.Yul,
     path: "precompiles",
+  },
+  pubdataChunkPublisher: {
+    address: "0x0000000000000000000000000000000000008011",
+    codeName: "PubdataChunkPublisher",
+    lang: Language.Solidity,
   },
 } as const;
 

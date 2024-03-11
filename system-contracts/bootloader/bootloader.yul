@@ -80,10 +80,10 @@ object "Bootloader" {
                 ret := {{GUARANTEED_PUBDATA_BYTES}}
             }
 
-            /// @dev The maximal gasPerPubdata, which allows users to still be 
-            /// able to send `GUARANTEED_PUBDATA_PER_TX` onchain.
+            /// @dev The maximal allowed gasPerPubdata, we want it multiplied by the u32::MAX 
+            /// (i.e. the maximal possible value of the pubdata counter) to be a safe JS integer with a good enough margin.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
-                ret := div(MAX_GAS_PER_TRANSACTION(), GUARANTEED_PUBDATA_PER_TX())
+                ret := 1048576
             }
 
             /// @dev The overhead for the interaction with L1.
@@ -399,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 24000000 / 32 VM words.
+            /// @dev The memory page consists of 30000000 / 32 VM words.
             /// Each execution result is a single boolean, but 
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now. 
             function MAX_MEM_SIZE() -> ret {
-                ret := 24000000
+                ret := 30000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -539,6 +539,12 @@ object "Bootloader" {
                 ret := 1000000
             }
 
+            /// @dev The maximal amount of pubdata that can be safely used by a transaction. 
+            /// If a transaction uses more pubdata than this, it will be reverted.
+            function MAX_PUBDATA_FOR_TX() -> ret {
+                ret := 120000
+            }
+
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
                 switch or(eq(x, 0), eq(y, 0))
@@ -651,7 +657,7 @@ object "Bootloader" {
             /// additional transformations, which the standard `extcodehash` does for EVM-compatibility
             /// @param addr The address of the account to get the code hash of.
             /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
-            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failer is user providing not
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
             /// enough gas.
             function getRawCodeHash(addr, assertSuccess) -> ret {
                 mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
@@ -925,7 +931,7 @@ object "Bootloader" {
                 // Skipping the first formal 0x20 byte
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                let basePubdataSpent := getPubdataSpent()
+                let basePubdataSpent := getPubdataCounter()
 
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
                     innerTxDataOffset,
@@ -938,7 +944,7 @@ object "Bootloader" {
                 let gasUsedOnPreparation := 0
                 let canonicalL1TxHash := 0
 
-                canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset)
+                canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset, gasPerPubdata, basePubdataSpent)
 
                 let refundGas := 0
                 let success := 0
@@ -971,11 +977,12 @@ object "Bootloader" {
                         gasPerPubdata,
                     )
 
-                    // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata
                     let ergsSpentOnPubdata := getErgsSpentForPubdata(
                         basePubdataSpent,
                         gasPerPubdata
                     )
+
+                    // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata.
                     let potentialRefund := saturatingSub(
                         safeAdd(reservedGas, gasForExecution, "safeadd: potentialRefund1"), 
                         safeAdd(gasSpentOnExecution, ergsSpentOnPubdata, "safeadd: potentialRefund2")
@@ -1070,10 +1077,18 @@ object "Bootloader" {
 
             /// @dev The function responsible for doing all the pre-execution operations for L1->L2 transactions.
             /// @param txDataOffset The offset to the transaction's information
+            /// @param gasPerPubdata The price per each pubdata byte in L2 gas
+            /// @param basePubdataSpent The amount of pubdata spent at the start of the transaction
             /// @return canonicalL1TxHash The hash of processed L1->L2 transaction
             /// @return gasUsedOnPreparation The number of L2 gas used in the preparation stage
-            function l1TxPreparation(txDataOffset) -> canonicalL1TxHash, gasUsedOnPreparation {
+            function l1TxPreparation(
+                txDataOffset,
+                gasPerPubdata,
+                basePubdataSpent
+            ) -> canonicalL1TxHash, gasUsedOnPreparation {
                 let innerTxDataOffset := add(txDataOffset, 32)
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
                 
                 let gasBeforePreparation := gas()
                 debugLog("gasBeforePreparation", gasBeforePreparation)
@@ -1137,7 +1152,7 @@ object "Bootloader" {
                 transactionIndex,
                 gasPerPubdata
             ) {
-                let basePubdataSpent := getPubdataSpent()
+                let basePubdataSpent := getPubdataCounter()
 
                 debugLog("baseSepnt", basePubdataSpent)
 
@@ -1280,6 +1295,8 @@ object "Bootloader" {
 
                 // Appending the transaction's hash to the current L2 block
                 appendTransactionHash(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), false)
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
 
                 checkEnoughGas(gasLimitForTx)
 
@@ -2690,28 +2707,34 @@ object "Bootloader" {
                 ret := verbatim_0i_1o("meta")
             }
 
-            function getPubdataSpent() -> ret {
+            function getPubdataCounter() -> ret {
                 ret := and($llvm_NoInline_llvm$_getMeta(), 0xFFFFFFFF)     
+            }
+
+            function getCurrentPubdataSpent(basePubdataSpent) -> ret {
+                let currentPubdataCounter := getPubdataCounter()
+                debugLog("basePubdata", basePubdataSpent)
+                debugLog("currentPubdata", currentPubdataCounter)
+                ret := sub(currentPubdataCounter, basePubdataSpent)
+                if gt(basePubdataSpent, currentPubdataCounter) {
+                    ret := 0
+                }
             }
 
             function getErgsSpentForPubdata(
                 basePubdataSpent,
                 gasPerPubdata,  
             ) -> ret {
-                let currentPubdataCounter := getPubdataSpent()
-                debugLog("basePubdata", basePubdataSpent)
-                debugLog("currentPubdata", currentPubdataCounter)
-                let spentPubdata := sub(currentPubdataCounter, basePubdataSpent)
-                if gt(basePubdataSpent, currentPubdataCounter) {
-                    spentPubdata := 0
-                }
-
-                ret := safeMul(spentPubdata, gasPerPubdata, "mul: getErgsSpentForPubdata")
+                ret := safeMul(getCurrentPubdataSpent(basePubdataSpent), gasPerPubdata, "mul: getErgsSpentForPubdata")
             }
 
             /// @dev Compares the amount of spent ergs on the pubdatawith the allowed amount.
-            /// @dev If the spent ergs on pubdata are too high it will either reject or revert 
-            /// the transaction depending on the `rejectTransaction` flag.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param computeGas The amount of gas spent on the computation.
+            /// @param reservedGas The amount of gas reserved for the pubdata.
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
+            /// @return ret Whether the amout of pubdata spent so far is valid and 
+            /// and can be covered by the user.
             function isNotEnoughGasForPubdata(
                 basePubdataSpent,
                 computeGas,
@@ -2721,8 +2744,11 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
+                
+                let notEnoughGas := lt(allowedGasLimit, spentErgs)
+                let tooMuchPubdata := gt(getCurrentPubdataSpent(basePubdataSpent), MAX_PUBDATA_FOR_TX())
 
-                ret := lt(allowedGasLimit, spentErgs)
+                ret := or(notEnoughGas, tooMuchPubdata)
             }
 
             /// @dev Set the new value for the tx origin context value
@@ -2742,6 +2768,32 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("Failed to set gas price", newGasPrice)
                     nearCallPanic()
+                }
+            }
+
+            /// @dev Sets the gas per pubdata byte value in the `SystemContext` contract. 
+            /// @notice Note that it has not actual impact on the execution of the contract.
+            function setPubdataInfo(
+                newGasPerPubdata,
+                basePubdataSpent
+            ) {
+                mstore(0, {{RIGHT_PADDED_SET_PUBDATA_INFO}})
+                mstore(4, newGasPerPubdata)
+                mstore(36, basePubdataSpent)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    68,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("setPubdataInfo failed", newGasPerPubdata)
+                    assertionError("setPubdataInfo failed")
                 }
             }
 
@@ -3796,7 +3848,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 7
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////

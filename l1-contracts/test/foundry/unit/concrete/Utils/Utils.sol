@@ -3,25 +3,19 @@ pragma solidity 0.8.20;
 
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
+import {IExecutor, SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
+address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
+
+uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 library Utils {
-    enum SystemLogKeys {
-        L2_TO_L1_LOGS_TREE_ROOT_KEY,
-        TOTAL_L2_TO_L1_PUBDATA_KEY,
-        STATE_DIFF_HASH_KEY,
-        PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-        PREV_BATCH_HASH_KEY,
-        CHAINED_PRIORITY_TXN_HASH_KEY,
-        NUMBER_OF_LAYER_1_TXS_KEY,
-        EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH
-    }
-
     function packBatchTimestampAndBlockTimestamp(
         uint256 batchTimestamp,
         uint256 blockTimestamp
@@ -49,45 +43,77 @@ library Utils {
     }
 
     function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+        bytes[] memory logs = new bytes[](9);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKeys.L2_TO_L1_LOGS_TREE_ROOT_KEY),
+            uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
             bytes32("")
         );
         logs[1] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKeys.TOTAL_L2_TO_L1_PUBDATA_KEY),
+            uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY),
             0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
         );
-        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKeys.STATE_DIFF_HASH_KEY), bytes32(""));
+        logs[2] = constructL2Log(true, L2_TO_L1_MESSENGER, uint256(SystemLogKey.STATE_DIFF_HASH_KEY), bytes32(""));
         logs[3] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKeys.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
             bytes32("")
         );
         logs[4] = constructL2Log(
             true,
             L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKeys.PREV_BATCH_HASH_KEY),
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
             bytes32("")
         );
         logs[5] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKeys.CHAINED_PRIORITY_TXN_HASH_KEY),
+            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
             keccak256("")
         );
         logs[6] = constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKeys.NUMBER_OF_LAYER_1_TXS_KEY),
+            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
             bytes32("")
         );
+        logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
+        logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
         return logs;
+    }
+
+    function createStoredBatchInfo() public pure returns (IExecutor.StoredBatchInfo memory) {
+        return
+            IExecutor.StoredBatchInfo({
+                batchNumber: 0,
+                batchHash: bytes32(""),
+                indexRepeatedStorageChanges: 0,
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+                timestamp: 0,
+                commitment: bytes32("")
+            });
+    }
+
+    function createCommitBatchInfo() public view returns (IExecutor.CommitBatchInfo memory) {
+        return
+            IExecutor.CommitBatchInfo({
+                batchNumber: 1,
+                timestamp: uint64(uint256(randomBytes32("timestamp"))),
+                indexRepeatedStorageChanges: 0,
+                newStateRoot: randomBytes32("newStateRoot"),
+                numberOfLayer1Txs: 0,
+                priorityOperationsHash: keccak256(""),
+                bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
+                eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
+                systemLogs: abi.encode(randomBytes32("systemLogs")),
+                pubdataCommitments: abi.encodePacked(uint256(0))
+            });
     }
 
     function encodePacked(bytes[] memory data) public pure returns (bytes memory) {
@@ -140,5 +166,83 @@ library Utils {
         selectors[4] = MailboxFacet.requestL2Transaction.selector;
         selectors[5] = MailboxFacet.l2TransactionBaseCost.selector;
         return selectors;
+    }
+
+    function createBatchCommitment(
+        IExecutor.CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) public pure returns (bytes32) {
+        bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
+        bytes32 metadataHash = keccak256(_batchMetaParameters());
+        bytes32 auxiliaryOutputHash = keccak256(
+            _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
+        );
+
+        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+    }
+
+    function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
+        return
+            abi.encodePacked(
+                _batch.indexRepeatedStorageChanges,
+                _batch.newStateRoot,
+                uint64(0), // index repeated storage changes in zkPorter
+                bytes32(0) // zkPorter batch hash
+            );
+    }
+
+    function _batchMetaParameters() internal pure returns (bytes memory) {
+        // Used in __Executor_Shared.t.sol
+        bytes8 dummyHash = 0x1234567890123456;
+        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash), bytes32(dummyHash));
+    }
+
+    function _batchAuxiliaryOutput(
+        IExecutor.CommitBatchInfo calldata _batch,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes memory) {
+        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
+
+        return
+            abi.encodePacked(
+                l2ToL1LogsHash,
+                _stateDiffHash,
+                _batch.bootloaderHeapInitialContentsHash,
+                _batch.eventsQueueStateHash,
+                _encodeBlobAuxilaryOutput(_blobCommitments, _blobHashes)
+            );
+    }
+
+    /// @dev Encodes the commitment to blobs to be used in the auxiliary output of the batch commitment
+    /// @param _blobCommitments - the commitments to the blobs
+    /// @param _blobHashes - the hashes of the blobs
+    /// @param blobAuxOutputWords - The circuit commitment to the blobs split into 32-byte words
+    function _encodeBlobAuxilaryOutput(
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
+        // These invariants should be checked by the caller of this function, but we double check
+        // just in case.
+        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
+        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+
+        // for each blob we have:
+        // linear hash (hash of preimage from system logs) and
+        // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+        // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
+        //
+        // For now, only up to 2 blobs are supported by the contract, while 16 are required by the circuits.
+        // All the unfilled blobs will have their commitment as 0, including the case when we use only 1 blob.
+
+        blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
+
+        for (uint i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            blobAuxOutputWords[i * 2] = _blobHashes[i];
+            blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
     }
 }
