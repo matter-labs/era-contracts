@@ -81,7 +81,7 @@ const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexZeroPad(
     ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO)),
-    40
+    20
   );
 }
 
