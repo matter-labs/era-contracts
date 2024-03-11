@@ -6,10 +6,7 @@
 
 name: Codespell
 
-on:
-  push:
-    branches:
-      - "*"
+on: pull_request
 
 jobs:
   codespell:
