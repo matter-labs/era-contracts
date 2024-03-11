@@ -266,7 +266,7 @@ describe("L2 upgrade test", function () {
     expect(revertReason).to.equal("ui");
   });
 
-  it("Should validate upgrade transaction cant output more pubdata than processable", async () => {
+  it("Should validate upgrade transaction can't output more pubdata than processable", async () => {
     const wrongTx = buildL2CanonicalTransaction({
       nonce: 0,
       gasLimit: 10000000,
@@ -830,7 +830,7 @@ async function executeUpgrade(
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }
 
-// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but thats ok)
+// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that's ok)
 async function rollBackToVersion(
   protocolVersion: string,
   stateTransition: StateTransitionManager,

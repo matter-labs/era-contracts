@@ -247,7 +247,7 @@ describe("L1Messenger tests", () => {
       await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.rejectedWith("Inappropriate caller");
     });
 
-    it("shoud emit event, called by known code system contract", async () => {
+    it("should emit event, called by known code system contract", async () => {
       await expect(
         l1Messenger
           .connect(knownCodeStorageAccount)

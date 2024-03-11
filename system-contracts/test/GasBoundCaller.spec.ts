@@ -92,7 +92,7 @@ describe("GasBoundCaller tests", function () {
     const pubdataToSend = 5000;
     const gasSpentOnPubdata = (await systemContext.gasPerPubdataByte()).mul(pubdataToSend);
 
-    // Now while the execution gas wont be enoguh, we do allow to spend more just in case
+    // Now while the execution gas won't be enough, we do allow to spend more just in case
     await (
       await tester.gasBoundCallRelayer(
         gasSpentOnPubdata,

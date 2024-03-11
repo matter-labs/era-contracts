@@ -112,7 +112,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev tranfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
     function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
