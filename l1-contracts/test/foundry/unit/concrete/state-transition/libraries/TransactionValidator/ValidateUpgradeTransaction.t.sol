@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
 
 import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
-import {TransactionValidator} from //noinspection ALL "solpp/state-transition/libraries/TransactionValidator.sol";
+import {TransactionValidator} from "solpp/state-transition/libraries/TransactionValidator.sol";
 
 contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
     function test_BasicRequest() public pure {

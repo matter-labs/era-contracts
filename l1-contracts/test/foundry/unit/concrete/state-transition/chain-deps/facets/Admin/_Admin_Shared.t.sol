@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {AdminFacet} from //noinspection ALL "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
