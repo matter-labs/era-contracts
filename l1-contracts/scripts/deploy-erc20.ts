@@ -86,7 +86,7 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-      console.log(JSON.stringify(await deployToken(token, wallet), null, 2));
+      console.log(JSON.stringify((await deployToken(token, wallet), null, 2)[0]));
     });
 
   program
