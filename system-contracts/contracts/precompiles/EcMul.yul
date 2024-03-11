@@ -38,7 +38,7 @@ object "EcMul" {
 
             /// @notice Constant function for the pre-computation of R^2 % N for the Montgomery REDC algorithm.
             /// @dev R^2 is the Montgomery residue of the value 2^512.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value R^2 modulus the curve field order.
             function R2_MOD_P() -> ret {
@@ -47,7 +47,7 @@ object "EcMul" {
 
             /// @notice Constant function for the pre-computation of N' for the Montgomery REDC algorithm.
             /// @dev N' is a value such that NN' = -1 mod R, with N being the curve field order.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value N'.
             function N_PRIME() -> ret {
