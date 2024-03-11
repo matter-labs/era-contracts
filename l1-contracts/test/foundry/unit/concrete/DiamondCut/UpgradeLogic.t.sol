@@ -117,7 +117,7 @@ contract UpgradeLogicTest is DiamondCutTest {
         proxyAsGetters = GettersFacet(address(diamondProxy));
     }
 
-    function test_RevertWhen_EmergencyFreezeWhenUnauthurizedGovernor() public {
+    function test_RevertWhen_EmergencyFreezeWhenUnauthorizedGovernor() public {
         vm.startPrank(randomSigner);
 
         vm.expectRevert(abi.encodePacked("StateTransition Chain: Only by admin or state transition manager"));

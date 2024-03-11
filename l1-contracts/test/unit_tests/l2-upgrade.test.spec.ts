@@ -81,8 +81,8 @@ describe("L2 upgrade test", function () {
     await owner.sendTransaction(tx);
 
     const dummyAdminFacetFactory = await hardhat.ethers.getContractFactory("DummyAdminFacet");
-    const dummyAdminfFacetContract = await dummyAdminFacetFactory.deploy();
-    const extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
+    const dummyAdminFacetContract = await dummyAdminFacetFactory.deploy();
+    const extraFacet = facetCut(dummyAdminFacetContract.address, dummyAdminFacetContract.interface, Action.Add, true);
 
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
     initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
@@ -320,7 +320,7 @@ describe("L2 upgrade test", function () {
     expect(revertReason).to.equal("Wrong number of factory deps");
   });
 
-  it("Should validate factory deps length isnt too large", async () => {
+  it("Should validate factory deps length isn't too large", async () => {
     const myFactoryDep = ethers.utils.hexlify(ethers.utils.randomBytes(32));
     const randomDepHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
 

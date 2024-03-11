@@ -19,9 +19,9 @@ import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
-/// @dev Unlike the value above, it is not overridden for the purpose of testing and 
-/// is identical to the constant value actually used as the system contracts offset on 
-/// mainnet. 
+/// @dev Unlike the value above, it is not overridden for the purpose of testing and
+/// is identical to the constant value actually used as the system contracts offset on
+/// mainnet.
 uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
 
 /// @dev All the system contracts must be located in the kernel space,
@@ -141,7 +141,7 @@ uint256 constant INITIAL_WRITE_STARTING_POSITION = 4;
 
 /// @dev Each storage diffs consists of the following elements:
 /// [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
-/// @dev The offset of the deriived key in a storage diff.
+/// @dev The offset of the derived key in a storage diff.
 uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
 /// @dev The offset of the enum index in a storage diff.
 uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;

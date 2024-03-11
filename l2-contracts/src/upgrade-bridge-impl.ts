@@ -198,7 +198,7 @@ async function main() {
 
       const bridgeImplBytecode = getContractBytecode(cmd.contract);
       const l2SharedBridgeImplAddr = computeL2Create2Address(deployWallet, bridgeImplBytecode, "0x", salt);
-      console.log("Bridge implemenation address: ", l2SharedBridgeImplAddr);
+      console.log("Bridge implementation address: ", l2SharedBridgeImplAddr);
 
       if (cmd.l2DoubleCheck !== false) {
         // If the bytecode has already been deployed there is no need to deploy it again.
@@ -251,7 +251,7 @@ async function main() {
       }
 
       console.log("\n");
-      console.log("Bridge implementation has been successfuly deployed!");
+      console.log("Bridge implementation has been successfully deployed!");
       console.log("Address:", l2SharedBridgeImplAddr);
     });
 
@@ -280,11 +280,11 @@ async function main() {
 
       console.log("Refund recipient: ", refundRecipient);
 
-      const ugpradesInfo = JSON.parse(cmd.upgradesInfo) as UpgradeInfo[];
-      ugpradesInfo.forEach(validateUpgradeInfo);
+      const upgradeInfos = JSON.parse(cmd.upgradesInfo) as UpgradeInfo[];
+      upgradeInfos.forEach(validateUpgradeInfo);
 
       const governanceCalls = [];
-      for (const info of ugpradesInfo) {
+      for (const info of upgradeInfos) {
         console.log("Generating upgrade transaction for contract: ", info.contract);
         console.log("Target address: ", info.target);
         const txInfo = await getTxInfo(
