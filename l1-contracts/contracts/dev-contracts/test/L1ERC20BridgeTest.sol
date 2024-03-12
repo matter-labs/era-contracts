@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-
 import {L1ERC20Bridge} from "../../bridge/L1ERC20Bridge.sol";
 import {IBridgehub, IL1SharedBridge} from "../../bridge/interfaces/IL1SharedBridge.sol";
 
