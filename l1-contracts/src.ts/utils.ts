@@ -95,11 +95,6 @@ export function getAddressFromEnv(envName: string): string {
   return address;
 }
 
-export function getOptionalAddressFromEnv(envName: string): string {
-  const address = process.env[envName];
-  return address;
-}
-
 export function getHashFromEnv(envName: string): string {
   const hash = process.env[envName];
   if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
