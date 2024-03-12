@@ -13,6 +13,7 @@ import {
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
+  getOptionalAddressFromEnv,
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
@@ -723,9 +724,18 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
+    const commitValidatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const blobValidatorAddress = getOptionalAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+
+    const validatorAddresses = [commitValidatorAddress];
+
+    if (blobValidatorAddress && blobValidatorAddress.length > 0) {
+      validatorAddresses.push(blobValidatorAddress);
+    }
+
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay],
+      [this.ownerAddress, this.addresses.StateTransition.DiamondProxy, executionDelay, validatorAddresses],
       create2Salt,
       ethTxOptions
     );
