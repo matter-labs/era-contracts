@@ -134,7 +134,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         VirtualBlockUpgradeInfo memory currentVirtualBlockUpgradeInfo = virtualBlockUpgradeInfo;
 
-        // Due to virtual blocks upgrade, we'll have to use the following logic for retreiving the blockhash:
+        // Due to virtual blocks upgrade, we'll have to use the following logic for retrieving the blockhash:
         // 1. If the block number is out of the 256-block supported range, return 0.
         // 2. If the block was created before the upgrade for the virtual blocks (i.e. there we used to use hashes of the batches),
         // we return the hash of the batch.
@@ -318,7 +318,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         // It is always assumed in production that _l2BlockNumber > 0
         _setL2BlockHash(_l2BlockNumber - 1, _prevL2BlockHash);
 
-        // Reseting the rolling hash
+        // Resetting the rolling hash
         currentL2BlockTxsRollingHash = bytes32(0);
     }
 

@@ -156,7 +156,7 @@ fn execute_internal_bootloader_test() {
             test_result = Some(if let Some(requested_assert) = requested_assert {
                 match &result.result {
                     ExecutionResult::Success { .. } => Err(format!(
-                        "Should have failed with {}, but run succesfully.",
+                        "Should have failed with {}, but run successfully.",
                         requested_assert
                     )),
                     ExecutionResult::Revert { output } => Err(format!(

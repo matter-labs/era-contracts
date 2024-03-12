@@ -221,7 +221,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
         // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
         // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
-        // as thier protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
+        // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
         // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
         require(
             IStateTransitionManager(s.stateTransitionManager).protocolVersion() == s.protocolVersion,

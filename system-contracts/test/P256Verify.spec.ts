@@ -30,7 +30,7 @@ describe("P256Verify tests", function () {
     const r = providedR || correctR;
     const s = proviedS || correctS;
 
-    // Contatenate the digest, r, s, x and y.
+    // Concatenate the digest, r, s, x and y.
     // Note that for r,s,x,y we need to remove the 0x prefix
     return digest + r.slice(2) + s.slice(2) + x.slice(2) + y.slice(2);
   }

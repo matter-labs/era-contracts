@@ -31,7 +31,7 @@ contract L1SharedBridgeTest is L1SharedBridge {
         _;
     }
 
-    /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
+    /// @notice used by bridgehub to acquire mintValue. If l2Tx fails refunds are sent to refund recipient on L2
     /// we also use it to keep to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,
