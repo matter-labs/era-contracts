@@ -674,9 +674,10 @@ export class Deployer {
     }
     this.chainId = parseInt(chainId, 16);
 
-    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx2 = await validatorTimelock.addValidator(chainId, validatorAddress, {
+    const tx2 = await validatorTimelock.addValidator(chainId, validatorOneAddress, {
       gasPrice,
       nonce,
       gasLimit,
@@ -686,18 +687,28 @@ export class Deployer {
       console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
     }
 
-    const diamondProxy = this.stateTransitionContract(this.deployWallet);
-    const tx3 = await diamondProxy.setTokenMultiplier(1, 1);
+    const tx3 = await validatorTimelock.addValidator(chainId, validatorTwoAddress, {
+      gasPrice,
+      nonce,
+      gasLimit,
+    });
     const receipt3 = await tx3.wait();
     if (this.verbose) {
-      console.log(`BaseTokenMultiplier set, gas used: ${receipt3.gasUsed.toString()}`);
+      console.log(`Validator registered, gas used: ${receipt3.gasUsed.toString()}`);
+    }
+
+    const diamondProxy = this.stateTransitionContract(this.deployWallet);
+    const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+    const receipt4 = await tx4.wait();
+    if (this.verbose) {
+      console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
     }
 
     if (validiumMode) {
-      const tx4 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
-      const receipt4 = await tx4.wait();
+      const tx5 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
+      const receipt5 = await tx5.wait();
       if (this.verbose) {
-        console.log(`Validium mode set, gas used: ${receipt4.gasUsed.toString()}`);
+        console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
       }
     }
   }
@@ -724,14 +735,6 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const commitValidatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
-    const blobValidatorAddress = getOptionalAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
-
-    const validatorAddresses = [commitValidatorAddress];
-
-    if (blobValidatorAddress && blobValidatorAddress.length > 0) {
-      validatorAddresses.push(blobValidatorAddress);
-    }
 
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
