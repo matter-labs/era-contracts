@@ -735,7 +735,7 @@ export class Deployer {
 
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.StateTransition.DiamondProxy, executionDelay, validatorAddresses],
+      [this.ownerAddress, executionDelay],
       create2Salt,
       ethTxOptions
     );
