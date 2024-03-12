@@ -177,7 +177,7 @@ async function main() {
       );
       displayTx("L2 ERC20 beacon upgrade: ", l2TxForErc20BeaconUpgrade);
 
-      // Small delimeter for better readability.
+      // Small delimiter for better readability.
       console.log("\n\n\n", "-".repeat(20), "\n\n\n");
 
       console.log("Secondly, the new governor needs to accept all the roles where they need to be accepted.");

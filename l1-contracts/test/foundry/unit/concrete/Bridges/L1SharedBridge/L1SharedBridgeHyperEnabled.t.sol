@@ -21,7 +21,7 @@ import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
 
 // import "forge-std/console.sol";
 
-// note, this should be the same as where hyper is disalbed
+// note, this should be the same as where hyper is disabled
 contract L1SharedBridgeHyperEnabledTest is Test {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,

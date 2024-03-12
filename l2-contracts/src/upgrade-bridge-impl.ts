@@ -198,7 +198,7 @@ async function main() {
 
       const bridgeImplBytecode = getContractBytecode(cmd.contract);
       const l2SharedBridgeImplAddr = computeL2Create2Address(deployWallet, bridgeImplBytecode, "0x", salt);
-      console.log("Bridge implemenation address: ", l2SharedBridgeImplAddr);
+      console.log("Bridge implementation address: ", l2SharedBridgeImplAddr);
 
       if (cmd.l2DoubleCheck !== false) {
         // If the bytecode has already been deployed there is no need to deploy it again.
@@ -251,7 +251,7 @@ async function main() {
       }
 
       console.log("\n");
-      console.log("Bridge implementation has been successfuly deployed!");
+      console.log("Bridge implementation has been successfully deployed!");
       console.log("Address:", l2SharedBridgeImplAddr);
     });
 

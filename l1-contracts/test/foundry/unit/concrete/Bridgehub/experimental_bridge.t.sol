@@ -58,7 +58,7 @@ contract ExperimentalBridgeTest is Test {
         vm.store(address(mockChainContract), baseTokenGasPriceNominatorLocation, bytes32(uint256(1)));
         bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
-        // The ownership can only be transfered by the current owner to a new owner via the two-step approach
+        // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
         // Default owner calls transferOwnership
         bridgeHub.transferOwnership(bridgeOwner);
@@ -102,7 +102,7 @@ contract ExperimentalBridgeTest is Test {
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isSTMRegistered);
 
-        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
@@ -131,7 +131,7 @@ contract ExperimentalBridgeTest is Test {
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isSTMRegistered);
 
-        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
