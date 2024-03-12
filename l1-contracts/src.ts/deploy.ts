@@ -13,7 +13,6 @@ import {
   getAddressFromEnv,
   getHashFromEnv,
   getNumberFromEnv,
-  getOptionalAddressFromEnv,
   PubdataPricingMode,
   hashL2Bytecode,
   DIAMOND_CUT_DATA_ABI_STRING,
