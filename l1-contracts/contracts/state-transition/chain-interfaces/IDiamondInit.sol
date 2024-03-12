@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.20;
 
-import {L2CanonicalTransaction} from "../../common/Messaging.sol";
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
 import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
 

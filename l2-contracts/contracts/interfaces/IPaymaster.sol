@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../L2ContractHelper.sol";
+import {Transaction} from "../L2ContractHelper.sol";
 
 enum ExecutionResult {
     Revert,
