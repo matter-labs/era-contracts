@@ -90,7 +90,7 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+    // storing depositHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
     uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
     uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
 

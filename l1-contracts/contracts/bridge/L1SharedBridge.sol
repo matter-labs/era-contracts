@@ -611,7 +611,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ///
     /// @return l1Receiver The address on L1 that will receive the withdrawn funds
     /// @return l1Token The address of the L1 token being withdrawn
-    /// @return amount The amount of the token being withdrawns
+    /// @return amount The amount of the token being withdrawn
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,

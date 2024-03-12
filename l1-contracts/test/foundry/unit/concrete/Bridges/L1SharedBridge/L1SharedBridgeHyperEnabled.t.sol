@@ -197,7 +197,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_claimFailedDeposit_Erc() public {
         token.mint(address(sharedBridge), amount);
 
-        // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+        // storing depositHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
         uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
@@ -257,7 +257,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
-        // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+        // storing depositHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
         uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.store(

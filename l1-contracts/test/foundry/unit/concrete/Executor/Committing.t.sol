@@ -11,7 +11,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR} from "solpp/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "solpp/common/L2ContractAddresses.sol";
 
 contract CommittingTest is ExecutorTest {
-    function test_RevertWhen_ComittingWithWrongLastCommittedBatchData() public {
+    function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
         IExecutor.CommitBatchInfo[] memory newCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         newCommitBatchInfoArray[0] = newCommitBatchInfo;
 
@@ -24,7 +24,7 @@ contract CommittingTest is ExecutorTest {
         executor.commitBatches(wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
     }
 
-    function test_RevertWhen_ComittingWithWrongOrderOfBatches() public {
+    function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.batchNumber = 2; // wrong batch number
 

@@ -82,7 +82,7 @@ describe("L2BaseToken tests", () => {
       expect(recipientBalanceAfterTransfer).to.be.eq(recipientBalanceBeforeTransfer.add(amountToTransfer));
     });
 
-    it("no tranfser due to insufficient balance", async () => {
+    it("no transfer due to insufficient balance", async () => {
       await (
         await L2BaseToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("5.0"))
       ).wait();

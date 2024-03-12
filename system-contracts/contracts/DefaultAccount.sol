@@ -155,7 +155,7 @@ contract DefaultAccount is IAccount {
     /// @notice Validation that the ECDSA signature of the transaction is correct.
     /// @param _hash The hash of the transaction to be signed.
     /// @param _signature The signature of the transaction.
-    /// @return EIP1271_SUCCESS_RETURN_VALUE if the signaure is correct. It reverts otherwise.
+    /// @return EIP1271_SUCCESS_RETURN_VALUE if the signature is correct. It reverts otherwise.
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         require(_signature.length == 65, "Signature length is incorrect");
         uint8 v;

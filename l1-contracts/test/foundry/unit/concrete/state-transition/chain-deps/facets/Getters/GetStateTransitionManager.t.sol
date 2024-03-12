@@ -6,7 +6,7 @@ import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetStateTransitionManagerTest is GettersFacetTest {
     function test() public {
-        address expected = makeAddr("stateTranstionManager");
+        address expected = makeAddr("stateTransitionManager");
         gettersFacetWrapper.util_setStateTransitionManager(expected);
 
         address received = gettersFacet.getStateTransitionManager();
