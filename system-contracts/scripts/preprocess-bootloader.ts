@@ -190,6 +190,19 @@ async function main() {
     BOOTLOADER_TYPE: "playground_batch",
   });
 
+  // For impersonating block start
+  console.log('Preprocessing production impersonating bootloader');
+  const provedBatchImpersonatingBootloader = preprocess.preprocess(
+      bootloader,
+      { BOOTLOADER_TYPE: 'proved_batch', ACCOUNT_IMPERSONATING: true }
+  );
+  console.log('Preprocessing fee estimation impersonating bootloader');
+  const feeEstimationImpersonatingBootloader = preprocess.preprocess(
+      bootloader,
+      { BOOTLOADER_TYPE: 'playground_batch', ACCOUNT_IMPERSONATING: true }
+  );
+  // For impersonating block end
+
   console.log("Preprocessing bootloader tests");
   const bootloaderTests = await renderFile("bootloader/tests/bootloader/bootloader_test.yul", {});
 
@@ -216,6 +229,11 @@ async function main() {
   writeFileSync(`${OUTPUT_DIR}/playground_batch.yul`, playgroundBatchBootloader);
   writeFileSync(`${OUTPUT_DIR}/gas_test.yul`, gasTestBootloader);
   writeFileSync(`${OUTPUT_DIR}/fee_estimate.yul`, feeEstimationBootloader);
+
+  // For impersonating block start
+  writeFileSync(`${OUTPUT_DIR}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  // For impersonating block end
 
   console.log("Bootloader preprocessing done!");
 }

@@ -428,6 +428,25 @@ object "Bootloader" {
                 ret := sub(MAX_MEM_SIZE(), mul(MAX_TRANSACTIONS_IN_BATCH(), 32))
             }
 
+
+            ///
+            /// DEBUG SUPPORT START
+            ///
+
+            /// Position of the first byte that can be used for debugging.
+            function DEBUG_BEGIN_BYTE() -> ret {
+                ret := sub(VM_HOOK_PARAMS_OFFSET(), mul(MAX_DEBUG_SLOTS(), 32)
+            }
+
+            /// @dev Number of debug slots to use (each one has 32 bytes)
+            function MAX_DEBUG_SLOTS() -> ret {
+                ret := 32
+            }
+
+            ///
+            /// DEBUG SUPPORT END.
+            ///
+
             /// @dev The pointer writing to which invokes the VM hooks
             function VM_HOOK_PTR() -> ret {
                 ret := sub(RESULT_START_PTR(), 32)
@@ -446,7 +465,8 @@ object "Bootloader" {
             function LAST_FREE_SLOT() -> ret {
                 // The slot right before the vm hooks is the last slot that
                 // can be used for transaction's descriptions
-                ret := sub(VM_HOOK_PARAMS_OFFSET(), 32)
+                /// DEBUG SUPPORT: use DEBUG_BEGIN_BYTE (as we reserve some bytes at the end of memory).
+                ret := sub(DEBUG_BEGIN_BYTE(), 32)
             }
 
             /// @dev The formal address of the bootloader
@@ -1164,6 +1184,32 @@ object "Bootloader" {
                     L2_TX_INTRINSIC_PUBDATA()
                 )
 
+
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                let totalGasLimit := getGasLimit(innerTxDataOffset)
+
+                // Sentinel value for Debug information for the in-memory node.
+                mstore(DEBUG_BEGIN_BYTE(), 1337)
+
+                // We start with total gas limit from user.
+                mstore(add(DEBUG_BEGIN_BYTE(), 32), totalGasLimit)
+                // This is the amount of gas that will never be used.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 2)), reservedGas)
+
+                // Amount of gas per each pubdata byte.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 3)), gasPerPubdata)
+
+                // This is the amount of gas that is left after we removed the minimum amount of gas that will be consumed
+                // by the transaction itself (INTRINSIC GAS).
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 4)), gasLimitForTx)
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 let gasPrice := getGasPrice(getMaxFeePerGas(innerTxDataOffset), getMaxPriorityFeePerGas(innerTxDataOffset))
 
                 debugLog("gasLimitForTx", gasLimitForTx)
@@ -1174,11 +1220,29 @@ object "Bootloader" {
                     gasPrice
                 )
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // This is the amount of gas that is left after validation.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 5)), gasLeft)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 debugLog("validation finished", 0)
 
                 let gasSpentOnExecute := 0
                 let success := 0
                 success, gasSpentOnExecute := l2TxExecution(txDataOffset, gasLeft)
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // Amount of gas spent on execute.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 6)), gasSpentOnExecute)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
 
                 debugLog("execution finished", 0)
 
@@ -1187,9 +1251,18 @@ object "Bootloader" {
                 if lt(gasLeft, gasSpentOnExecute){
                     gasToRefund := 0
                 }
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 8)), gasToRefund)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
 
                 // Note, that we pass reservedGas from the refundGas separately as it should not be used
                 // during the postOp execution.
+                <!-- @ifndef ACCOUNT_IMPERSONATING -->
                 refund := refundCurrentL2Transaction(
                     txDataOffset,
                     transactionIndex,
@@ -1198,6 +1271,14 @@ object "Bootloader" {
                     gasPrice,
                     reservedGas
                 )
+                <!-- @endif -->
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 9)), refund)
+                ///
+                /// DEBUG SUPPORT END
+                ///
 
                 debugLog("refund", 0)
 
@@ -1253,6 +1334,17 @@ object "Bootloader" {
                     safeMul(intrinsicPubdata, gasPerPubdata, "qw"),
                     "fj" 
                 )
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 11)), operatorOverheadForTransaction)
+
+                // Fixed overhead.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 10)), intrinsicOverhead)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
 
                 switch lt(gasLimitForTx, intrinsicOverhead)
                 case 1 {
@@ -1296,7 +1388,12 @@ object "Bootloader" {
 
                     debugLog("validateABI", validateABI)
 
+                    <!-- @ifndef ACCOUNT_IMPERSONATING -->
                     isValid := ZKSYNC_NEAR_CALL_validateTx(validateABI, txDataOffset, gasPrice)                    
+                    <!-- @endif -->
+                    <!-- @ifdef ACCOUNT_IMPERSONATING -->
+                    isValid := 1
+                    <!-- @endif -->
                 }
 
                 debugLog("isValid", isValid)
@@ -1336,6 +1433,17 @@ object "Bootloader" {
                     gasSpentOnFactoryDeps := sub(gasBeforeFactoryDeps, gas())
                 }
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                // Gas spent on fetching and unpacking the bytecodes.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 7)), gasSpentOnFactoryDeps)
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 // If marking of factory dependencies has been unsuccessful, 0 value is returned.
                 // Otherwise, all the previous dependencies have been successfully published, so
                 // we need to move the pointer.
@@ -1359,10 +1467,18 @@ object "Bootloader" {
 
                     let gasBeforeExecute := gas()
                     // for this one, we don't care whether or not it fails.
+                    <!-- @ifndef ACCOUNT_IMPERSONATING -->
                     success := ZKSYNC_NEAR_CALL_executeL2Tx(
                         executeABI,
                         txDataOffset
                     )
+                    <!-- @endif -->
+                    <!-- @ifdef ACCOUNT_IMPERSONATING -->
+                    success := ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
+                        executeABI,
+                        txDataOffset
+                    )
+                    <!-- @endif -->
 
                     gasSpentOnExecute := add(gasSpentOnFactoryDeps, sub(gasBeforeExecute, gas()))
                 }
@@ -1421,6 +1537,36 @@ object "Bootloader" {
                 success := executeL2Tx(txDataOffset, from)
                 debugLog("Executing L2 ret", success)
             }
+
+            <!-- @ifdef ACCOUNT_IMPERSONATING -->
+            function ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
+                abi,
+                txDataOffset
+            ) -> success {
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let to := getTo(innerTxDataOffset)
+                let from := getFrom(innerTxDataOffset)
+                let value := getValue(innerTxDataOffset)
+                let dataPtr := getDataPtr(innerTxDataOffset)
+
+                debugLog("Executing L2 tx", 0)
+                switch isEOA(from)
+                case true {
+                    setTxOrigin(from)
+                }
+                default {
+                    setTxOrigin(0)
+                }
+
+                success := msgValueSimulatorMimicCall(
+                    to,
+                    from,
+                    value,
+                    dataPtr
+                )
+                debugLog("Executing L2 ret", success)
+            }
+            <!-- @endif -->
 
             /// @dev Sets factory dependencies for an L2 transaction with possible usage of packed bytecodes.
             function ZKSYNC_NEAR_CALL_markFactoryDepsL2(
@@ -1698,6 +1844,14 @@ object "Bootloader" {
                 }
 
                 let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 12)), requiredOverhead)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
 
                 debugLog("txTotalGasLimit", txTotalGasLimit)
                 debugLog("requiredOverhead", requiredOverhead)
@@ -1924,6 +2078,16 @@ object "Bootloader" {
                     safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"),
                     TX_SLOT_OVERHEAD_GAS()
                 )
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 13)), safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"))
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 14)), TX_SLOT_OVERHEAD_GAS())
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
             }
 
             /// @dev A method where all panics in the nearCalls get to.
@@ -2886,7 +3050,9 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+                        <!-- @endif -->
 
                         <!-- @endif -->
                         
@@ -2896,7 +3062,9 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
                         
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
@@ -2914,7 +3082,9 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+                        <!-- @endif -->
 
                         <!-- @endif -->
                         
@@ -2922,7 +3092,9 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
                         
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -2940,12 +3112,17 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+
+                        <!-- @endif -->
 
                         <!-- @endif -->
                         
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
                         
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -2965,7 +3142,9 @@ object "Bootloader" {
                         }
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
