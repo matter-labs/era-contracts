@@ -60,6 +60,11 @@ export function getAddressFromEnv(envName: string): string {
   return address;
 }
 
+export function getOptionalAddressFromEnv(envName: string): string {
+  const address = process.env[envName];
+  return address;
+}
+
 export function getHashFromEnv(envName: string): string {
   const hash = process.env[envName];
   if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
@@ -194,6 +199,7 @@ export interface DeployedAddresses {
   Governance: string;
   ValidatorTimeLock: string;
   Create2Factory: string;
+  BlobVersionedHashRetriever: string;
 }
 
 export function deployedAddressesFromEnv(): DeployedAddresses {
@@ -218,6 +224,7 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
     ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
     Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
+    BlobVersionedHashRetriever: getAddressFromEnv("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR"),
   };
 }
 
