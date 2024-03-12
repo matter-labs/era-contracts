@@ -5,7 +5,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {StateTransitionManager} from "solpp/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData} from "solpp/state-transition/IStateTransitionManager.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 
 contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {

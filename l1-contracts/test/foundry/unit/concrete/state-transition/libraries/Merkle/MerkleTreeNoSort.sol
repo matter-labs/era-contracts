@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "murky/common/MurkyBase.sol";
+import {MurkyBase} from "murky/common/MurkyBase.sol";
 
 contract MerkleTreeNoSort is MurkyBase {
     /********************
