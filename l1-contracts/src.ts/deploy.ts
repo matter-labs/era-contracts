@@ -686,6 +686,8 @@ export class Deployer {
       console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
     }
 
+    nonce++;
+
     const tx3 = await validatorTimelock.addValidator(chainId, validatorTwoAddress, {
       gasPrice,
       nonce,
