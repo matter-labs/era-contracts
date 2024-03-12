@@ -3,8 +3,8 @@
     "contractName": "AccountCodeStorage",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/AccountCodeStorage.sol/AccountCodeStorage.json",
     "sourceCodePath": "contracts-preprocessed/AccountCodeStorage.sol",
-    "bytecodeHash": "0x010000756b99c25e87559bf8a2fe7ee65106b5e7136b3aaf5adf43e646efd162",
-    "sourceCodeHash": "0xa4bb031f7c6e95044b3c69f15107141d8ee4f2fd637986955f3d5bde4444ff3f"
+    "bytecodeHash": "0x01000075617ee213e660597b8a24debbb3fe3eb4a0d57a1edac696700f387125",
+    "sourceCodeHash": "0xfbf66e830201c4b7fda14f0ddf28a53beb7fbb48a8406392bcfd0ef7ea9265c8"
   },
   {
     "contractName": "BootloaderUtilities",
@@ -24,8 +24,8 @@
     "contractName": "Compressor",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/Compressor.sol/Compressor.json",
     "sourceCodePath": "contracts-preprocessed/Compressor.sol",
-    "bytecodeHash": "0x0100016d1fcef700e8b7ef46796672557663133797e992e0279911b312b4aaf9",
-    "sourceCodeHash": "0xe0e22aa80843159daff6f09ed907c42d0d0d55225d04ba35b211389e05264f39"
+    "bytecodeHash": "0x0100016d541c42e9d56cce34d2975438b62082ed3be0bd465fe0985f929fb953",
+    "sourceCodeHash": "0xe289c3a39b5c9837d71ab2d79afce20c28a8474c4f008719c5b1d0c2f3725e33"
   },
   {
     "contractName": "ContractDeployer",
@@ -38,8 +38,8 @@
     "contractName": "DefaultAccount",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/DefaultAccount.sol/DefaultAccount.json",
     "sourceCodePath": "contracts-preprocessed/DefaultAccount.sol",
-    "bytecodeHash": "0x0100055bd421e13d184297b0b7acc3ff6d5d095b910329eb26e893b0d761c775",
-    "sourceCodeHash": "0x7f7c2dc241f593353aea2eb4f42b3365d620b02a5c69d1359eca80c356b628f9"
+    "bytecodeHash": "0x0100055be6a6fb79805b2f738bd799092f821ec47a31dc57cb7ebc2552e5799c",
+    "sourceCodeHash": "0xcdd8d63d83fbfa57c5e62660d162ab1e89568e32c155ca4667b29b50be9c8fda"
   },
   {
     "contractName": "EmptyContract",
@@ -94,8 +94,8 @@
     "contractName": "PubdataChunkPublisher",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/PubdataChunkPublisher.sol/PubdataChunkPublisher.json",
     "sourceCodePath": "contracts-preprocessed/PubdataChunkPublisher.sol",
-    "bytecodeHash": "0x0100004709ff3610040753b8ee8e2023986b79d5474ea386c6472edf3d640bca",
-    "sourceCodeHash": "0x4ef08d1890c90e8c1aee092022c56bdef975b4ceb69da62a1a76830a35d703ed"
+    "bytecodeHash": "0x010000471f7a4c7ad1a4e8261bbf225b6a8a46084450424afa402f33a6d8a346",
+    "sourceCodeHash": "0x590a1db7278ba5a40153555b4fe47f3b15e04d55aa06c0f996483730cd1a5998"
   },
   {
     "contractName": "SystemContext",
