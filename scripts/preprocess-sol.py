@@ -64,5 +64,3 @@ if __name__ == "__main__":
 
     # Replace environment variable placeholders in Solidity files
     replace_env_variables_in_sol_files(args.output, env_variables)
-
-    print("Process completed.")
