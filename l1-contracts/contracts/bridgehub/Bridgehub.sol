@@ -4,14 +4,14 @@ pragma solidity 0.8.20;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import "./IBridgehub.sol";
-import "../bridge/interfaces/IL1SharedBridge.sol";
-import "../state-transition/IStateTransitionManager.sol";
-import "../common/ReentrancyGuard.sol";
-import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {IZkSyncStateTransition} from "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice all the ether is held by the weth bridge

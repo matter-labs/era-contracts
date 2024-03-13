@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./IL1SharedBridge.sol";
+import {IL1SharedBridge} from "./IL1SharedBridge.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs

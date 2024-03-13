@@ -8,9 +8,6 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
 import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {IAdmin} from "solpp/state-transition/chain-interfaces/IAdmin.sol";
 
 contract AdminTest is Test {

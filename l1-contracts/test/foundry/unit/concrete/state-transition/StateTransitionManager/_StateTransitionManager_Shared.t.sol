@@ -14,9 +14,7 @@ import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {GenesisUpgrade} from "solpp/upgrades/GenesisUpgrade.sol";
-import {IDiamondInit} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "solpp/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData} from "solpp/state-transition/IStateTransitionManager.sol";
 
