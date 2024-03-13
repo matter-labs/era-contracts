@@ -127,9 +127,15 @@ object "CodeOracle" {
             //   - hash[1] -- whether the contract is being constructed
             //   - hash[2..3] -- big endian length of the bytecode in 32-byte words. This number must be odd.
             //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
+            // 2. EVM bytecode. It has the following format:
+            //   - hash[0] -- version (0x02)
+            //   - hash[1] -- whether the contract is being constructed
+            //   - hash[2..3] -- big endian length of the bytecode in bytes. This number can be arbitrary.
+            //   - hash[4..31] -- the last 28 bytes of the sha256 hash.
             // 
-            // Note, that in theory it can represent just some random blob of bytes, while 
-            // in practice it only represents only the corresponding bytecodes.
+            // Note, that in theory both values can represent just some random blob of bytes, while 
+            // in practice they only represent only the corresponding bytecodes.
+
 
             switch version 
             case 1 {
@@ -137,6 +143,14 @@ object "CodeOracle" {
                 // can pass the `isCodeHashKnown` check.
                 let lengthInWords := and(shr(224, versionedCodeHash), 0xffff)
                 decommit(versionedCodeHash, lengthInWords)
+            }
+            case 2 {
+                // We do not double check whether the length is 32 mod 64, since it assumed that only valid bytecodes
+                // can pass the `isCodeHashKnown` check.
+                let lengthInBytes := and(shr(224, versionedCodeHash), 0xffff)
+                
+                // It is assumed that the `lengthInBytes` is divisible by 32.
+                decommit(versionedCodeHash, div(lengthInBytes, 32))
             }
             default {
                 // Unsupported
