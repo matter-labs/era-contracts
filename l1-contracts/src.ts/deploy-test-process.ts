@@ -32,7 +32,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
   return new Deployer({
     deployWallet,
     ownerAddress,
-    verbose: false, // change here to view deployement
+    verbose: false, // change here to view deployment
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
@@ -43,7 +43,7 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
   return new EraDeployer({
     deployWallet,
     ownerAddress,
-    verbose: false, // change here to view deployement
+    verbose: false, // change here to view deployment
     addresses: addressConfig,
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,

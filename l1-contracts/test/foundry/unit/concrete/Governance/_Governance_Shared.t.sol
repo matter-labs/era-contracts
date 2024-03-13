@@ -46,7 +46,7 @@ contract GovernanceTest is Test, EventOnFallback {
 
     function _checkEventBeforeExecution(IGovernance.Operation memory op) private {
         for (uint256 i = 0; i < op.calls.length; i++) {
-            require(op.calls[i].target == address(eventOnFallback), "EventOnFallbak target expected");
+            require(op.calls[i].target == address(eventOnFallback), "EventOnFallback target expected");
             // Check event
             vm.expectEmit(false, false, false, true);
             emit Called(address(governance), op.calls[i].value, op.calls[i].data);

@@ -55,8 +55,8 @@ describe("Hyperchain migration test", function () {
     await owner.sendTransaction(tx);
 
     const dummyAdminFacetFactory = await hardhat.ethers.getContractFactory("DummyAdminFacet");
-    const dummyAdminfFacetContract = await dummyAdminFacetFactory.deploy();
-    extraFacet = facetCut(dummyAdminfFacetContract.address, dummyAdminfFacetContract.interface, Action.Add, true);
+    const dummyAdminFacetContract = await dummyAdminFacetFactory.deploy();
+    extraFacet = facetCut(dummyAdminFacetContract.address, dummyAdminFacetContract.interface, Action.Add, true);
 
     deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
 
