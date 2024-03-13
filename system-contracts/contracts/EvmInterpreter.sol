@@ -2281,8 +2281,8 @@ contract EvmInterpreter {
     }
 
     function _isEVM(address _addr) internal view returns (bool isEVM) {
-        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.isEVM.selector;
-        address addr = address(DEPLOYER_SYSTEM_CONTRACT);
+        bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector;
+        address addr = address(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
         assembly {
             mstore(0, selector)
             mstore(4, _addr)

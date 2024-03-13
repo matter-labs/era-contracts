@@ -136,4 +136,10 @@ contract AccountCodeStorage is IAccountCodeStorage {
             codeSize = Utils.bytecodeLenInBytes(codeHash);
         }
     }
+
+    /// @notice Method for detecting whether an address is an EVM contract
+    function isAccountEVM(address _addr) external view override returns (bool) {
+        bytes32 bytecodeHash = getRawCodeHash(_addr);
+        return Utils.isCodeHashEVM(bytecodeHash);
+    }
 }
