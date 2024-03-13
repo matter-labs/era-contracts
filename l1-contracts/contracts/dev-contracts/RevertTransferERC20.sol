@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./TestnetERC20Token.sol";
+import {TestnetERC20Token} from "./TestnetERC20Token.sol";
 
 /// @title RevertTransferERC20Token - A ERC20 token contract which can revert transfers depending on a flag
 /// @dev Used for testing failed ERC-20 withdrawals from the zkSync smart contract
@@ -21,7 +21,7 @@ contract RevertTransferERC20 is TestnetERC20Token {
     }
 
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        // Assert is used here to also simulate the out-of-gas error, since failed asserion
+        // Assert is used here to also simulate the out-of-gas error, since failed assertion
         // consumes up all the remaining gas
         assert(!revertTransfer);
 

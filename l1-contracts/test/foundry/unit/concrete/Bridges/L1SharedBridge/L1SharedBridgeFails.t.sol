@@ -7,14 +7,11 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {L1SharedBridge} from "solpp/bridge/L1SharedBridge.sol";
-import {Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
-import {L1ERC20Bridge} from "solpp/bridge/L1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "solpp/common/Config.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "solpp/bridgehub/IBridgehub.sol";
+import {IBridgehub} from "solpp/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "solpp/common/Messaging.sol";
 import {IMailbox} from "solpp/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "solpp/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
 import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "solpp/common/L2ContractAddresses.sol";
 import {ERA_CHAIN_ID, ERA_DIAMOND_PROXY} from "solpp/common/Config.sol";
@@ -22,7 +19,7 @@ import {IGetters} from "solpp/state-transition/chain-interfaces/IGetters.sol";
 
 // import "forge-std/console.sol";
 
-/// We are testing all the specifici revert and require cases.
+/// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is Test {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
@@ -92,7 +89,7 @@ contract L1SharedBridgeFailTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
     uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
     uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
     uint256 isWithdrawalFinalizedStorageLocation = uint256(4 - 1 + 1 + 1);

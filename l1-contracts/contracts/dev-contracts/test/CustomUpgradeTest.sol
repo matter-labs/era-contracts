@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "../../state-transition/libraries/Diamond.sol";
-import "../../upgrades/BaseZkSyncUpgrade.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade, ProposedUpgrade} from "../../upgrades/BaseZkSyncUpgrade.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
     // add this to be excluded from coverage report
@@ -15,7 +15,7 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for upgrade, which may be interpreted differently for each upgrade.
     function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal override {
-        keccak256(_customCallDataForUpgrade); // called to supress compilation warning
+        keccak256(_customCallDataForUpgrade); // called to suppress compilation warning
         emit Test();
     }
 

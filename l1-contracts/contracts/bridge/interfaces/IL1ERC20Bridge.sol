@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "./IL1SharedBridge.sol";
+import {IL1SharedBridge} from "./IL1SharedBridge.sol";
 
 /// @title L1 Bridge contract legacy interface
 /// @author Matter Labs
@@ -72,5 +72,5 @@ interface IL1ERC20Bridge {
         bytes32 _depositL2TxHash
     ) external returns (uint256 amount);
 
-    function tranferTokenToSharedBridge(address _token, uint256 _amount) external;
+    function transferTokenToSharedBridge(address _token, uint256 _amount) external;
 }

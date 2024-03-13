@@ -34,7 +34,7 @@ library L2ContractHelper {
 
     /// @notice Validates the format of the given bytecode hash.
     /// @dev Due to the specification of the L2 bytecode hash, not every 32 bytes could be a legit bytecode hash.
-    /// @dev The function reverts on invalid bytecode hash formam.
+    /// @dev The function reverts on invalid bytecode hash format.
     /// @param _bytecodeHash The hash of the bytecode to validate.
     function validateBytecodeHash(bytes32 _bytecodeHash) internal pure {
         uint8 version = uint8(_bytecodeHash[0]);

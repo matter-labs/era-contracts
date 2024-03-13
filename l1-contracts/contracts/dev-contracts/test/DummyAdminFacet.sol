@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncStateTransitionBase} from "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 
 contract DummyAdminFacet is ZkSyncStateTransitionBase {
     // add this to be excluded from coverage report

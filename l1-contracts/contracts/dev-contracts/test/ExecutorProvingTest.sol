@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 import {VerifierParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {PubdataSource, LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(

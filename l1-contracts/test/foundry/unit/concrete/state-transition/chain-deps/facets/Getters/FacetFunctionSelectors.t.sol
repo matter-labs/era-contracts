@@ -3,7 +3,6 @@
 pragma solidity 0.8.20;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
-import {IGetters} from "solpp/state-transition/chain-interfaces/IGetters.sol";
 
 contract FacetFunctionSelectorsTest is GettersFacetTest {
     function test() public {

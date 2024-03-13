@@ -252,7 +252,7 @@ describe("DefaultAccount tests", function () {
       );
     });
 
-    it("successfully payed", async () => {
+    it("successfully paid", async () => {
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,

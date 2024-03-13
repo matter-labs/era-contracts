@@ -120,7 +120,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         l2BridgeAddress[ERA_CHAIN_ID] = ERA_ERC20_BRIDGE_ADDRESS;
     }
 
-    /// @dev tranfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
     function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
         if (_token == ETH_TOKEN_ADDRESS) {
             uint256 balanceBefore = address(this).balance;
@@ -135,7 +135,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
             uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
             require(amount > 0, "ShB: 0 amount to transfer");
-            IL1ERC20Bridge(_target).tranferTokenToSharedBridge(_token, amount);
+            IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token, amount);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
             require(balanceAfter - balanceBefore == amount, "ShB: wrong amount transferred");
             chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + amount;
@@ -447,7 +447,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
 
         if (!hyperbridgingEnabled[_chainId]) {
             // Check that the chain has sufficient balance
-            require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enought funds
+            require(chainBalance[_chainId][l1Token] >= amount, "ShB not enough funds 2"); // not enough funds
             chainBalance[_chainId][l1Token] -= amount;
         }
 
@@ -509,7 +509,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         // = 4 + 20 + 32 + 32 + _additionalData.length >= 68 (bytes).
 
         // So the data is expected to be at least 56 bytes long.
-        require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong messsage length
+        require(_l2ToL1message.length >= 56, "ShB wrong msg len"); // wrong message length
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailbox.finalizeEthWithdrawal.selector) {
@@ -622,7 +622,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     ///
     /// @return l1Receiver The address on L1 that will receive the withdrawn funds
     /// @return l1Token The address of the L1 token being withdrawn
-    /// @return amount The amount of the token being withdrawns
+    /// @return amount The amount of the token being withdrawn
     function finalizeWithdrawalLegacyErc20Bridge(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,

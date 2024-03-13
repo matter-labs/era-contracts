@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import "../../vendor/AddressAliasHelper.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
 contract AddressAliasHelperTest {
     function applyL1ToL2Alias(address _l1Address) external pure returns (address) {

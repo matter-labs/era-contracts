@@ -6,13 +6,12 @@ import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
-import {IBridgehub, Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
+import {Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "solpp/bridgehub/IBridgehub.sol";
 import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
 import {DummyStateTransition} from "solpp/dev-contracts/test/DummyStateTransition.sol";
 import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol";
 import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
-import {TransactionValidator} from "solpp/state-transition/libraries/TransactionValidator.sol";
 
 import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "solpp/common/Config.sol";
@@ -58,7 +57,7 @@ contract ExperimentalBridgeTest is Test {
         vm.store(address(mockChainContract), baseTokenGasPriceNominatorLocation, bytes32(uint256(1)));
         bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
-        // The ownership can only be transfered by the current owner to a new owner via the two-step approach
+        // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
         // Default owner calls transferOwnership
         bridgeHub.transferOwnership(bridgeOwner);
@@ -102,7 +101,7 @@ contract ExperimentalBridgeTest is Test {
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isSTMRegistered);
 
-        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);
@@ -131,7 +130,7 @@ contract ExperimentalBridgeTest is Test {
         isSTMRegistered = bridgeHub.stateTransitionManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isSTMRegistered);
 
-        // An address that has already been registered, cannot be registered again (atleast not before calling `removeStateTransitionManager`).
+        // An address that has already been registered, cannot be registered again (at least not before calling `removeStateTransitionManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(bytes("Bridgehub: state transition already registered"));
         bridgeHub.addStateTransitionManager(randomAddressWithoutTheCorrectInterface);

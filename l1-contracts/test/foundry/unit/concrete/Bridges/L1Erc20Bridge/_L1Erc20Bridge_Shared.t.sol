@@ -10,7 +10,6 @@ import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
 import {FeeOnTransferToken} from "solpp/dev-contracts/FeeOnTransferToken.sol";
 import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol";
 import {ReenterL1ERC20Bridge} from "solpp/dev-contracts/test/ReenterL1ERC20Bridge.sol";
-import {Forwarder} from "solpp/dev-contracts/Forwarder.sol";
 import {Utils} from "../../Utils/Utils.sol";
 
 contract L1Erc20BridgeTest is Test {

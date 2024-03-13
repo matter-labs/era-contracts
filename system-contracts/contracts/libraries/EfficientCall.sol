@@ -2,8 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import "./SystemContractHelper.sol";
-import "./Utils.sol";
+import {SystemContractHelper, ADDRESS_MASK} from "./SystemContractHelper.sol";
+import {SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, MIMIC_CALL_BY_REF_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {Utils} from "./Utils.sol";
 import {SHA256_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "../Constants.sol";
 
 /**

@@ -2,9 +2,11 @@
 
 pragma solidity 0.8.20;
 
-import "../../bridge/L1SharedBridge.sol";
-import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
-import "../../bridge/interfaces/IL1SharedBridge.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {L1SharedBridge} from "../../bridge/L1SharedBridge.sol";
+import {IL1ERC20Bridge, IBridgehub} from "../../bridge/interfaces/IL1SharedBridge.sol";
+import {ETH_TOKEN_ADDRESS, ERA_CHAIN_ID} from "../../common/Config.sol";
 
 /// @author Matter Labs
 contract L1SharedBridgeTest is L1SharedBridge {
@@ -31,7 +33,7 @@ contract L1SharedBridgeTest is L1SharedBridge {
         _;
     }
 
-    /// @notice used by bridgehub to aquire mintValue. If l2Tx fails refunds are sent to refundrecipient on L2
+    /// @notice used by bridgehub to acquire mintValue. If l2Tx fails refunds are sent to refund recipient on L2
     /// we also use it to keep to track each chain's assets
     function bridgehubDepositBaseToken(
         uint256 _chainId,

@@ -4,9 +4,6 @@ pragma solidity ^0.8.17;
 
 import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
 
-import {IMailbox} from "solpp/state-transition/chain-interfaces/IMailbox.sol";
-import {L2Log} from "solpp/common/Messaging.sol";
-
 contract ProveL2LogInclusionTest is BridgehubMailboxTest {
     // uint256 internal blockNumber;
     // uint256 internal index;

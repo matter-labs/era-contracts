@@ -12,7 +12,6 @@ import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol
 import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 
 contract revertBatchesTest is StateTransitionManagerTest {
     // Items for logs & commits
@@ -36,7 +35,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
 
-        // Initital setup for loge & commits
+        // Initial setup for logs & commits
         vm.stopPrank();
         vm.startPrank(newChainAdmin);
 
