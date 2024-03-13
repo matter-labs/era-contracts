@@ -4,8 +4,6 @@ pragma solidity ^0.8.17;
 
 import {BridgehubTest} from "../_Bridgehub_Shared.t.sol";
 
-// import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
-
 contract BridgehubMailboxTest is BridgehubTest {
     uint256 internal chainId;
     address internal chainStateTransition;
