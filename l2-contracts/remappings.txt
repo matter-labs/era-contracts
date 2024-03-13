@@ -1,0 +1,5 @@
+@openzeppelin/=node_modules/@openzeppelin/
+forge-std/=lib/forge-std/src/
+hardhat/=node_modules/hardhat/
+solpp/=cache-zk/solpp-generated-contracts/
+foundry-test/=test/foundry/
