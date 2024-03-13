@@ -14,7 +14,7 @@ contract OnlyAdminOrStateTransitionManagerTest is ZkSyncStateTransitionBaseTest 
         testBaseFacet.functionWithOnlyAdminOrStateTransitionManagerModifier();
     }
 
-    function test_revertWhen_calledByNonStateTranstionManager() public {
+    function test_revertWhen_calledByNonStateTransitionManager() public {
         address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
 
         vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);

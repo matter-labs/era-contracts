@@ -72,5 +72,5 @@ interface IL1ERC20Bridge {
         bytes32 _depositL2TxHash
     ) external returns (uint256 amount);
 
-    function tranferTokenToSharedBridge(address _token, uint256 _amount) external;
+    function transferTokenToSharedBridge(address _token, uint256 _amount) external;
 }

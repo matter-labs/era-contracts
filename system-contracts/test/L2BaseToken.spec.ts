@@ -82,7 +82,7 @@ describe("L2BaseToken tests", () => {
       expect(recipientBalanceAfterTransfer).to.be.eq(recipientBalanceBeforeTransfer.add(amountToTransfer));
     });
 
-    it("no tranfser due to insufficient balance", async () => {
+    it("no transfer due to insufficient balance", async () => {
       await (
         await L2BaseToken.connect(bootloaderAccount).mint(wallets[0].address, ethers.utils.parseEther("5.0"))
       ).wait();
@@ -180,7 +180,7 @@ describe("L2BaseToken tests", () => {
         returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
       });
 
-      // To prevent underflow since initial values are 0's and we are substracting from them
+      // To prevent underflow since initial values are 0's and we are subtracting from them
       const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
       await (await L2BaseToken.connect(bootloaderAccount).mint(L2BaseToken.address, amountToMint)).wait();
 
@@ -217,7 +217,7 @@ describe("L2BaseToken tests", () => {
         returnData: ethers.utils.defaultAbiCoder.encode(["bytes32"], [ethers.utils.keccak256(message)]),
       });
 
-      // Consitency reasons - won't crash if test order reverse
+      // Consistency reasons - won't crash if test order reverse
       const amountToMint: BigNumber = ethers.utils.parseEther("100.0");
       await (await L2BaseToken.connect(bootloaderAccount).mint(L2BaseToken.address, amountToMint)).wait();
 

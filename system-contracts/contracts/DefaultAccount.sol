@@ -64,7 +64,7 @@ contract DefaultAccount is IAccount {
     /// @param _suggestedSignedHash The suggested hash of the transaction to be signed by the user.
     /// This is the hash that is signed by the EOA by default.
     /// @param _transaction The transaction structure itself.
-    /// @dev Besides the params above, it also accepts unused first paramter "_txHash", which
+    /// @dev Besides the params above, it also accepts unused first parameter "_txHash", which
     /// is the unique (canonical) hash of the transaction.
     function validateTransaction(
         bytes32, // _txHash
@@ -157,7 +157,7 @@ contract DefaultAccount is IAccount {
     /// @notice Validation that the ECDSA signature of the transaction is correct.
     /// @param _hash The hash of the transaction to be signed.
     /// @param _signature The signature of the transaction.
-    /// @return EIP1271_SUCCESS_RETURN_VALUE if the signaure is correct. It reverts otherwise.
+    /// @return EIP1271_SUCCESS_RETURN_VALUE if the signature is correct. It reverts otherwise.
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         require(_signature.length == 65, "Signature length is incorrect");
         uint8 v;

@@ -6,7 +6,7 @@ pragma abicoder v2;
 import {LOAD_LATEST_RETURNDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS} from "../libraries/SystemContractsCaller.sol";
 import {EfficientCall, KECCAK256_SYSTEM_CONTRACT} from "../libraries/EfficientCall.sol";
 
-// In this test it is important to actuall change the real Keccak256's contract's bytecode,
+// In this test it is important to actually change the real Keccak256's contract's bytecode,
 // which requires changes in the real AccountCodeStorage contract
 address constant REAL_DEPLOYER_SYSTEM_CONTRACT = address(0x8006);
 address constant REAL_FORCE_DEPLOYER_ADDRESS = address(0x8007);

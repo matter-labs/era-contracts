@@ -36,7 +36,7 @@ enum Global {
  * @notice Library used for accessing zkEVM-specific opcodes, needed for the development
  * of system contracts.
  * @dev While this library will be eventually available to public, some of the provided
- * methods won't work for non-system contracts and also breaking changes at short notice are possilbe.
+ * methods won't work for non-system contracts and also breaking changes at short notice are possible.
  * We do not recommend this library for external use.
  */
 library SystemContractHelper {
@@ -234,10 +234,10 @@ library SystemContractHelper {
     }
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of the current size
-    /// of the auxilary heap in bytes.
+    /// of the auxiliary heap in bytes.
     /// @param meta Packed representation of the ZkSyncMeta.
-    /// @return auxHeapSize The size of the auxilary memory in bytes byte.
-    /// @dev You can read more on auxilary memory in the VM1.2 documentation.
+    /// @return auxHeapSize The size of the auxiliary memory in bytes byte.
+    /// @dev You can read more on auxiliary memory in the VM1.2 documentation.
     function getAuxHeapSizeFromMeta(uint256 meta) internal pure returns (uint32 auxHeapSize) {
         auxHeapSize = uint32(extractNumberFromMeta(meta, META_AUX_HEAP_SIZE_OFFSET, 32));
     }
@@ -319,7 +319,7 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Retuns whether the current call is a system call.
+    /// @notice Returns whether the current call is a system call.
     /// @return `true` or `false` based on whether the current call is a system call.
     function isSystemCall() internal view returns (bool) {
         uint256 callFlags = getCallFlags();

@@ -35,7 +35,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
 
-        // Initital setup for loge & commits
+        // Initial setup for logs & commits
         vm.stopPrank();
         vm.startPrank(newChainAdmin);
 

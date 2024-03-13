@@ -37,7 +37,7 @@ contract AuthorizationTest is ExecutorTest {
         });
     }
 
-    function test_RevertWhen_CommitingByUnauthorisedAddress() public {
+    function test_RevertWhen_CommittingByUnauthorisedAddress() public {
         IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         commitBatchInfoArray[0] = commitBatchInfo;
 

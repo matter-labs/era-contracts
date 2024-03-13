@@ -384,9 +384,9 @@ function expectedLegacyL2GasPrice(l1GasPrice: ethers.BigNumberish) {
   const pubdataPriceETH = ethers.BigNumber.from(l1GasPrice).mul(17);
   const gasPricePerPubdata = ethers.BigNumber.from(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
   const FAIR_L2_GAS_PRICE = 500_000_000; // 0.5 gwei
-  const minL2GasPirceETH = ethers.BigNumber.from(pubdataPriceETH.add(gasPricePerPubdata).sub(1)).div(
+  const minL2GasPriceETH = ethers.BigNumber.from(pubdataPriceETH.add(gasPricePerPubdata).sub(1)).div(
     gasPricePerPubdata
   );
 
-  return ethers.BigNumber.from(Math.max(FAIR_L2_GAS_PRICE, minL2GasPirceETH.toNumber()));
+  return ethers.BigNumber.from(Math.max(FAIR_L2_GAS_PRICE, minL2GasPriceETH.toNumber()));
 }
