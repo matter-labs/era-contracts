@@ -6,7 +6,7 @@ import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {PriorityOperation} from "solpp/dev-contracts/test/PriorityQueueTest.sol";
 
 contract PopOperationsTest is PriorityQueueSharedTest {
-    uint public constant NUMBER_OPERATIONS = 10;
+    uint256 public constant NUMBER_OPERATIONS = 10;
 
     function setUp() public {
         push_mock_entries(NUMBER_OPERATIONS);
@@ -38,7 +38,7 @@ contract PopOperationsTest is PriorityQueueSharedTest {
     }
 
     function test_pop_until_limit() public {
-        for (uint i = 0; i < NUMBER_OPERATIONS; ++i) {
+        for (uint256 i = 0; i < NUMBER_OPERATIONS; ++i) {
             PriorityOperation memory front = priorityQueue.popFront();
             assertEq(keccak256(abi.encode(i)), front.canonicalTxHash);
         }

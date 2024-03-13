@@ -17,6 +17,7 @@
     "max-states-count": "off",
     "no-global-import": "error",
     "no-unused-import": "error",
+    "explicit-types": "error",
     "compiler-version": ["warn", "^0.8.0"]
   }
 }

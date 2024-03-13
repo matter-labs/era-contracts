@@ -912,7 +912,7 @@ contract ExperimentalBridgeTest is Test {
     function _restrictArraySize(bytes[] memory longArray, uint256 newSize) internal pure returns (bytes[] memory) {
         bytes[] memory shortArray = new bytes[](newSize);
 
-        for (uint i; i < newSize; i++) {
+        for (uint256 i; i < newSize; i++) {
             shortArray[i] = longArray[i];
         }
 
