@@ -7,7 +7,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
 import {IGovernance} from "solpp/governance/IGovernance.sol";
 
-contract SeflUpgradesTest is GovernanceTest {
+contract SelfUpgradesTest is GovernanceTest {
     event ChangeSecurityCouncil(address _securityCouncilBefore, address _securityCouncilAfter);
 
     event ChangeMinDelay(uint256 _delayBefore, uint256 _delayAfter);

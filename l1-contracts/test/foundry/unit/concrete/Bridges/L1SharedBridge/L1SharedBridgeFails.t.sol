@@ -22,7 +22,7 @@ import {IGetters} from "solpp/state-transition/chain-interfaces/IGetters.sol";
 
 // import "forge-std/console.sol";
 
-/// We are testing all the specifici revert and require cases.
+/// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is Test {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
@@ -92,7 +92,7 @@ contract L1SharedBridgeFailTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depoistHappend[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
     uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
     uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
     uint256 isWithdrawalFinalizedStorageLocation = uint256(4 - 1 + 1 + 1);

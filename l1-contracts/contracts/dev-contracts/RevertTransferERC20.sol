@@ -21,7 +21,7 @@ contract RevertTransferERC20 is TestnetERC20Token {
     }
 
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        // Assert is used here to also simulate the out-of-gas error, since failed asserion
+        // Assert is used here to also simulate the out-of-gas error, since failed assertion
         // consumes up all the remaining gas
         assert(!revertTransfer);
 
