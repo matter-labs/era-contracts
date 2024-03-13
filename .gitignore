@@ -11,6 +11,7 @@ cache/
 contracts-preprocessed/
 era_test_node.log*
 node_modules/
+out/
 target/
 tools/data/Verifier.sol
 typechain/
