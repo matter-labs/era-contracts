@@ -16,7 +16,7 @@ contract KeccakTest {
 
     // Just some computation-heavy function, it will be used to test out of gas
     function infiniteFuction(uint256 n) public pure returns (uint256 sumOfSquares) {
-        for (uint i = 0; i < n; i++) {
+        for (uint256 i = 0; i < n; i++) {
             sumOfSquares += i * i;
         }
     }

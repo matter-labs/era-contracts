@@ -13,8 +13,8 @@ contract PriorityQueueSharedTest is Test {
     }
 
     // Pushes 'count' entries into the priority queue.
-    function push_mock_entries(uint count) public {
-        for (uint i = 0; i < count; ++i) {
+    function push_mock_entries(uint256 count) public {
+        for (uint256 i = 0; i < count; ++i) {
             PriorityOperation memory dummyOp = PriorityOperation({
                 canonicalTxHash: keccak256(abi.encode(i)),
                 expirationTimestamp: uint64(i),

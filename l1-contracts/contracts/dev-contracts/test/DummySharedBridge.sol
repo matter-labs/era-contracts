@@ -73,7 +73,7 @@ contract DummySharedBridge {
         amount = amountReturnInFinalizeWithdrawal;
     }
 
-    event Debugger(uint);
+    event Debugger(uint256);
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,

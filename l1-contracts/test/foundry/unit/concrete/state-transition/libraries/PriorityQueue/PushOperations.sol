@@ -7,7 +7,7 @@ import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {PriorityOperation} from "solpp/dev-contracts/test/PriorityQueueTest.sol";
 
 contract PushOperationsTest is PriorityQueueSharedTest {
-    uint public constant NUMBER_OPERATIONS = 10;
+    uint256 public constant NUMBER_OPERATIONS = 10;
 
     function setUp() public {
         push_mock_entries(NUMBER_OPERATIONS);
