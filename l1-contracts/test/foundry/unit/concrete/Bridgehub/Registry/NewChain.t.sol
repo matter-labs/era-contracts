@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.17;
 
-import {Vm} from "forge-std/Test.sol";
+// import {Vm} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+// import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {RegistryTest} from "./_Registry_Shared.t.sol";
 
-import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
+// import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
 
 contract NewChainTest is RegistryTest {
     uint256 internal chainId;

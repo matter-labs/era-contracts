@@ -4,8 +4,8 @@ pragma solidity ^0.8.17;
 
 import {BridgehubMailboxTest} from "./_BridgehubMailbox_Shared.t.sol";
 
-import {IMailbox} from "solpp/state-transition/chain-interfaces/IMailbox.sol";
-import {TxStatus} from "solpp/common/Messaging.sol";
+// import {IMailbox} from "solpp/state-transition/chain-interfaces/IMailbox.sol";
+// import {TxStatus} from "solpp/common/Messaging.sol";
 
 contract ProveL1ToL2TransactionStatusTest is BridgehubMailboxTest {
     // uint256 internal blockNumber;
