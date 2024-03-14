@@ -8,7 +8,7 @@ import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
-import {VerifierParamsm, PubdataPricingMode} from "../Storage.sol";
+import {VerifierParams, PubdataPricingMode} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -37,11 +37,9 @@ contract ExecutorFacet is Base, IExecutor {
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
         require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
 
-        PubdataPricingMode memory pubdataPricingMode = s.feeParams.pubdataPricingMode;
-
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, pubdataPricingMode);
+        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash, s.feeParams.pubdataPricingMode);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
@@ -54,7 +52,7 @@ contract ExecutorFacet is Base, IExecutor {
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
-            if (pubdataPricingMode == PubdataPricingMode.Rollup) {
+            if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
                 require(
                     logOutput.pubdataHash ==
                         keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
@@ -136,15 +134,6 @@ contract ExecutorFacet is Base, IExecutor {
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
-
-        bytes32 providedL2ToL1PubdataHash;
-        if (pubdataPricingMode == PubdataPricingMode.Rollup) {
-            providedL2ToL1PubdataHash = keccak256(_newBatch.totalL2ToL1Pubdata);
-        } else if (pubdataPricingMode == PubdataPricingMode.Validium) {
-            require(_newBatch.totalL2ToL1Pubdata.length == 0, "Mts");
-        } else {
-            revert("sop");
-        }
 
         // linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
