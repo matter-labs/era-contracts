@@ -40,7 +40,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         Deployed
     }
 
-    mapping(address => bytes) public evmCode;
     mapping(address => bytes32) public evmCodeHash;
 
     // TODO: this is a hack before rewriting to assembly.
@@ -55,12 +54,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
         bytes memory trueBytecode = paddedNewDeployedCode[32:32 + bytecodeLen];
 
-        evmCode[msg.sender] = paddedNewDeployedCode;
         evmCodeHash[msg.sender] = keccak256(trueBytecode);
         constructorReturnGas = constructorGasLeft;
 
         // ToDO: use efficient call
         KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedNewDeployedCode);
+
+        bytes32 codeHash = Utils.hashEVMBytecode(paddedNewDeployedCode);
+        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(msg.sender, codeHash);
     }
 
     modifier onlySelf() {
@@ -489,8 +490,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // To be removed in the future
         require(_input.length > 0);
 
-        // Temporary: remember the constructor code.
-        evmCode[_newAddress] = _input;
         constructorReturnGas = 0;
 
         uint256 value = msg.value;
@@ -526,10 +525,5 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         }
 
         require(evmCodeHash[_newAddress] != 0x0, "The code hash must be set after the constructor call");
-
-        bytes32 codeHash = Utils.hashEVMBytecode(evmCode[_newAddress]);
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccountConstructedCodeHash(_newAddress, codeHash);
-
-        emit ContractDeployed(_sender, codeHash, _newAddress);
     }
 }

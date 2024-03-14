@@ -117,7 +117,6 @@ interface IContractDeployer {
 
     function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable;
 
-    function evmCode(address) external view returns (bytes memory);
     function evmCodeHash(address) external view returns (bytes32);
 
     // TODO: this is a hack before rewriting to assembly.
