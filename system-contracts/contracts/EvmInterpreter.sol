@@ -106,13 +106,13 @@ contract EvmInterpreter {
         }
     }
 
-    function _getRawCodeHash() internal returns (bytes32 hash) {
+    function _getRawCodeHash(address _account) internal view returns (bytes32 hash) {
         bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash.selector;
         address to = address(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
         assembly {
             mstore(0, selector)
-            mstore(4, address())
-            let success := staticcall(gas(), to, 0, 4, 0, 32)
+            mstore(4, _account)
+            let success := staticcall(gas(), to, 0, 36, 0, 32)
     
             if iszero(success) {
                 // This error should never happen
@@ -123,32 +123,16 @@ contract EvmInterpreter {
         }
     }
 
-    function _getDeployedBytecode() internal {
-        /*
-            Firstly, we need to retrieve our code hash from the storage.
-        */
+    function _getDeployedBytecode() internal view {
+        uint256 codeLen = _fetchDeployedCode(
+            SystemContractHelper.getCodeAddress(),
+            BYTECODE_OFFSET + 32,
+            MAX_POSSIBLE_BYTECODE
+        );
 
-        bytes32 codeHash = _getRawCodeHash();
-
-        address to = CODE_ORACLE_SYSTEM_CONTRACT;
-        uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
-        uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
-
+        uint256 bytecodeLenPosition = BYTECODE_OFFSET;
         assembly {
-            mstore(0, codeHash)
-            let success := staticcall(gas(), to, 0, 32, 0, 0)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-
-            returndatacopy(
-                bytecodeLengthOffset,
-                // Skip 0x20 in the ABI encoding of the `bytes` type
-                32,
-                sub(returndatasize(), 32)
-            )
+            mstore(bytecodeLenPosition, codeLen)
         }
     }
 
@@ -166,34 +150,64 @@ contract EvmInterpreter {
         SystemContractHelper.copyActivePtrData(bytecodeOffset, 0, size);
     }
 
+    // Basically performs an extcodecopy, while returning the length of the bytecode.
+    function _fetchDeployedCode(
+        address _addr,
+        uint256 _offset,
+        uint256 _len
+    ) internal view returns (uint256 codeLen) {
+        bytes32 codeHash = _getRawCodeHash(_addr);
 
-    function _getBytecode() internal {
-        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
-        address to = address(DEPLOYER_SYSTEM_CONTRACT);
-        uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
+        address to = CODE_ORACLE_SYSTEM_CONTRACT;
 
         assembly {
-            mstore(0, selector)
-            mstore(4, address())
-
-            let success := staticcall(gas(), to, 0, 36, 0, 0)
+            mstore(0, codeHash)
+            let success := staticcall(gas(), to, 0, 32, 0, 0)
 
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
 
-            returndatacopy(
-                bytecodeLengthOffset,
-                // Skip 0x20 in the ABI encoding of the `bytes` type
-                32,
-                sub(returndatasize(), 32)
-            )
+            // The first word is the true length of the bytecode
+            returndatacopy(0,0,32)
+            codeLen := mload(0)
+
+            if gt(_len, codeLen) {
+                _len := codeLen
+            }
+
+            returndatacopy(_offset, 32, _len)
         }
     }
 
+    // function _getBytecode() internal {
+    //     bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
+    //     address to = address(DEPLOYER_SYSTEM_CONTRACT);
+    //     uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
+
+    //     assembly {
+    //         mstore(0, selector)
+    //         mstore(4, address())
+
+    //         let success := staticcall(gas(), to, 0, 36, 0, 0)
+
+    //         if iszero(success) {
+    //             // This error should never happen
+    //             revert(0, 0)
+    //         }
+
+    //         returndatacopy(
+    //             bytecodeLengthOffset,
+    //             // Skip 0x20 in the ABI encoding of the `bytes` type
+    //             32,
+    //             sub(returndatasize(), 32)
+    //         )
+    //     }
+    // }
+
+    // TODO: fix this function as evmCode is now padded
     function _extcodecopy(address _addr, uint256 dest, uint256 offset, uint256 len) internal view {
-        bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
 
         // TODO: This is not very efficient
@@ -209,25 +223,7 @@ contract EvmInterpreter {
         }
 
         // Secondly, we get the actual bytecode
-        assembly {
-            mstore(0, selector)
-            mstore(4, _addr)
-
-            // TODO: test how it behaves on corner cases
-            let success := staticcall(gas(), to, 0, 36, 0, 0)
-
-            let rtOffset := add(offset, 64)
-
-            if lt(returndatasize(), rtOffset) {
-                rtOffset := returndatasize()
-            }
-
-            if gt(add(rtOffset, len), returndatasize()) {
-                len := sub(returndatasize(), rtOffset)
-            }
-
-            returndatacopy(dest, rtOffset, len)
-        }
+        _fetchDeployedCode(_addr, offset, len);
     }
 
     // Note that this function modifies EVM memory and does not restore it. It is expected that
@@ -2495,7 +2491,7 @@ contract EvmInterpreter {
         }
 
         input = msg.data;
-        _getBytecode();
+        _getDeployedBytecode();
 
         warmAccount(address(uint160(address(this))));
         (uint256 retOffset, uint256 retLen, uint256 gasLeft) = _simulate(isCallerEVM, input, evmGas, isStatic);

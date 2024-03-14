@@ -78,10 +78,6 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
         require(Utils.bytecodeLenInWords(_bytecodeHash) % 2 == 1, "Code length in words must be odd");
     }
 
-    // function _normalizeBytecode() {
-         
-    // }
-
     function publishEVMBytecode(bytes calldata bytecode) external onlyCallFrom(address(DEPLOYER_SYSTEM_CONTRACT)) {
         /*
             TODO: ensure that it is properly padded, etc.

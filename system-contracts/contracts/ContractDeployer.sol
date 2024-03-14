@@ -54,12 +54,13 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
 
         uint256 bytecodeLen = uint256(bytes32(paddedNewDeployedCode[:32]));
         bytes memory trueBytecode = paddedNewDeployedCode[32:32 + bytecodeLen];
-        evmCode[msg.sender] = trueBytecode;
+
+        evmCode[msg.sender] = paddedNewDeployedCode;
         evmCodeHash[msg.sender] = keccak256(trueBytecode);
         constructorReturnGas = constructorGasLeft;
 
         // ToDO: use efficient call
-        // KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(newDeployedCode);
+        KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(paddedNewDeployedCode);
     }
 
     modifier onlySelf() {
