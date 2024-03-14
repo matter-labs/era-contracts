@@ -1069,7 +1069,7 @@ contract EvmInterpreter {
 
         gasToReturn = validateCorrectBytecode(offset, len, gasToReturn);
 
-        // (offset, len) = padBytecode(offset, len);
+        (offset, len) = padBytecode(offset, len);
 
         _setDeployedCode(gasToReturn, offset, len);
     }
