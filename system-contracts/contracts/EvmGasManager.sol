@@ -2,8 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./EvmConstants.sol";
-import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {IEvmGasManager} from "./interfaces/IEvmGasManager.sol";
+
 import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT} from "./Constants.sol";
 
 // We consider all the contracts (including system ones) as warm.
@@ -12,7 +11,7 @@ uint160 constant PRECOMPILES_END = 0xffff;
 // Denotes that passGas has been consumed
 uint256 constant INF_PASS_GAS = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-contract EvmGasManager is ISystemContract, IEvmGasManager {
+contract EvmGasManager {
     // We need strust to use `storage` pointers
     struct WarmAccountInfo {
         bool isWarm;
@@ -86,7 +85,7 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
     /*
         returns true if the account was already warm
     */
-    function warmAccount(address account) external payable onlySystemEvm onlySystemCall returns (bool wasWarm) {
+    function warmAccount(address account) external payable onlySystemEvm returns (bool wasWarm) {
         if (uint160(account) < PRECOMPILES_END) return true;
 
         wasWarm = tloadWarmAccount(account);
@@ -97,10 +96,7 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
         return tloadWarmSlot(msg.sender, _slot).warm;
     }
 
-    function warmSlot(
-        uint256 _slot,
-        uint256 _currentValue
-    ) external payable onlySystemEvm onlySystemCall returns (bool, uint256) {
+    function warmSlot(uint256 _slot, uint256 _currentValue) external payable onlySystemEvm returns (bool, uint256) {
         SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
 
         if (info.warm) {
@@ -127,13 +123,13 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
 
     */
 
-    function pushEVMFrame(uint256 _passGas, bool _isStatic) external onlySystemEvm onlySystemCall {
+    function pushEVMFrame(uint256 _passGas, bool _isStatic) external {
         EVMStackFrameInfo memory frame = EVMStackFrameInfo({passGas: _passGas, isStatic: _isStatic});
 
         evmStackFrames.push(frame);
     }
 
-    function consumeEvmFrame() external onlySystemEvm onlySystemCall returns (uint256 passGas, bool isStatic) {
+    function consumeEvmFrame() external returns (uint256 passGas, bool isStatic) {
         if (evmStackFrames.length == 0) return (INF_PASS_GAS, false);
 
         EVMStackFrameInfo memory frameInfo = evmStackFrames[evmStackFrames.length - 1];
@@ -145,7 +141,7 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    function popEVMFrame() external onlySystemEvm onlySystemCall {
+    function popEVMFrame() external {
         evmStackFrames.pop();
     }
 }
