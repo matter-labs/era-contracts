@@ -22,8 +22,9 @@ import {
   getTokens,
   deployedAddressesFromEnv,
   SYSTEM_CONFIG,
+  getOptionalAddressFromEnv,
 } from "../scripts/utils";
-import { deployViaCreate2 } from "./deploy-utils";
+import { deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
 import type { PubdataPricingMode } from "../test/unit_tests/utils";
 
@@ -102,6 +103,7 @@ export class Deployer {
         priorityTxMaxGasLimit,
         initialProtocolVersion,
         feeParams,
+        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
       },
     ]);
 
@@ -148,6 +150,25 @@ export class Deployer {
       this.verbose,
       libraries
     );
+    return result[0];
+  }
+
+  private async deployBytecodeViaCreate2(
+    contractName: string,
+    bytecode: ethers.BytesLike,
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ): Promise<string> {
+    const result = await deployBytecodeViaCreate2(
+      this.deployWallet,
+      contractName,
+      bytecode,
+      create2Salt,
+      ethTxOptions,
+      this.addresses.Create2Factory,
+      this.verbose
+    );
+
     return result[0];
   }
 
@@ -403,10 +424,18 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const commitValidatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const blobValidatorAddress = getOptionalAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+
+    const validatorAddresses = [commitValidatorAddress];
+
+    if (blobValidatorAddress && blobValidatorAddress.length > 0) {
+      validatorAddresses.push(blobValidatorAddress);
+    }
+
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddresses],
       create2Salt,
       ethTxOptions
     );
@@ -425,6 +454,28 @@ export class Deployer {
     if (this.verbose) {
       console.log(`CONTRACTS_L1_MULTICALL3_ADDR=${contractAddress}`);
     }
+  }
+
+  public async deployBlobVersionedHashRetriever(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
+    const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+
+    const contractAddress = await this.deployBytecodeViaCreate2(
+      "BlobVersionedHashRetriever",
+      bytecode,
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.BlobVersionedHashRetriever = contractAddress;
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
