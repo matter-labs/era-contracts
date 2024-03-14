@@ -50,12 +50,17 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     uint256 public constructorReturnGas;
 
     function setDeployedCode(uint256 constructorGasLeft, bytes calldata newDeployedCode) external {
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
+        
         // FIXME: check the correct behavior when deploying empty bytecode.
         require(evmCode[msg.sender].length > 0, "Only EVM contracts can call it");
 
         evmCode[msg.sender] = newDeployedCode;
         evmCodeHash[msg.sender] = keccak256(newDeployedCode);
         constructorReturnGas = constructorGasLeft;
+
+        // ToDO: use efficient call
+        // KNOWN_CODE_STORAGE_CONTRACT.publishEVMBytecode(newDeployedCode);
     }
 
     modifier onlySelf() {
@@ -215,7 +220,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     }
 
     function createEVMInternal(address _newAddress, bytes calldata _initCode) external payable {
-        ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(_newAddress);
+        require(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM(msg.sender));
         _evmDeployOnAddress(_newAddress, _initCode);
     }
 

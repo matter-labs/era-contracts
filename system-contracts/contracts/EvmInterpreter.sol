@@ -106,11 +106,71 @@ contract EvmInterpreter {
         }
     }
 
+    function _getRawCodeHash() internal returns (bytes32 hash) {
+        bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash.selector;
+        address to = address(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT);
+        assembly {
+            mstore(0, selector)
+            mstore(4, address())
+            let success := staticcall(gas(), to, 0, 4, 0, 32)
+    
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+    
+            hash := mload(0)
+        }
+    }
+
+    function _getDeployedBytecode() internal {
+        /*
+            Firstly, we need to retrieve our code hash from the storage.
+        */
+
+        bytes32 codeHash = _getRawCodeHash();
+
+        address to = CODE_ORACLE_SYSTEM_CONTRACT;
+        uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
+        uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
+
+        assembly {
+            mstore(0, codeHash)
+            let success := staticcall(gas(), to, 0, 32, 0, 0)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            returndatacopy(
+                bytecodeLengthOffset,
+                // Skip 0x20 in the ABI encoding of the `bytes` type
+                32,
+                sub(returndatasize(), 32)
+            )
+        }
+    }
+
+    function _getConstructorBytecode() internal {
+        uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
+        uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
+
+        SystemContractHelper.loadCalldataIntoActivePtr();
+        uint256 size = SystemContractHelper.getActivePtrDataSize();
+
+        assembly {
+            mstore(bytecodeLengthOffset, size)
+        }
+
+        SystemContractHelper.copyActivePtrData(bytecodeOffset, 0, size);
+    }
+
+
     function _getBytecode() internal {
         bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
         uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
-        uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
 
         assembly {
             mstore(0, selector)
@@ -999,7 +1059,7 @@ contract EvmInterpreter {
         // compatibility.
         require(!isStatic);
 
-        _getBytecode();
+        _getConstructorBytecode();
 
         if (!isCallerEVM) {
             evmGas = _getEVMGas();
@@ -1008,6 +1068,8 @@ contract EvmInterpreter {
         (uint256 offset, uint256 len, uint256 gasToReturn) = _simulate(isCallerEVM, msg.data[0:0], evmGas, false);
 
         gasToReturn = validateCorrectBytecode(offset, len, gasToReturn);
+
+        // (offset, len) = padBytecode(offset, len);
 
         _setDeployedCode(gasToReturn, offset, len);
     }
@@ -1027,6 +1089,29 @@ contract EvmInterpreter {
             }
             uint256 gasForCode = len * GAS_CODE_DEPOSIT;
             return chargeGas(gasToReturn, gasForCode);
+        }
+    }
+
+    /// zkEVM requires all bytecodes that can be decommitted into the memory to be at leas t
+    function padBytecode(uint256 _offset, uint256 _len) internal pure returns (uint256 blobOffset, uint256 blobLen){
+        blobOffset = _offset - 32;
+        uint256 trueLastByte = _offset + _len;
+
+        assembly {
+            mstore(blobOffset, _len)
+            // clearing out additional bytes
+            mstore(trueLastByte , 0)
+            mstore(add(trueLastByte, 32) , 0)
+        }
+
+        blobLen = _len + 32;
+        if (blobLen % 32 != 0) {
+            blobLen += 32 - (blobLen % 32);
+        }
+
+        // Not it is divisible by 32, but we must make sure that the number of 32 byte words is odd
+        if (blobLen % 64 != 32) {
+            blobLen += 32;
         }
     }
 
