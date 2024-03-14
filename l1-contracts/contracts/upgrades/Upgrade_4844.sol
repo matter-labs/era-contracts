@@ -8,13 +8,15 @@ import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract Upgrade_4844 is BaseZkSyncUpgrade {
+    address constant BLOB_VERSIONED_HASH_GETTER_ADDR = 0x0000000000000000000000000000000000001337;
+
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         // Check to make sure that the new blob versioned hash address is not the zero address.
-        require($(BLOB_VERSIONED_HASH_GETTER_ADDR) != address(0), "b9");
+        require(BLOB_VERSIONED_HASH_GETTER_ADDR != address(0), "b9");
 
-        s.blobVersionedHashRetriever = $(BLOB_VERSIONED_HASH_GETTER_ADDR);
+        s.blobVersionedHashRetriever = BLOB_VERSIONED_HASH_GETTER_ADDR;
 
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
