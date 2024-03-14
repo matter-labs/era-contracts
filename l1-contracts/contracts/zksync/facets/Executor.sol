@@ -127,7 +127,7 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
         PubdataPricingMode pubdataPricingMode
     ) internal pure returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
