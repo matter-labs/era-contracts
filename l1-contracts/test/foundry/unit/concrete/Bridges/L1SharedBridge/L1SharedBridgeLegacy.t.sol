@@ -125,7 +125,14 @@ contract L1SharedBridgeLegacyTest is Test {
         address refundRecipient = address(0);
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, txHash, alice, bob, address(token), amount);
+        emit LegacyDepositInitiated({
+            chainId: ERA_CHAIN_ID,
+            l2DepositTxHash: txHash,
+            from: alice,
+            to: bob,
+            l1Token: address(token),
+            amount: amount
+        });
 
         vm.mockCall(
             bridgehubAddress,

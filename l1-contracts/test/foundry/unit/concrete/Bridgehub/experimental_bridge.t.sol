@@ -343,7 +343,14 @@ contract ExperimentalBridgeTest is Test {
         if (randomCaller != deployerAddress && randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Bridgehub: not owner or admin"));
-            bridgeHub.createNewChain(chainId, address(mockSTM), address(testToken), uint256(123), admin, bytes(""));
+            bridgeHub.createNewChain({
+                _chainId: chainId,
+                _stateTransitionManager: address(mockSTM),
+                _baseToken: address(testToken),
+                _salt: uint256(123),
+                _admin: admin,
+                _initData: bytes("")
+            });
         }
 
         chainId = bound(chainId, 1, type(uint48).max);
@@ -374,14 +381,15 @@ contract ExperimentalBridgeTest is Test {
             bytes("")
         );
 
-        newChainId = bridgeHub.createNewChain(
-            chainId,
-            address(mockSTM),
-            address(testToken),
-            uint256(chainId * 2),
-            admin,
-            _newChainInitData
-        );
+        newChainId = bridgeHub.createNewChain({
+            _chainId: chainId,
+            _stateTransitionManager: address(mockSTM),
+            _baseToken: address(testToken),
+            _salt: uint256(chainId * 2),
+            _admin: admin,
+            _initData: _newChainInitData
+        });
+
         vm.stopPrank();
         vm.clearMockedCalls();
 
@@ -455,14 +463,14 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgeHub.getStateTransition(mockChainId) == address(mockChainContract));
 
         // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
-        L2Log memory l2Log = _createMockL2Log(
-            randomL2ShardId,
-            randomIsService,
-            randomTxNumInBatch,
-            randomSender,
-            randomKey,
-            randomValue
-        );
+        L2Log memory l2Log = _createMockL2Log({
+            randomL2ShardId: randomL2ShardId,
+            randomIsService: randomIsService,
+            randomTxNumInBatch: randomTxNumInBatch,
+            randomSender: randomSender,
+            randomKey: randomKey,
+            randomValue: randomValue
+        });
 
         // Since we have used random data for the `bridgeHub.proveL2LogInclusion` function which basically forwards the call
         // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
@@ -977,14 +985,14 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.addStateTransitionManager(address(mockSTM));
         vm.stopPrank();
 
-        L2Log memory l2Log = _createMockL2Log(
-            randomL2ShardId,
-            randomIsService,
-            randomTxNumInBatch,
-            randomSender,
-            randomKey,
-            randomValue
-        );
+        L2Log memory l2Log = _createMockL2Log({
+            randomL2ShardId: randomL2ShardId,
+            randomIsService: randomIsService,
+            randomTxNumInBatch: randomTxNumInBatch,
+            randomSender: randomSender,
+            randomKey: randomKey,
+            randomValue: randomValue
+        });
 
         vm.mockCall(
             address(bridgeHub),

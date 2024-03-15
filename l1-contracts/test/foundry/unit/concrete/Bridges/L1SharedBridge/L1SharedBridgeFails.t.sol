@@ -482,14 +482,14 @@ contract L1SharedBridgeFailTest is Test {
         );
 
         vm.expectRevert("ShB: legacy withdrawal");
-        sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            legacyBatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInSharedBridge() public {
@@ -526,14 +526,14 @@ contract L1SharedBridgeFailTest is Test {
         );
 
         vm.expectRevert("Withdrawal is already finalized");
-        sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            legacyBatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInDiamondProxy() public {
@@ -560,14 +560,14 @@ contract L1SharedBridgeFailTest is Test {
         );
         vm.expectRevert("Withdrawal is already finalized 2");
 
-        sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            legacyBatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawal_chainBalance() public {
@@ -588,6 +588,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
@@ -601,14 +602,14 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("ShB not enough funds 2");
 
-        sharedBridge.finalizeWithdrawal(
-            chainId,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_checkWithdrawal_wrongProof() public {
@@ -629,6 +630,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
@@ -642,14 +644,14 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("ShB withd w proof");
 
-        sharedBridge.finalizeWithdrawal(
-            chainId,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_parseL2WithdrawalMessage_WrongMsgLength() public {
@@ -664,14 +666,14 @@ contract L1SharedBridgeFailTest is Test {
         bytes memory message = abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector);
 
         vm.expectRevert("ShB wrong msg len");
-        sharedBridge.finalizeWithdrawal(
-            chainId,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_parseL2WithdrawalMessage_WrongMsgLength2() public {
@@ -686,14 +688,15 @@ contract L1SharedBridgeFailTest is Test {
         bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount); /// should have more data here
 
         vm.expectRevert("ShB wrong msg len 2");
-        sharedBridge.finalizeWithdrawal(
-            chainId,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_parseL2WithdrawalMessage_WrongSelector() public {
@@ -709,14 +712,14 @@ contract L1SharedBridgeFailTest is Test {
         bytes memory message = abi.encodePacked(IMailbox.proveL2LogInclusion.selector, alice, amount);
 
         vm.expectRevert("ShB Incorrect message function selector");
-        sharedBridge.finalizeWithdrawal(
-            chainId,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: legacyBatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_depositLegacyERC20Bridge_l2BridgeNotDeployed() public {
@@ -763,7 +766,15 @@ contract L1SharedBridgeFailTest is Test {
         uint256 l2TxGasPerPubdataByte = 100;
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, txHash, alice, bob, address(token), amount);
+
+        emit LegacyDepositInitiated({
+            chainId: ERA_CHAIN_ID,
+            l2DepositTxHash: txHash,
+            from: alice,
+            to: bob,
+            l1Token: address(token),
+            amount: amount
+        });
 
         vm.mockCall(
             bridgehubAddress,

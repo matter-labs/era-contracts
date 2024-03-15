@@ -102,7 +102,14 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        l2TxHash = deposit({
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+            _refundRecipient: address(0)
+        });
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request

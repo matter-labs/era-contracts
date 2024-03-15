@@ -93,6 +93,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
     /// @notice Internal function to send L2ToL1Log.
     function _processL2ToL1Log(L2ToL1Log memory _l2ToL1Log) internal returns (uint256 logIdInMerkleTree) {
         bytes32 hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 _l2ToL1Log.l2ShardId,
                 _l2ToL1Log.isService,

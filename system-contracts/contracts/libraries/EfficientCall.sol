@@ -111,7 +111,15 @@ library EfficientCall {
         bool _isConstructor,
         bool _isSystem
     ) internal returns (bytes memory returnData) {
-        bool success = rawMimicCall(_gas, _address, _data, _whoToMimic, _isConstructor, _isSystem);
+        bool success = rawMimicCall({
+            _gas: _gas,
+            _address: _address,
+            _data: _data,
+            _whoToMimic: _whoToMimic,
+            _isConstructor: _isConstructor,
+            _isSystem: _isSystem
+        });
+
         returnData = _verifyCallResult(success);
     }
 
