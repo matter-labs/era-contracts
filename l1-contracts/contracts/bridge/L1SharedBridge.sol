@@ -285,18 +285,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        _claimFailedDeposit(
-            false,
-            _chainId,
-            _depositSender,
-            _l1Token,
-            _amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        _claimFailedDeposit({
+            _checkedInLegacyBridge: false,
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
     }
 
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
@@ -313,15 +313,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32[] calldata _merkleProof
     ) internal nonReentrant {
         {
-            bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
-                _chainId,
-                _l2TxHash,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBatch,
-                _merkleProof,
-                TxStatus.Failure
-            );
+            bool proofValid = bridgeHub.proveL1ToL2TransactionStatus({
+                _chainId: _chainId,
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: TxStatus.Failure
+            });
             require(proofValid, "yn");
         }
         require(_amount > 0, "y1");
@@ -651,17 +651,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        _claimFailedDeposit(
-            true,
-            ERA_CHAIN_ID,
-            _depositSender,
-            _l1Token,
-            _amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        _claimFailedDeposit({
+            _checkedInLegacyBridge: true,
+            _chainId: ERA_CHAIN_ID,
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
     }
 }

@@ -13,7 +13,16 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
     function test_RevertWhen_ClaimAmountIsZero() public {
         vm.expectRevert(bytes("2T"));
         bytes32[] memory merkleProof;
-        bridge.claimFailedDeposit(randomSigner, address(token), dummyL2DepositTxHash, 0, 0, 0, merkleProof);
+
+        bridge.claimFailedDeposit({
+            _depositSender: randomSigner,
+            _l1Token: address(token),
+            _l2TxHash: dummyL2DepositTxHash,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDepositSuccessfully() public {
@@ -36,7 +45,15 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
         vm.expectEmit(true, true, true, true, address(bridge));
         emit ClaimedFailedDeposit(alice, address(token), amount);
         bytes32[] memory merkleProof;
-        bridge.claimFailedDeposit(alice, address(token), dummyL2DepositTxHash, 0, 0, 0, merkleProof);
+        bridge.claimFailedDeposit({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _l2TxHash: dummyL2DepositTxHash,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: merkleProof
+        });
 
         uint256 depositedAmountAfterWithdrawal = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
         assertEq(depositedAmountAfterWithdrawal, 0);

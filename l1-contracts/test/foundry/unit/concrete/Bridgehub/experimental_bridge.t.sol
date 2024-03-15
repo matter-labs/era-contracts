@@ -362,6 +362,7 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockSTM),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockSTM.createNewChain.selector,
                 chainId,
@@ -420,6 +421,7 @@ contract ExperimentalBridgeTest is Test {
         // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
             address(mockChainContract),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.proveL2MessageInclusion.selector,
                 mockBatchNumber,
@@ -466,6 +468,7 @@ contract ExperimentalBridgeTest is Test {
         // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
             address(mockChainContract),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.proveL2LogInclusion.selector,
                 mockBatchNumber,
@@ -502,6 +505,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(mockChainContract),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.proveL1ToL2TransactionStatus.selector,
                 randomL2TxHash,
@@ -515,15 +519,15 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            bridgeHub.proveL1ToL2TransactionStatus(
-                randomChainId,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ) == randomResultantBool
+            bridgeHub.proveL1ToL2TransactionStatus({
+                _chainId: randomChainId,
+                _l2TxHash: randomL2TxHash,
+                _l2BatchNumber: randomL2BatchNumber,
+                _l2MessageIndex: randomL2MessageIndex,
+                _l2TxNumberInBatch: randomL2TxNumberInBatch,
+                _merkleProof: randomMerkleProof,
+                _status: txStatus
+            }) == randomResultantBool
         );
     }
 
@@ -538,6 +542,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(mockChainContract),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 mockChainContract.l2TransactionBaseCost.selector,
                 mockGasPrice,
@@ -570,17 +575,17 @@ contract ExperimentalBridgeTest is Test {
             mockFactoryDeps = _restrictArraySize(mockFactoryDeps, MAX_NEW_FACTORY_DEPS);
         }
 
-        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect(
-            mockChainId,
-            mockMintValue,
-            mockL2Contract,
-            mockL2Value,
-            mockL2Calldata,
-            mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps,
-            mockRefundRecipient
-        );
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
+            mockChainId: mockChainId,
+            mockMintValue: mockMintValue,
+            mockL2Contract: mockL2Contract,
+            mockL2Value: mockL2Value,
+            mockL2Calldata: mockL2Calldata,
+            mockL2GasLimit: mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps: mockFactoryDeps,
+            mockRefundRecipient: mockRefundRecipient
+        });
 
         l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
 
@@ -632,17 +637,17 @@ contract ExperimentalBridgeTest is Test {
             mockFactoryDeps = _restrictArraySize(mockFactoryDeps, MAX_NEW_FACTORY_DEPS);
         }
 
-        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect(
-            mockChainId,
-            mockMintValue,
-            mockL2Contract,
-            mockL2Value,
-            mockL2Calldata,
-            mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps,
-            mockRefundRecipient
-        );
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
+            mockChainId: mockChainId,
+            mockMintValue: mockMintValue,
+            mockL2Contract: mockL2Contract,
+            mockL2Value: mockL2Value,
+            mockL2Calldata: mockL2Calldata,
+            mockL2GasLimit: mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps: mockFactoryDeps,
+            mockRefundRecipient: mockRefundRecipient
+        });
 
         l2TxnReqDirect.chainId = _setUpStateTransitionForChainId(l2TxnReqDirect.chainId);
 
@@ -696,16 +701,16 @@ contract ExperimentalBridgeTest is Test {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata
     ) public {
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter(
-            chainId,
-            mintValue,
-            l2Value,
-            l2GasLimit,
-            l2GasPerPubdataByteLimit,
-            refundRecipient,
-            secondBridgeValue,
-            secondBridgeCalldata
-        );
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
+            chainId: chainId,
+            mintValue: mintValue,
+            l2Value: l2Value,
+            l2GasLimit: l2GasLimit,
+            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
+            refundRecipient: refundRecipient,
+            secondBridgeValue: secondBridgeValue,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
 
         l2TxnReq2BridgeOut.chainId = _setUpStateTransitionForChainId(l2TxnReq2BridgeOut.chainId);
 
@@ -940,6 +945,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(bridgeHub),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 bridgeHub.proveL2MessageInclusion.selector,
                 mockChainId,
@@ -981,6 +987,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(bridgeHub),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 bridgeHub.proveL2LogInclusion.selector,
                 mockChainId,
@@ -1018,6 +1025,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(bridgeHub),
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 bridgeHub.proveL1ToL2TransactionStatus.selector,
                 randomChainId,
@@ -1032,15 +1040,15 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            bridgeHub.proveL1ToL2TransactionStatus(
-                randomChainId,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ) == randomResultantBool
+            bridgeHub.proveL1ToL2TransactionStatus({
+                _chainId: randomChainId,
+                _l2TxHash: randomL2TxHash,
+                _l2BatchNumber: randomL2BatchNumber,
+                _l2MessageIndex: randomL2MessageIndex,
+                _l2TxNumberInBatch: randomL2TxNumberInBatch,
+                _merkleProof: randomMerkleProof,
+                _status: txStatus
+            }) == randomResultantBool
         );
     }
 }

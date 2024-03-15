@@ -163,6 +163,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         );
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, ETH_TOKEN_ADDRESS, amount);
+        // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
@@ -221,6 +222,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
@@ -237,17 +239,17 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, address(token), amount);
         vm.prank(bridgehubAddress);
-        sharedBridge.claimFailedDeposit(
-            chainId,
-            alice,
-            address(token),
-            amount,
-            txHash,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof
-        );
+        sharedBridge.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDeposit_Eth() public {
@@ -282,6 +284,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
@@ -298,17 +301,17 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         vm.prank(bridgehubAddress);
-        sharedBridge.claimFailedDeposit(
-            chainId,
-            alice,
-            ETH_TOKEN_ADDRESS,
-            amount,
-            txHash,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof
-        );
+        sharedBridge.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: ETH_TOKEN_ADDRESS,
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawal_EthOnEth() public {

@@ -116,6 +116,7 @@ library TransactionHelper {
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
     function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 EIP712_TRANSACTION_TYPE_HASH,
                 _transaction.txType,
@@ -200,6 +201,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     encodedListLength,
                     encodedNonce,
@@ -230,6 +232,7 @@ library TransactionHelper {
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -272,6 +275,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x01",
                     encodedListLength,
@@ -301,6 +305,7 @@ library TransactionHelper {
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -344,6 +349,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x02",
                     encodedListLength,

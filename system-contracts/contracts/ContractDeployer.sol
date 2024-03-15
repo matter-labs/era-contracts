@@ -103,6 +103,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 constructorInputHash = EfficientCall.keccak(_input);
 
         bytes32 hash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, bytes32(uint256(uint160(_sender))), _salt, _bytecodeHash, constructorInputHash)
         );
 

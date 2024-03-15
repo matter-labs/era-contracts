@@ -42,7 +42,15 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         vm.prank(alice);
         bytes32[] memory merkleProof;
         vm.expectRevert(bytes("r1"));
-        bridgeReenterItself.claimFailedDeposit(alice, address(token), dummyL2DepositTxHash, 0, 0, 0, merkleProof);
+        bridgeReenterItself.claimFailedDeposit({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _l2TxHash: dummyL2DepositTxHash,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: merkleProof
+        });
     }
 
     function _finalizeWithdrawalExpectRevertOnReentrancy() internal {

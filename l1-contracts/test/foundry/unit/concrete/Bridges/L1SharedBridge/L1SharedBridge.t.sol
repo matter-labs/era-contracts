@@ -157,6 +157,7 @@ contract L1SharedBridgeTest is Test {
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, ETH_TOKEN_ADDRESS, amount);
+        // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
     }
 
@@ -173,6 +174,7 @@ contract L1SharedBridgeTest is Test {
         );
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositInitiated(chainId, txDataHash, alice, zkSync, address(token), amount);
+        // solhint-disable-next-line func-named-parameters
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
@@ -186,7 +188,6 @@ contract L1SharedBridgeTest is Test {
 
     function test_claimFailedDeposit_Erc() public {
         token.mint(address(sharedBridge), amount);
-
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
@@ -208,6 +209,7 @@ contract L1SharedBridgeTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
@@ -223,17 +225,17 @@ contract L1SharedBridgeTest is Test {
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, address(token), amount);
-        sharedBridge.claimFailedDeposit(
-            chainId,
-            alice,
-            address(token),
-            amount,
-            txHash,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof
-        );
+        sharedBridge.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDeposit_Eth() public {
@@ -260,6 +262,7 @@ contract L1SharedBridgeTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
@@ -275,17 +278,17 @@ contract L1SharedBridgeTest is Test {
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
-        sharedBridge.claimFailedDeposit(
-            chainId,
-            alice,
-            ETH_TOKEN_ADDRESS,
-            amount,
-            txHash,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof
-        );
+        sharedBridge.claimFailedDeposit({
+            _chainId: chainId,
+            _depositSender: alice,
+            _l1Token: ETH_TOKEN_ADDRESS,
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawal_EthOnEth() public {
