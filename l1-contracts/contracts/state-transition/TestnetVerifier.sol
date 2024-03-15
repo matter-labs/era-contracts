@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {IVerifier} from "./interfaces/IVerifier.sol";
+import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 contract TestnetVerifier is IVerifier {
     IVerifier _mainVerifier;

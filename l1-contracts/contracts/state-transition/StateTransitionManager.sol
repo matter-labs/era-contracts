@@ -183,7 +183,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
+            gasLimit: 72_000_000,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
