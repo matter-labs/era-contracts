@@ -182,7 +182,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
-        uint256, // l2Value, needed for Weth deposits in the future
+        // solhint-disable-next-line no-unused-vars
+        uint256 _l2Value, // l2Value, needed for Weth deposits in the future
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");

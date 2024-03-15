@@ -603,7 +603,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("ShB not enough funds 2");
 
         sharedBridge.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
+            _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
@@ -645,7 +645,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("ShB withd w proof");
 
         sharedBridge.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
+            _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
@@ -667,7 +667,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("ShB wrong msg len");
         sharedBridge.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
+            _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,

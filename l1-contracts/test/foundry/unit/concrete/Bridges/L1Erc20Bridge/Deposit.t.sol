@@ -78,7 +78,7 @@ contract DepositTest is L1Erc20BridgeTest {
         bytes32 txHash = bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
-            _amount: 0,
+            _amount: amount,
             _l2TxGasLimit: 0,
             _l2TxGasPerPubdataByte: 0,
             _refundRecipient: address(0)

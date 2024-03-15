@@ -641,7 +641,7 @@ contract L1SharedBridgeTest is Test {
         emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, ETH_TOKEN_ADDRESS, amount);
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: l2BatchNumber,
+            _l2BatchNumber: legacyBatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
