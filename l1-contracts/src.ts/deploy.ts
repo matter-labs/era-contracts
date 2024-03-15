@@ -235,7 +235,20 @@ export class Deployer {
 
   public async deployVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+
+    let contractAddress: string;
+
+    if (process.env.CHAIN_ETH_NETWORK === "mainnet") {
+      contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+    } else {
+      const mainVerifierAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+      contractAddress = await this.deployViaCreate2(
+        "TestnetVerifier",
+        [mainVerifierAddress],
+        create2Salt,
+        ethTxOptions
+      );
+    }
 
     if (this.verbose) {
       console.log(`CONTRACTS_VERIFIER_ADDR=${contractAddress}`);
