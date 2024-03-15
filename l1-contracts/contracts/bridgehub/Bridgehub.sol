@@ -115,7 +115,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-        uint256, //_salt
+        // solhint-disable-next-line no-unused-vars
+        uint256 _salt,
         address _admin,
         bytes calldata _initData
     ) external onlyOwnerOrAdmin nonReentrant returns (uint256 chainId) {

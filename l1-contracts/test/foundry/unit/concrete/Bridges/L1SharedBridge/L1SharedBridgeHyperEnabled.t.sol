@@ -177,7 +177,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             txDataHash: txDataHash,
             from: alice,
             to: zkSync,
-            l1token: ETH_TOKEN_ADDRESS,
+            l1Token: ETH_TOKEN_ADDRESS,
             amount: amount
         });
         sharedBridge.bridgehubDeposit{value: amount}({
@@ -205,7 +205,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             txDataHash: txDataHash,
             from: alice,
             to: zkSync,
-            l1token: address(token),
+            l1Token: address(token),
             amount: amount
         });
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));

@@ -161,7 +161,7 @@ contract L1SharedBridgeTest is Test {
             txDataHash: txDataHash,
             from: alice,
             to: zkSync,
-            l1token: ETH_TOKEN_ADDRESS,
+            l1Token: ETH_TOKEN_ADDRESS,
             amount: amount
         });
         sharedBridge.bridgehubDeposit{value: amount}(chainId, alice, 0, abi.encode(ETH_TOKEN_ADDRESS, 0, bob));
@@ -184,7 +184,7 @@ contract L1SharedBridgeTest is Test {
             txDataHash: txDataHash,
             from: alice,
             to: zkSync,
-            l1token: address(token),
+            l1Token: address(token),
             amount: amount
         });
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
@@ -236,7 +236,7 @@ contract L1SharedBridgeTest is Test {
         );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge({chainId: chainId, to: alice, l1token: address(token), amount: amount});
+        emit ClaimedFailedDepositSharedBridge({chainId: chainId, to: alice, l1Token: address(token), amount: amount});
         sharedBridge.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -292,7 +292,7 @@ contract L1SharedBridgeTest is Test {
         emit ClaimedFailedDepositSharedBridge({
             chainId: chainId,
             to: alice,
-            l1token: ETH_TOKEN_ADDRESS,
+            l1Token: ETH_TOKEN_ADDRESS,
             amount: amount
         });
         sharedBridge.claimFailedDeposit({
