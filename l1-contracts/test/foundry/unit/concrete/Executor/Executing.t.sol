@@ -6,9 +6,9 @@ pragma solidity 0.8.20;
 import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {IExecutor, SystemLogKey} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {L2_BOOTLOADER_ADDRESS} from "../../../../../contracts/common/L2ContractAddresses.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../contracts/zksync/Config.sol";
+import {IExecutor, SystemLogKey} from "../../../../../contracts/zksync/interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
 

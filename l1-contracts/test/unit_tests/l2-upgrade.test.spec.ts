@@ -67,7 +67,13 @@ describe("L2 upgrade test", function () {
 
     const dummyHash = new Uint8Array(32);
     dummyHash.set([1, 0, 0, 1]);
-    verifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierContract = await testnetVerifierFactory.deploy(
+      ethers.utils.hexlify(ethers.utils.randomBytes(20))
+    );
+
+    verifier = testnetVerifierContract.address;
     verifierParams = {
       recursionCircuitsSetVksHash: ethers.constants.HashZero,
       recursionLeafLevelVkHash: ethers.constants.HashZero,
@@ -328,7 +334,11 @@ describe("L2 upgrade test", function () {
   it("Should successfully perform an upgrade", async () => {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const newVerifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierContract = await testnetVerifierFactory.deploy(
+      ethers.utils.hexlify(ethers.utils.randomBytes(20))
+    );
+    const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
       recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
       recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),

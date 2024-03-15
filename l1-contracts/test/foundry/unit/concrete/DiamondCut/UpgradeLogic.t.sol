@@ -4,14 +4,14 @@ pragma solidity 0.8.20;
 // solhint-disable max-line-length
 
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {DiamondCutTestContract} from "../../../../../contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {DiamondInit} from "../../../../../contracts/zksync/DiamondInit.sol";
+import {DiamondProxy} from "../../../../../contracts/zksync/DiamondProxy.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../contracts/zksync/Storage.sol";
+import {AdminFacet} from "../../../../../contracts/zksync/facets/Admin.sol";
+import {GettersFacet} from "../../../../../contracts/zksync/facets/Getters.sol";
+import {IVerifier} from "../../../../../contracts/zksync/interfaces/IVerifier.sol";
+import {Diamond} from "../../../../../contracts/zksync/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 
 // solhint-enable max-line-length

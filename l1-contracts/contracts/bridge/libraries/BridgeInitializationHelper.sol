@@ -7,6 +7,7 @@ import "../../vendor/AddressAliasHelper.sol";
 import "../../common/libraries/L2ContractHelper.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/L2ContractAddresses.sol";
 import "../../common/interfaces/IL2ContractDeployer.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../zksync/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,10 +16,7 @@ library BridgeInitializationHelper {
     /// @dev The L2 gas limit for requesting L1 -> L2 transaction of deploying L2 bridge instance.
     /// @dev It is big enough to deploy any contract, so we can use the same value for all bridges.
     /// NOTE: this constant will be accurately calculated in the future.
-    uint256 constant DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = $(DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT);
-
-    /// @dev The default l2GasPricePerPubdata to be used in bridges.
-    uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+    uint256 constant DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT = 10_000_000;
 
     /// @notice Requests L2 transaction that will deploy a contract with a given bytecode hash and constructor data.
     /// NOTE: it is always used to deploy via create2 with ZERO salt

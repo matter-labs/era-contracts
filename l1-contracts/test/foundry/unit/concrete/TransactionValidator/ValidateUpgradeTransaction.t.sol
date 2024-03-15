@@ -1,8 +1,8 @@
 pragma solidity 0.8.20;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
-import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
-import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
+import {IMailbox} from "contracts/zksync/interfaces/IMailbox.sol";
+import {TransactionValidator} from "contracts/zksync/libraries/TransactionValidator.sol";
 
 contract ValidateUpgradeTxTest is TransactionValidatorSharedTest {
     function test_BasicRequest() public pure {

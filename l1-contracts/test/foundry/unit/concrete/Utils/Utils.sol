@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {IExecutor, SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
+import {GettersFacet} from "../../../../../contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../contracts/zksync/facets/Mailbox.sol";
+import {IExecutor, SystemLogKey} from "contracts/zksync/interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;

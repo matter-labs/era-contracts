@@ -18,6 +18,8 @@ interface IOldContractDeployer {
 
 /// @author Matter Labs
 contract DiamondUpgradeInit2 is MailboxFacet {
+    uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
     function forceDeploy2(
         bytes calldata _upgradeDeployerCalldata,
         bytes calldata _upgradeSystemContractsCalldata,
@@ -29,7 +31,7 @@ contract DiamondUpgradeInit2 is MailboxFacet {
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             _upgradeDeployerCalldata,
-            $(PRIORITY_TX_MAX_GAS_LIMIT),
+            PRIORITY_TX_MAX_GAS_LIMIT,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps,
             true,
@@ -42,7 +44,7 @@ contract DiamondUpgradeInit2 is MailboxFacet {
             L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             0,
             _upgradeSystemContractsCalldata,
-            $(PRIORITY_TX_MAX_GAS_LIMIT),
+            PRIORITY_TX_MAX_GAS_LIMIT,
             REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _factoryDeps,
             true,

@@ -4,11 +4,11 @@ pragma solidity 0.8.20;
 // solhint-disable max-line-length
 
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {DiamondCutTestContract} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {DiamondCutTestContract} from "../../../../../contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {ExecutorFacet} from "../../../../../contracts/zksync/facets/Executor.sol";
+import {GettersFacet} from "../../../../../contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../contracts/zksync/facets/Mailbox.sol";
+import {Diamond} from "../../../../../contracts/zksync/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
 
 // solhint-enable max-line-length
