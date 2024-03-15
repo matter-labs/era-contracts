@@ -877,7 +877,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
-        uint256, //mockL2GasPerPubdataByteLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
     ) internal pure returns (L2TransactionRequestDirect memory) {
