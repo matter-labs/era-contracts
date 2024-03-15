@@ -400,24 +400,25 @@ library Utils {
     function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
         uint256[4] memory reserved;
         uint256[] memory factoryDeps = new uint256[](1);
-        return L2CanonicalTransaction({
-            txType: 0,
-            from: 0,
-            to: 0,
-            gasLimit: 0,
-            gasPerPubdataByteLimit: 0,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: 0,
-            nonce: 0,
-            value: 0,
-            reserved: reserved,
-            data: "",
-            signature: "",
-            factoryDeps: factoryDeps,
-            paymasterInput: "",
-            reservedDynamic: ""
-        });
+        return
+            L2CanonicalTransaction({
+                txType: 0,
+                from: 0,
+                to: 0,
+                gasLimit: 0,
+                gasPerPubdataByteLimit: 0,
+                maxFeePerGas: 0,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: "",
+                signature: "",
+                factoryDeps: factoryDeps,
+                paymasterInput: "",
+                reservedDynamic: ""
+            });
     }
 
     function createBatchCommitment(
