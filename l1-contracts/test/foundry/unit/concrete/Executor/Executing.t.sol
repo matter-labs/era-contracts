@@ -6,9 +6,9 @@ import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {L2_BOOTLOADER_ADDRESS} from "../../../../../contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../contracts/common/Config.sol";
-import {IExecutor} from "../../../../../contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {

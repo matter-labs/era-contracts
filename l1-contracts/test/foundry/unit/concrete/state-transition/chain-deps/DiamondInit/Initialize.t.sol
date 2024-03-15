@@ -5,12 +5,12 @@ import {DiamondInitTest} from "./_DiamondInit_Shared.t.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {

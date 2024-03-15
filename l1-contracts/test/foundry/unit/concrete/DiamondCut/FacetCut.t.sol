@@ -4,11 +4,11 @@ pragma solidity 0.8.20;
 import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
-import {DiamondCutTestContract} from "../../../../../contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {ExecutorFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {Diamond} from "../../../../../contracts/state-transition/libraries/Diamond.sol";
+import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;

@@ -6,3 +6,5 @@ forge-std/=lib/forge-std/src/
 hardhat/=node_modules/hardhat/
 murky/=lib/murky/src/
 foundry-test/=test/foundry/
+contracts/=contracts/
+

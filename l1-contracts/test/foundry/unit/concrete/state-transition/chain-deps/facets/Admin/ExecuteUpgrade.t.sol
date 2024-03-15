@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ExecuteUpgradeTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);

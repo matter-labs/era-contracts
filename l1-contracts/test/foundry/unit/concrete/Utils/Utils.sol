@@ -4,17 +4,17 @@ pragma solidity 0.8.20;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
-import {Diamond} from "../../../../../contracts/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "../../../../../contracts/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {IVerifier, VerifierParams} from "../../../../../contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {FeeParams, PubdataPricingMode} from "../../../../../contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {InitializeData, InitializeDataNewChain} from "../../../../../contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey} from "../../../../../contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;

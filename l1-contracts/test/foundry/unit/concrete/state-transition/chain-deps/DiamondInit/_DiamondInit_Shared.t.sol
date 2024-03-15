@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract DiamondInitTest is Test {
     Diamond.FacetCut[] internal facetCuts;

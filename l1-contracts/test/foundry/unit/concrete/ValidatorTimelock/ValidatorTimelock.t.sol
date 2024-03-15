@@ -3,10 +3,10 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {ValidatorTimelock, IExecutor} from "solpp/state-transition/ValidatorTimelock.sol";
-import {DummyStateTransitionManagerForValidatorTimelock} from "solpp/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
-import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
-import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
+import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
+import {DummyStateTransitionManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
+import {ERA_CHAIN_ID} from "contracts/common/Config.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.

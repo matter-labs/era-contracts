@@ -2,10 +2,10 @@
 pragma solidity 0.8.20;
 
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
-import {RevertFallback} from "../../../../../contracts/dev-contracts/RevertFallback.sol";
-import {ReturnSomething} from "../../../../../contracts/dev-contracts/ReturnSomething.sol";
-import {DiamondCutTestContract} from "../../../../../contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {Diamond} from "../../../../../contracts/state-transition/libraries/Diamond.sol";
+import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
+import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
+import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract InitializationTest is DiamondCutTest {
     address private revertFallbackAddress;
