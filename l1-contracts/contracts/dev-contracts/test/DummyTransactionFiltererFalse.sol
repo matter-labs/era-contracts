@@ -9,7 +9,7 @@ contract TransactionFiltererFalse is ITransactionFilterer {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    function isTransactionAllowed(BridgehubL2TransactionRequest memory) external view returns (bool) {
+    function isTransactionAllowed(address, address, uint256, uint256) external view returns (bool){
         return false;
     }
 }

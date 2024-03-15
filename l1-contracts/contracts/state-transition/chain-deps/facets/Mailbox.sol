@@ -229,7 +229,12 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
         // Check that the transaction is allowed by the filterer (if the filterer is set).
         if (s.transactionFilterer != address(0)) {
-            require(ITransactionFilterer(s.transactionFilterer).isTransactionAllowed(_request), "tf");
+            require(ITransactionFilterer(s.transactionFilterer).isTransactionAllowed(
+                _request.sender,
+                _request.contractL2,
+                _request.mintValue,
+                _request.l2Value),
+                "tf");
         }
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
