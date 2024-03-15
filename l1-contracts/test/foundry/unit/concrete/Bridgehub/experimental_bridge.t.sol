@@ -877,6 +877,7 @@ contract ExperimentalBridgeTest is Test {
         uint256 mockL2Value,
         bytes memory mockL2Calldata,
         uint256 mockL2GasLimit,
+        // solhint-disable-next-line no-unused-vars
         uint256 mockL2GasPerPubdataByteLimit,
         bytes[] memory mockFactoryDeps,
         address mockRefundRecipient
