@@ -313,7 +313,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32[] calldata _merkleProof
     ) internal nonReentrant {
         {
-            bool proofValid = bridgeHub.proveL1ToL2TransactionStatus({
+            bool proofValid = bridgehub.proveL1ToL2TransactionStatus({
                 _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
