@@ -90,7 +90,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: _initializeData.genesisBatchHash,
-            indexRepeatedStorageChangesL: _initializeData.genesisIndexRepeatedStorageChanges,
+            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,

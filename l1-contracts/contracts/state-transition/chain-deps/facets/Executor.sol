@@ -87,7 +87,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             StoredBatchInfo({
                 batchNumber: _newBatch.batchNumber,
                 batchHash: _newBatch.newStateRoot,
-                indexRepeatedStorageChangesL: _newBatch.indexRepeatedStorageChanges,
+                indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
                 numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
                 priorityOperationsHash: _newBatch.priorityOperationsHash,
                 l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
