@@ -4,23 +4,11 @@
 pragma solidity 0.8.20;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {ITransactionFilterer} from "solpp/state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction} from "solpp/common/Messaging.sol";
+import {BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "solpp/common/Config.sol";
+import {TransactionFiltererTrue} from "solpp/dev-contracts/test/DummyTransactionFiltererTrue.sol";
+import {TransactionFiltererFalse} from "solpp/dev-contracts/test/DummyTransactionFiltererFalse.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
-
-
-contract TransactionFiltererTrue is ITransactionFilterer {
-    function isTransactionAllowed(BridgehubL2TransactionRequest memory _request) external view returns (bool) {
-        return true;
-    }
-}
-
-contract TransactionFiltererFalse is ITransactionFilterer {
-    function isTransactionAllowed(BridgehubL2TransactionRequest memory _request) external view returns (bool) {
-        return false;
-    }
-}
 
 contract BridgehubRequestL2TransactionTest is MailboxTest {
     function test_successWithoutFilterer() public {
