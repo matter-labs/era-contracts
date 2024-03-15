@@ -7,7 +7,6 @@ import {BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "solpp/common/Config.sol";
 import {TransactionFiltererTrue} from "solpp/dev-contracts/test/DummyTransactionFiltererTrue.sol";
 import {TransactionFiltererFalse} from "solpp/dev-contracts/test/DummyTransactionFiltererFalse.sol";
-import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 
 contract BridgehubRequestL2TransactionTest is MailboxTest {
     function test_successWithoutFilterer() public {
