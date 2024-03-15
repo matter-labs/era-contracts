@@ -30,7 +30,7 @@ export default {
   },
   contractSizer: {
     runOnCompile: false,
-    except: ["dev-contracts", "zksync/upgrade-initializers", "zksync/libraries", "common/libraries"],
+    except: ["dev-contracts", "zksync/libraries", "common/libraries"],
   },
   paths: {
     sources: "./contracts",

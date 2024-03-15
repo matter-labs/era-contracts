@@ -4,18 +4,18 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../contracts/zksync/Config.sol";
-import {DiamondInit} from "../../../../../contracts/zksync/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../contracts/zksync/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../contracts/zksync/Storage.sol";
-import {ExecutorFacet} from "../../../../../contracts/zksync/facets/Executor.sol";
-import {GettersFacet} from "../../../../../contracts/zksync/facets/Getters.sol";
-import {AdminFacet} from "../../../../../contracts/zksync/facets/Admin.sol";
-import {MailboxFacet} from "../../../../../contracts/zksync/facets/Mailbox.sol";
-import {IExecutor} from "../../../../../contracts/zksync/interfaces/IExecutor.sol";
-import {IVerifier} from "../../../../../contracts/zksync/interfaces/IVerifier.sol";
-import {Diamond} from "../../../../../contracts/zksync/libraries/Diamond.sol";
-import {TestnetVerifier} from "../../../../../contracts/zksync/TestnetVerifier.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../contracts/common/Config.sol";
+import {DiamondInit} from "../../../../../contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "../../../../../contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {ExecutorFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Getters.sol";
+import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
+import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IExecutor} from "../../../../../contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IVerifier} from "../../../../../contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {Diamond} from "../../../../../contracts/state-transition/libraries/Diamond.sol";
+import {TestnetVerifier} from "../../../../../contracts/state-transition/TestnetVerifier.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -36,17 +36,18 @@ contract ExecutorTest is Test {
     IExecutor.ProofInput internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](10);
-        selectors[0] = admin.setPendingGovernor.selector;
-        selectors[1] = admin.acceptGovernor.selector;
-        selectors[2] = admin.setPendingAdmin.selector;
-        selectors[3] = admin.acceptAdmin.selector;
-        selectors[4] = admin.setValidator.selector;
-        selectors[5] = admin.setPorterAvailability.selector;
-        selectors[6] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[7] = admin.executeUpgrade.selector;
-        selectors[8] = admin.freezeDiamond.selector;
-        selectors[9] = admin.unfreezeDiamond.selector;
+        bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = admin.setPendingAdmin.selector;
+        selectors[1] = admin.acceptAdmin.selector;
+        selectors[2] = admin.setValidator.selector;
+        selectors[3] = admin.setPorterAvailability.selector;
+        selectors[4] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[5] = admin.changeFeeParams.selector;
+        selectors[6] = admin.setTokenMultiplier.selector;
+        selectors[7] = admin.upgradeChainFromVersion.selector;
+        selectors[8] = admin.executeUpgrade.selector;
+        selectors[9] = admin.freezeDiamond.selector;
+        selectors[10] = admin.unfreezeDiamond.selector;
         return selectors;
     }
 
@@ -62,8 +63,8 @@ contract ExecutorTest is Test {
     function getGettersSelectors() public view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](28);
         selectors[0] = getters.getVerifier.selector;
-        selectors[1] = getters.getGovernor.selector;
-        selectors[2] = getters.getPendingGovernor.selector;
+        selectors[1] = getters.getAdmin.selector;
+        selectors[2] = getters.getPendingAdmin.selector;
         selectors[3] = getters.getTotalBlocksCommitted.selector;
         selectors[4] = getters.getTotalBlocksVerified.selector;
         selectors[5] = getters.getTotalBlocksExecuted.selector;
@@ -125,6 +126,8 @@ contract ExecutorTest is Test {
         getters = new GettersFacet();
         mailbox = new MailboxFacet();
 
+        DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
+
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -132,23 +135,37 @@ contract ExecutorTest is Test {
         address dummyAddress = makeAddr("dummyAddress");
         TestnetVerifier testnetVerifier = new TestnetVerifier(dummyAddress);
 
-        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
-            verifier: testnetVerifier, // verifier
-            governor: owner,
+        genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: bytes32(""),
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: keccak256(""),
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: bytes32("")
+        });
+
+        InitializeData memory params = InitializeData({
+            // TODO REVIEW
+            chainId: ERA_CHAIN_ID,
+            bridgehub: makeAddr("bridgehub"),
+            stateTransitionManager: address(stateTransitionManager),
+            protocolVersion: 0,
             admin: owner,
-            genesisBatchHash: bytes32(0),
-            genesisIndexRepeatedStorageChanges: 0,
-            genesisBatchCommitment: bytes32(0),
+            validatorTimelock: validator,
+            baseToken: ETH_TOKEN_ADDRESS,
+            baseTokenBridge: address(new DummyEraBaseTokenBridge()),
+            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
+            verifier: IVerifier(dummyAddress), // verifier
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: 0,
                 recursionLeafLevelVkHash: 0,
                 recursionCircuitsSetVksHash: 0
             }),
-            zkPorterIsAvailable: false,
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
-            initialProtocolVersion: 0,
             feeParams: defaultFeeParams(),
             blobVersionedHashRetriever: blobVersionedHashRetriever
         });
@@ -195,23 +212,13 @@ contract ExecutorTest is Test {
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
 
-        vm.prank(owner);
-        admin.setValidator(validator, true);
+        // Initiate the token multiplier to enable L1 -> L2 transactions.
+        vm.prank(address(stateTransitionManager));
+        admin.setTokenMultiplier(1, 1);
 
         uint256[] memory recursiveAggregationInput;
         uint256[] memory serializedProof;
         proofInput = IExecutor.ProofInput(recursiveAggregationInput, serializedProof);
-
-        genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
-            batchNumber: 0,
-            batchHash: bytes32(""),
-            indexRepeatedStorageChanges: 0,
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            timestamp: 0,
-            commitment: bytes32("")
-        });
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
@@ -232,4 +239,7 @@ contract ExecutorTest is Test {
             pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

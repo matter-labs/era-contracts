@@ -4,7 +4,7 @@ import * as hre from "hardhat";
 import { ethers } from "ethers";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
 import { render, renderFile } from "template-file";
-import { utils } from "zksync-web3";
+import { utils } from "zksync-ethers";
 import { getRevertSelector, getTransactionUtils } from "./constants";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -69,13 +69,13 @@ const params = {
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
-  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2EthToken", "mint"),
+  RIGHT_PADDED_MINT_ETHER_SELECTOR: getPaddedSelector("L2BaseToken", "mint"),
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
-  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2EthToken", "transferFromTo"),
+  PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
   SUCCESSFUL_ACCOUNT_VALIDATION_MAGIC_VALUE: getPaddedSelector("IAccount", "validateTransaction"),
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
@@ -94,7 +94,7 @@ const params = {
   // One of "worst case" scenarios for the number of state diffs in a batch is when 260kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 260kb / 5 = 52k. This means that they will have
   // accoomdate 14144000 bytes of calldata for the uncompressed state diffs. Adding 260k on top leaves us with
-  // roughly 14404000 bytes needed for calldata. 450125 slots are needed to accomodate this amount of data.
+  // roughly 14404000 bytes needed for calldata. 450125 slots are needed to accommodate this amount of data.
   // We round up to 451000 slots just in case.
   //
   // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
@@ -127,7 +127,7 @@ function createTestFramework(tests: string[]): string {
   let testFramework = `
     let test_id:= mload(0)
 
-    switch test_id 
+    switch test_id
     case 0 {
         testing_totalTests(${tests.length})
     }
@@ -155,7 +155,7 @@ function validateSource(source: string) {
   const matches = source.matchAll(/<!-- @if BOOTLOADER_TYPE=='([^']*)' -->/g);
   for (const match of matches) {
     if (!PREPROCCESING_MODES.includes(match[1])) {
-      throw Error(`Invalid preprocessing mode '${match[1]}' at postion ${match.index}`);
+      throw Error(`Invalid preprocessing mode '${match[1]}' at position ${match.index}`);
     }
   }
 }

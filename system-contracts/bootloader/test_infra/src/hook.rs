@@ -3,7 +3,7 @@ use multivm::vm_latest::{
     HistoryMode, SimpleMemory,
 };
 
-use multivm::zk_evm_1_4_1::{
+use multivm::zk_evm_latest::{
     aux_structures::MemoryPage,
     tracing::{BeforeExecutionData, VmLocalStateData},
     zkevm_opcode_defs::{FatPointer, Opcode, UMAOpcode},
@@ -55,7 +55,7 @@ fn test_hook_as_string(hook_param: U256) -> String {
 }
 
 fn test_hook_as_int_or_hex(hook_param: U256) -> String {
-    // For long data, it is better to use hex-encoding for greater readibility
+    // For long data, it is better to use hex-encoding for greater readability
     if hook_param > U256::from(u64::max_value()) {
         let mut bytes = [0u8; 32];
         hook_param.to_big_endian(&mut bytes);

@@ -7,7 +7,7 @@ import {INonceHolder} from "./interfaces/INonceHolder.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {IKnownCodesStorage} from "./interfaces/IKnownCodesStorage.sol";
 import {IImmutableSimulator} from "./interfaces/IImmutableSimulator.sol";
-import {IEthToken} from "./interfaces/IEthToken.sol";
+import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
@@ -50,7 +50,7 @@ address constant FORCE_DEPLOYER = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 IL1Messenger constant L1_MESSENGER_CONTRACT = IL1Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
-IEthToken constant ETH_TOKEN_SYSTEM_CONTRACT = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -127,7 +127,7 @@ uint256 constant INITIAL_WRITE_STARTING_POSITION = 4;
 
 /// @dev Each storage diffs consists of the following elements:
 /// [20bytes address][32bytes key][32bytes derived key][8bytes enum index][32bytes initial value][32bytes final value]
-/// @dev The offset of the deriived key in a storage diff.
+/// @dev The offset of the derived key in a storage diff.
 uint256 constant STATE_DIFF_DERIVED_KEY_OFFSET = 52;
 /// @dev The offset of the enum index in a storage diff.
 uint256 constant STATE_DIFF_ENUM_INDEX_OFFSET = 84;

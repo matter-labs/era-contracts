@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/libraries/Diamond.sol";
-import "../../zksync/facets/Getters.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
+import {GettersFacet} from "../../state-transition/chain-deps/facets/Getters.sol";
 
 contract DiamondCutTestContract is GettersFacet {
     function diamondCut(Diamond.DiamondCutData memory _diamondCut) external {
