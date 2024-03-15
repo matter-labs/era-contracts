@@ -13,5 +13,11 @@ interface ITransactionFilterer {
     /// @param l2Value The msg.value of the L2 transaction
     /// @param l2Calldata The calldata of the L2 transaction
     /// @return Whether the transaction is allowed
-    function isTransactionAllowed(address sender, address contractL2, uint256 mintValue, uint256 l2Value, bytes memory l2Calldata) external view returns (bool);
+    function isTransactionAllowed(
+        address sender,
+        address contractL2,
+        uint256 mintValue,
+        uint256 l2Value,
+        bytes memory l2Calldata
+    ) external view returns (bool);
 }
