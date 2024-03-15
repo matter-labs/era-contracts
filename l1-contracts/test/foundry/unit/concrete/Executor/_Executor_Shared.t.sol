@@ -18,6 +18,7 @@ import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamo
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -147,6 +148,8 @@ contract ExecutorTest is Test {
             commitment: bytes32("")
         });
 
+        TestnetVerifier testnetVerifier = new TestnetVerifier(dummyAddress);
+
         InitializeData memory params = InitializeData({
             // TODO REVIEW
             chainId: ERA_CHAIN_ID,
@@ -158,7 +161,7 @@ contract ExecutorTest is Test {
             baseToken: ETH_TOKEN_ADDRESS,
             baseTokenBridge: address(new DummyEraBaseTokenBridge()),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            verifier: IVerifier(dummyAddress), // verifier
+            verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
                 recursionNodeLevelVkHash: 0,
                 recursionLeafLevelVkHash: 0,

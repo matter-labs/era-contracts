@@ -323,8 +323,8 @@ library Utils {
     //     allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
     // }
 
-    function makeVerifier() public pure returns (IVerifier) {
-        return IVerifier(address(0xdeadbeef));
+    function makeVerifier(address testnetVerifier) public pure returns (IVerifier) {
+        return IVerifier(testnetVerifier);
     }
 
     function makeVerifierParams() public pure returns (VerifierParams memory) {
@@ -344,7 +344,7 @@ library Utils {
             });
     }
 
-    function makeInitializeData() public pure returns (InitializeData memory) {
+    function makeInitializeData(address testnetVerifier) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
@@ -356,7 +356,7 @@ library Utils {
                 baseToken: address(0x923645439232223445),
                 baseTokenBridge: address(0x23746765237749923040872834),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(),
+                verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -366,10 +366,12 @@ library Utils {
             });
     }
 
-    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain(
+        address testnetVerifier
+    ) public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(),
+                verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -379,9 +381,12 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
-        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, makeInitializeData());
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            makeInitializeData(testnetVerifier)
+        );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

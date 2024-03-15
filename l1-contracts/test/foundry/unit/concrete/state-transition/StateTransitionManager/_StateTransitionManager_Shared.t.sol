@@ -17,6 +17,7 @@ import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -31,6 +32,7 @@ contract StateTransitionManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
     uint256 chainId = block.chainid;
+    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
 
     Diamond.FacetCut[] internal facetCuts;
 
@@ -116,8 +118,8 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
+    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);
 

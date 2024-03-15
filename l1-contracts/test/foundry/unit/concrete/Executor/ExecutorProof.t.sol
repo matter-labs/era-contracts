@@ -10,6 +10,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     function createBatchCommitment(
@@ -43,6 +44,7 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
+    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -67,7 +69,7 @@ contract ExecutorProofTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         executor = TestExecutorFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

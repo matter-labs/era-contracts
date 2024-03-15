@@ -14,7 +14,7 @@ import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.verifier = IVerifier(address(0));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -28,7 +28,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_governorIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.admin = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -42,7 +42,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_validatorTimelockIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.validatorTimelock = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -56,7 +56,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_priorityTxMaxGasLimitIsGreaterThanMaxGasPerTransaction() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.priorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -70,7 +70,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_valuesCorrectWhenSuccessfulInit() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
