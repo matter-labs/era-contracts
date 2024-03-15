@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {FeeParams, PubdataPricingMode} from "solpp/zksync/Storage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/zksync/Storage.sol";
 
 contract AuthorizationTest is AdminTest {
     function test_SetPendingAdmin_RevertWhen_AdminNotGovernanceOwner() public {

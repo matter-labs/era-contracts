@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../contracts/zksync/Config.sol";
 
 contract DepositTest is L1WethBridgeTest {
     function test_RevertWhen_ReceivedL1TokenIsNotL1WethAddress() public {

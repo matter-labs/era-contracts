@@ -3,18 +3,18 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {L1WethBridge} from "../../../../../../cache/solpp-generated-contracts/bridge/L1WethBridge.sol";
-import {WETH9} from "../../../../../../cache/solpp-generated-contracts/dev-contracts/WETH9.sol";
-import {GettersFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {MailboxFacet} from "../../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {Diamond} from "../../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
-import {DiamondProxy} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
+import {L1WethBridge} from "../../../../../../contracts/bridge/L1WethBridge.sol";
+import {WETH9} from "../../../../../../contracts/dev-contracts/WETH9.sol";
+import {GettersFacet} from "../../../../../../contracts/zksync/facets/Getters.sol";
+import {MailboxFacet} from "../../../../../../contracts/zksync/facets/Mailbox.sol";
+import {DiamondInit} from "../../../../../../contracts/zksync/DiamondInit.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../../contracts/zksync/Storage.sol";
+import {Diamond} from "../../../../../../contracts/zksync/libraries/Diamond.sol";
+import {DiamondProxy} from "../../../../../../contracts/zksync/DiamondProxy.sol";
 import {Utils} from "../../Utils/Utils.sol";
-import {IZkSync} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IZkSync.sol";
-import {DiamondInit} from "../../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {IVerifier} from "../../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
+import {IZkSync} from "../../../../../../contracts/zksync/interfaces/IZkSync.sol";
+import {DiamondInit} from "../../../../../../contracts/zksync/DiamondInit.sol";
+import {IVerifier} from "../../../../../../contracts/zksync/interfaces/IVerifier.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract L1WethBridgeTest is Test {

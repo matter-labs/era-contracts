@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {IExecutor} from "../../../../../contracts/zksync/interfaces/IExecutor.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;

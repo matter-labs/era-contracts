@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {UncheckedMathTest} from "./_UncheckedMath_Shared.t.sol";
-import {UncheckedMath} from "solpp/common/libraries/UncheckedMath.sol";
+import {UncheckedMath} from "contracts/common/libraries/UncheckedMath.sol";
 
 contract UncheckedAddTest is UncheckedMathTest {
     using UncheckedMath for uint256;

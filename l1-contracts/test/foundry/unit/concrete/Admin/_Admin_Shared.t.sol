@@ -2,14 +2,14 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {DiamondProxy} from "solpp/zksync/DiamondProxy.sol";
-import {DiamondInit} from "solpp/zksync/DiamondInit.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/zksync/Storage.sol";
-import {Diamond} from "solpp/zksync/libraries/Diamond.sol";
-import {AdminFacet} from "solpp/zksync/facets/Admin.sol";
-import {Base} from "solpp/zksync/facets/Base.sol";
-import {Governance} from "solpp/governance/Governance.sol";
-import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
+import {DiamondProxy} from "contracts/zksync/DiamondProxy.sol";
+import {DiamondInit} from "contracts/zksync/DiamondInit.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/zksync/Storage.sol";
+import {Diamond} from "contracts/zksync/libraries/Diamond.sol";
+import {AdminFacet} from "contracts/zksync/facets/Admin.sol";
+import {Base} from "contracts/zksync/facets/Base.sol";
+import {Governance} from "contracts/governance/Governance.sol";
+import {IVerifier} from "../../../../../contracts/zksync/interfaces/IVerifier.sol";
 
 contract GettersMock is Base {
     function getFeeParams() public returns (FeeParams memory) {

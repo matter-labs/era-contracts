@@ -4,17 +4,18 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
-import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
-import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
-import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
-import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
-import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
-import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
-import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../contracts/zksync/Config.sol";
+import {DiamondInit} from "../../../../../contracts/zksync/DiamondInit.sol";
+import {DiamondProxy} from "../../../../../contracts/zksync/DiamondProxy.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../contracts/zksync/Storage.sol";
+import {ExecutorFacet} from "../../../../../contracts/zksync/facets/Executor.sol";
+import {GettersFacet} from "../../../../../contracts/zksync/facets/Getters.sol";
+import {AdminFacet} from "../../../../../contracts/zksync/facets/Admin.sol";
+import {MailboxFacet} from "../../../../../contracts/zksync/facets/Mailbox.sol";
+import {IExecutor} from "../../../../../contracts/zksync/interfaces/IExecutor.sol";
+import {IVerifier} from "../../../../../contracts/zksync/interfaces/IVerifier.sol";
+import {Diamond} from "../../../../../contracts/zksync/libraries/Diamond.sol";
+import {TestnetVerifier} from "../../../../../contracts/zksync/TestnetVerifier.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
@@ -127,10 +128,12 @@ contract ExecutorTest is Test {
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
+
         address dummyAddress = makeAddr("dummyAddress");
+        TestnetVerifier testnetVerifier = new TestnetVerifier(dummyAddress);
 
         DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
-            verifier: IVerifier(dummyAddress), // verifier
+            verifier: testnetVerifier, // verifier
             governor: owner,
             admin: owner,
             genesisBatchHash: bytes32(0),

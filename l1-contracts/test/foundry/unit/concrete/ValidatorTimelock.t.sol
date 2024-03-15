@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "./Utils/Utils.sol";
-import {ValidatorTimelock, IExecutor} from "solpp/zksync/ValidatorTimelock.sol";
+import {ValidatorTimelock, IExecutor} from "contracts/zksync/ValidatorTimelock.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice Event emitted from ValidatorTimelock when new validator is added

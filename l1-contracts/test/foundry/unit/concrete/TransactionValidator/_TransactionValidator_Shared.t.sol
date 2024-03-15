@@ -2,9 +2,9 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {IMailbox} from "solpp/zksync/interfaces/IMailbox.sol";
-//import {TransactionValidator} from "solpp/zksync/libraries/TransactionValidator.sol";
-import {TransactionValidator} from "cache/solpp-generated-contracts/zksync/libraries/TransactionValidator.sol";
+import {IMailbox} from "contracts/zksync/interfaces/IMailbox.sol";
+//import {TransactionValidator} from "contracts/zksync/libraries/TransactionValidator.sol";
+import {TransactionValidator} from "contracts/zksync/libraries/TransactionValidator.sol";
 
 contract TransactionValidatorSharedTest is Test {
     constructor() {}
