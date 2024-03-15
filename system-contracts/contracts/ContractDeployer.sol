@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_EVM_PREFIX, CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT, EVM_INTERPRETER} from "./Constants.sol";
+import {CREATE2_EVM_PREFIX, CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -25,9 +25,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @notice Information about an account contract.
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
-
-    /// TODO: maybe have a preprocessor for it.
-    bytes32 internal evmInterpreterHash;
 
     // The hash of the EVMProxy contract. Set during genesis or during an upgrade
     // NOTE: keep this in slot 1 or you will have to change it in core/bin/zksync_core/src/genesis.rs where evm_proxy_hash_log is
@@ -368,8 +365,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes calldata _input,
         bool _callConstructor
     ) internal {
-        require(_bytecodeHash != evmInterpreterHash, "EVM interpreter hash can only be deployed for EVM");
-
         _ensureBytecodeIsKnown(_bytecodeHash);
 
         AccountInfo memory newAccountInfo;
@@ -419,7 +414,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(_newAddress);
 
         // When constructing they just get the intrepeter bytecode hash in consutrcting mode
-        _constructEVMContract(msg.sender, _newAddress, evmInterpreterHash, _input);
+        _constructEVMContract(msg.sender, _newAddress, _input);
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -483,7 +478,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     function _constructEVMContract(
         address _sender,
         address _newAddress,
-        bytes32 _bytecodeHash,
         bytes calldata _input
     ) internal {
         // FIXME: this is a temporary limitation.
