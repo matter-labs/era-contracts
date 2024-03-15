@@ -604,7 +604,7 @@ contract L1SharedBridgeFailTest is Test {
 
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
@@ -646,7 +646,7 @@ contract L1SharedBridgeFailTest is Test {
 
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
@@ -668,7 +668,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("ShB wrong msg len");
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
@@ -691,7 +691,7 @@ contract L1SharedBridgeFailTest is Test {
 
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
@@ -714,7 +714,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("ShB Incorrect message function selector");
         sharedBridge.finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
-            _l2BatchNumber: legacyBatchNumber,
+            _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
             _message: message,
