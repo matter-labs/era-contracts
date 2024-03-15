@@ -3,7 +3,6 @@
 pragma solidity 0.8.20;
 
 import {ITransactionFilterer} from "../../state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 contract TransactionFiltererTrue is ITransactionFilterer {
     // add this to be excluded from coverage report
