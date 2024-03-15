@@ -1,5 +1,8 @@
 [profile.default]
-src = "out/src"
-out = "out/build"
+src = "../l1-contracts/contracts"
+out = "out"
 libs = ["lib"]
-remappings = ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"]
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "contracts/=../l1-contracts/contracts/"
+]
