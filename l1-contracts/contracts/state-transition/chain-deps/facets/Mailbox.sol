@@ -233,7 +233,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
                 _request.sender,
                 _request.contractL2,
                 _request.mintValue,
-                _request.l2Value),
+                _request.l2Value,
+                _request.l2Calldata),
                 "tf");
         }
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
