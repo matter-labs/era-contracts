@@ -27,11 +27,14 @@ contract ExperimentalBridgeTest is Test {
     DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
 
+    uint256 eraChainId;
+
     function setUp() public {
+        eraChainId = 9;
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyStateTransition(address(bridgeHub));
+        mockChainContract = new DummyStateTransition(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);

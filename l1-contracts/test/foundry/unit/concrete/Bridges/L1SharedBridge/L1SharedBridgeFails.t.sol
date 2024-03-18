@@ -14,7 +14,6 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {ERA_CHAIN_ID, ERA_DIAMOND_PROXY} from "contracts/common/Config.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 // import "forge-std/console.sol";
@@ -84,6 +83,10 @@ contract L1SharedBridgeFailTest is Test {
     uint256 amount = 100;
     bytes32 txHash;
 
+    uint256 eraChainId;
+    address eraDiamondProxy;
+    address eraErc20BridgeAddress;
+
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
     uint16 l2TxNumberInBatch;
@@ -113,12 +116,18 @@ contract L1SharedBridgeFailTest is Test {
         eraFirstPostUpgradeBatch = 1;
 
         chainId = 1;
+        eraChainId = 9;
+        eraDiamondProxy = makeAddr("eraDiamondProxy");
+        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge(
             l1WethAddress,
             IBridgehub(bridgehubAddress),
-            IL1ERC20Bridge(l1ERC20BridgeAddress)
+            IL1ERC20Bridge(l1ERC20BridgeAddress),
+            eraChainId,
+            eraErc20BridgeAddress,
+            eraDiamondProxy
         );
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
@@ -129,7 +138,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(ERA_CHAIN_ID, l2SharedBridge);
+        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
     }
 
     function test_initialize_wrongOwner() public {
@@ -472,7 +481,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("ShB: legacy withdrawal");
         sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
+            eraChainId,
             legacyBatchNumber,
             l2MessageIndex,
             l2TxNumberInBatch,
@@ -499,7 +508,7 @@ contract L1SharedBridgeFailTest is Test {
                     keccak256(
                         abi.encode(
                             legacyBatchNumber,
-                            keccak256(abi.encode(ERA_CHAIN_ID, isWithdrawalFinalizedStorageLocation))
+                            keccak256(abi.encode(eraChainId, isWithdrawalFinalizedStorageLocation))
                         )
                     )
                 )
@@ -516,7 +525,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("Withdrawal is already finalized");
         sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
+            eraChainId,
             legacyBatchNumber,
             l2MessageIndex,
             l2TxNumberInBatch,
@@ -536,7 +545,7 @@ contract L1SharedBridgeFailTest is Test {
         );
 
         vm.mockCall(
-            ERA_DIAMOND_PROXY,
+            eraDiamondProxy,
             abi.encodeWithSelector(IGetters.isEthWithdrawalFinalized.selector),
             abi.encode(true)
         );
@@ -550,7 +559,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("Withdrawal is already finalized 2");
 
         sharedBridge.finalizeWithdrawal(
-            ERA_CHAIN_ID,
+            eraChainId,
             legacyBatchNumber,
             l2MessageIndex,
             l2TxNumberInBatch,
@@ -714,7 +723,7 @@ contract L1SharedBridgeFailTest is Test {
         address refundRecipient = address(0);
 
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(ERA_CHAIN_ID, address(0));
+        sharedBridge.initializeChainGovernance(eraChainId, address(0));
 
         vm.expectRevert("ShB b. n dep");
         vm.prank(l1ERC20BridgeAddress);
@@ -752,7 +761,7 @@ contract L1SharedBridgeFailTest is Test {
         uint256 l2TxGasPerPubdataByte = 100;
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, txHash, alice, bob, address(token), amount);
+        emit LegacyDepositInitiated(eraChainId, txHash, alice, bob, address(token), amount);
 
         vm.mockCall(
             bridgehubAddress,

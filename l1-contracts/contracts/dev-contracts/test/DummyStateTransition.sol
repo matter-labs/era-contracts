@@ -5,7 +5,7 @@ import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 
 contract DummyStateTransition is MailboxFacet {
-    constructor(address bridgeHubAddress) {
+    constructor(address bridgeHubAddress, uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.bridgehub = bridgeHubAddress;
     }
 

@@ -15,6 +15,8 @@ contract FacetCutTest is DiamondCutTest {
     ExecutorFacet private executorFacet1;
     ExecutorFacet private executorFacet2;
 
+    uint256 eraChainId;
+
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](4);
         selectors[0] = executorFacet1.commitBatches.selector;
@@ -25,8 +27,9 @@ contract FacetCutTest is DiamondCutTest {
     }
 
     function setUp() public {
+        eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
-        mailboxFacet = new MailboxFacet();
+        mailboxFacet = new MailboxFacet(eraChainId);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet();
         executorFacet2 = new ExecutorFacet();

@@ -351,7 +351,7 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("MailboxFacet", [this.chainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
@@ -391,6 +391,7 @@ export class Deployer {
       contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
     } else {
       const mainVerifierAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+      ethTxOptions.nonce = await this.deployWallet.getTransactionCount();
       contractAddress = await this.deployViaCreate2(
         "TestnetVerifier",
         [mainVerifierAddress],
@@ -496,7 +497,15 @@ export class Deployer {
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR], // we load from process.env, as normally L1_ERC20 bridge will already be deployed
+      [
+        l1WethToken,
+        this.addresses.Bridgehub.BridgehubProxy,
+        // we load from process.env, as normally L1_ERC20 bridge will already be deployed
+        process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR,
+        this.chainId,
+        this.addresses.Bridges.ERC20BridgeImplementation,
+        this.addresses.StateTransition.DiamondProxy,
+      ],
       create2Salt,
       ethTxOptions
     );
@@ -752,7 +761,7 @@ export class Deployer {
 
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay],
+      [this.ownerAddress, executionDelay, this.chainId],
       create2Salt,
       ethTxOptions
     );

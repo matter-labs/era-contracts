@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS, ERA_CHAIN_ID} from "contracts/common/Config.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -34,6 +34,8 @@ contract ExecutorTest is Test {
     uint256 internal currentTimestamp;
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
+
+    uint256 eraChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     IExecutor.ProofInput internal proofInput;
@@ -124,10 +126,12 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
+        eraChainId = 9;
+
         executor = new ExecutorFacet();
         admin = new AdminFacet();
         getters = new GettersFacet();
-        mailbox = new MailboxFacet();
+        mailbox = new MailboxFacet(eraChainId);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
 
@@ -152,7 +156,7 @@ contract ExecutorTest is Test {
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
-            chainId: ERA_CHAIN_ID,
+            chainId: eraChainId,
             bridgehub: makeAddr("bridgehub"),
             stateTransitionManager: address(stateTransitionManager),
             protocolVersion: 0,

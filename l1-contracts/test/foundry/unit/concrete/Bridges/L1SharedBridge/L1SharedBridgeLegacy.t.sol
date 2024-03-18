@@ -13,7 +13,6 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {ERA_CHAIN_ID} from "contracts/common/Config.sol";
 
 contract L1SharedBridgeLegacyTest is Test {
     event BridgehubDepositBaseTokenInitiated(
@@ -77,6 +76,10 @@ contract L1SharedBridgeLegacyTest is Test {
     uint256 amount = 100;
     bytes32 txHash;
 
+    uint256 eraChainId;
+    address eraDiamondProxy;
+    address eraErc20BridgeAddress;
+
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
     uint16 l2TxNumberInBatch;
@@ -100,12 +103,18 @@ contract L1SharedBridgeLegacyTest is Test {
         merkleProof = new bytes32[](1);
 
         chainId = 1;
+        eraChainId = 9;
+        eraDiamondProxy = makeAddr("eraDiamondProxy");
+        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge(
             l1WethAddress,
             IBridgehub(bridgehubAddress),
-            IL1ERC20Bridge(l1ERC20BridgeAddress)
+            IL1ERC20Bridge(l1ERC20BridgeAddress),
+            eraChainId,
+            eraErc20BridgeAddress,
+            eraDiamondProxy
         );
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
@@ -116,7 +125,7 @@ contract L1SharedBridgeLegacyTest is Test {
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(ERA_CHAIN_ID, l2SharedBridge);
+        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
     }
 
     function test_depositLegacyERC20Bridge() public {
@@ -125,7 +134,7 @@ contract L1SharedBridgeLegacyTest is Test {
         address refundRecipient = address(0);
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, txHash, alice, bob, address(token), amount);
+        emit LegacyDepositInitiated(eraChainId, txHash, alice, bob, address(token), amount);
 
         vm.mockCall(
             bridgehubAddress,
@@ -155,7 +164,7 @@ contract L1SharedBridgeLegacyTest is Test {
             keccak256(
                 abi.encode(
                     uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -177,7 +186,7 @@ contract L1SharedBridgeLegacyTest is Test {
             bridgehubAddress,
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
                 l2ToL1Message,
@@ -187,7 +196,7 @@ contract L1SharedBridgeLegacyTest is Test {
         );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, ETH_TOKEN_ADDRESS, amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, ETH_TOKEN_ADDRESS, amount);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
             l2BatchNumber,
@@ -208,7 +217,7 @@ contract L1SharedBridgeLegacyTest is Test {
             keccak256(
                 abi.encode(
                     uint256(uint160(address(token))),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -235,7 +244,7 @@ contract L1SharedBridgeLegacyTest is Test {
             bridgehubAddress,
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
                 l2ToL1Message,
@@ -245,7 +254,7 @@ contract L1SharedBridgeLegacyTest is Test {
         );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
             l2BatchNumber,
@@ -264,10 +273,10 @@ contract L1SharedBridgeLegacyTest is Test {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(ERA_CHAIN_ID, depositLocationInStorage)))),
+            keccak256(abi.encode(txHash, keccak256(abi.encode(eraChainId, depositLocationInStorage)))),
             txDataHash
         );
-        require(sharedBridge.depositHappened(ERA_CHAIN_ID, txHash) == txDataHash, "Deposit not set");
+        require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
         uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
@@ -275,7 +284,7 @@ contract L1SharedBridgeLegacyTest is Test {
             keccak256(
                 abi.encode(
                     uint256(uint160(address(token))),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -289,7 +298,7 @@ contract L1SharedBridgeLegacyTest is Test {
             bridgehubAddress,
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 txHash,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -301,7 +310,7 @@ contract L1SharedBridgeLegacyTest is Test {
         );
 
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);
         sharedBridge.claimFailedDepositLegacyErc20Bridge(
             alice,

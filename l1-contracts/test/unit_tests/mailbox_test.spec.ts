@@ -199,7 +199,7 @@ describe("Mailbox tests", function () {
 
     before(async () => {
       const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
-      const mailboxTestContract = await mailboxTestContractFactory.deploy();
+      const mailboxTestContract = await mailboxTestContractFactory.deploy(chainId);
       testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
 
       // Generating 10 more gas prices for test suit

@@ -100,15 +100,6 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 
 address constant ETH_TOKEN_ADDRESS = address(1);
 
-/// @dev Era's chainID
-uint256 constant ERA_CHAIN_ID = 324;
-
-/// @dev The address of legacy L1 ERC20 bridge.
-address constant ERA_ERC20_BRIDGE_ADDRESS = 0x681A1AFdC2e06776816386500D2D461a6C96cB45;
-
-/// @dev The address of zkSync Era diamond proxy contract.
-address constant ERA_DIAMOND_PROXY = 0x32400084C286CF3E17e7B677ea9583e60a000324;
-
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
