@@ -94,6 +94,5 @@ contract KnownCodesStorage is IKnownCodesStorage, ISystemContract {
                 sstore(hash, 1)
             }
         }
-
     }
 }

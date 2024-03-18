@@ -113,12 +113,12 @@ contract EvmInterpreter {
             mstore(0, selector)
             mstore(4, _account)
             let success := staticcall(gas(), to, 0, 36, 0, 32)
-    
+
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
-    
+
             hash := mload(0)
         }
     }
@@ -136,7 +136,7 @@ contract EvmInterpreter {
         }
     }
 
-    /// @dev This function is used to get the initCode. 
+    /// @dev This function is used to get the initCode.
     /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
     /// to obtain the bytecode.
     function _getConstructorBytecode() internal {
@@ -154,11 +154,7 @@ contract EvmInterpreter {
     }
 
     // Basically performs an extcodecopy, while returning the length of the bytecode.
-    function _fetchDeployedCode(
-        address _addr,
-        uint256 _offset,
-        uint256 _len
-    ) internal view returns (uint256 codeLen) {
+    function _fetchDeployedCode(address _addr, uint256 _offset, uint256 _len) internal view returns (uint256 codeLen) {
         bytes32 codeHash = _getRawCodeHash(_addr);
 
         address to = CODE_ORACLE_SYSTEM_CONTRACT;
@@ -173,7 +169,7 @@ contract EvmInterpreter {
             }
 
             // The first word is the true length of the bytecode
-            returndatacopy(0,0,32)
+            returndatacopy(0, 0, 32)
             codeLen := mload(0)
 
             if gt(_len, codeLen) {
@@ -1064,15 +1060,15 @@ contract EvmInterpreter {
     }
 
     /// zkEVM requires all bytecodes that can be decommitted into the memory to be at leas t
-    function padBytecode(uint256 _offset, uint256 _len) internal pure returns (uint256 blobOffset, uint256 blobLen){
+    function padBytecode(uint256 _offset, uint256 _len) internal pure returns (uint256 blobOffset, uint256 blobLen) {
         blobOffset = _offset - 32;
         uint256 trueLastByte = _offset + _len;
 
         assembly {
             mstore(blobOffset, _len)
             // clearing out additional bytes
-            mstore(trueLastByte , 0)
-            mstore(add(trueLastByte, 32) , 0)
+            mstore(trueLastByte, 0)
+            mstore(add(trueLastByte, 32), 0)
         }
 
         blobLen = _len + 32;

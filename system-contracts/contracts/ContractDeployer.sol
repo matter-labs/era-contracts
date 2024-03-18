@@ -467,11 +467,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         emit ContractDeployed(_sender, _bytecodeHash, _newAddress);
     }
 
-    function _constructEVMContract(
-        address _sender,
-        address _newAddress,
-        bytes calldata _input
-    ) internal {
+    function _constructEVMContract(address _sender, address _newAddress, bytes calldata _input) internal {
         // FIXME: this is a temporary limitation.
         // To be removed in the future
         require(_input.length > 0);
