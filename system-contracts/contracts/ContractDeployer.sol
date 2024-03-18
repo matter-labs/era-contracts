@@ -26,10 +26,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @dev For EOA and simple contracts (i.e. not accounts) this value is 0.
     mapping(address => AccountInfo) internal accountInfo;
 
-    // The hash of the EVMProxy contract. Set during genesis or during an upgrade
-    // NOTE: keep this in slot 1 or you will have to change it in core/bin/zksync_core/src/genesis.rs where evm_proxy_hash_log is
-    // bytes32 internal evmProxyHash;
-
     enum EvmContractState {
         None,
         ConstructorPending,
@@ -38,10 +34,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     }
 
     mapping(address => bytes32) public evmCodeHash;
-
-    // TODO: this is a hack before rewriting to assembly.
-    // This is the only reliable way to pass gas into constructor
-    // mapping(address => uint256) public constructorGas;
 
     uint256 public constructorReturnGas;
 
@@ -495,7 +487,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         // 2. Set the constructed code hash on the account
         _storeConstructingByteCodeHashOnAddress(
             _newAddress,
-            // Dummy EVM bytecode hash just to call simulator
+            // Dummy EVM bytecode hash just to call simulator.
+            // The second byte is `0x01` to indicate that it is being constructed.
             bytes32(0x0201000000000000000000000000000000000000000000000000000000000000)
         );
 
@@ -509,10 +502,8 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bool success = SystemContractHelper.mimicCall(uint32(gasleft()), _newAddress, msg.sender, _input, true, false);
 
         if (!success) {
-            // TODO: double check the behavior on EVM
             assembly {
                 // Just propagate the error back
-                // TODO: treat deployment nonce correctly
                 returndatacopy(0, 0, returndatasize())
                 revert(0, returndatasize())
             }

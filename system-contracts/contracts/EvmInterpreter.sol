@@ -63,7 +63,7 @@ contract EvmInterpreter {
         }
     }
 
-    // To prevent overflows, we always keep memory below 1MB. If someone tries to allocate more, we just return inf.
+    // To prevent overflows, we always keep memory below 1MB.
     // This constant is chosen in a way that:
     // - expandMemory will never overflow with 2 * MAX_ALLOWED_MEM_SIZE as input
     // - it should never be realistic for an EVM to get that much memory. TODO: possibly enforce that.
@@ -136,6 +136,9 @@ contract EvmInterpreter {
         }
     }
 
+    /// @dev This function is used to get the initCode. 
+    /// @dev It assumes that the initCode has been passed via the calldata and so we use the pointer
+    /// to obtain the bytecode.
     function _getConstructorBytecode() internal {
         uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
         uint256 bytecodeOffset = BYTECODE_OFFSET + 32;
@@ -181,36 +184,8 @@ contract EvmInterpreter {
         }
     }
 
-    // function _getBytecode() internal {
-    //     bytes4 selector = DEPLOYER_SYSTEM_CONTRACT.evmCode.selector;
-    //     address to = address(DEPLOYER_SYSTEM_CONTRACT);
-    //     uint256 bytecodeLengthOffset = BYTECODE_OFFSET;
-
-    //     assembly {
-    //         mstore(0, selector)
-    //         mstore(4, address())
-
-    //         let success := staticcall(gas(), to, 0, 36, 0, 0)
-
-    //         if iszero(success) {
-    //             // This error should never happen
-    //             revert(0, 0)
-    //         }
-
-    //         returndatacopy(
-    //             bytecodeLengthOffset,
-    //             // Skip 0x20 in the ABI encoding of the `bytes` type
-    //             32,
-    //             sub(returndatasize(), 32)
-    //         )
-    //     }
-    // }
-
-    // TODO: fix this function as evmCode is now padded
     function _extcodecopy(address _addr, uint256 dest, uint256 offset, uint256 len) internal view {
         address to = address(DEPLOYER_SYSTEM_CONTRACT);
-
-        // TODO: This is not very efficient
 
         // Firstly, we zero out everything.
         unchecked {
@@ -501,16 +476,16 @@ contract EvmInterpreter {
         uint256 dst
     ) {
         if (shouldPad) {
-            uint256 tmp;
+            uint256 previousValue;
             assembly {
-                tmp := mload(sub(dst, 32))
+                previousValue := mload(sub(dst, 32))
                 mstore(sub(dst, 32), gasToPass)
             }
 
             _;
 
             assembly {
-                mstore(sub(dst, 32), tmp)
+                mstore(sub(dst, 32), previousValue)
             }
         } else {
             _;
@@ -647,14 +622,14 @@ contract EvmInterpreter {
             // Performing the conversion
             _calleeGas = _getZkEVMGas(_calleeGas);
 
-            uint256 tmp = gasleft();
+            uint256 zkevmGasBefore = gasleft();
             assembly {
                 success := call(_calleeGas, _callee, _value, _inputOffset, _inputLen, _outputOffset, _outputLen)
             }
 
             _saveReturnDataAfterZkEVMCall();
 
-            uint256 gasUsed = _calcEVMGas(tmp - gasleft());
+            uint256 gasUsed = _calcEVMGas(zkevmGasBefore - gasleft());
 
             if (_calleeGas > gasUsed) {
                 _gasLeft = _calleeGas - gasUsed;
@@ -727,13 +702,13 @@ contract EvmInterpreter {
             // Performing the conversion
             _calleeGas = _getZkEVMGas(_calleeGas);
 
-            uint256 tmp = gasleft();
+            uint256 zkevmGasBefore = gasleft();
             assembly {
                 success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
             }
             _saveReturnDataAfterZkEVMCall();
 
-            uint256 gasUsed = _calcEVMGas(tmp - gasleft());
+            uint256 gasUsed = _calcEVMGas(zkevmGasBefore - gasleft());
 
             if (_calleeGas > gasUsed) {
                 _gasLeft = _calleeGas - gasUsed;
@@ -1150,9 +1125,6 @@ contract EvmInterpreter {
         unchecked {
             uint256 _ergTracking = gasleft();
 
-            // temp storage for many various operations
-            uint256 tmp = 0;
-
             // program counter (pc is taken in assembly, so ip = instruction pointer)
             uint256 ip = BYTECODE_OFFSET + 32;
 
@@ -1190,55 +1162,56 @@ contract EvmInterpreter {
 
                     uint256 a;
                     uint256 b;
+                    uint256 result;
 
                     (a, tos) = _popStackItem(tos);
                     (b, tos) = _popStackItem(tos);
 
                     if (opcode == OP_ADD) {
-                        tmp = a + b;
+                        result = a + b;
                         gasLeft = chargeGas(gasLeft, 3);
                     } else if (opcode == OP_MUL) {
-                        tmp = a * b;
+                        result = a * b;
                         gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SUB) {
-                        tmp = a - b;
+                        result = a - b;
                         gasLeft = chargeGas(gasLeft, 3);
                     } else if (opcode == OP_DIV) {
                         assembly ("memory-safe") {
-                            tmp := div(a, b)
+                            result := div(a, b)
                         }
                         gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SDIV) {
                         assembly ("memory-safe") {
-                            tmp := sdiv(a, b)
+                            result := sdiv(a, b)
                         }
                         gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_MOD) {
                         assembly ("memory-safe") {
-                            tmp := mod(a, b)
+                            result := mod(a, b)
                         }
                         gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_SMOD) {
                         assembly ("memory-safe") {
-                            tmp := smod(a, b)
+                            result := smod(a, b)
                         }
                         gasLeft = chargeGas(gasLeft, 5);
                     } else if (opcode == OP_ADDMOD) {
                         uint256 n;
                         (n, tos) = _popStackItem(tos);
                         assembly ("memory-safe") {
-                            tmp := addmod(a, b, n)
+                            result := addmod(a, b, n)
                         }
                         gasLeft = chargeGas(gasLeft, 8);
                     } else if (opcode == OP_MULMOD) {
                         uint256 n;
                         (n, tos) = _popStackItem(tos);
                         assembly ("memory-safe") {
-                            tmp := mulmod(a, b, n)
+                            result := mulmod(a, b, n)
                         }
                         gasLeft = chargeGas(gasLeft, 8);
                     } else if (opcode == OP_EXP) {
-                        tmp = a ** b;
+                        result = a ** b;
 
                         uint256 toCharge = 10;
                         while (b > 0) {
@@ -1249,12 +1222,12 @@ contract EvmInterpreter {
                         gasLeft = chargeGas(gasLeft, toCharge);
                     } else if (opcode == OP_SIGNEXTEND) {
                         assembly ("memory-safe") {
-                            tmp := signextend(a, b)
+                            result := signextend(a, b)
                         }
                         gasLeft = chargeGas(gasLeft, 5);
                     }
 
-                    tos = pushStackItem(tos, tmp);
+                    tos = pushStackItem(tos, result);
 
                     // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                     continue;
@@ -1262,19 +1235,20 @@ contract EvmInterpreter {
 
                 // ALU 2 - arithmetic-logic opcodes group (2 out of 2)
                 if (opcode < GRP_ALU2) {
+                    uint256 result;
                     if (opcode == OP_NOT) {
                         uint256 a;
                         (a, tos) = _popStackItem(tos);
 
-                        tmp = ~a;
+                        result = ~a;
                     } else if (opcode == OP_ISZERO) {
                         uint256 a;
                         (a, tos) = _popStackItem(tos);
 
                         if (a == 0) {
-                            tmp = 1;
+                            result = 1;
                         } else {
-                            tmp = 0;
+                            result = 0;
                         }
                     } else {
                         uint256 a;
@@ -1285,46 +1259,46 @@ contract EvmInterpreter {
 
                         if (opcode == OP_LT) {
                             assembly ("memory-safe") {
-                                tmp := lt(a, b)
+                                result := lt(a, b)
                             }
                         } else if (opcode == OP_GT) {
                             assembly ("memory-safe") {
-                                tmp := gt(a, b)
+                                result := gt(a, b)
                             }
                         } else if (opcode == OP_SLT) {
                             assembly ("memory-safe") {
-                                tmp := slt(a, b)
+                                result := slt(a, b)
                             }
                         } else if (opcode == OP_SGT) {
                             assembly ("memory-safe") {
-                                tmp := sgt(a, b)
+                                result := sgt(a, b)
                             }
                         } else if (opcode == OP_EQ) {
                             assembly ("memory-safe") {
-                                tmp := eq(a, b)
+                                result := eq(a, b)
                             }
                         } else if (opcode == OP_AND) {
-                            tmp = (a & b);
+                            result = (a & b);
                         } else if (opcode == OP_OR) {
-                            tmp = (a | b);
+                            result = (a | b);
                         } else if (opcode == OP_XOR) {
-                            tmp = (a ^ b);
+                            result = (a ^ b);
                         } else if (opcode == OP_BYTE) {
                             assembly ("memory-safe") {
-                                tmp := byte(b, a)
+                                result := byte(b, a)
                             }
                         } else if (opcode == OP_SHL) {
-                            tmp = (b << a);
+                            result = (b << a);
                         } else if (opcode == OP_SHR) {
-                            tmp = (b >> a);
+                            result = (b >> a);
                         } else if (opcode == OP_SAR) {
                             assembly ("memory-safe") {
-                                tmp := sar(a, b)
+                                result := sar(a, b)
                             }
                         }
                     }
 
-                    tos = pushStackItem(tos, tmp);
+                    tos = pushStackItem(tos, result);
                     gasLeft = chargeGas(gasLeft, 3);
                     // emit OpcodeTrace(opcode, _ergTracking - gasleft());
                     continue;
@@ -1762,16 +1736,16 @@ contract EvmInterpreter {
                             gasLeft = chargeGas(gasLeft, GAS_COLD_SLOAD);
                         }
 
-                        uint256 tmp;
+                        uint256 result;
                         assembly ("memory-safe") {
-                            tmp := sload(key)
+                            result := sload(key)
                         }
 
                         if (!isWarm) {
-                            warmSlot(key, tmp);
+                            warmSlot(key, result);
                         }
 
-                        tos = pushStackItem(tos, tmp);
+                        tos = pushStackItem(tos, result);
 
                         // need not to worry about gas refunds as it happens outside the evm
                         // emit OpcodeTrace(opcode, _ergTracking - gasleft());
