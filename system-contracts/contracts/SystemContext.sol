@@ -105,7 +105,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         VirtualBlockUpgradeInfo memory currentVirtualBlockUpgradeInfo = virtualBlockUpgradeInfo;
 
-        // Due to virtual blocks upgrade, we'll have to use the following logic for retreiving the blockhash:
+        // Due to virtual blocks upgrade, we'll have to use the following logic for retrieving the blockhash:
         // 1. If the block number is out of the 256-block supported range, return 0.
         // 2. If the block was created before the upgrade for the virtual blocks (i.e. there we used to use hashes of the batches),
         // we return the hash of the batch.

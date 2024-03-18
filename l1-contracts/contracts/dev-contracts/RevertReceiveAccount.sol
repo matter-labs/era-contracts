@@ -16,7 +16,7 @@ contract RevertReceiveAccount {
     }
 
     receive() external payable {
-        // Assert is used here to also simulate the out-of-gas error, since failed asserion
+        // Assert is used here to also simulate the out-of-gas error, since failed assertion
         // consumes up all the remaining gas
         assert(!revertReceive);
     }

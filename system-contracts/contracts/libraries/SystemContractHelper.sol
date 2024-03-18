@@ -315,7 +315,7 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Retuns whether the current call is a system call.
+    /// @notice Returns whether the current call is a system call.
     /// @return `true` or `false` based on whether the current call is a system call.
     function isSystemCall() internal view returns (bool) {
         uint256 callFlags = getCallFlags();
