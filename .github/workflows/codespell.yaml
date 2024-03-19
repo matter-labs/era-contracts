@@ -12,7 +12,6 @@ name: Codespell
 on: pull_request
 
 jobs:
-
   codespell:
     runs-on: ubuntu-latest
 
