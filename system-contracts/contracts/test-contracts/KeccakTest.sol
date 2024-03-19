@@ -15,7 +15,7 @@ contract KeccakTest {
     bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Just some computation-heavy function, it will be used to test out of gas
-    function infiniteFuction(uint256 n) public pure returns (uint256 sumOfSquares) {
+    function infiniteFunction(uint256 n) public pure returns (uint256 sumOfSquares) {
         for (uint256 i = 0; i < n; i++) {
             sumOfSquares += i * i;
         }
@@ -55,7 +55,7 @@ contract KeccakTest {
     }
 
     function zeroPointerTest() external {
-        try this.infiniteFuction{gas: 1000000}(1000000) returns (uint256) {
+        try this.infiniteFunction{gas: 1000000}(1000000) returns (uint256) {
             revert("The transaction should have failed");
         } catch {}
 

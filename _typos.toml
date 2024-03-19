@@ -1,0 +1,13 @@
+[files]
+# Temporarily commenting a lot so that at least *.sol files are included.
+extend-exclude = [
+    "/l1-contracts/lib/",
+    "/l1-contracts/out/",
+    "/l1-contracts/node_modules/",
+    "*.json",
+]
+
+[default.extend-words]
+# Don't correct the surname "Teh"
+FOT = "FOT"
+ue = "ue"
