@@ -32,7 +32,7 @@ contract StateTransitionManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
     uint256 chainId = block.chainid;
-    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     Diamond.FacetCut[] internal facetCuts;
 

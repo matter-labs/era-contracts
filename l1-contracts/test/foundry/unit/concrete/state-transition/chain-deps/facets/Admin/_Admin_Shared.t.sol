@@ -14,7 +14,7 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);

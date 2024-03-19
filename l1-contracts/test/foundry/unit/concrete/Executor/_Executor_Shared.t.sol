@@ -139,8 +139,6 @@ contract ExecutorTest is Test {
 
         bytes8 dummyHash = 0x1234567890123456;
 
-        address dummyAddress = makeAddr("dummyAddress");
-
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: bytes32(""),
@@ -152,7 +150,7 @@ contract ExecutorTest is Test {
             commitment: bytes32("")
         });
 
-        TestnetVerifier testnetVerifier = new TestnetVerifier(dummyAddress);
+        TestnetVerifier testnetVerifier = new TestnetVerifier();
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW

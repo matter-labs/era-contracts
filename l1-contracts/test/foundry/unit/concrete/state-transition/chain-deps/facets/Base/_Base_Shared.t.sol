@@ -40,7 +40,7 @@ bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "StateTransiti
 contract ZkSyncStateTransitionBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](6);

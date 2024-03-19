@@ -11,7 +11,7 @@ import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract DiamondInitTest is Test {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function setUp() public virtual {
         facetCuts.push(

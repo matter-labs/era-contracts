@@ -24,7 +24,7 @@ contract TestFacet is ZkSyncStateTransitionBase {
 
 contract DiamondProxyTest is Test {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier(address(0xdeadbeef)));
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
