@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
-import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemLogKey} from "./Constants.sol";
 

@@ -2,10 +2,13 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/Verifier.sol";
+import {Verifier} from "../../state-transition/Verifier.sol";
 
 /// @author Matter Labs
 contract VerifierRecursiveTest is Verifier {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     function _loadVerificationKey() internal pure override {
         assembly {
             // gate setup commitments

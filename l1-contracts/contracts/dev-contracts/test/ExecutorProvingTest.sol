@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.20;
 
-import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
-import {VerifierParams} from "../../zksync/Storage.sol";
-import {LogProcessingOutput} from "../../zksync/interfaces/IExecutor.sol";
-import {PubdataSource} from "../../zksync/interfaces/IExecutor.sol";
+import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
+import {VerifierParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
+import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
@@ -25,7 +27,8 @@ contract ExecutorProvingTest is ExecutorFacet {
 
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        PubdataPricingMode
     ) external pure returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }

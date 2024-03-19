@@ -2,12 +2,16 @@
 
 pragma solidity 0.8.20;
 
-import "../../zksync/facets/Mailbox.sol";
-import "../../zksync/Config.sol";
+import {FeeParams} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../common/Config.sol";
 
 contract MailboxFacetTest is MailboxFacet {
-    constructor() {
-        s.governor = msg.sender;
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
+    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
+        s.admin = msg.sender;
     }
 
     function setFeeParams(FeeParams memory _feeParams) external {

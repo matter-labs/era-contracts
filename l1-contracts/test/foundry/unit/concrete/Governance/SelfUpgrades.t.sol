@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {IGovernance} from "../../../../../contracts/governance/IGovernance.sol";
 
-contract SeflUpgradesTest is GovernanceTest {
+import {GovernanceTest} from "./_Governance_Shared.t.sol";
+
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+
+contract SelfUpgradesTest is GovernanceTest {
     event ChangeSecurityCouncil(address _securityCouncilBefore, address _securityCouncilAfter);
 
     event ChangeMinDelay(uint256 _delayBefore, uint256 _delayAfter);

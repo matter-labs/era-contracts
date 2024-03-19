@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
 
-import {SystemContractsCaller, CalldataForwardingMode, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, MIMIC_CALL_BY_REF_CALL_ADDRESS, META_CALL_ADDRESS, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, RAW_FAR_CALL_BY_REF_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SYSTEM_CALL_BY_REF_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 
 uint256 constant UINT32_MASK = 0xffffffff;
 uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
@@ -12,6 +12,7 @@ uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
 /// It needs to be padded with `00` to be treated as uint256 by Solidity
 uint256 constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
 
+/// @notice NOTE: The `getZkSyncMeta` that is used to obtain this struct will experience a breaking change in 2024.
 struct ZkSyncMeta {
     uint32 gasPerPubdataByte;
     uint32 heapSize;
@@ -35,8 +36,8 @@ enum Global {
  * @notice Library used for accessing zkEVM-specific opcodes, needed for the development
  * of system contracts.
  * @dev While this library will be eventually available to public, some of the provided
- * methods won't work for non-system contracts. We will not recommend this library
- * for external use.
+ * methods won't work for non-system contracts and also breaking changes at short notice are possible.
+ * We do not recommend this library for external use.
  */
 library SystemContractHelper {
     /// @notice Send an L2Log to L1.
@@ -52,6 +53,7 @@ library SystemContractHelper {
             _isService := and(_isService, 1)
             // This `success` is always 0, but the method always succeeds
             // (except for the cases when there is not enough gas)
+            // solhint-disable-next-line no-unused-vars
             let success := call(_isService, callAddr, _key, _value, 0xFFFF, 0, 0)
         }
     }
@@ -190,6 +192,7 @@ library SystemContractHelper {
     }
 
     /// @notice Get the packed representation of the `ZkSyncMeta` from the current context.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @return meta The packed representation of the ZkSyncMeta.
     /// @dev The fields in ZkSyncMeta are NOT tightly packed, i.e. there is a special rule on how
     /// they are packed. For more information, please read the documentation on ZkSyncMeta.
@@ -214,6 +217,7 @@ library SystemContractHelper {
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of gas
     /// that a single byte sent to L1 as pubdata costs.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @param meta Packed representation of the ZkSyncMeta.
     /// @return gasPerPubdataByte The current price in gas per pubdata byte.
     function getGasPerPubdataByteFromMeta(uint256 meta) internal pure returns (uint32 gasPerPubdataByte) {
@@ -231,10 +235,10 @@ library SystemContractHelper {
     }
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of the current size
-    /// of the auxilary heap in bytes.
+    /// of the auxiliary heap in bytes.
     /// @param meta Packed representation of the ZkSyncMeta.
-    /// @return auxHeapSize The size of the auxilary memory in bytes byte.
-    /// @dev You can read more on auxilary memory in the VM1.2 documentation.
+    /// @return auxHeapSize The size of the auxiliary memory in bytes byte.
+    /// @dev You can read more on auxiliary memory in the VM1.2 documentation.
     function getAuxHeapSizeFromMeta(uint256 meta) internal pure returns (uint32 auxHeapSize) {
         auxHeapSize = uint32(extractNumberFromMeta(meta, META_AUX_HEAP_SIZE_OFFSET, 32));
     }
@@ -266,6 +270,7 @@ library SystemContractHelper {
     }
 
     /// @notice Retrieves the ZkSyncMeta structure.
+    /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @return meta The ZkSyncMeta execution context parameters.
     function getZkSyncMeta() internal view returns (ZkSyncMeta memory meta) {
         uint256 metaPacked = getZkSyncMetaBytes();
@@ -315,11 +320,11 @@ library SystemContractHelper {
         }
     }
 
-    /// @notice Retuns whether the current call is a system call.
+    /// @notice Returns whether the current call is a system call.
     /// @return `true` or `false` based on whether the current call is a system call.
     function isSystemCall() internal view returns (bool) {
         uint256 callFlags = getCallFlags();
-        // When the system call is passed, the 2-bit it set to 1
+        // When the system call is passed, the 2-bit is set to 1
         return (callFlags & 2) != 0;
     }
 

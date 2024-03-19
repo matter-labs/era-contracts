@@ -2,15 +2,16 @@
 pragma solidity 0.8.20;
 
 import {Vm} from "forge-std/Test.sol";
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {IExecutor} from "contracts/zksync/interfaces/IExecutor.sol";
-import {SystemLogKey} from "contracts/zksync/interfaces/IExecutor.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/zksync/Config.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract CommittingTest is ExecutorTest {
-    function test_RevertWhen_ComittingWithWrongLastCommittedBatchData() public {
+    function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
         IExecutor.CommitBatchInfo[] memory newCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         newCommitBatchInfoArray[0] = newCommitBatchInfo;
 
@@ -23,7 +24,7 @@ contract CommittingTest is ExecutorTest {
         executor.commitBatches(wrongGenesisStoredBatchInfo, newCommitBatchInfoArray);
     }
 
-    function test_RevertWhen_ComittingWithWrongOrderOfBatches() public {
+    function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
         IExecutor.CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
         wrongNewCommitBatchInfo.batchNumber = 2; // wrong batch number
 

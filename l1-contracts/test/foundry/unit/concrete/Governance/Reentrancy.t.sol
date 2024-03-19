@@ -4,9 +4,11 @@ pragma solidity 0.8.20;
 // solhint-disable max-line-length
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
-import {IGovernance} from "../../../../../contracts/governance/IGovernance.sol";
-import {ReenterGovernance} from "../../../../../contracts/dev-contracts/test/ReenterGovernance.sol";
+
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {ReenterGovernance} from "contracts/dev-contracts/test/ReenterGovernance.sol";
 
 contract ReentrancyTest is GovernanceTest {
     using stdStorage for StdStorage;
