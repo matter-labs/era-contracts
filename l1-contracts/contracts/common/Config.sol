@@ -98,6 +98,9 @@ uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 10000;
 /// the operator in case the batch is closed because of the memory for transactions being filled up.
 uint256 constant MEMORY_OVERHEAD_GAS = 10;
 
+/// @dev The maximum gas limit for a priority transaction in L2.
+uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
 address constant ETH_TOKEN_ADDRESS = address(1);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
