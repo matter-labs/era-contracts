@@ -4,11 +4,18 @@ pragma solidity 0.8.20;
 
 import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Modified version of the main verifier contract for the testnet environment
+/// @dev This contract is used to skip the zkp verification for the testnet environment.
+/// If the proof is not empty, it will verify it using the main verifier contract,
+/// otherwise, it will skip the verification.
 contract TestnetVerifier is IVerifier {
-    IVerifier _mainVerifier;
+    IVerifier immutable mainVerifier;
 
-    constructor(address _verifier) {
-        _mainVerifier = IVerifier(_verifier);
+    constructor(address _mainVerifier) {
+        assert(block.chainid != 1);
+        mainVerifier = IVerifier(_mainVerifier);
     }
 
     function verify(
@@ -18,15 +25,14 @@ contract TestnetVerifier is IVerifier {
     ) external view returns (bool) {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
-        assert(block.chainid != 1);
         if (_proof.length == 0) {
             return true;
         }
 
-        return _mainVerifier.verify(_publicInputs, _proof, _recursiveAggregationInput);
+        return mainVerifier.verify(_publicInputs, _proof, _recursiveAggregationInput);
     }
 
     function verificationKeyHash() external view returns (bytes32) {
-        return _mainVerifier.verificationKeyHash();
+        return mainVerifier.verificationKeyHash();
     }
 }
