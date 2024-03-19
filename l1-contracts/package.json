@@ -71,6 +71,7 @@
     "verify": "hardhat run --network env scripts/verify.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
+    "initialize-erc20-bridge": "ts-node scripts/initialize-erc20-bridge.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
     "initialize-governance": "ts-node scripts/initialize-governance.ts",
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
