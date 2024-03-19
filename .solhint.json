@@ -13,11 +13,17 @@
     "no-complex-fallback": "off",
     "reason-string": "off",
     "func-name-mixedcase": "off",
-    "no-unused-vars": "off",
+    "no-unused-vars": "error",
     "max-states-count": "off",
     "no-global-import": "error",
     "no-unused-import": "error",
     "explicit-types": "error",
-    "compiler-version": ["warn", "^0.8.0"]
+    "modifier-name-mixedcase": "error",
+    "imports-on-top": "error",
+    "quotes": "error",
+    "use-forbidden-name": "error",
+    "visibility-modifier-order": "error",
+    "reentrancy": "error",
+    "compiler-version": ["error", "^0.8.0"]
   }
 }

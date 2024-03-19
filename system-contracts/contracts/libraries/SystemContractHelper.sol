@@ -53,6 +53,7 @@ library SystemContractHelper {
             _isService := and(_isService, 1)
             // This `success` is always 0, but the method always succeeds
             // (except for the cases when there is not enough gas)
+            // solhint-disable-next-line no-unused-vars
             let success := call(_isService, callAddr, _key, _value, 0xFFFF, 0, 0)
         }
     }
