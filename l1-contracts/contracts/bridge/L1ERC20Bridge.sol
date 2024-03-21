@@ -102,7 +102,14 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        l2TxHash = deposit({
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+            _refundRecipient: address(0)
+        });
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -142,15 +149,15 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}(
-            msg.sender,
-            _l2Receiver,
-            _l1Token,
-            _amount,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
-            _refundRecipient
-        );
+        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}({
+            _msgSender: msg.sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+            _refundRecipient: _refundRecipient
+        });
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
@@ -186,16 +193,16 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(amount != 0, "2T"); // empty deposit
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
-        sharedBridge.claimFailedDepositLegacyErc20Bridge(
-            _depositSender,
-            _l1Token,
-            amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
         emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
     }
 

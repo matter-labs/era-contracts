@@ -108,6 +108,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
         // Check that hashed log is not the default one,
@@ -181,14 +182,14 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == ERA_CHAIN_ID, "finalizeEthWithdrawal only available for Era on mailbox");
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     ///  @inheritdoc IMailbox

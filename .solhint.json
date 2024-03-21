@@ -24,6 +24,7 @@
     "use-forbidden-name": "error",
     "visibility-modifier-order": "error",
     "reentrancy": "error",
+    "func-named-parameters": ["error", 5],
     "compiler-version": ["error", "^0.8.0"]
   }
 }

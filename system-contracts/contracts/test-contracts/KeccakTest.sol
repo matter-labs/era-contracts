@@ -84,14 +84,14 @@ contract KeccakTest {
         bytes calldata upgradeCalldata
     ) external returns (bytes32 hash) {
         // Firstly, we reset keccak256 bytecode to be some random bytecode
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            eraseCallData,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: eraseCallData,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         // Since the keccak contract has been erased, it should not work anymore
         try this.callKeccak(msg.data[0:0]) returns (bytes32) {
@@ -99,14 +99,14 @@ contract KeccakTest {
         } catch {}
 
         // Upgrading it back to the correct version:
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         // Now it should work again
         hash = this.callKeccak(msg.data[0:0]);
@@ -114,14 +114,14 @@ contract KeccakTest {
     }
 
     function keccakPerformUpgrade(bytes calldata upgradeCalldata) external {
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
     }
 
     function callKeccak(bytes calldata _data) external pure returns (bytes32 hash) {
@@ -137,14 +137,14 @@ contract KeccakTest {
         require(testInputs.length == expectedOutputs.length, "mismatch between number of inputs and outputs");
 
         // Firstly, we upgrade keccak256 bytecode to the correct version.
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         bytes32[] memory result = new bytes32[](testInputs.length);
 
@@ -158,13 +158,13 @@ contract KeccakTest {
         }
 
         // Upgrading it back to the original version:
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            resetCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: resetCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
     }
 }

@@ -32,10 +32,25 @@ contract ReenterL1ERC20Bridge {
         if (functionToCall == FunctionToCall.LegacyDeposit) {
             l1Erc20Bridge.deposit(address(0), address(0), 0, 0, 0);
         } else if (functionToCall == FunctionToCall.Deposit) {
-            l1Erc20Bridge.deposit(address(0), address(0), 0, 0, 0, address(0));
+            l1Erc20Bridge.deposit({
+                _l2Receiver: address(0),
+                _l1Token: address(0),
+                _amount: 0,
+                _l2TxGasLimit: 0,
+                _l2TxGasPerPubdataByte: 0,
+                _refundRecipient: address(0)
+            });
         } else if (functionToCall == FunctionToCall.ClaimFailedDeposit) {
             bytes32[] memory merkleProof;
-            l1Erc20Bridge.claimFailedDeposit(address(0), address(0), bytes32(0), 0, 0, 0, merkleProof);
+            l1Erc20Bridge.claimFailedDeposit({
+                _depositSender: address(0),
+                _l1Token: address(0),
+                _l2TxHash: bytes32(0),
+                _l2BatchNumber: 0,
+                _l2MessageIndex: 0,
+                _l2TxNumberInBatch: 0,
+                _merkleProof: merkleProof
+            });
         } else if (functionToCall == FunctionToCall.FinalizeWithdrawal) {
             bytes32[] memory merkleProof;
             l1Erc20Bridge.finalizeWithdrawal(0, 0, 0, bytes(""), merkleProof);
