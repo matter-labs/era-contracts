@@ -142,7 +142,7 @@ export async function requestExecute(
   );
 }
 
-// due to gas reasons we call tha chains's contract directly, instead of the bridgehub.
+// due to gas reasons we call the chains' contract directly, instead of the bridgehub.
 export async function requestExecuteDirect(
   mailbox: IMailbox,
   to: Address,

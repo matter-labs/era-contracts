@@ -33,7 +33,7 @@ contract InitializationTest is DiamondCutTest {
         diamondCutTestContract.diamondCut(diamondCutData);
     }
 
-    function test_ReverWhen_DelegateCallToEOA() public {
+    function test_RevertWhen_DelegateCallToEOA() public {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
