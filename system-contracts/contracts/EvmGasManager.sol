@@ -100,7 +100,7 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
     function warmSlot(
         uint256 _slot,
         uint256 _currentValue
-    ) external payable onlySystemEvm onlySystemCall returns (bool, uint256)  {
+    ) external payable onlySystemEvm onlySystemCall returns (bool, uint256) {
         SlotInfo memory info = tloadWarmSlot(msg.sender, _slot);
 
         if (info.warm) {
