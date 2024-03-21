@@ -8,14 +8,13 @@ import type { BigNumberish, Wallet } from "ethers";
 import type { FacetCut } from "./diamondCut";
 
 import { SYSTEM_CONFIG } from "../scripts/utils";
-import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode } from "../src.ts/utils";
+import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode, ADDRESS_ONE } from "../src.ts/utils";
 import { Deployer } from "./deploy";
 import { Interface } from "ethers/lib/utils";
 import { deployTokens, getTokens } from "./deploy-token";
 import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
-  loadDefaultEnvVarsForTests,
   initialBridgehubDeployment,
   registerHyperchain,
 } from "./deploy-process";
@@ -24,9 +23,26 @@ import * as fs from "fs";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 import { CONTRACTS_LATEST_PROTOCOL_VERSION } from "../test/unit_tests/utils";
 // import { DummyAdminFacet } from "../typechain";
+import * as zkethers from "zksync-ethers";
 
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
+
+export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
+  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
+  process.env.CONTRACTS_GENESIS_ROOT = ethers.constants.HashZero;
+  process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
+  process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = ethers.constants.HashZero;
+  // process.env.CONTRACTS_GENESIS_UPGRADE_ADDR = ADDRESS_ONE;
+  process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = "72000000";
+  process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = ethers.constants.HashZero;
+  process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = ethers.constants.HashZero;
+  process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = ethers.constants.HashZero;
+  // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
+  process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
+  process.env.ERA_CHAIN_ID = "9";
+  process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
+}
 
 export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<Deployer> {
   return new Deployer({
@@ -40,7 +56,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
 }
 
 export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<EraDeployer> {
-  return new EraDeployer({
+  const deployer =  new EraDeployer({
     deployWallet,
     ownerAddress,
     verbose: false, // change here to view deployment
@@ -48,6 +64,11 @@ export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddr
     bootloaderBytecodeHash: L2_BOOTLOADER_BYTECODE_HASH,
     defaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   });
+  const l2_rpc_addr = "http://localhost:3050";
+  const web3Provider = new zkethers.Provider(l2_rpc_addr);
+  web3Provider.pollingInterval = 100; // It's OK to keep it low even on stage.
+  deployer.syncWallet = new zkethers.Wallet(deployWallet.privateKey, web3Provider, deployWallet.provider);
+  return deployer;
 }
 
 export async function initialTestnetDeploymentProcess(
@@ -71,6 +92,60 @@ export async function initialTestnetDeploymentProcess(
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
+  return deployer;
+}
+
+export async function initialPreUpgradeContractsDeployment(
+  deployWallet: Wallet,
+  ownerAddress: string,
+  gasPrice: BigNumberish,
+  extraFacets: FacetCut[],
+  baseTokenName?: string
+): Promise<EraDeployer> {
+  await loadDefaultEnvVarsForTests(deployWallet);
+  const deployer = await defaultEraDeployerForTests(deployWallet, ownerAddress);
+  deployer.chainId = 9;
+
+  const testnetTokens = getTokens();
+  const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
+  fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
+
+  let nonce = await deployer.deployWallet.getTransactionCount();
+  let create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+
+  // Create2 factory already deployed on the public networks, only deploy it on local node
+  if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
+    await deployer.deployCreate2Factory({ gasPrice, nonce });
+    nonce++;
+
+    await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
+    nonce++;
+  }
+  await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+  nonce++;
+
+  await deployer.deployDefaultUpgrade(create2Salt, {
+    gasPrice,
+    nonce,
+  });
+  nonce++;
+
+  await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
+  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+
+  // /// note the weird order is ok, it mimics historical deployment process
+  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+
+  // // for Era we first deploy the DiamondProxy manually, set the vars manually,
+  // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
+  // // note we just deploy the STM to get the storedBatchZero
+  await deployer.deployStateTransitionDiamondFacets(create2Salt);
+  // await deployer.deployStateTransitionManagerImplementation(create2Salt, {  });
+  // await deployer.deployStateTransitionManagerProxy(create2Salt, {  }, extraFacets);
+
+  await deployer.deployDiamondProxy(extraFacets, {});
+
   return deployer;
 }
 
@@ -104,10 +179,11 @@ export async function initialEraTestnetDeploymentProcess(
   return deployer;
 }
 
-class EraDeployer extends Deployer {
+export class EraDeployer extends Deployer {
+  public syncWallet : zkethers.Wallet;
   public async deployDiamondProxy(extraFacets: FacetCut[], ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    ethTxOptions.gasPrice ??= 5_000_000; // to fix gasPrice
+    ethTxOptions.gasPrice ??= 30_000_000; // to fix gasPrice
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
     const dummyAdminAddress = await this.deployViaCreate2(
       "DummyAdminFacet",
@@ -117,7 +193,8 @@ class EraDeployer extends Deployer {
     );
 
     const adminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet", dummyAdminAddress);
-    const facetCuts: FacetCut[] = [facetCut(adminFacet.address, adminFacet.interface, Action.Add, false)];
+    let facetCuts: FacetCut[] = [facetCut(adminFacet.address, adminFacet.interface, Action.Add, false)];
+    facetCuts = facetCuts.concat(extraFacets ?? []);
     const contractAddress = await this.deployViaCreate2(
       "DiamondProxy",
       [chainId, diamondCut(facetCuts, ethers.constants.AddressZero, "0x")],
@@ -131,9 +208,11 @@ class EraDeployer extends Deployer {
     }
 
     this.addresses.StateTransition.DiamondProxy = contractAddress;
-    // notably, the DummyAdminFacet does not depend on the
-    const diamondAdminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet", contractAddress);
-    await diamondAdminFacet.executeUpgrade2(await this.upgradeZkSyncStateTransitionDiamondCut(extraFacets));
+    this.chainId = parseInt(getNumberFromEnv("ERA_CHAIN_ID"));
+    // notably, the DummyAdminFacet does not depend on the contracts containing the ERA_Diamond_Proxy address
+    const diamondAdminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet2", contractAddress);
+    // we separate the main diamond cut into an upgrade ( as this was copied from the the old diamond cut )
+    await diamondAdminFacet.executeUpgrade2(await this.upgradeZkSyncStateTransitionDiamondCut());
   }
 
   public async upgradeZkSyncStateTransitionDiamondCut(extraFacets?: FacetCut[]) {
@@ -170,7 +249,24 @@ class EraDeployer extends Deployer {
       maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
       minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
     };
-    const storedBatchZero = await this.stateTransitionManagerContract(this.deployWallet).storedBatchZero();
+    const storedBatchZero = ethers.utils.keccak256(
+      new ethers.utils.AbiCoder().encode(
+        ["tuple(uint64 a, bytes32 b, uint64 c, uint256 d, bytes32 e, bytes32 f, uint256 g, bytes32 h)"],
+        [
+          {
+            a: "0",
+            b: getHashFromEnv("CONTRACTS_GENESIS_ROOT"),
+            c: getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX"),
+            d: ethers.constants.HashZero,
+            e: "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+            f: ethers.constants.HashZero,
+            g: ethers.constants.HashZero,
+            h: getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT"),
+          },
+        ]
+      )
+    );
+
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
       // these first values are set in the contract
       {
@@ -179,7 +275,7 @@ class EraDeployer extends Deployer {
         stateTransitionManager: this.addresses.StateTransition.StateTransitionProxy,
         protocolVersion: CONTRACTS_LATEST_PROTOCOL_VERSION,
         admin: this.ownerAddress,
-        validatorTimelock: this.addresses.ValidatorTimeLock,
+        validatorTimelock: ADDRESS_ONE,
         baseToken: ETH_ADDRESS_IN_CONTRACTS,
         baseTokenBridge: this.addresses.Bridges.SharedBridgeProxy,
         storedBatchZero,
@@ -194,5 +290,16 @@ class EraDeployer extends Deployer {
     ]);
 
     return diamondCut(facetCuts, this.addresses.StateTransition.DiamondInit, diamondInitCalldata);
+  }
+
+  public async deployHyperchainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("UpgradeHyperchains", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_HYPERCHAIN_UPGRADE_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 }

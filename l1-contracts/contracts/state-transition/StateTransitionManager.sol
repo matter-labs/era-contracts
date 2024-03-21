@@ -246,6 +246,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyBridgehub {
         if (stateTransition[_chainId] != address(0)) {
             // StateTransition chain already registered
+            // note this can only happen if we added the chain manually, as chains are normally registered through the bridgehub
+            // this is for legacy chains
             return;
         }
 

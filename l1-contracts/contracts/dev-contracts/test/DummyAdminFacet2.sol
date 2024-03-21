@@ -10,14 +10,10 @@ contract DummyAdminFacet2 is ZkSyncStateTransitionBase {
     function test() internal virtual {}
 
     function getName() external pure returns (string memory) {
-        return "DummyAdminFacet";
+        return "DummyAdminFacet2";
     }
 
-    function dummySetValidator(address _validator) external {
-        s.validators[_validator] = true;
-    }
-
-    function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external {
+    function executeUpgrade2(Diamond.DiamondCutData calldata _diamondCut) external {
         Diamond.diamondCut(_diamondCut);
     }
 }

@@ -17,6 +17,10 @@ import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
 
+export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
+export const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
+export const BEACON_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
+
 export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: ethers.BigNumber) {
   const l1SharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
 
@@ -71,7 +75,6 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
   }
-  const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
 
   if (!L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE) {
     throw new Error("L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE not found");
@@ -118,7 +121,6 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   }
   /// prepare proxyInitializationParams
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
-  const BEACON_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
   const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
   // console.log("kl todo l2GovernorAddress", l2GovernorAddress, deployer.addresses.Governance)
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [

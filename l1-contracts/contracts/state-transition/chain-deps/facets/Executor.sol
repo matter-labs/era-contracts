@@ -48,7 +48,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 0);
+            require(_newBatch.pubdataCommitments.length == 1);
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
