@@ -3,6 +3,7 @@
 import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
+import * as path from "path";
 
 import type { BigNumberish } from "ethers";
 import { BigNumber, ethers } from "ethers";
@@ -11,62 +12,76 @@ import type { DiamondCut } from "./diamondCut";
 import { getFacetCutsForUpgrade } from "./diamondCut";
 
 import { getTokens } from "./deploy-token";
-import { EraLegacyChainId } from "./deploy";
 import type { Deployer } from "./deploy";
+import type { EraDeployer } from "./deploy-test-process";
+
+import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
 import { Interface } from "ethers/lib/utils";
-import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
+import { ADDRESS_ONE, readBytecode, readInterface, type L2CanonicalTransaction, type ProposedUpgrade, type VerifierParams } from "./utils";
 
-import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-web3/build/src/utils";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+// import { L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE, L2_SHARED_BRIDGE_ABI, BEACON_PROXY_BYTECODE} from "../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit, applyL1ToL2Alias, hashL2Bytecode} from "../../l2-contracts/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 // const CONTRACT_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008006";
 // const COMPLEX_UPGRADE_ADDRESS = "0x000000000000000000000000000000000000800f";
 
+const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
+const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
+const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
+
+
+const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
+const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
+const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
+
+
 export async function upgradeToHyperchains(
-  deployer: Deployer,
+  deployer: EraDeployer,
   gasPrice: BigNumberish,
   create2Salt?: string,
   nonce?: number
 ) {
   // does not interfere with existing system
+  // note other contract were already deployed
   if (deployer.verbose) {
     console.log("Deploying new contracts");
   }
-  await deployNewContracts(deployer, gasPrice, create2Salt, nonce);
+  await deployNewContracts(deployer, gasPrice, create2Salt, nonce); //done
 
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
-  // but this requires the sharedBridge to be deployed.
-  // kl to: (is this needed?) disable shared bridge deposits until L2Bridge is upgraded.
+  // this requires the sharedBridge to be deployed.
+  // In theory, the L1SharedBridge deposits should be disabled until the L2Bridge is upgraded.
+  // However, without the Portal, UI being upgraded it does not matter (nobody will call it)
   if (deployer.verbose) {
     console.log("Integrating Era into Bridgehub and upgrading L2 system contract");
   }
-  await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice);
+  await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice); // details for L2 system contract upgrade not finished
 
   // the L2Bridge and L1ERC20Bridge should be updated relatively in sync, as new messages might not be parsed correctly by the old bridge.
   // however new bridges can parse old messages. L1->L2 messages are faster, so L2 side is upgraded first.
-  // until we integrate Era into the Bridgehub, txs will not work.
   if (deployer.verbose) {
     console.log("Upgrading L2 bridge");
   }
-  await upgradeL2Bridge(deployer);
-  // kl todo add both bridge address to L2Bridge, so that it can receive txs from both bridges
-  // kl todo: enable L1SharedBridge deposits if disabled.
+  await upgradeL2Bridge(deployer); // mostly finished
+
   if (deployer.verbose) {
     console.log("Upgrading L1 ERC20 bridge");
   }
-  await upgradeL1ERC20Bridge(deployer);
-  // // note, withdrawals will not work until this step, but deposits will
+  await deployer.upgradeL1ERC20Bridge(true); // done
+
+  // note, withdrawals will not work until this step, but deposits will
   if (deployer.verbose) {
     console.log("Migrating assets from L1 ERC20 bridge and ChainBalance");
   }
-  await migrateAssets(deployer);
+  await migrateAssets(deployer); // done
 }
 
-async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
+async function deployNewContracts(deployer: EraDeployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
   nonce = nonce || (await deployer.deployWallet.getTransactionCount());
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
@@ -81,8 +96,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
   nonce++;
 
-  // kl todo check if this needs to be redeployed
-  await deployer.deployDefaultUpgrade(create2Salt, {
+  await deployer.deployHyperchainsUpgrade(create2Salt, {
     gasPrice,
     nonce,
   });
@@ -101,7 +115,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {
   // era facet cut
-  const defaultUpgrade = new Interface(hardhat.artifacts.readArtifactSync("DefaultUpgrade").abi);
+  const upgradeHyperchains = new Interface(hardhat.artifacts.readArtifactSync("UpgradeHyperchains").abi);
   const newProtocolVersion = 24;
   const toAddress: string = ethers.constants.AddressZero;
   const calldata: string = ethers.constants.HashZero;
@@ -110,7 +124,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     from: FORCE_DEPLOYER_ADDRESS,
     to: toAddress,
     gasLimit: 72_000_000,
-    gasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     maxFeePerGas: 0,
     maxPriorityFeePerGas: 0,
     paymaster: 0,
@@ -141,7 +155,18 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     upgradeTimestamp: upgradeTimestamp,
     newProtocolVersion: 24,
   };
-  const defaultUpgradeData = defaultUpgrade.encodeFunctionData("upgrade", [proposedUpgrade]);
+  const defaultUpgradeData = upgradeHyperchains.encodeFunctionData("upgradeWithAdditionalData", [
+    proposedUpgrade,
+    new ethers.utils.AbiCoder().encode(
+      ["uint256", "address", "address", "address"],
+      [
+        deployer.chainId,
+        deployer.addresses.Bridgehub.BridgehubProxy,
+        deployer.addresses.StateTransition.StateTransitionProxy,
+        deployer.addresses.Bridges.SharedBridgeProxy,
+      ]
+    ),
+  ]);
 
   const facetCuts = await getFacetCutsForUpgrade(
     deployer.deployWallet,
@@ -150,31 +175,36 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     deployer.addresses.StateTransition.GettersFacet,
     deployer.addresses.StateTransition.MailboxFacet,
     deployer.addresses.StateTransition.ExecutorFacet
-  ); //.concat(extraFacets ?? []);
+  );
   const diamondCut: DiamondCut = {
     facetCuts,
     initAddress: deployer.addresses.StateTransition.DefaultUpgrade,
     initCalldata: defaultUpgradeData,
   };
-  //   console.log('kl todo', facetCuts)
-  const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet").abi);
-  // to test this remove modifier from executeUpgrade
+  const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet2").abi);
+
   const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
   await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
 
   // register Era in Bridgehub, STM
   const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
+  if (deployer.verbose) {
+    console.log("registering Era in stateTransitionManager");
+  }
   const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
-    EraLegacyChainId,
+    deployer.chainId,
     deployer.addresses.StateTransition.DiamondProxy
   );
   await tx0.wait();
   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
+  if (deployer.verbose) {
+    console.log("registering Era in Bridgehub");
+  }
   const tx = await bridgehub.createNewChain(
-    EraLegacyChainId,
+    deployer.chainId,
     deployer.addresses.StateTransition.StateTransitionProxy,
-    ETH_ADDRESS_IN_CONTRACTS,
+    ADDRESS_ONE,
     ethers.constants.HashZero,
     deployer.addresses.Governance,
     ethers.constants.HashZero,
@@ -185,14 +215,31 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
-  // upgrade L2 bridge contract, we do this directly via the L2
-  // set initializeChainGovernance in L1SharedBridge
-  deployer;
-}
 
-async function upgradeL1ERC20Bridge(deployer: Deployer) {
-  // upgrade old contracts
-  await deployer.upgradeL1ERC20Bridge(true);
+  // todo deploy l2 bridge here
+  // L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE
+  const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
+  const 
+
+  // upgrade from L1 governance. This has to come from governacne on L1. 
+  const l2Bridge= L2_SHARED_BRIDGE_INTERFACE;
+  const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [deployer.addresses.Bridges.SharedBridgeProxy, deployer.addresses.Bridges.ERC20BridgeProxy, hashL2Bytecode(BEACON_PROXY_BYTECODE), applyL1ToL2Alias(deployer.addresses.Governance)]);
+  const bridgeProxy : ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(ADDRESS_ONE, deployer.deployWallet); // we just need the interface, so wrong address
+
+  const l2ProxyCalldata = bridgeProxy.interface.encodeFunctionData("upgradeToAndCall", [l2BridgeImplementationAddress, l2BridgeCalldata]);
+
+  const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
+  const factoryDeps = [] ; 
+  const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR, 0, l2ProxyCalldata, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, factoryDeps, deployer.deployWallet.address]); 
+  const gasPrice = await deployer.deployWallet.getGasPrice();
+  const requiredValueForL2Tx = await deployer.bridgehubContract(deployer.deployWallet).l2TransactionBaseCost(
+    deployer.chainId,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );//"1000000000000000000";
+  console.log("KL todo", requiredValueForL2Tx)
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, requiredValueForL2Tx.mul(10) , mailboxCalldata)
 }
 
 async function migrateAssets(deployer: Deployer) {
@@ -202,12 +249,12 @@ async function migrateAssets(deployer: Deployer) {
   }
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const ethTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
-    ETH_ADDRESS_IN_CONTRACTS,
+  ADDRESS_ONE,
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.chainId,
   ]);
-  ethTransferData;
-  //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
+  // ethTransferData;
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
 
   if (deployer.verbose) {
     console.log("transferring Dai");
@@ -215,11 +262,21 @@ async function migrateAssets(deployer: Deployer) {
 
   const tokens = getTokens();
   const altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
+
+  // Mint some tokens
+  const l1Erc20ABI = ["function mint(address to, uint256 amount)"];
+  const l1Erc20Contract = new ethers.Contract(altTokenAddress, l1Erc20ABI, deployer.deployWallet);
+  const mintTx = await l1Erc20Contract.mint(
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    ethers.utils.parseEther("10000.0")
+  );
+  await mintTx.wait();
+
   const daiTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
     altTokenAddress,
     deployer.addresses.Bridges.ERC20BridgeProxy,
     deployer.chainId,
   ]);
-  daiTransferData;
-  //   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);
+  // daiTransferData;
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);
 }
