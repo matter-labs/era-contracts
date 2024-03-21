@@ -30,6 +30,10 @@ import {
   requestExecuteDirect,
 } from "./utils";
 
+// This test is mimicking the legacy Era functions. Era's Address was known at the upgrade, so we hardcoded them in the contracts,
+// Now we are deploying a diamond proxy, which has to have that address.
+// We do this by having a deterministic testing process (wallet, create2Factory address, Era diamond proxy address, etc.),
+// and setting the ERA_DIAMOND_PROXY address in the hardhat config.
 describe("Legacy Era tests", function () {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
@@ -53,8 +57,7 @@ describe("Legacy Era tests", function () {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
     const gasPrice = await owner.provider.getGasPrice();
-    // WARNING!!! WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!
-    // create2Address and Era diamond proxy address can be the same one as fixed in hardhat config
+
     deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
     // process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
@@ -187,6 +190,23 @@ describe("Legacy Era tests", function () {
     expect(revertReason).equal("xx");
   });
 
+  // we would want to check the scenario where ERA_DIAMOND_PROXY is called,
+  // this is a bit complex
+
+  // it("Should revert on finalizing a withdrawal with legacy batch number", async () => {
+  //   const l1Receiver = await randomSigner.getAddress();
+  //   const l2ToL1message = ethers.utils.hexConcat([
+  //     functionSignature,
+  //     l1Receiver,
+  //     erc20TestToken.address,
+  //     ethers.constants.HashZero,
+  //   ]);
+  //   const revertReason = await getCallRevertReason(
+  //     l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
+  //   );
+  //   expect(revertReason).equal("xc"); // note we check that we
+  // });
+
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
@@ -240,7 +260,7 @@ describe("Legacy Era tests", function () {
   });
 
   describe("finalizeEthWithdrawal", function () {
-    const BLOCK_NUMBER = 0;
+    const BLOCK_NUMBER = 1;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
     const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";

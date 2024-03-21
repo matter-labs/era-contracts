@@ -35,8 +35,6 @@ import { ERC20Factory } from "../typechain";
 
 let L2_BOOTLOADER_BYTECODE_HASH: string;
 let L2_DEFAULT_ACCOUNT_BYTECODE_HASH: string;
-export const EraLegacyChainId = 324;
-export const EraLegacyDiamondProxyAddress = "0x32400084C286CF3E17e7B677ea9583e60a000324";
 
 export interface DeployerConfig {
   deployWallet: Wallet;
@@ -445,7 +443,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
-    const executeTX = await governance.execute(operation);
+    const executeTX = await governance.execute(operation, {value: value});
     await executeTX.wait();
     if (this.verbose) {
       console.log(
@@ -457,12 +455,13 @@ export class Deployer {
     }
   }
 
-  // used for testing, mimics deployment process.
+  // used for testing, mimics original deployment process.
+  // we don't use the real implementation, as we need the address to be independent
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.Bridgehub.BridgehubProxy, this.addresses.TransparentProxyAdmin, "0x"], // we have to use an  address where a contract is already deployed
+      [this.addresses.TransparentProxyAdmin, this.addresses.TransparentProxyAdmin, "0x"], // we have to use an  address where a contract is already deployed, so TransparentProxyAdmin
       create2Salt,
       ethTxOptions
     );

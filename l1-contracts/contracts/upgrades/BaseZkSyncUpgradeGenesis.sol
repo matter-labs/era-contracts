@@ -14,6 +14,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     function _setNewProtocolVersion(uint256 _newProtocolVersion) internal override {
         uint256 previousProtocolVersion = s.protocolVersion;
         require(
+            // !! ONLY CHANGE IS IN THIS LINE !!
             // Genesis Upgrade difference: Note this is the only thing change > to >=
             _newProtocolVersion >= previousProtocolVersion,
             "New protocol version is not greater than the current one"

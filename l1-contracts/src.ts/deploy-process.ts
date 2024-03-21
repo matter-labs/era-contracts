@@ -14,22 +14,8 @@ import { getTokens } from "./deploy-token";
 
 import { ADDRESS_ONE } from "../src.ts/utils";
 
-const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
-
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
-
-export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
-  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
-  process.env.CONTRACTS_GENESIS_ROOT = zeroHash;
-  process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
-  process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = zeroHash;
-  process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = "72000000";
-  process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = zeroHash;
-  process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = zeroHash;
-  process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = zeroHash;
-  process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
-}
 
 export async function initialBridgehubDeployment(
   deployer: Deployer,
@@ -84,6 +70,9 @@ export async function initialBridgehubDeployment(
   await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
   await deployer.upgradeL1ERC20Bridge();
+  if (deployer.verbose) {
+    console.log("Deployment finished");
+  }
 }
 
 export async function registerHyperchain(
