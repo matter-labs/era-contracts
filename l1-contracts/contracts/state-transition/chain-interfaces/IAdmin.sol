@@ -42,6 +42,9 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @notice Used to set to validium directly after genesis
     function setValidiumMode(PubdataPricingMode _validiumMode) external;
 
+    /// @notice Set the transaction filterer
+    function setTransactionFilterer(address _transactionFilterer) external;
+
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
@@ -78,6 +81,9 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Validium mode status changed
     event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+
+    /// @notice The transaction filterer has been updated
+    event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(

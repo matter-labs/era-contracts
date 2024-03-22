@@ -149,6 +149,7 @@ contract CommittingTest is ExecutorTest {
 
         bytes memory wrongL2Logs = abi.encodePacked(
             Utils.encodePacked(l2Logs),
+            // solhint-disable-next-line func-named-parameters
             Utils.constructL2Log(
                 true,
                 L2_SYSTEM_CONTEXT_ADDRESS,
@@ -239,6 +240,7 @@ contract CommittingTest is ExecutorTest {
         bytes[] memory l2Logs = Utils.createSystemLogs();
         bytes memory wrongL2Logs = abi.encodePacked(
             Utils.encodePacked(l2Logs),
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(119), bytes32(""))
         );
 

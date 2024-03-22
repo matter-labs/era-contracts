@@ -5,6 +5,7 @@ pragma solidity 0.8.20;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
@@ -115,6 +116,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
         // Check that hashed log is not the default one,
@@ -188,14 +190,14 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         require(s.chainId == eraChainId, "finalizeEthWithdrawal only available for Era on mailbox");
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal(
-            eraChainId,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
+            _chainId: eraChainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     ///  @inheritdoc IMailbox
@@ -233,6 +235,20 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     function _requestL2TransactionSender(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        // Check that the transaction is allowed by the filterer (if the filterer is set).
+        if (s.transactionFilterer != address(0)) {
+            require(
+                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+                    sender: _request.sender,
+                    contractL2: _request.contractL2,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: _request.l2Calldata,
+                    refundRecipient: _request.refundRecipient
+                }),
+                "tf"
+            );
+        }
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address l2Sender = _request.sender;

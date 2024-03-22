@@ -87,16 +87,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
-            0,
-            _initializeData.genesisBatchHash,
-            _initializeData.genesisIndexRepeatedStorageChanges,
-            0,
-            EMPTY_STRING_KECCAK,
-            DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            0,
-            _initializeData.genesisBatchCommitment
-        );
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _initializeData.genesisBatchHash,
+            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: _initializeData.genesisBatchCommitment
+        });
+
         storedBatchZero = keccak256(abi.encode(batchZero));
 
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
@@ -258,6 +259,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes
+        // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),

@@ -28,18 +28,18 @@ contract SystemCaller {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            Utils.safeCastToU32(gasleft()),
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: Utils.safeCastToU32(gasleft()),
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            true
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: true
+        });
 
         bool success;
         if (msg.value == 0) {

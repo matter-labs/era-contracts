@@ -62,7 +62,7 @@ interface IStateTransitionManager {
 
     function protocolVersion() external view returns (uint256);
 
-    function initialize(StateTransitionManagerInitializeData calldata _initalizeData) external;
+    function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external;
 
