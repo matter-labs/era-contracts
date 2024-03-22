@@ -297,12 +297,10 @@ contract ExecutorFacet is Base, IExecutor {
     function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
         require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
-        // if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-        //     require(
-        //         _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
-        //         "exe10" // executing batch should be committed
-        //     );
-        // }
+        require(
+            _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
+            "exe10" // executing batch should be committed
+        );
 
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
@@ -352,12 +350,10 @@ contract ExecutorFacet is Base, IExecutor {
         bytes32 prevBatchCommitment = _prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            // if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            //     require(
-            //         _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
-            //         "o1"
-            //     );
-            // }
+            require(
+                _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
+                "o1"
+            );
 
             bytes32 currentBatchCommitment = _committedBatches[i].commitment;
             proofPublicInput[i] = _getBatchProofPublicInput(
@@ -540,15 +536,9 @@ contract ExecutorFacet is Base, IExecutor {
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            require(_pubdataCommitments.length > 0, "plr");
-            require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS, "bd");
-            require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
-        } else if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
-            require(_pubdataCommitments.length == 0, "plv");
-        } else {
-            revert("pl");
-        }
+        require(_pubdataCommitments.length > 0, "plr");
+        require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS, "bd");
+        require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
 
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
@@ -584,22 +574,11 @@ contract ExecutorFacet is Base, IExecutor {
         // We verify that for each set of blobHash/blobCommitment are either both empty
         // or there are values for both.
         for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
-            if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-                require(
-                    (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
-                        (_blobHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
-                    "bhr"
-                );
-            } else if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
-                // blobCommitments are always bytes32(0) in Validium mode
-                require(
-                    (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
-                        (_blobHashes[i] != bytes32(0) && blobCommitments[i] == bytes32(0)),
-                    "bhv"
-                );
-            } else {
-                revert("bh");
-            }
+            require(
+                (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
+                    (_blobHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
+                "bhr"
+            );
         }
     }
 
