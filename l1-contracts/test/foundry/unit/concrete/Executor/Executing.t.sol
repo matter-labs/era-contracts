@@ -212,15 +212,15 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        mailbox.requestL2Transaction{value: totalCost}(
-            address(0),
-            l2Value,
-            bytes(""),
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps,
-            address(0)
-        );
+        mailbox.requestL2Transaction{value: totalCost}({
+            _contractL2: address(0),
+            _l2Value: l2Value,
+            _calldata: bytes(""),
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _factoryDeps: factoryDeps,
+            _refundRecipient: address(0)
+        });
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
@@ -228,6 +228,7 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
+        // solhint-disable-next-line func-named-parameters
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),

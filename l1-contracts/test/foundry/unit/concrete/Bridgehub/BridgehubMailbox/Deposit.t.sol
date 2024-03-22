@@ -11,7 +11,7 @@ contract DepositTest is BridgehubMailboxTest {
     //     vm.startPrank(nonChainContract);
     //     bridgehub.deposit(chainId);
     // }
-    // function test_SuccessfullIfCalledByChainContract() public {
+    // function test_SuccessfulIfCalledByChainContract() public {
     //     address chainContract = bridgehub.getStateTransition(chainId);
     //     vm.startPrank(chainContract);
     //     bridgehub.deposit(chainId);

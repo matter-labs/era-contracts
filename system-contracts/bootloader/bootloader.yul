@@ -2062,9 +2062,9 @@ object "Bootloader" {
                 mstore(add(txDataWithHashesOffset, 64), 96)
 
                 let calldataPtr := prependSelector(txDataWithHashesOffset, selector)
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // Besides the length of the transaction itself,
                 // we also require 3 words for hashes and the offset
@@ -2086,9 +2086,9 @@ object "Bootloader" {
             /// @dev Calculates and saves the explorer hash and the suggested signed hash for the transaction.
             function saveTxHashes(txDataOffset) {
                 let calldataPtr := prependSelector(txDataOffset, {{GET_TX_HASHES_SELECTOR}})
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // The first word is formal, but still required by the ABI
                 // We also should take into account the selector.
@@ -2235,12 +2235,12 @@ object "Bootloader" {
             /// this method also enforces that the nonce has been marked as used.
             function accountValidateTx(txDataOffset) {
                 // Skipping the first 0x20 word of the ABI-encoding of the struct
-                let innerTxDataOffst := add(txDataOffset, 32)
-                let from := getFrom(innerTxDataOffst)
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let from := getFrom(innerTxDataOffset)
                 ensureAccount(from)
 
                 // The nonce should be unique for each transaction.
-                let nonce := getNonce(innerTxDataOffst)
+                let nonce := getNonce(innerTxDataOffset)
                 // Here we check that this nonce was not available before the validation step
                 ensureNonceUsage(from, nonce, 0)
 

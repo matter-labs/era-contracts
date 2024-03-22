@@ -103,6 +103,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 constructorInputHash = EfficientCall.keccak(_input);
 
         bytes32 hash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, bytes32(uint256(uint160(_sender))), _salt, _bytecodeHash, constructorInputHash)
         );
 
@@ -222,14 +223,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
-        _constructContract(
-            _sender,
-            _deployment.newAddress,
-            _deployment.bytecodeHash,
-            _deployment.input,
-            false,
-            _deployment.callConstructor
-        );
+        _constructContract({
+            _sender: _sender,
+            _newAddress: _deployment.newAddress,
+            _bytecodeHash: _deployment.bytecodeHash,
+            _input: _deployment.input,
+            _isSystem: false,
+            _callConstructor: _deployment.callConstructor
+        });
     }
 
     /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. This function and `Bootloader:upgradeKeccakIfNeeded`
@@ -240,14 +241,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
         _ensureBytecodeIsKnown(_keccak256BytecodeHash);
 
-        _constructContract(
-            msg.sender,
-            address(KECCAK256_SYSTEM_CONTRACT),
-            _keccak256BytecodeHash,
-            msg.data[0:0],
-            false,
-            false
-        );
+        _constructContract({
+            _sender: msg.sender,
+            _newAddress: address(KECCAK256_SYSTEM_CONTRACT),
+            _bytecodeHash: _keccak256BytecodeHash,
+            _input: msg.data[0:0],
+            _isSystem: false,
+            _callConstructor: false
+        });
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
@@ -312,7 +313,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
-        _constructContract(msg.sender, _newAddress, _bytecodeHash, _input, false, true);
+        _constructContract({
+            _sender: msg.sender,
+            _newAddress: _newAddress,
+            _bytecodeHash: _bytecodeHash,
+            _input: _input,
+            _isSystem: false,
+            _callConstructor: true
+        });
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -358,7 +366,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
                 // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
                 SystemContractHelper.setValueForNextFarCall(uint128(value));
             }
-            bytes memory returnData = EfficientCall.mimicCall(gasleft(), _newAddress, _input, _sender, true, _isSystem);
+            bytes memory returnData = EfficientCall.mimicCall({
+                _gas: gasleft(),
+                _address: _newAddress,
+                _data: _input,
+                _whoToMimic: _sender,
+                _isConstructor: true,
+                _isSystem: _isSystem
+            });
             // 4. Mark bytecode hash as constructed
             ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.markAccountCodeHashAsConstructed(_newAddress);
             // 5. Set the contract immutables

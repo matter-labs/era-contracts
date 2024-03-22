@@ -20,7 +20,7 @@ contract UnsafeBytesTestTest is Test {
 
     function setUp() public {
         unsafeBytesTest = new UnsafeBytesTest();
-
+        // solhint-disable-next-line func-named-parameters
         bytesData = abi.encodePacked(addr0, addr1, u256, u321, u322, addr2, b32, addr3);
     }
 

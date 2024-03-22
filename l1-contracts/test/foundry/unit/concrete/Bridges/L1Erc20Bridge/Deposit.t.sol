@@ -15,7 +15,14 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_depositAmountIsZero() public {
         vm.expectRevert(bytes("0T"));
-        bridge.deposit(randomSigner, address(token), 0, 0, 0, address(0));
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0,
+            _amount: 0,
+            _refundRecipient: address(0)
+        });
     }
 
     function test_RevertWhen_legacyDepositAmountIsZero() public {
@@ -68,7 +75,14 @@ contract DepositTest is L1Erc20BridgeTest {
         vm.prank(alice);
         vm.expectEmit(true, true, true, true, address(bridge));
         emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
-        bytes32 txHash = bridge.deposit(randomSigner, address(token), amount, 0, 0, address(0));
+        bytes32 txHash = bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
+        });
         assertEq(txHash, dummyL2DepositTxHash);
 
         uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);

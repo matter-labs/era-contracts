@@ -48,6 +48,7 @@ library Utils {
             servicePrefix = 0x0000;
         }
 
+        // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
     }
 
@@ -438,6 +439,7 @@ library Utils {
 
     function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 _batch.indexRepeatedStorageChanges,
                 _batch.newStateRoot,
@@ -461,6 +463,7 @@ library Utils {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 l2ToL1LogsHash,
                 _stateDiffHash,

@@ -84,16 +84,16 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitments, blobHashes);
 
         return
-            StoredBatchInfo(
-                _newBatch.batchNumber,
-                _newBatch.newStateRoot,
-                _newBatch.indexRepeatedStorageChanges,
-                _newBatch.numberOfLayer1Txs,
-                _newBatch.priorityOperationsHash,
-                logOutput.l2LogsTreeRoot,
-                _newBatch.timestamp,
-                commitment
-            );
+            StoredBatchInfo({
+                batchNumber: _newBatch.batchNumber,
+                batchHash: _newBatch.newStateRoot,
+                indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
+                numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+                priorityOperationsHash: _newBatch.priorityOperationsHash,
+                l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
+                timestamp: _newBatch.timestamp,
+                commitment: commitment
+            });
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -514,6 +514,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 _batch.indexRepeatedStorageChanges,
                 _batch.newStateRoot,
@@ -537,6 +538,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 l2ToL1LogsHash,
                 _stateDiffHash,

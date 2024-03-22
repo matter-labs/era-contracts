@@ -182,7 +182,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     function bridgehubDeposit(
         uint256 _chainId,
         address _prevMsgSender,
-        uint256, // l2Value, needed for Weth deposits in the future
+        // solhint-disable-next-line no-unused-vars
+        uint256 _l2Value, // l2Value, needed for Weth deposits in the future
         bytes calldata _data
     ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         require(l2BridgeAddress[_chainId] != address(0), "ShB l2 bridge not deployed");
@@ -224,7 +225,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
                 txDataHash: txDataHash
             });
         }
-        emit BridgehubDepositInitiated(_chainId, txDataHash, _prevMsgSender, _l2Receiver, _l1Token, amount);
+        emit BridgehubDepositInitiated({
+            chainId: _chainId,
+            txDataHash: txDataHash,
+            from: _prevMsgSender,
+            to: _l2Receiver,
+            l1Token: _l1Token,
+            amount: amount
+        });
     }
 
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
@@ -285,18 +293,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override {
-        _claimFailedDeposit(
-            false,
-            _chainId,
-            _depositSender,
-            _l1Token,
-            _amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        _claimFailedDeposit({
+            _checkedInLegacyBridge: false,
+            _chainId: _chainId,
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
     }
 
     /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
@@ -313,15 +321,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes32[] calldata _merkleProof
     ) internal nonReentrant {
         {
-            bool proofValid = bridgehub.proveL1ToL2TransactionStatus(
-                _chainId,
-                _l2TxHash,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBatch,
-                _merkleProof,
-                TxStatus.Failure
-            );
+            bool proofValid = bridgehub.proveL1ToL2TransactionStatus({
+                _chainId: _chainId,
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: TxStatus.Failure
+            });
             require(proofValid, "yn");
         }
         require(_amount > 0, "y1");
@@ -395,7 +403,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         if (_isEraLegacyWithdrawal(_chainId, _l2BatchNumber)) {
             require(!legacyBridge.isWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex), "ShB: legacy withdrawal");
         }
-        _finalizeWithdrawal(_chainId, _l2BatchNumber, _l2MessageIndex, _l2TxNumberInBatch, _message, _merkleProof);
+        _finalizeWithdrawal({
+            _chainId: _chainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     struct MessageParams {
@@ -599,7 +614,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         // Save the deposited amount to claim funds on L1 if the deposit failed on L2
         depositHappened[ERA_CHAIN_ID][l2TxHash] = txDataHash;
 
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, l2TxHash, _prevMsgSender, _l2Receiver, _l1Token, _amount);
+        emit LegacyDepositInitiated({
+            chainId: ERA_CHAIN_ID,
+            l2DepositTxHash: l2TxHash,
+            from: _prevMsgSender,
+            to: _l2Receiver,
+            l1Token: _l1Token,
+            amount: _amount
+        });
     }
 
     /// @notice Finalizes the withdrawal for transactions initiated via the legacy ERC20 bridge.
@@ -619,14 +641,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
-        (l1Receiver, l1Token, amount) = _finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        (l1Receiver, l1Token, amount) = _finalizeWithdrawal({
+            _chainId: ERA_CHAIN_ID,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     /// @notice Withdraw funds from the initiated deposit, that failed when finalizing on zkSync Era chain.
@@ -651,17 +673,17 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external override onlyLegacyBridge {
-        _claimFailedDeposit(
-            true,
-            ERA_CHAIN_ID,
-            _depositSender,
-            _l1Token,
-            _amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        _claimFailedDeposit({
+            _checkedInLegacyBridge: true,
+            _chainId: ERA_CHAIN_ID,
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
     }
 }
