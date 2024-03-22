@@ -24,7 +24,13 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
 
         vm.expectRevert(bytes("pw"));
         bytes32[] memory merkleProof;
-        bridge.finalizeWithdrawal(l2BatchNumber, l2MessageIndex, 0, "", merkleProof);
+        bridge.finalizeWithdrawal({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: 0,
+            _message: "",
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawalSuccessfully() public {
@@ -37,10 +43,17 @@ contract FinalizeWithdrawalTest is L1Erc20BridgeTest {
         dummySharedBridge.setDataToBeReturnedInFinalizeWithdrawal(alice, address(token), amount);
 
         vm.prank(alice);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
         emit WithdrawalFinalized(alice, address(token), amount);
         bytes32[] memory merkleProof;
-        bridge.finalizeWithdrawal(l2BatchNumber, l2MessageIndex, 0, "", merkleProof);
+        bridge.finalizeWithdrawal({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: 0,
+            _message: "",
+            _merkleProof: merkleProof
+        });
 
         // withdrawal finalization should be handled in the shared bridge, so it shouldn't
         // change in the  L1 ERC20 bridge after finalization.

@@ -33,7 +33,13 @@ contract ReentrancyTest is L1Erc20BridgeTest {
 
         vm.prank(alice);
         vm.expectRevert(bytes("r1"));
-        bridgeReenterItself.deposit(randomSigner, address(token), amount, 0, 0);
+        bridgeReenterItself.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function _claimFailedDepositExpectRevertOnReentrancy() internal {
@@ -67,7 +73,13 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         vm.prank(alice);
         vm.expectRevert(bytes("r1"));
         bytes32[] memory merkleProof;
-        bridgeReenterItself.finalizeWithdrawal(l2BatchNumber, l2MessageIndex, 0, "", merkleProof);
+        bridgeReenterItself.finalizeWithdrawal({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: 0,
+            _message: "",
+            _merkleProof: merkleProof
+        });
     }
 
     function test_depositReenterDeposit() public {

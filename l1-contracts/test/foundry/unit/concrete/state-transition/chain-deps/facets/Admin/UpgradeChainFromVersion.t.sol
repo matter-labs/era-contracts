@@ -102,6 +102,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         vm.expectRevert("StateTransition: protocolVersion mismatch in STC after upgrading");
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ExecuteUpgrade(diamondCutData);
 

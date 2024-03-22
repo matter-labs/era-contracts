@@ -35,6 +35,7 @@ contract SetPriorityTxMaxGasLimitTest is AdminTest {
         uint256 oldPriorityTxMaxGasLimit = utilsFacet.util_getPriorityTxMaxGasLimit();
         uint256 newPriorityTxMaxGasLimit = 100;
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, newPriorityTxMaxGasLimit);
 

@@ -135,13 +135,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
 
-        IStateTransitionManager(_stateTransitionManager).createNewChain(
-            _chainId,
-            _baseToken,
-            address(sharedBridge),
-            _admin,
-            _initData
-        );
+        IStateTransitionManager(_stateTransitionManager).createNewChain({
+            _chainId: _chainId,
+            _baseToken: _baseToken,
+            _sharedBridge: address(sharedBridge),
+            _admin: _admin,
+            _diamondCut: _initData
+        });
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;

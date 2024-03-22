@@ -124,6 +124,7 @@ contract L1SharedBridgeLegacyTest is Test {
         uint256 l2TxGasPerPubdataByte = 100;
         address refundRecipient = address(0);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit LegacyDepositInitiated({
             chainId: ERA_CHAIN_ID,
@@ -195,16 +196,17 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, ETH_TOKEN_ADDRESS, amount);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
@@ -255,16 +257,17 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDepositLegacyErc20Bridge_Erc() public {
@@ -312,6 +315,7 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);

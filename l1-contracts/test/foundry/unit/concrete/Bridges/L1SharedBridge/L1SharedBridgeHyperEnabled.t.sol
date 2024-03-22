@@ -137,6 +137,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         sharedBridge.bridgehubDepositBaseToken{value: amount}({
@@ -152,6 +153,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.prank(alice);
         token.approve(address(sharedBridge), amount);
         vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, address(token), amount);
         sharedBridge.bridgehubDepositBaseToken({
@@ -165,6 +167,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_bridgehubDeposit_Eth() public {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         vm.mockCall(
             bridgehubAddress,
@@ -193,6 +196,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.prank(alice);
         token.approve(address(sharedBridge), amount);
         vm.prank(bridgehubAddress);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         vm.mockCall(
             bridgehubAddress,
@@ -212,6 +216,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     }
 
     function test_bridgehubConfirmL2Transaction() public {
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
@@ -264,6 +269,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, address(token), amount);
         vm.prank(bridgehubAddress);
@@ -326,6 +332,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit ClaimedFailedDepositSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         vm.prank(bridgehubAddress);
@@ -384,6 +391,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         sharedBridge.finalizeWithdrawal({
@@ -443,6 +451,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
         sharedBridge.finalizeWithdrawal({
@@ -502,6 +511,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, ETH_TOKEN_ADDRESS, amount);
         sharedBridge.finalizeWithdrawal({
@@ -561,6 +571,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
         sharedBridge.finalizeWithdrawal({
@@ -616,6 +627,7 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit WithdrawalFinalizedSharedBridge(chainId, alice, address(token), amount);
         sharedBridge.finalizeWithdrawal({
