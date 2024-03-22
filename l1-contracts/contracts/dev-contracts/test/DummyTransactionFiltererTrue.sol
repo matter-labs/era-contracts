@@ -8,7 +8,14 @@ contract TransactionFiltererTrue is ITransactionFilterer {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    function isTransactionAllowed(address, address, uint256, uint256, bytes memory, address) external view returns (bool) {
+    function isTransactionAllowed(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory,
+        address
+    ) external view returns (bool) {
         return true;
     }
 }
