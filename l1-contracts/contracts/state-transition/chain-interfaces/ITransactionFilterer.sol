@@ -18,6 +18,7 @@ interface ITransactionFilterer {
         address contractL2,
         uint256 mintValue,
         uint256 l2Value,
-        bytes memory l2Calldata
+        bytes memory l2Calldata,
+        address refundRecipient
     ) external view returns (bool);
 }

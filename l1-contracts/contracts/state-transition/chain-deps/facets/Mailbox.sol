@@ -235,7 +235,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
                     _request.contractL2,
                     _request.mintValue,
                     _request.l2Value,
-                    _request.l2Calldata
+                    _request.l2Calldata,
+                    _request.refundRecipient
                 ),
                 "tf"
             );
