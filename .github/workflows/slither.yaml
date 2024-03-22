@@ -13,6 +13,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
       - name: prepare contracts
         run: rm -rf ./l1-contracts/dev-contracts &&
           rm -rf ./l1-contracts/state-transition/TestnetVerifier.sol &&
@@ -22,6 +31,7 @@ jobs:
       - name: Run Slither
         uses: crytic/slither-action@v0.3.0
         with:
+          node-version: 18
           fail-on: critical
           target: 'l1-contracts'
-          slither-config: 'l1-contracts/slither.config.json'
+          slither-config: 'slither.config.json'
