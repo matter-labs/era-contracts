@@ -496,11 +496,11 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            bridgeHub.proveL2MessageInclusion({
+            bridgeHub.proveL2LogInclusion({
                 _chainId: mockChainId,
                 _batchNumber: mockBatchNumber,
                 _index: mockIndex,
-                _message: l2Log,
+                _log: l2Log,
                 _proof: mockProof
             })
         );

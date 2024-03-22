@@ -30,7 +30,7 @@ contract DepositTest is L1Erc20BridgeTest {
         bridge.deposit({
             _l2Receiver: randomSigner,
             _l1Token: address(token),
-            _amount: 1,
+            _amount: 0,
             _l2TxGasLimit: 0,
             _l2TxGasPerPubdataByte: 0
         });
