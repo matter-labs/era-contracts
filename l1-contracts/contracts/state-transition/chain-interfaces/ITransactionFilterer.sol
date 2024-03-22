@@ -12,6 +12,7 @@ interface ITransactionFilterer {
     /// @param mintValue The value of the L1 transaction
     /// @param l2Value The msg.value of the L2 transaction
     /// @param l2Calldata The calldata of the L2 transaction
+    /// @param refundRecipient The address to refund the excess value
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,

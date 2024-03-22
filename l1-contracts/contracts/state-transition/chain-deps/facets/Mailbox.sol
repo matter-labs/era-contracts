@@ -231,14 +231,14 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // Check that the transaction is allowed by the filterer (if the filterer is set).
         if (s.transactionFilterer != address(0)) {
             require(
-                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed(
-                    _request.sender,
-                    _request.contractL2,
-                    _request.mintValue,
-                    _request.l2Value,
-                    _request.l2Calldata,
-                    _request.refundRecipient
-                ),
+                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+                    sender: _request.sender,
+                    contractL2: _request.contractL2,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: _request.l2Calldata,
+                    refundRecipient: _request.refundRecipient
+                }),
                 "tf"
             );
         }
