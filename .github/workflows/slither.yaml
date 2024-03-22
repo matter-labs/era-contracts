@@ -34,6 +34,11 @@ jobs:
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Remove non-compiled files
+        run: rm -rf ./l1-contracts/state-transition/utils/ |
+          rm -rf ./l1-contracts/state-transition/Verifier.sol |
+          rm -rf ./l1-contracts/state-transition/TestnetVerifier.sol
+
       - name: Run Slither
-        run: |
+        run:
           slither --config ./l1-contracts/slither.config.json ./l1-contracts
