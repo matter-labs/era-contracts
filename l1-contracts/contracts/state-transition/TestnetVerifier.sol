@@ -15,6 +15,8 @@ contract TestnetVerifier is Verifier {
         assert(block.chainid != 1);
     }
 
+    /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
+    /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof,
