@@ -14,11 +14,10 @@ jobs:
           submodules: recursive
 
       - name: prepare contracts
-        run: cd l1-contracts &&
-          rm -rf ./dev-contracts &&
-          rm -rf ./state-transition/TestnetVerifier.sol &&
-          rm -rf ./state-transition/Verifier.sol &&
-          rm -rf ./state-transition/utils
+        run: rm -rf ./l1-contracts/dev-contracts &&
+          rm -rf ./l1-contracts/state-transition/TestnetVerifier.sol &&
+          rm -rf ./l1-contracts/state-transition/Verifier.sol &&
+          rm -rf ./l1-contracts/state-transition/utils
 
       - name: Run Slither
         uses: crytic/slither-action@v0.3.0
