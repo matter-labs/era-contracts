@@ -150,4 +150,6 @@ struct ZkSyncStateTransitionStorage {
     /// we multiply by the nominator, and divide by the denominator
     uint128 baseTokenGasPriceMultiplierNominator;
     uint128 baseTokenGasPriceMultiplierDenominator;
+    /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
+    address transactionFilterer;
 }

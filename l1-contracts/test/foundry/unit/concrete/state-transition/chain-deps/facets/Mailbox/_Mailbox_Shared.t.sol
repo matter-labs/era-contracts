@@ -6,40 +6,34 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
-contract AdminTest is Test {
-    IAdmin internal adminFacet;
+contract MailboxTest is Test {
+    IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
+    address sender;
+    uint256 eraChainId = 9;
     address internal testnetVerifier = address(new TestnetVerifier());
 
-    function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](12);
-        selectors[0] = IAdmin.setPendingAdmin.selector;
-        selectors[1] = IAdmin.acceptAdmin.selector;
-        selectors[2] = IAdmin.setValidator.selector;
-        selectors[3] = IAdmin.setPorterAvailability.selector;
-        selectors[4] = IAdmin.setPriorityTxMaxGasLimit.selector;
-        selectors[5] = IAdmin.changeFeeParams.selector;
-        selectors[6] = IAdmin.setTokenMultiplier.selector;
-        selectors[7] = IAdmin.upgradeChainFromVersion.selector;
-        selectors[8] = IAdmin.executeUpgrade.selector;
-        selectors[9] = IAdmin.freezeDiamond.selector;
-        selectors[10] = IAdmin.unfreezeDiamond.selector;
-        selectors[11] = IAdmin.setTransactionFilterer.selector;
+    function getMailboxSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IMailbox.bridgehubRequestL2Transaction.selector;
         return selectors;
     }
 
     function setUp() public virtual {
+        sender = makeAddr("sender");
+        vm.deal(sender, 100 ether);
+
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet()),
+            facet: address(new MailboxFacet(eraChainId)),
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: getAdminSelectors()
+            selectors: getMailboxSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: address(new UtilsFacet()),
@@ -49,7 +43,7 @@ contract AdminTest is Test {
         });
 
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
-        adminFacet = IAdmin(diamondProxy);
+        mailboxFacet = IMailbox(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
 

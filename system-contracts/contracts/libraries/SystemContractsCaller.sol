@@ -82,18 +82,18 @@ library SystemContractsCaller {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            gasLimit,
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: gasLimit,
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            true
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: true
+        });
 
         if (value == 0) {
             // Doing the system call directly

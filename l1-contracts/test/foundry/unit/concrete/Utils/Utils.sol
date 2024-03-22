@@ -15,6 +15,7 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/Z
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -47,6 +48,7 @@ library Utils {
             servicePrefix = 0x0000;
         }
 
+        // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
     }
 
@@ -232,7 +234,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](36);
+        bytes4[] memory selectors = new bytes4[](38);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
@@ -269,6 +271,8 @@ library Utils {
         selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
         selectors[34] = UtilsFacet.util_setIsFrozen.selector;
         selectors[35] = UtilsFacet.util_getIsFrozen.selector;
+        selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
+        selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
         return selectors;
     }
 
@@ -399,6 +403,30 @@ library Utils {
         return address(diamondProxy);
     }
 
+    function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
+        uint256[4] memory reserved;
+        uint256[] memory factoryDeps = new uint256[](1);
+        return
+            L2CanonicalTransaction({
+                txType: 0,
+                from: 0,
+                to: 0,
+                gasLimit: 0,
+                gasPerPubdataByteLimit: 0,
+                maxFeePerGas: 0,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: "",
+                signature: "",
+                factoryDeps: factoryDeps,
+                paymasterInput: "",
+                reservedDynamic: ""
+            });
+    }
+
     function createBatchCommitment(
         IExecutor.CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
@@ -416,6 +444,7 @@ library Utils {
 
     function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 _batch.indexRepeatedStorageChanges,
                 _batch.newStateRoot,
@@ -439,6 +468,7 @@ library Utils {
         bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
 
         return
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 l2ToL1LogsHash,
                 _stateDiffHash,

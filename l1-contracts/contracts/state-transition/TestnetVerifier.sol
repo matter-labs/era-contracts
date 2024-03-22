@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Verifier} from "./Verifier.sol";
+import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,6 +16,8 @@ contract TestnetVerifier is Verifier {
         assert(block.chainid != 1);
     }
 
+    /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
+    /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof,

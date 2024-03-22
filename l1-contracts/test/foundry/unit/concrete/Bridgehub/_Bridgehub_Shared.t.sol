@@ -24,7 +24,6 @@ contract BridgehubTest is Test {
 
     function getDiamondCutData(address diamondInit) internal pure returns (Diamond.DiamondCutData memory) {
         address governor = GOVERNOR;
-
         bytes memory initCalldata = abi.encodeWithSelector(IDiamondInit.initialize.selector, governor);
 
         return
