@@ -3,8 +3,8 @@ name: Slither scanner
 on: pull_request
 
 jobs:
-  slither:
-    name: Slither check
+  slither-l1:
+    name: Slither check for L1 contracts
     runs-on: ubuntu-latest
 
     steps:
@@ -22,16 +22,10 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: prepare contracts
-        run: rm -rf ./l1-contracts/dev-contracts &&
-          rm -rf ./l1-contracts/state-transition/TestnetVerifier.sol &&
-          rm -rf ./l1-contracts/state-transition/Verifier.sol &&
-          rm -rf ./l1-contracts/state-transition/utils
-
       - name: Run Slither
         uses: crytic/slither-action@v0.3.0
         with:
           node-version: 18
           fail-on: critical
           target: 'l1-contracts'
-          slither-config: 'slither.config.json'
+          slither-config: './l1-contracts/slither.config.json'
