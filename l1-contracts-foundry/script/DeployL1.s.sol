@@ -116,7 +116,7 @@ contract DeployL1Script is Script {
         } else {
             console.log("Using provider's gas price");
         }
-        
+
         chainId = vm.envUint("CHAIN_ID");
         create2Salt = vm.envBytes32("CONTRACTS_CREATE2_FACTORY_SALT");
         network = vm.envString("CHAIN_ETH_NETWORK");
