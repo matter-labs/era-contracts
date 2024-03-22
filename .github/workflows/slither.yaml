@@ -24,3 +24,4 @@ jobs:
         uses: crytic/slither-action@v0.3.0
         with:
           fail-on: critical
+          target: 'l1-contracts'
