@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+// solhint-disable no-console
+
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -401,6 +403,7 @@ contract DeployL1Script is Script {
     function deploySharedBridgeImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(L1SharedBridge).creationCode,
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 vm.envAddress("TOKEN_WETH_ADDRESS"),
                 addresses.bridgehub.bridgehubProxy,
