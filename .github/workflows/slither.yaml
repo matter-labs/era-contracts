@@ -22,10 +22,18 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Run Slither
-        uses: crytic/slither-action@v0.3.0
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 18
-          fail-on: critical
-          target: 'l1-contracts'
-          slither-config: './l1-contracts/slither.config.json'
+          python-version: 3.8
+
+      - name: Install Slither
+        run: |
+          pip install slither-analyzer
+
+      - name: Use Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run Slither
+        run: |
+          slither --config ./l1-contracts/slither.config.json ./l1-contracts
