@@ -1,0 +1,26 @@
+name: Slither scanner
+
+on: pull_request
+
+jobs:
+  slither:
+    name: Slither check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: prepare contracts
+        run: cd l1-contracts &&
+          rm -rf ./dev-contracts &&
+          rm -rf ./state-transition/TestnetVerifier.sol &&
+          rm -rf ./state-transition/Verifier.sol &&
+          rm -rf ./state-transition/utils
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.3.0
+        with:
+          fail-on: critical
