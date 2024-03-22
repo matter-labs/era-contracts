@@ -699,7 +699,7 @@ contract L1SharedBridgeFailTest is Test {
         vm.expectRevert("ShB wrong msg len 2");
 
         sharedBridge.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
+            _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
@@ -722,7 +722,7 @@ contract L1SharedBridgeFailTest is Test {
 
         vm.expectRevert("ShB Incorrect message function selector");
         sharedBridge.finalizeWithdrawal({
-            _chainId: ERA_CHAIN_ID,
+            _chainId: eraChainId,
             _l2BatchNumber: l2BatchNumber,
             _l2MessageIndex: l2MessageIndex,
             _l2TxNumberInBatch: l2TxNumberInBatch,
