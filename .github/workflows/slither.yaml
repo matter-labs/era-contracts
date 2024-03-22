@@ -40,5 +40,4 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/TestnetVerifier.sol
 
       - name: Run Slither
-        run:
-          slither --config ./l1-contracts/slither.config.json ./l1-contracts
+        run: slither --config ./l1-contracts/slither.config.json ./l1-contracts
