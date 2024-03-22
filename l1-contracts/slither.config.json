@@ -4,8 +4,9 @@
   "exclude_dependencies": true,
   "compile_force_framework": "foundry",
   "exclude_medium": true,
-  "exclude_high": true,
+  "exclude_high": false,
   "exclude_low": true,
   "exclude_informational": true,
   "exclude_optimization": true
 }
+g
