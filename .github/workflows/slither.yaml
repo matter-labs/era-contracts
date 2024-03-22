@@ -24,3 +24,4 @@ jobs:
         with:
           fail-on: critical
           target: 'l1-contracts'
+          slither-config: 'l1-contracts/slither.config.json'
