@@ -15,6 +15,7 @@ import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyn
 import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -233,7 +234,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](36);
+        bytes4[] memory selectors = new bytes4[](38);
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
         selectors[2] = UtilsFacet.util_setBridgehub.selector;
@@ -270,6 +271,8 @@ library Utils {
         selectors[33] = UtilsFacet.util_getProtocolVersion.selector;
         selectors[34] = UtilsFacet.util_setIsFrozen.selector;
         selectors[35] = UtilsFacet.util_getIsFrozen.selector;
+        selectors[36] = UtilsFacet.util_setTransactionFilterer.selector;
+        selectors[37] = UtilsFacet.util_setBaseTokenGasPriceMultiplierDenominator.selector;
         return selectors;
     }
 
@@ -393,6 +396,30 @@ library Utils {
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
+    }
+
+    function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
+        uint256[4] memory reserved;
+        uint256[] memory factoryDeps = new uint256[](1);
+        return
+            L2CanonicalTransaction({
+                txType: 0,
+                from: 0,
+                to: 0,
+                gasLimit: 0,
+                gasPerPubdataByteLimit: 0,
+                maxFeePerGas: 0,
+                maxPriorityFeePerGas: 0,
+                paymaster: 0,
+                nonce: 0,
+                value: 0,
+                reserved: reserved,
+                data: "",
+                signature: "",
+                factoryDeps: factoryDeps,
+                paymasterInput: "",
+                reservedDynamic: ""
+            });
     }
 
     function createBatchCommitment(

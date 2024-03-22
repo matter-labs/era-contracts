@@ -104,6 +104,14 @@ contract UtilsFacet is ZkSyncStateTransitionBase {
         return s.validators[_validator];
     }
 
+    function util_setTransactionFilterer(address _filterer) external {
+        s.transactionFilterer = _filterer;
+    }
+
+    function util_setBaseTokenGasPriceMultiplierDenominator(uint128 _denominator) external {
+        s.baseTokenGasPriceMultiplierDenominator = _denominator;
+    }
+
     function util_setZkPorterAvailability(bool _available) external {
         s.zkPorterIsAvailable = _available;
     }
