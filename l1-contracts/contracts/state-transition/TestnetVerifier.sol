@@ -3,6 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Verifier} from "./Verifier.sol";
+import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
