@@ -344,7 +344,9 @@ describe("L2 upgrade test", function () {
   it("Should successfully perform an upgrade", async () => {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const newVerifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierContract = await testnetVerifierFactory.deploy();
+    const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
       recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
       recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),

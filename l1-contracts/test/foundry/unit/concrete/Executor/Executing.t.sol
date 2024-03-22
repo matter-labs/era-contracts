@@ -3,15 +3,12 @@ pragma solidity 0.8.20;
 
 import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/common/Config.sol";
-import {IExecutor, SystemLogKey} from "../../../../../cache/solpp-generated-contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "solpp/common/Config.sol";
-import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {L2_BOOTLOADER_ADDRESS} from "solpp/common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {

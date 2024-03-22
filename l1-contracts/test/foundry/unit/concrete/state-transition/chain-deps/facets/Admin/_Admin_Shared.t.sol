@@ -6,13 +6,15 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {IAdmin} from "solpp/state-transition/chain-interfaces/IAdmin.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](12);
@@ -46,7 +48,7 @@ contract AdminTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

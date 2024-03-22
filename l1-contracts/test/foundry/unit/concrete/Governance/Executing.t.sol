@@ -6,7 +6,7 @@ import {Utils} from "../Utils/Utils.sol";
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
-import {IGovernance} from "solpp/governance/IGovernance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 
 contract ExecutingTest is GovernanceTest {
     using stdStorage for StdStorage;

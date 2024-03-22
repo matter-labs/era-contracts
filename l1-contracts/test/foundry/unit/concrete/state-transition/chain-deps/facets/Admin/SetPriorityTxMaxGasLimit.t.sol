@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
-import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 
 contract SetPriorityTxMaxGasLimitTest is AdminTest {
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);

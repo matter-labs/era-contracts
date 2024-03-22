@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Utils} from "../Utils/Utils.sol";
-
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondCutTestContract} from "solpp/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
-import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
+import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
     DiamondProxy private diamondProxy;

@@ -279,7 +279,7 @@ contract Verifier is IVerifier {
         uint256[] calldata, // _publicInputs
         uint256[] calldata, // _proof
         uint256[] calldata // _recursiveAggregationInput
-    ) external view returns (bool) {
+    ) public view virtual returns (bool) {
         // No memory was accessed yet, so keys can be loaded into the right place and not corrupt any other memory.
         _loadVerificationKey();
 

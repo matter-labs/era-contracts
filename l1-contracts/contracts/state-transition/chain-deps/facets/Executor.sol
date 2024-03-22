@@ -420,18 +420,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
         require(currentTotalBatchesVerified <= s.totalBatchesCommitted, "q");
 
-        // #if DUMMY_VERIFIER
-
-        // Additional level of protection for the mainnet
-        assert(block.chainid != 1);
-        // We allow skipping the zkp verification for the test(net) environment
-        // If the proof is not empty, verify it, otherwise, skip the verification
-        if (_proof.serializedProof.length > 0) {
-            _verifyProof(proofPublicInput, _proof);
-        }
-        // #else
         _verifyProof(proofPublicInput, _proof);
-        // #endif
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;

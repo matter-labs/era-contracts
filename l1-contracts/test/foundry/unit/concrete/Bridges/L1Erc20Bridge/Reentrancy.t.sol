@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
-import {ReenterL1ERC20Bridge} from "solpp/dev-contracts/test/ReenterL1ERC20Bridge.sol";
+import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 
 contract ReentrancyTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
