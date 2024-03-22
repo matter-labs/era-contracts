@@ -14,7 +14,6 @@ import { BigNumber } from "ethers";
 describe("NonceHolder tests", () => {
   const wallet = getWallets()[0];
   let nonceHolder: NonceHolder;
-  let systemNonceHolder: NonceHolder;
   let nonceHolderAccount: ethers.Signer;
   let systemAccount: ethers.Signer;
   let deployerAccount: ethers.Signer;
@@ -24,7 +23,6 @@ describe("NonceHolder tests", () => {
     await deployContractOnAddress(await wallet.getAddress(), "NonceHolder");
     await deployContractOnAddress(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, "NonceHolder");
     nonceHolder = NonceHolderFactory.connect(await wallet.getAddress(), wallet);
-    systemNonceHolder = NonceHolderFactory.connect(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
     nonceHolderAccount = await ethers.getImpersonatedSigner(await wallet.getAddress());
     systemAccount = await ethers.getImpersonatedSigner("0x000000000000000000000000000000000000900b");
     deployerAccount = await ethers.getImpersonatedSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
@@ -61,12 +59,12 @@ describe("NonceHolder tests", () => {
       expect(rawNonceBefore).to.equal(rawNonceAfter);
     });
 
-    // it("should increase account minNonce by many", async () => {
-    //   const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
-    //   await nonceHolder.connect(systemAccount).increaseMinNonce(2 ** 4);
-    //   const result = await nonceHolder.getMinNonce(systemAccount.address);
-    //   expect(result).to.equal(nonceBefore.add(2 ** 4));
-    // });
+    it("should increase account minNonce by many", async () => {
+      const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
+      await nonceHolder.connect(systemAccount).increaseMinNonce(2 ** 4);
+      const result = await nonceHolder.getMinNonce(systemAccount.address);
+      expect(result).to.equal(nonceBefore.add(2 ** 4));
+    });
 
     it("should fail with too high", async () => {
       const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
@@ -87,7 +85,7 @@ describe("NonceHolder tests", () => {
   describe("incrementMinNonceIfEquals", async () => {
     it("should revert This method require system call flag", async () => {
       const expectedNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      await expect(systemNonceHolder.incrementMinNonceIfEquals(expectedNonce)).to.be.rejectedWith(
+      await expect(nonceHolder.incrementMinNonceIfEquals(expectedNonce)).to.be.rejectedWith(
         "This method require system call flag"
       );
     });
@@ -167,7 +165,7 @@ describe("NonceHolder tests", () => {
       expect(storedValue).to.equal(333);
     });
 
-    it("should emit ValueSetUnderNonce event", async () => {
+    it("should emit ValueSetUnderNonce event not in order", async () => {
       const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
       await nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(currentNonce);
       const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [[1, 0]]);
