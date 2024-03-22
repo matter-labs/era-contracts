@@ -10,7 +10,7 @@ contract MailboxFacetTest is MailboxFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor() {
+    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.admin = msg.sender;
     }
 

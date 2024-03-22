@@ -5,10 +5,10 @@ import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "solpp/common/Config.sol";
-import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "solpp/common/L2ContractAddresses.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
+import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract CommittingTest is ExecutorTest {
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {

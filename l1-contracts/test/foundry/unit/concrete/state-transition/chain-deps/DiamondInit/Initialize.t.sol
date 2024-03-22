@@ -5,16 +5,16 @@ import {DiamondInitTest} from "./_DiamondInit_Shared.t.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.verifier = IVerifier(address(0));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -28,7 +28,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_governorIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.admin = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -42,7 +42,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_validatorTimelockIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.validatorTimelock = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -56,7 +56,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_priorityTxMaxGasLimitIsGreaterThanMaxGasPerTransaction() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.priorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -70,7 +70,7 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_valuesCorrectWhenSuccessfulInit() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

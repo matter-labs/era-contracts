@@ -3,8 +3,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Verifier} from "solpp/state-transition/Verifier.sol";
-import {VerifierTest} from "solpp/dev-contracts/test/VerifierTest.sol";
+import {Verifier} from "contracts/state-transition/Verifier.sol";
+import {VerifierTest} from "contracts/dev-contracts/test/VerifierTest.sol";
 
 contract VerifierTestTest is Test {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;

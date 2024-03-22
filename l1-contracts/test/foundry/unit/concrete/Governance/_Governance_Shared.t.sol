@@ -4,11 +4,11 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {EventOnFallback} from "solpp/dev-contracts/EventOnFallback.sol";
-import {Forwarder} from "solpp/dev-contracts/Forwarder.sol";
-import {Governance} from "solpp/governance/Governance.sol";
-import {IGovernance} from "solpp/governance/IGovernance.sol";
-import {RevertFallback} from "solpp/dev-contracts/RevertFallback.sol";
+import {Governance} from "contracts/governance/Governance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {EventOnFallback} from "contracts/dev-contracts/EventOnFallback.sol";
+import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
+import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;

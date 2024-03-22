@@ -4,17 +4,17 @@ pragma solidity 0.8.20;
 
 import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
-import {Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "solpp/bridgehub/IBridgehub.sol";
-import {DummyStateTransitionManagerWBH} from "solpp/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
-import {DummyStateTransition} from "solpp/dev-contracts/test/DummyStateTransition.sol";
-import {DummySharedBridge} from "solpp/dev-contracts/test/DummySharedBridge.sol";
-import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {DummyStateTransitionManagerWBH} from "contracts/dev-contracts/test/DummyStateTransitionManagerWithBridgeHubAddress.sol";
+import {DummyStateTransition} from "contracts/dev-contracts/test/DummyStateTransition.sol";
+import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
+import {IL1SharedBridge} from "contracts/bridge/interfaces/IL1SharedBridge.sol";
 
-import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "solpp/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "solpp/common/Config.sol";
+import {L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, MAX_NEW_FACTORY_DEPS} from "contracts/common/Config.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -27,11 +27,14 @@ contract ExperimentalBridgeTest is Test {
     DummySharedBridge mockSecondSharedBridge;
     TestnetERC20Token testToken;
 
+    uint256 eraChainId;
+
     function setUp() public {
+        eraChainId = 9;
         bridgeHub = new Bridgehub();
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         mockSTM = new DummyStateTransitionManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyStateTransition(address(bridgeHub));
+        mockChainContract = new DummyStateTransition(address(bridgeHub), eraChainId);
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);

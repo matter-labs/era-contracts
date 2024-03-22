@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
-import {PriorityOperation} from "solpp/state-transition/libraries/PriorityQueue.sol";
+import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
 
 contract GetPriorityQueueFrontOperationTest is GettersFacetTest {
     function test_revertWhen_queueIsEmpty() public {

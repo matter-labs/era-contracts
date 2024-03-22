@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
-import {IGovernance} from "solpp/governance/IGovernance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 
 contract Authorization is GovernanceTest {
     function test_RevertWhen_SchedulingByUnauthorisedAddress() public {

@@ -4,18 +4,18 @@ pragma solidity 0.8.20;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
-import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
-import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -327,8 +327,8 @@ library Utils {
     //     allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
     // }
 
-    function makeVerifier() public pure returns (IVerifier) {
-        return IVerifier(address(0xdeadbeef));
+    function makeVerifier(address testnetVerifier) public pure returns (IVerifier) {
+        return IVerifier(testnetVerifier);
     }
 
     function makeVerifierParams() public pure returns (VerifierParams memory) {
@@ -348,7 +348,7 @@ library Utils {
             });
     }
 
-    function makeInitializeData() public pure returns (InitializeData memory) {
+    function makeInitializeData(address testnetVerifier) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
@@ -360,7 +360,7 @@ library Utils {
                 baseToken: address(0x923645439232223445),
                 baseTokenBridge: address(0x23746765237749923040872834),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(),
+                verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -370,10 +370,12 @@ library Utils {
             });
     }
 
-    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain(
+        address testnetVerifier
+    ) public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(),
+                verifier: makeVerifier(testnetVerifier),
                 verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
@@ -383,9 +385,12 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
-        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, makeInitializeData());
+        bytes memory diamondInitData = abi.encodeWithSelector(
+            diamondInit.initialize.selector,
+            makeInitializeData(testnetVerifier)
+        );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,

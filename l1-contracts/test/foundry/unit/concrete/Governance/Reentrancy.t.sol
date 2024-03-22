@@ -7,8 +7,8 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
-import {IGovernance} from "solpp/governance/IGovernance.sol";
-import {ReenterGovernance} from "solpp/dev-contracts/test/ReenterGovernance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {ReenterGovernance} from "contracts/dev-contracts/test/ReenterGovernance.sol";
 
 contract ReentrancyTest is GovernanceTest {
     using stdStorage for StdStorage;

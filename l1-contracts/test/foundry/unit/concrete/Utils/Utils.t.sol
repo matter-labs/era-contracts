@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";
-import {SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
 
