@@ -206,9 +206,7 @@ contract ExecutorFacet is Base, IExecutor {
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         require(_newBatchesData.length == 1, "e4");
         // Check that we commit batches after last committed batch
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
-        }
+        require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
@@ -299,12 +297,12 @@ contract ExecutorFacet is Base, IExecutor {
     function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
         require(currentBatchNumber == s.totalBatchesExecuted + _executedBatchIdx + 1, "k"); // Execute batches in order
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            require(
-                _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
-                "exe10" // executing batch should be committed
-            );
-        }
+        // if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+        //     require(
+        //         _hashStoredBatchInfo(_storedBatch) == s.storedBatchHashes[currentBatchNumber],
+        //         "exe10" // executing batch should be committed
+        //     );
+        // }
 
         bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
         require(priorityOperationsHash == _storedBatch.priorityOperationsHash, "x"); // priority operations hash does not match to expected
@@ -349,19 +347,17 @@ contract ExecutorFacet is Base, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-            require(_hashStoredBatchInfo(_prevBatch) == s.storedBatchHashes[currentTotalBatchesVerified], "t1");
-        }
+        require(_hashStoredBatchInfo(_prevBatch) == s.storedBatchHashes[currentTotalBatchesVerified], "t1");
 
         bytes32 prevBatchCommitment = _prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
-                require(
-                    _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
-                    "o1"
-                );
-            }
+            // if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+            //     require(
+            //         _hashStoredBatchInfo(_committedBatches[i]) == s.storedBatchHashes[currentTotalBatchesVerified],
+            //         "o1"
+            //     );
+            // }
 
             bytes32 currentBatchCommitment = _committedBatches[i].commitment;
             proofPublicInput[i] = _getBatchProofPublicInput(
