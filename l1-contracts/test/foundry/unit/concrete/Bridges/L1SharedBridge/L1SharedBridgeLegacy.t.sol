@@ -108,14 +108,14 @@ contract L1SharedBridgeLegacyTest is Test {
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge(
-            l1WethAddress,
-            IBridgehub(bridgehubAddress),
-            IL1ERC20Bridge(l1ERC20BridgeAddress),
-            eraChainId,
-            eraErc20BridgeAddress,
-            eraDiamondProxy
-        );
+        sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
+            _eraChainId: eraChainId,
+            _eraErc20BridgeAddress: eraErc20BridgeAddress,
+            _eraDiamondProxy: eraDiamondProxy
+        });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
