@@ -361,8 +361,15 @@ describe("SystemContext tests", () => {
     });
 
     it("should update currentL2BlockTxsRollingHash", async () => {
+      const slot = 10;
+      const before = await systemContext.provider.getStorageAt(systemContext.address, slot);
+
       const hash = ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [111]));
       await systemContext.connect(bootloaderAccount).appendTransactionToCurrentL2Block(hash);
+
+      const value = await systemContext.provider.getStorageAt(systemContext.address, slot);
+      const cumulative = ethers.utils.keccak256(ethers.utils.solidityPack(["bytes32", "bytes32"], [before, hash]));
+      expect(value).to.be.equal(cumulative);
     });
   });
 
