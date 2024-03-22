@@ -489,7 +489,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             });
         }
 
-        bool success = bridgeHub.proveL2MessageInclusion({
+        bool success = bridgehub.proveL2MessageInclusion({
             _chainId: _chainId,
             _batchNumber: _messageParams.l2BatchNumber,
             _index: _messageParams.l2MessageIndex,
