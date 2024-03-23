@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
@@ -177,6 +177,18 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             } else if (logKey == uint256(SystemLogKey.BLOB_TWO_HASH_KEY)) {
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
                 logOutput.blob2Hash = logValue;
+            } else if (logKey == uint256(SystemLogKey.BLOB_THREE_HASH_KEY)) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                logOutput.blob3Hash = logValue;
+            } else if (logKey == uint256(SystemLogKey.BLOB_FOUR_HASH_KEY)) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                logOutput.blob4Hash = logValue;
+            } else if (logKey == uint256(SystemLogKey.BLOB_FIVE_HASH_KEY)) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                logOutput.blob5Hash = logValue;
+            } else if (logKey == uint256(SystemLogKey.BLOB_SIX_HASH_KEY)) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
+                logOutput.blob6Hash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
@@ -186,13 +198,35 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
 
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
-        // With the protocol upgrade we expect 8 logs: 2^10 - 1 = 1023
+        // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 511
+        // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 1023
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            require(processedLogs == 511, "b7");
+            require(processedLogs == 8191, "b7");
         } else {
-            require(processedLogs == 1023, "b8");
+            require(processedLogs == 16383, "b8");
         }
+    }
+
+    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint j = _i;
+        uint len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint k = len;
+        while (_i != 0) {
+            k = k-1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
     }
 
     /// @inheritdoc IExecutor
