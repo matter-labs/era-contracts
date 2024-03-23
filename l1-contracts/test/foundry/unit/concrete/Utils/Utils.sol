@@ -94,9 +94,24 @@ library Utils {
         );
         logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
         logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
-        logs[9] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_THREE_HASH_KEY), bytes32(0));
-        logs[10] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FOUR_HASH_KEY), bytes32(0));
-        logs[11] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FIVE_HASH_KEY), bytes32(0));
+        logs[9] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
+            bytes32(0)
+        );
+        logs[10] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FOUR_HASH_KEY),
+            bytes32(0)
+        );
+        logs[11] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FIVE_HASH_KEY),
+            bytes32(0)
+        );
         logs[12] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0));
         return logs;
     }

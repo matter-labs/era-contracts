@@ -688,7 +688,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     /// @dev Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
     /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
     /// new opcode.
-    function _getBlobVersionedHash(uint256 _index) internal virtual view returns (bytes32 versionedHash) {
+    function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
         assembly {
             versionedHash := blobhash(_index)
         }

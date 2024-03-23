@@ -132,7 +132,12 @@ contract UtilsTest is Test {
 
         assertEq(
             logs[9],
-            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_THREE_HASH_KEY), bytes32(0)),
+            Utils.constructL2Log(
+                true,
+                PUBDATA_PUBLISHER_ADDRESS,
+                uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
+                bytes32(0)
+            ),
             "log[9] should be correct"
         );
 

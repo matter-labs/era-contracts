@@ -100,7 +100,7 @@ export default {
           "*": ["storageLayout"],
         },
       },
-      evmVersion: "cancun"
+      evmVersion: "cancun",
     },
   },
   contractSizer: {

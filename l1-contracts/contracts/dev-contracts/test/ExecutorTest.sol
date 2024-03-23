@@ -8,7 +8,7 @@ contract TestExecutor is ExecutorFacet {
     /// @dev Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
     /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
     /// new opcode.
-    function _getBlobVersionedHash(uint256 _index) internal virtual override view returns (bytes32 versionedHash) {
+    function _getBlobVersionedHash(uint256 _index) internal view virtual override returns (bytes32 versionedHash) {
         (bool success, bytes memory data) = s.blobVersionedHashRetriever.staticcall(abi.encode(_index));
         require(success, "vc");
         versionedHash = abi.decode(data, (bytes32));
