@@ -228,9 +228,24 @@ export function createSystemLogs(
     ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
   ];
 }
@@ -265,9 +280,24 @@ export function createSystemLogsWithUpgrade(
     ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY, ethers.constants.HashZero),
-    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_THREE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FOUR_HASH_KEY,
+      ethers.constants.HashZero
+    ),
+    constructL2Log(
+      true,
+      PUBDATA_CHUNK_PUBLISHER_ADDRESS,
+      SYSTEM_LOG_KEYS.BLOB_FIVE_HASH_KEY,
+      ethers.constants.HashZero
+    ),
     constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_SIX_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(
       true,
