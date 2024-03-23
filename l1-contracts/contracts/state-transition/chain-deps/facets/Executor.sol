@@ -207,28 +207,6 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
     }
 
-    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint j = _i;
-        uint len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint k = len;
-        while (_i != 0) {
-            k = k-1;
-            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
-    }
-
     /// @inheritdoc IExecutor
     function commitBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
@@ -710,9 +688,9 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
     /// @dev Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
     /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
     /// new opcode.
-    function _getBlobVersionedHash(uint256 _index) internal view returns (bytes32 versionedHash) {
-        (bool success, bytes memory data) = s.blobVersionedHashRetriever.staticcall(abi.encode(_index));
-        require(success, "vc");
-        versionedHash = abi.decode(data, (bytes32));
+    function _getBlobVersionedHash(uint256 _index) internal virtual view returns (bytes32 versionedHash) {
+        assembly {
+            versionedHash := blobhash(_index)
+        }
     }
 }

@@ -11,6 +11,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
+import {TestExecutor} from "solpp/dev-contracts/test/ExecutorTest.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
@@ -26,7 +27,7 @@ contract ExecutorTest is Test {
     address internal randomSigner;
     address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
-    ExecutorFacet internal executor;
+    TestExecutor internal executor;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
@@ -124,7 +125,7 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
-        executor = new ExecutorFacet();
+        executor = new TestExecutor();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet();
@@ -208,7 +209,7 @@ contract ExecutorTest is Test {
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
-        executor = ExecutorFacet(address(diamondProxy));
+        executor = TestExecutor(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
