@@ -118,7 +118,7 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0xab2238ade1c47671daadd8859d3f40986daf53a9349716fca57e6679e5dc1ece,
+            0xa1dcde434352cda8e331e721232ff2d457d4074efae1e3d06ef5b10ffada0c9a,
             "nextCommitment computation failed"
         );
 
@@ -130,6 +130,6 @@ contract ExecutorProofTest is Test {
             recursionCircuitsSetVksHash: 0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac
         });
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment, verifierParams);
-        assertEq(result, 0x23ef2434974fa8d0f7f7d29839aaa78fe767bf36edb3a5979d60a6b0, "getBatchProofPublicInput");
+        assertEq(result, 0x88C3540EF85F4D77A019EDE1FA56265C8B1D6106ACA64AFC2FEB667, "getBatchProofPublicInput");
     }
 }

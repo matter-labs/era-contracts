@@ -584,7 +584,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
         // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
         //
-        // For now, only up to 2 blobs are supported by the contract, while 16 are required by the circuits.
+        // For now, only up to 6 blobs are supported by the contract, while 16 are required by the circuits.
         // All the unfilled blobs will have their commitment as 0, including the case when we use only 1 blob.
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
