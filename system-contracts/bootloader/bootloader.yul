@@ -399,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 54000000 / 32 VM words.
+            /// @dev The memory page consists of 58000000 / 32 VM words.
             /// Each execution result is a single boolean, but
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 54000000
+                ret := 58000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
