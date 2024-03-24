@@ -13,25 +13,15 @@ import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 contract GasBoundCallerTester is GasBoundCaller {
     uint256 public lastRecordedGasLeft;
 
-    function testEntryOverheadInner(
-        address _to,
-        uint256 _maxTotalGas,
-        uint256 _expectedGas,
-        bytes calldata _data
-    ) external payable {
+    function testEntryOverheadInner(uint256 _expectedGas) external payable {
         // `2/3` to ensure that the constant is good with sufficient overhead
         require(gasleft() + (2 * CALL_ENTRY_OVERHEAD) / 3 >= _expectedGas, "Entry overhead is incorrect");
 
         lastRecordedGasLeft = gasleft();
     }
 
-    function testEntryOverhead(
-        address _to,
-        uint256 _maxTotalGas,
-        uint256 _expectedGas,
-        bytes calldata _data
-    ) external payable {
-        this.testEntryOverheadInner{gas: _expectedGas}(_to, _maxTotalGas, _expectedGas, _data);
+    function testEntryOverhead(uint256 _expectedGas) external payable {
+        this.testEntryOverheadInner{gas: _expectedGas}(_expectedGas);
     }
 
     function testReturndataOverheadInner(bool _shouldReturn, uint256 _len) external {

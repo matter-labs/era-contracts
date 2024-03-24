@@ -3,9 +3,8 @@ pragma solidity 0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
+import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, SystemLogKey} from "./Constants.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {SystemLogKey} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -54,7 +53,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
         for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             SystemContractHelper.toL1(
                 true,
-                bytes32(uint256(SystemLogKey(i + BLOB_HASH_SYSTEM_LOG_KEY_OFFSET))),
+                bytes32(uint256(SystemLogKey(i + uint256(SystemLogKey.BLOB_ONE_HASH_KEY)))),
                 blobHashes[i]
             );
         }

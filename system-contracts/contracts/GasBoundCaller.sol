@@ -54,7 +54,13 @@ contract GasBoundCaller {
         // If the call fails, the `EfficientCall.call` will propagate the revert.
         // Since the revert is propagated, the pubdata published wouldn't change and so no
         // other checks are needed.
-        bytes memory returnData = EfficientCall.call(gasleft(), _to, msg.value, _data, false);
+        bytes memory returnData = EfficientCall.call({
+            _gas: gasleft(),
+            _to: _to,
+            _value: msg.value,
+            _data: _data,
+            _isSystem: false
+        });
 
         uint256 pubdataPublishedAfter = REAL_SYSTEM_CONTEXT_CONTRACT.getCurrentPubdataSpent();
 

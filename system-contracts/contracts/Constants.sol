@@ -120,9 +120,6 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-/// @dev The offset in the logs of where the blob hashes start.
-uint256 constant BLOB_HASH_SYSTEM_LOG_KEY_OFFSET = 8;
-
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
 /// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
