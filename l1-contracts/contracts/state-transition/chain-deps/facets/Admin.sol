@@ -92,6 +92,12 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit ValidiumModeStatusUpdate(_validiumMode);
     }
 
+    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
+        address oldTransactionFilterer = s.transactionFilterer;
+        s.transactionFilterer = _transactionFilterer;
+        emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/

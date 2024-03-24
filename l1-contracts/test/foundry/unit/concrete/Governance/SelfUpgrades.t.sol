@@ -5,7 +5,7 @@ import {Utils} from "../Utils/Utils.sol";
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 
-import {IGovernance} from "solpp/governance/IGovernance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 
 contract SelfUpgradesTest is GovernanceTest {
     event ChangeSecurityCouncil(address _securityCouncilBefore, address _securityCouncilAfter);

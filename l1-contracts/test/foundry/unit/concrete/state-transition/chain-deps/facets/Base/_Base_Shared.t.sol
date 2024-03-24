@@ -6,8 +6,9 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ZkSyncStateTransitionBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestBaseFacet is ZkSyncStateTransitionBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
@@ -39,6 +40,7 @@ bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "StateTransiti
 contract ZkSyncStateTransitionBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](6);
@@ -65,7 +67,7 @@ contract ZkSyncStateTransitionBaseTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         testBaseFacet = TestBaseFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

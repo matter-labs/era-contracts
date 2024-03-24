@@ -1,5 +1,5 @@
 [profile.default]
-src = 'cache/solpp-generated-contracts'
+src = 'contracts'
 out = 'artifacts-forge'
 libs = ['node_modules', 'lib']
 cache_path = 'cache-forge'

@@ -120,6 +120,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         address _sender,
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 

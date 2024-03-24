@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import "../../state-transition/libraries/Merkle.sol";
+import {Merkle} from "../../state-transition/libraries/Merkle.sol";
 
 contract MerkleTest {
     function calculateRoot(

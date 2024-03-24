@@ -47,35 +47,35 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
-uint256 constant MAX_GAS_PER_TRANSACTION = $(MAX_GAS_PER_TRANSACTION);
+uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased
 /// value.
-uint256 constant L1_GAS_PER_PUBDATA_BYTE = $(L1_GAS_PER_PUBDATA_BYTE);
+uint256 constant L1_GAS_PER_PUBDATA_BYTE = 17;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in computational L2 gas
-uint256 constant L1_TX_INTRINSIC_L2_GAS = $(L1_TX_INTRINSIC_L2_GAS);
+uint256 constant L1_TX_INTRINSIC_L2_GAS = 167_157;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata
-uint256 constant L1_TX_INTRINSIC_PUBDATA = $(L1_TX_INTRINSIC_PUBDATA);
+uint256 constant L1_TX_INTRINSIC_PUBDATA = 88;
 
 /// @dev The minimal base price for L1 transaction
-uint256 constant L1_TX_MIN_L2_GAS_BASE = $(L1_TX_MIN_L2_GAS_BASE);
+uint256 constant L1_TX_MIN_L2_GAS_BASE = 173_484;
 
 /// @dev The number of L2 gas the transaction starts costing more with each 544 bytes of encoding
-uint256 constant L1_TX_DELTA_544_ENCODING_BYTES = $(L1_TX_DELTA_544_ENCODING_BYTES);
+uint256 constant L1_TX_DELTA_544_ENCODING_BYTES = 1656;
 
 /// @dev The number of L2 gas an L1->L2 transaction gains with each new factory dependency
-uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = $(L1_TX_DELTA_FACTORY_DEPS_L2_GAS);
+uint256 constant L1_TX_DELTA_FACTORY_DEPS_L2_GAS = 2473;
 
 /// @dev The number of L2 gas an L1->L2 transaction gains with each new factory dependency
-uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = $(L1_TX_DELTA_FACTORY_DEPS_PUBDATA);
+uint256 constant L1_TX_DELTA_FACTORY_DEPS_PUBDATA = 64;
 
 /// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
-uint256 constant MAX_NEW_FACTORY_DEPS = $(MAX_NEW_FACTORY_DEPS);
+uint256 constant MAX_NEW_FACTORY_DEPS = 32;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
-uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
@@ -98,16 +98,10 @@ uint256 constant TX_SLOT_OVERHEAD_L2_GAS = 10000;
 /// the operator in case the batch is closed because of the memory for transactions being filled up.
 uint256 constant MEMORY_OVERHEAD_GAS = 10;
 
+/// @dev The maximum gas limit for a priority transaction in L2.
+uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
 address constant ETH_TOKEN_ADDRESS = address(1);
-
-/// @dev Era's chainID
-uint256 constant ERA_CHAIN_ID = $(ERA_CHAIN_ID);
-
-/// @dev The address of legacy L1 ERC20 bridge.
-address constant ERA_ERC20_BRIDGE_ADDRESS = $(ERA_ERC20_BRIDGE_ADDRESS);
-
-/// @dev The address of zkSync Era diamond proxy contract.
-address constant ERA_DIAMOND_PROXY = $(ERA_DIAMOND_PROXY);
 
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 

@@ -16,7 +16,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, ERA_DIAMOND_PROXY, ERA_CHAIN_ID} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
@@ -87,16 +87,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
-            0,
-            _initializeData.genesisBatchHash,
-            _initializeData.genesisIndexRepeatedStorageChanges,
-            0,
-            EMPTY_STRING_KECCAK,
-            DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            0,
-            _initializeData.genesisBatchCommitment
-        );
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _initializeData.genesisBatchHash,
+            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: _initializeData.genesisBatchCommitment
+        });
+
         storedBatchZero = keccak256(abi.encode(batchZero));
 
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
@@ -183,7 +184,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
+            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
@@ -258,6 +259,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes
+        // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),

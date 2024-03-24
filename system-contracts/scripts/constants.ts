@@ -15,13 +15,13 @@ export interface SystemContractDescription {
   codeName: string;
 }
 
-export interface YulContractDescrption extends SystemContractDescription {
+export interface YulContractDescription extends SystemContractDescription {
   lang: Language.Yul;
   path: string;
 }
 
 // Currently used only for the tests
-export interface ZasmContractDescrption extends SystemContractDescription {
+export interface ZasmContractDescription extends SystemContractDescription {
   lang: Language.Zasm;
   path: string;
 }
@@ -31,7 +31,7 @@ export interface SolidityContractDescription extends SystemContractDescription {
 }
 
 interface ISystemContracts {
-  [key: string]: YulContractDescrption | SolidityContractDescription;
+  [key: string]: YulContractDescription | SolidityContractDescription;
 }
 
 export const SYSTEM_CONTRACTS: ISystemContracts = {
@@ -414,7 +414,7 @@ function getValidateTxStructure(
 }
 
 export function getTransactionUtils(): string {
-  let result = `/// 
+  let result = `///
             /// TransactionData utilities
             ///\n`;
 

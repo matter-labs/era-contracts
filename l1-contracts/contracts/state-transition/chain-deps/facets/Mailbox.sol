@@ -5,20 +5,19 @@ pragma solidity 0.8.24;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {Merkle} from "../../libraries/Merkle.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
 import {FeeParams, PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2ContractHelper} from "../../../common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, ETH_TOKEN_ADDRESS, ERA_CHAIN_ID} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
 
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IL1SharedBridge} from "../../../bridge/interfaces/IL1SharedBridge.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -34,13 +33,20 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @inheritdoc IZkSyncStateTransitionBase
     string public constant override getName = "MailboxFacet";
 
+    /// @dev Era's chainID
+    uint256 immutable eraChainId;
+
+    constructor(uint256 _eraChainId) {
+        eraChainId = _eraChainId;
+    }
+
     /// @inheritdoc IMailbox
     function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == ERA_CHAIN_ID, "transferEthToSharedBridge only available for Era on mailbox");
+        require(s.chainId == eraChainId, "transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
         address sharedBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(sharedBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
+        IL1SharedBridge(sharedBridgeAddress).receiveEth{value: amount}(eraChainId);
     }
 
     /// @notice when requesting transactions through the bridgehub
@@ -110,6 +116,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(_batchNumber <= s.totalBatchesExecuted, "xx");
 
         bytes32 hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
         // Check that hashed log is not the default one,
@@ -182,15 +189,15 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == ERA_CHAIN_ID, "finalizeEthWithdrawal only available for Era on mailbox");
-        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal(
-            ERA_CHAIN_ID,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        require(s.chainId == eraChainId, "finalizeEthWithdrawal only available for Era on mailbox");
+        IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
+            _chainId: eraChainId,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
     }
 
     ///  @inheritdoc IMailbox
@@ -203,7 +210,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == ERA_CHAIN_ID, "legacy interface only available for era token");
+        require(s.chainId == eraChainId, "legacy interface only available for era token");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -228,6 +235,20 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     function _requestL2TransactionSender(
         BridgehubL2TransactionRequest memory _request
     ) internal nonReentrant returns (bytes32 canonicalTxHash) {
+        // Check that the transaction is allowed by the filterer (if the filterer is set).
+        if (s.transactionFilterer != address(0)) {
+            require(
+                ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
+                    sender: _request.sender,
+                    contractL2: _request.contractL2,
+                    mintValue: _request.mintValue,
+                    l2Value: _request.l2Value,
+                    l2Calldata: _request.l2Calldata,
+                    refundRecipient: _request.refundRecipient
+                }),
+                "tf"
+            );
+        }
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address l2Sender = _request.sender;
@@ -340,6 +361,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
 
         // Data that is needed for the operator to simulate priority queue offchain
+        // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(
             _priorityOpParams.txId,
             canonicalTxHash,

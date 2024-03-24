@@ -351,7 +351,7 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [], create2Salt, ethTxOptions);
+    const contractAddress = await this.deployViaCreate2("MailboxFacet", [this.chainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
@@ -384,7 +384,14 @@ export class Deployer {
 
   public async deployVerifier(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+
+    let contractAddress: string;
+
+    if (process.env.CHAIN_ETH_NETWORK === "mainnet") {
+      contractAddress = await this.deployViaCreate2("Verifier", [], create2Salt, ethTxOptions);
+    } else {
+      contractAddress = await this.deployViaCreate2("TestnetVerifier", [], create2Salt, ethTxOptions);
+    }
 
     if (this.verbose) {
       console.log(`CONTRACTS_VERIFIER_ADDR=${contractAddress}`);
@@ -483,7 +490,15 @@ export class Deployer {
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
-      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR], // we load from process.env, as normally L1_ERC20 bridge will already be deployed
+      [
+        l1WethToken,
+        this.addresses.Bridgehub.BridgehubProxy,
+        // we load from process.env, as normally L1_ERC20 bridge will already be deployed
+        process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR,
+        this.chainId,
+        this.addresses.Bridges.ERC20BridgeImplementation,
+        this.addresses.StateTransition.DiamondProxy,
+      ],
       create2Salt,
       ethTxOptions
     );
@@ -673,9 +688,10 @@ export class Deployer {
     }
     this.chainId = parseInt(chainId, 16);
 
-    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx2 = await validatorTimelock.addValidator(chainId, validatorAddress, {
+    const tx2 = await validatorTimelock.addValidator(chainId, validatorOneAddress, {
       gasPrice,
       nonce,
       gasLimit,
@@ -685,18 +701,30 @@ export class Deployer {
       console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
     }
 
-    const diamondProxy = this.stateTransitionContract(this.deployWallet);
-    const tx3 = await diamondProxy.setTokenMultiplier(1, 1);
+    nonce++;
+
+    const tx3 = await validatorTimelock.addValidator(chainId, validatorTwoAddress, {
+      gasPrice,
+      nonce,
+      gasLimit,
+    });
     const receipt3 = await tx3.wait();
     if (this.verbose) {
-      console.log(`BaseTokenMultiplier set, gas used: ${receipt3.gasUsed.toString()}`);
+      console.log(`Validator registered, gas used: ${receipt3.gasUsed.toString()}`);
+    }
+
+    const diamondProxy = this.stateTransitionContract(this.deployWallet);
+    const tx4 = await diamondProxy.setTokenMultiplier(1, 1);
+    const receipt4 = await tx4.wait();
+    if (this.verbose) {
+      console.log(`BaseTokenMultiplier set, gas used: ${receipt4.gasUsed.toString()}`);
     }
 
     if (validiumMode) {
-      const tx4 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
-      const receipt4 = await tx4.wait();
+      const tx5 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
+      const receipt5 = await tx5.wait();
       if (this.verbose) {
-        console.log(`Validium mode set, gas used: ${receipt4.gasUsed.toString()}`);
+        console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
       }
     }
   }
@@ -723,9 +751,10 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
+
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay],
+      [this.ownerAddress, executionDelay, this.chainId],
       create2Salt,
       ethTxOptions
     );

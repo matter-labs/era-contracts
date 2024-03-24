@@ -6,13 +6,12 @@ import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../../Utils/Utils.sol";
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "solpp/common/Config.sol";
-import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
-import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract revertBatchesTest is StateTransitionManagerTest {
     // Items for logs & commits
@@ -36,7 +35,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
 
-        // Initial setup for loge & commits
+        // Initial setup for logs & commits
         vm.stopPrank();
         vm.startPrank(newChainAdmin);
 

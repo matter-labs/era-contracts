@@ -4,8 +4,8 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../../common/Config.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 contract DummySharedBridge {
     event BridgehubDepositBaseTokenInitiated(
@@ -73,7 +73,7 @@ contract DummySharedBridge {
         amount = amountReturnInFinalizeWithdrawal;
     }
 
-    event Debugger(uint);
+    event Debugger(uint256);
 
     function bridgehubDepositBaseToken(
         uint256 _chainId,

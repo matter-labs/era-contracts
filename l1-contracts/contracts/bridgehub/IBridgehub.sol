@@ -3,9 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
-import "../common/Messaging.sol";
-import "../state-transition/IStateTransitionManager.sol";
-import "../state-transition/libraries/Diamond.sol";
+import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;

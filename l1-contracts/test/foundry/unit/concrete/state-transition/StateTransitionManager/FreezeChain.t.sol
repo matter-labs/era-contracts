@@ -2,9 +2,7 @@
 pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 contract freezeChainTest is StateTransitionManagerTest {
     function test_FreezingChain() public {

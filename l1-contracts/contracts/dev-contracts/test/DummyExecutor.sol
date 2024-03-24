@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import "../../state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 /// @title DummyExecutor
 /// @notice A test smart contract implementing the IExecutor interface to simulate Executor behavior for testing purposes.
