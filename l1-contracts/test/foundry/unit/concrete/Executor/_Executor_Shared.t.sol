@@ -10,7 +10,7 @@ import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummySta
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -128,7 +128,7 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        executor = new ExecutorFacet();
+        executor = new TestExecutor();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet(eraChainId);

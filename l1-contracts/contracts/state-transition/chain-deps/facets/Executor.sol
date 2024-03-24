@@ -563,7 +563,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         return
             // solhint-disable-next-line func-named-parameters
-            abi.encode(
+            abi.encodePacked(
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,

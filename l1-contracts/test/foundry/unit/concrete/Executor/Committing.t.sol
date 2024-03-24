@@ -5,7 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, MAX_NUMBER_OF_BLOBS} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -335,10 +335,10 @@ contract CommittingTest is ExecutorTest {
             bytes32(uint256(0xbeef))
         );
 
-        bytes32[] memory blobHashes = new bytes32[](2);
+        bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         blobHashes[0] = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
 
-        bytes32[] memory blobCommitments = new bytes32[](2);
+        bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         blobCommitments[0] = bytes32(uint256(0xbeef));
 
         bytes32 expectedBatchCommitment = Utils.createBatchCommitment(

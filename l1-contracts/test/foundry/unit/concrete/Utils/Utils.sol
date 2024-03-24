@@ -24,7 +24,7 @@ address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x00000000000000000000000000000
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
 
-uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 library Utils {
@@ -440,7 +440,7 @@ library Utils {
 
         return
             // solhint-disable-next-line func-named-parameters
-            abi.encode(
+            abi.encodePacked(
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
