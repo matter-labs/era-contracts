@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
-import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS} from "./Constants.sol";
+import {L1_MESSENGER_CONTRACT, BLOB_SIZE_BYTES, MAX_NUMBER_OF_BLOBS, BLOB_HASH_SYSTEM_LOG_KEY_OFFSET} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemLogKey} from "./Constants.sol";
@@ -52,11 +52,12 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher, ISystemContract {
             blobHashes[i] = blobHash;
         }
 
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_ONE_HASH_KEY)), blobHashes[0]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_TWO_HASH_KEY)), blobHashes[1]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_THREE_HASH_KEY)), blobHashes[2]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_FOUR_HASH_KEY)), blobHashes[3]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_FIVE_HASH_KEY)), blobHashes[4]);
-        SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.BLOB_SIX_HASH_KEY)), blobHashes[5]);
+        for (uint8 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            SystemContractHelper.toL1(
+                true,
+                bytes32(uint256(SystemLogKey(i + BLOB_HASH_SYSTEM_LOG_KEY_OFFSET))),
+                blobHashes[i]
+            );
+        }
     }
 }

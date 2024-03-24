@@ -22,6 +22,9 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
+/// @dev The offset in the logs of where the blob hashes start.
+uint256 constant BLOB_HASH_SYSTEM_LOG_KEY_OFFSET = 7;
+
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {
     Calldata,
@@ -36,12 +39,6 @@ struct LogProcessingOutput {
     bytes32 stateDiffHash;
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
-    bytes32 blob1Hash;
-    bytes32 blob2Hash;
-    bytes32 blob3Hash;
-    bytes32 blob4Hash;
-    bytes32 blob5Hash;
-    bytes32 blob6Hash;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)

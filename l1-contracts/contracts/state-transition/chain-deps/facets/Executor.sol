@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, BLOB_HASH_SYSTEM_LOG_KEY_OFFSET} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -42,18 +42,14 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        bytes32[] memory blobHashes = _processBlobLogs(_newBatch);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
             require(_newBatch.pubdataCommitments.length == 1);
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
-            // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
-            // Otherwise we should be using bytes32(0)
-            blobHashes[0] = logOutput.blob1Hash;
-            blobHashes[1] = logOutput.blob2Hash;
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
@@ -63,7 +59,6 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
                     keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
                 "wp"
             );
-            blobHashes[0] = logOutput.blob1Hash;
             blobCommitments[0] = bytes32(
                 _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
                     .pubdataCommitments
@@ -171,40 +166,60 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
-            } else if (logKey == uint256(SystemLogKey.BLOB_ONE_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
-                logOutput.blob1Hash = logValue;
-            } else if (logKey == uint256(SystemLogKey.BLOB_TWO_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                logOutput.blob2Hash = logValue;
-            } else if (logKey == uint256(SystemLogKey.BLOB_THREE_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                logOutput.blob3Hash = logValue;
-            } else if (logKey == uint256(SystemLogKey.BLOB_FOUR_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                logOutput.blob4Hash = logValue;
-            } else if (logKey == uint256(SystemLogKey.BLOB_FIVE_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                logOutput.blob5Hash = logValue;
-            } else if (logKey == uint256(SystemLogKey.BLOB_SIX_HASH_KEY)) {
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pd");
-                logOutput.blob6Hash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
-            } else {
+            } else if (
+                logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY) + MAX_NUMBER_OF_BLOBS
+            ) {
                 revert("ul");
             }
         }
 
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 511
-        // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 1023
+        // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
+        // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             require(processedLogs == 8191, "b7");
         } else {
             require(processedLogs == 16383, "b8");
         }
+    }
+
+    /// @dev Check that L2 blob logs are proper and batch contain all information for them
+    /// @dev The logs processed here should line up such that only one log for each key from the
+    ///      SystemLogKey enum in Constants.sol is processed per new batch.
+    function _processBlobLogs(CommitBatchInfo calldata _newBatch) internal pure returns (bytes32[] memory blobHashes) {
+        // Copy L2 to L1 logs into memory.
+        bytes memory emittedL2Logs = _newBatch.systemLogs;
+
+        // Used as bitmap to set/check log processing happens exactly once.
+        // See SystemLogKey enum in Constants.sol for ordering.
+        uint256 processedLogs;
+
+        blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
+
+        // linear traversal of the logs
+        for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
+            // Extract the values to be compared to/used such as the log sender, key, and value
+            (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+            (uint256 logKey, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+            (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
+
+            if (
+                logKey >= BLOB_HASH_SYSTEM_LOG_KEY_OFFSET &&
+                logKey != uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
+            ) {
+                // Ensure that the log hasn't been processed already
+                require(!_checkBit(processedLogs, uint8(logKey) - uint8(BLOB_HASH_SYSTEM_LOG_KEY_OFFSET)), "pk");
+                processedLogs = _setBit(processedLogs, uint8(logKey) - uint8(BLOB_HASH_SYSTEM_LOG_KEY_OFFSET));
+
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
+                blobHashes[logKey - BLOB_HASH_SYSTEM_LOG_KEY_OFFSET] = logValue;
+            }
+        }
+        // We have 6 logs so that corresponds to 2^6 - 1 = 63
+        require(processedLogs == 63, "l8");
     }
 
     /// @inheritdoc IExecutor
@@ -685,9 +700,6 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         }
     }
 
-    /// @dev Since we don't have access to the new BLOBHASH opecode we need to leverage a static call to a yul contract
-    /// that calls the opcode via a verbatim call. This should be swapped out once there is solidity support for the
-    /// new opcode.
     function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
         assembly {
             versionedHash := blobhash(_index)
