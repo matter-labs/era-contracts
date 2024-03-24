@@ -224,7 +224,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
         // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
         require(
-            IStateTransitionManager(s.stateTransitionManager).protocolVersion() == s.protocolVersion,
+            IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion),
             "Executor facet: wrong protocol version"
         );
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.

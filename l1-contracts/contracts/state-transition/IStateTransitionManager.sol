@@ -62,6 +62,10 @@ interface IStateTransitionManager {
 
     function protocolVersion() external view returns (uint256);
 
+    function protocolVersionTimestamp(uint256 _protocolVersion) external view returns (uint256);
+
+    function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
+
     function initialize(StateTransitionManagerInitializeData calldata _initalizeData) external;
 
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external;
@@ -88,6 +92,10 @@ interface IStateTransitionManager {
     ) external;
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
+
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
+    
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
 
     function freezeChain(uint256 _chainId) external;
 

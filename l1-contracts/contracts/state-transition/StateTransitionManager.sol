@@ -41,6 +41,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev current protocolVersion
     uint256 public protocolVersion;
 
+    /// @dev timestamp when protocolVersion can be last used
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionTimestamp;
+
     /// @dev validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
 
@@ -142,10 +145,22 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _newProtocolVersion
+        uint256 _oldProtocolVersionTimestamp,
+        uint256 _newProtocolVersion,
     ) external onlyOwner {
+        protocolVersionTimestamp[_oldProtocolVersion] = _oldProtocolVersionTimestamp;
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
         protocolVersion = _newProtocolVersion;
+    }
+
+    /// @dev check that the protocolVersion is active 
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+        return block.timestamp < protocolVersionTimestamp[_protocolVersion];
+    }
+
+    /// @dev set the protocol version timestamp
+    function setProtocolVersionTimestamp(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        protocolVersionTimestamp[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -169,6 +184,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev reverts batches on the specified chain
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+    }
+
+    /// @dev executes upgrade on chain
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// registration
