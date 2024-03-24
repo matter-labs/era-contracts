@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.25;
 
 import {ZkSyncStateTransitionBase} from "../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";

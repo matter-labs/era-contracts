@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.25;
 
 import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_STATE_TRANSITION_MANAGER} from "./_Base_Shared.t.sol";
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.25;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
@@ -169,9 +169,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
-            } else if (
-                logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY) + MAX_NUMBER_OF_BLOBS
-            ) {
+            } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 revert("ul");
             }
         }

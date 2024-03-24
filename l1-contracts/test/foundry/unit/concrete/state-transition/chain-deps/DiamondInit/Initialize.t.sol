@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.25;
 
 import {DiamondInitTest} from "./_DiamondInit_Shared.t.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
