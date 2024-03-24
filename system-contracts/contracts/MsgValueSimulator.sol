@@ -80,7 +80,7 @@ contract MsgValueSimulator is ISystemContract {
 
         return
             EfficientCall.mimicCall({
-                _gas: gasleft(),
+                _gas: userGas,
                 _address: to,
                 _data: _data,
                 _whoToMimic: msg.sender,
