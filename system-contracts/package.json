@@ -10,6 +10,7 @@
     "ethers": "^5.7.0",
     "fast-glob": "^3.3.2",
     "hardhat": "^2.18.3",
+    "hardhat-verify": "^1.0.0",
     "preprocess": "^3.2.0",
     "zksync-web3": "^0.14.3"
   },
@@ -17,7 +18,9 @@
     "@matterlabs/hardhat-zksync-chai-matchers": "^0.1.4",
     "@matterlabs/hardhat-zksync-node": "^0.0.1-beta.7",
     "@matterlabs/hardhat-zksync-solc": "^0.4.2",
+    "@matterlabs/hardhat-zksync-verify": "^0.5.1",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
+    "@nomicfoundation/hardhat-verify": "^2.0.5",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
     "@typechain/ethers-v5": "^2.0.0",
     "@types/chai": "^4.2.21",
