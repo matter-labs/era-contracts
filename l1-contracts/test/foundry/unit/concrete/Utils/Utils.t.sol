@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";

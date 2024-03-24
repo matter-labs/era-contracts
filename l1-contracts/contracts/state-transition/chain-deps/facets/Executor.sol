@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, BLOB_HASH_SYSTEM_LOG_KEY_OFFSET} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -205,15 +205,15 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
 
             if (
-                logKey >= BLOB_HASH_SYSTEM_LOG_KEY_OFFSET &&
+                logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) &&
                 logKey != uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
             ) {
                 // Ensure that the log hasn't been processed already
-                require(!_checkBit(processedLogs, uint8(logKey) - uint8(BLOB_HASH_SYSTEM_LOG_KEY_OFFSET)), "pk");
-                processedLogs = _setBit(processedLogs, uint8(logKey) - uint8(BLOB_HASH_SYSTEM_LOG_KEY_OFFSET));
+                require(!_checkBit(processedLogs, uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)), "pk");
+                processedLogs = _setBit(processedLogs, uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY));
 
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
-                blobHashes[logKey - BLOB_HASH_SYSTEM_LOG_KEY_OFFSET] = logValue;
+                blobHashes[logKey - uint256(SystemLogKey.BLOB_ONE_HASH_KEY)] = logValue;
             }
         }
         // We have 6 logs so that corresponds to 2^6 - 1 = 63

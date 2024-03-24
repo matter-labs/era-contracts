@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import "../../bridge/L1SharedBridge.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";

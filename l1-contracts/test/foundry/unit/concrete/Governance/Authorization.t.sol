@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {IGovernance} from "solpp/governance/IGovernance.sol";

@@ -1,5 +1,5 @@
 // // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";

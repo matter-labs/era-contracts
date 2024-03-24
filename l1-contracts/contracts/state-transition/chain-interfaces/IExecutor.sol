@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
 
@@ -21,9 +21,6 @@ enum SystemLogKey {
     BLOB_SIX_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
-
-/// @dev The offset in the logs of where the blob hashes start.
-uint256 constant BLOB_HASH_SYSTEM_LOG_KEY_OFFSET = 7;
 
 /// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
 enum PubdataSource {

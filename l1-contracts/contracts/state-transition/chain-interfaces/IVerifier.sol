@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 /// @notice Part of the configuration parameters of ZKP circuits
 struct VerifierParams {

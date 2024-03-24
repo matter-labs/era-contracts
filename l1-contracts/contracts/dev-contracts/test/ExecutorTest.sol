@@ -2,7 +2,7 @@
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 
-pragma solidity 0.8.25;
+pragma solidity 0.8.24;
 
 contract TestExecutor is ExecutorFacet {
     /// @dev Since we want to test the blob functionality we want mock the calls to the blobhash opcode.
