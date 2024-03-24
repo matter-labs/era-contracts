@@ -445,7 +445,7 @@ library Utils {
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
-                _encodeBlobAuxilaryOutput(_blobCommitments, _blobHashes)
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
             );
     }
 
@@ -453,7 +453,7 @@ library Utils {
     /// @param _blobCommitments - the commitments to the blobs
     /// @param _blobHashes - the hashes of the blobs
     /// @param blobAuxOutputWords - The circuit commitment to the blobs split into 32-byte words
-    function _encodeBlobAuxilaryOutput(
+    function _encodeBlobAuxiliaryOutput(
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) internal pure returns (bytes32[] memory blobAuxOutputWords) {

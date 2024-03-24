@@ -32,9 +32,9 @@ object "CodeOracle" {
             /// @param versionedHash The versioned hash to check
             /// @return Whether the versioned hash is known
             function isCodeHashKnown(versionedHash) -> ret {
-                // 1. Selector for `KnwonCodesStorage.getMarker(bytes32)`
+                // 1. Selector for `KnownCodesStorage.getMarker(bytes32)`
                 mstore(0, 0x4c6314f000000000000000000000000000000000000000000000000000000000)
-                // 2. Input for `KnwonCodesStorage.getMarker(bytes32)`
+                // 2. Input for `KnownCodesStorage.getMarker(bytes32)`
                 mstore(4, versionedHash)
 
                 let success := staticcall(
