@@ -219,7 +219,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             }
         }
         // We have 6 logs so that corresponds to 2^6 - 1 = 63
-        require(processedLogs == 2**MAX_NUMBER_OF_BLOBS - 1, "l8");
+        require(processedLogs == 2 ** MAX_NUMBER_OF_BLOBS - 1, "l8");
     }
 
     /// @inheritdoc IExecutor
