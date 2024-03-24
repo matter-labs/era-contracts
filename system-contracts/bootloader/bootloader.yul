@@ -399,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 30000000 / 32 VM words.
+            /// @dev The memory page consists of 59000000 / 32 VM words.
             /// Each execution result is a single boolean, but
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 30000000
+                ret := 59000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -3847,7 +3847,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 9
+                ret := 13
             }
 
             ////////////////////////////////////////////////////////////////////////////
