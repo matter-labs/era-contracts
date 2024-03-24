@@ -38,6 +38,9 @@ struct LogProcessingOutput {
     uint256 packedBatchAndL2BlockTimestamp;
 }
 
+/// @dev The maximum number of bytes that calldata should be.
+uint256 constant MAX_CALLDATA_SIZE = 128_000;
+
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, MAX_CALLDATA_SIZE} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -54,6 +54,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
+            require(_newBatch.pubdataCommitments.length <= MAX_CALLDATA_SIZE, "cz");
             require(
                 logOutput.pubdataHash ==
                     keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
@@ -208,16 +209,17 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
                 logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) &&
                 logKey != uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
             ) {
+                uint8 key = uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY);
                 // Ensure that the log hasn't been processed already
-                require(!_checkBit(processedLogs, uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY)), "pk");
-                processedLogs = _setBit(processedLogs, uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY));
+                require(!_checkBit(processedLogs, key), "pk");
+                processedLogs = _setBit(processedLogs, key);
 
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
                 blobHashes[logKey - uint256(SystemLogKey.BLOB_ONE_HASH_KEY)] = logValue;
             }
         }
         // We have 6 logs so that corresponds to 2^6 - 1 = 63
-        require(processedLogs == 63, "l8");
+        require(processedLogs == 2**MAX_NUMBER_OF_BLOBS - 1, "l8");
     }
 
     /// @inheritdoc IExecutor
