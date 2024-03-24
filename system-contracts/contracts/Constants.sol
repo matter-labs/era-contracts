@@ -103,10 +103,6 @@ bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
-/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, it is better to
-/// allow the operator to provide any reasonably large value in order to avoid unneeded constraints on the operator.
-uint256 constant MAX_ALLOWED_PUBDATA_PER_BATCH = 1_560_000;
-
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
     TOTAL_L2_TO_L1_PUBDATA_KEY,
