@@ -117,7 +117,7 @@ library SafeERC20 {
         bytes32 s
     ) internal {
         uint256 nonceBefore = token.nonces(owner);
-        token.permit(owner, spender, value, deadline, v, r, s);
+        token.permit({owner: owner, spender: spender, value: value, deadline : deadline, v: v, r: r, s: s});
         uint256 nonceAfter = token.nonces(owner);
         require(
             nonceAfter == nonceBefore + 1,

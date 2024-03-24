@@ -361,6 +361,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         );
 
         // Data that is needed for the operator to simulate priority queue offchain
+        // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(
             _priorityOpParams.txId,
             canonicalTxHash,

@@ -24,6 +24,7 @@ contract SetPorterAvailabilityTest is AdminTest {
 
         utilsFacet.util_setZkPorterAvailability(true);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit IsPorterAvailableStatusUpdate(isPorterAvailable);
 
@@ -39,6 +40,7 @@ contract SetPorterAvailabilityTest is AdminTest {
 
         utilsFacet.util_setZkPorterAvailability(false);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit IsPorterAvailableStatusUpdate(isPorterAvailable);
 

@@ -774,6 +774,7 @@ contract L1SharedBridgeFailTest is Test {
         uint256 l2TxGasLimit = 100000;
         uint256 l2TxGasPerPubdataByte = 100;
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
 
         emit LegacyDepositInitiated({

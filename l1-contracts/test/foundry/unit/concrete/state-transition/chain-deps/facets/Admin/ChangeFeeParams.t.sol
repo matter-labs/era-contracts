@@ -73,6 +73,7 @@ contract ChangeFeeParamsTest is AdminTest {
             minimalL2GasPrice: 450_000_000
         });
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewFeeParams(oldFeeParams, newFeeParams);
 

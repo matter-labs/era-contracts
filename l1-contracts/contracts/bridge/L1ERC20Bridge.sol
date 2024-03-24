@@ -159,6 +159,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _refundRecipient: _refundRecipient
         });
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
+        // solhint-disable-next-line func-named-parameters
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
@@ -222,13 +223,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
-        (address l1Receiver, address l1Token, uint256 amount) = sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        (address l1Receiver, address l1Token, uint256 amount) = sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
     }
 }

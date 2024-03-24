@@ -63,7 +63,7 @@ library EfficientCall {
         bytes calldata _data,
         bool _isSystem
     ) internal returns (bytes memory returnData) {
-        bool success = rawCall(_gas, _address, _value, _data, _isSystem);
+        bool success = rawCall({_gas: _gas, _address: _address, _value: _value, _data: _data, _isSystem: _isSystem});
         returnData = _verifyCallResult(success);
     }
 
@@ -271,14 +271,14 @@ library EfficientCall {
         SystemContractHelper.ptrShrinkIntoActive(shrinkTo);
 
         uint32 gas = Utils.safeCastToU32(_gas);
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer(
-            gas,
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer({
+            gasPassed: gas,
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.ForwardFatPointer,
-            _isConstructor,
-            _isSystem
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.ForwardFatPointer,
+            isConstructorCall: _isConstructor,
+            isSystemCall: _isSystem
+        });
         SystemContractHelper.ptrPackIntoActivePtr(farCallAbi);
     }
 }

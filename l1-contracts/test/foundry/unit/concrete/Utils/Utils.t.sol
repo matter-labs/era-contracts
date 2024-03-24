@@ -31,6 +31,7 @@ contract UtilsTest is Test {
 
         assertEq(
             l2Log,
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 bytes2(0x0001), // servicePrefix
                 bytes2(0x0000), // 0x0000

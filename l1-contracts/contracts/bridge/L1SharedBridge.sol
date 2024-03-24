@@ -501,13 +501,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             });
         }
 
-        bool success = bridgehub.proveL2MessageInclusion(
-            _chainId,
-            _messageParams.l2BatchNumber,
-            _messageParams.l2MessageIndex,
-            l2ToL1Message,
-            _merkleProof
-        );
+        bool success = bridgehub.proveL2MessageInclusion({
+            _chainId: _chainId,
+            _batchNumber: _messageParams.l2BatchNumber,
+            _index: _messageParams.l2MessageIndex,
+            _message: l2ToL1Message,
+            _proof: _merkleProof
+        });
         require(success, "ShB withd w proof"); // withdrawal wrong proof
     }
 
