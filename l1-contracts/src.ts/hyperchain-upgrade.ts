@@ -22,22 +22,22 @@ import { Interface } from "ethers/lib/utils";
 import { ADDRESS_ONE, readBytecode, readInterface, type L2CanonicalTransaction, type ProposedUpgrade, type VerifierParams } from "./utils";
 
 // import { L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE, L2_SHARED_BRIDGE_ABI, BEACON_PROXY_BYTECODE} from "../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit, applyL1ToL2Alias, hashL2Bytecode} from "../../l2-contracts/src/utils";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit, applyL1ToL2Alias, hashL2Bytecode, computeL2Create2Address, create2DeployFromL1, publishBytecodeFromL1} from "../../l2-contracts/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 // const CONTRACT_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008006";
 // const COMPLEX_UPGRADE_ADDRESS = "0x000000000000000000000000000000000000800f";
 
-const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
+const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/contracts-preprocessed/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
-
+const systemContractsArtifactsPath = path.join("../.." as string, "contracts/system-contracts/??/");// kl todo
 
 const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
 const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
 const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
-
+const SYSTEM_CONTEXT_BYTECODE = readBytecode(systemContractsArtifactsPath, "SystemContext");
 
 export async function upgradeToHyperchains(
   deployer: EraDeployer,
@@ -114,6 +114,9 @@ async function deployNewContracts(deployer: EraDeployer, gasPrice: BigNumberish,
 }
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {
+  // publish L2 system contracts
+  await publishBytecodeFromL1(deployer.chainId, deployer.deployWallet, SYSTEM_CONTEXT_BYTECODE, gasPrice);
+
   // era facet cut
   const upgradeHyperchains = new Interface(hardhat.artifacts.readArtifactSync("UpgradeHyperchains").abi);
   const newProtocolVersion = 24;
@@ -219,7 +222,7 @@ async function upgradeL2Bridge(deployer: Deployer) {
   // todo deploy l2 bridge here
   // L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE
   const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
-  const 
+ 
 
   // upgrade from L1 governance. This has to come from governacne on L1. 
   const l2Bridge= L2_SHARED_BRIDGE_INTERFACE;
