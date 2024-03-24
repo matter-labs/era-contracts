@@ -146,14 +146,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionTimestamp,
-        uint256 _newProtocolVersion,
+        uint256 _newProtocolVersion
     ) external onlyOwner {
         protocolVersionTimestamp[_oldProtocolVersion] = _oldProtocolVersionTimestamp;
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
         protocolVersion = _newProtocolVersion;
     }
 
-    /// @dev check that the protocolVersion is active 
+    /// @dev check that the protocolVersion is active
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return block.timestamp < protocolVersionTimestamp[_protocolVersion];
     }

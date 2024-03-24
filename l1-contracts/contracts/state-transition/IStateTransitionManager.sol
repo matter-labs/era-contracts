@@ -88,13 +88,14 @@ interface IStateTransitionManager {
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionTimestamp,
         uint256 _newProtocolVersion
     ) external;
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
 
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
-    
+
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
 
     function freezeChain(uint256 _chainId) external;
