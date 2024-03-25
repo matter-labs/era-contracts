@@ -140,12 +140,11 @@ contract DeployL1Script is Script {
         string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
+        chainId = block.chainid;
+
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        chainId = toml.readUint("$.chain_id");
-        network = toml.readString("$.chain_eth_network");
-
         config.deployerAddress = msg.sender;
         config.gasPrice = toml.readUint("$.gas_price");
 
@@ -595,7 +594,6 @@ contract DeployL1Script is Script {
         );
 
         vm.serializeUint("l1", "chain_id", chainId);
-        vm.serializeString("l1", "network", network);
         vm.serializeString("l1", "bridgehub", l1Bridgehub);
         vm.serializeString("l1", "state_transition", l1StateTransition);
         vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);

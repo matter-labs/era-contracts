@@ -1,6 +1,4 @@
 gas_price = 0
-chain_id = 31337
-chain_eth_network = "local"
 
 [contracts]
 create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
