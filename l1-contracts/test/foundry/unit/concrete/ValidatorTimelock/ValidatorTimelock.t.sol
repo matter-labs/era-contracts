@@ -58,6 +58,7 @@ contract ValidatorTimelockTest is Test {
         assert(validator.validators(chainId, bob) == false);
 
         vm.prank(owner);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(validator));
         emit ValidatorAdded(chainId, bob);
         validator.addValidator(chainId, bob);
@@ -71,6 +72,7 @@ contract ValidatorTimelockTest is Test {
         assert(validator.validators(chainId, bob) == true);
 
         vm.prank(owner);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(validator));
         emit ValidatorRemoved(chainId, bob);
         validator.removeValidator(chainId, bob);

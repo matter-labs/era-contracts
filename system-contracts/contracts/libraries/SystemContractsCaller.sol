@@ -223,13 +223,14 @@ library SystemContractsCaller {
         bool isSystemCall
     ) internal pure returns (uint256 farCallAbi) {
         // Fill in the call parameter fields
-        farCallAbi = getFarCallABIWithEmptyFatPointer(
-            gasPassed,
-            shardId,
-            forwardingMode,
-            isConstructorCall,
-            isSystemCall
-        );
+        farCallAbi = getFarCallABIWithEmptyFatPointer({
+            gasPassed: gasPassed,
+            shardId: shardId,
+            forwardingMode: forwardingMode,
+            isConstructorCall: isConstructorCall,
+            isSystemCall: isSystemCall
+        });
+
         // Fill in the fat pointer fields
         farCallAbi |= dataOffset;
         farCallAbi |= (uint256(memoryPage) << 32);

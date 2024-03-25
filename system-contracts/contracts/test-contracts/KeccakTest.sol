@@ -22,14 +22,14 @@ contract KeccakTest {
     }
 
     function _loadFarCallABIIntoActivePtr(uint256 _gas) private view {
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer(
-            uint32(_gas),
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer({
+            gasPassed: uint32(_gas),
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.ForwardFatPointer,
-            false,
-            false
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.ForwardFatPointer,
+            isConstructorCall: false,
+            isSystemCall: false
+        });
         _ptrPackIntoActivePtr(farCallAbi);
     }
 

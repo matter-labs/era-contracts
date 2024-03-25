@@ -21,8 +21,10 @@ contract AcceptAdminTest is AdminTest {
         address pendingAdmin = utilsFacet.util_getPendingAdmin();
         address previousAdmin = utilsFacet.util_getAdmin();
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewPendingAdmin(pendingAdmin, address(0));
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewAdmin(previousAdmin, pendingAdmin);
 

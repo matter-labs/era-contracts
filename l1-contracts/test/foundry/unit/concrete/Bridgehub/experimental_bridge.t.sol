@@ -443,7 +443,15 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(true)
         );
 
-        assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId, mockBatchNumber, mockIndex, l2Message, mockProof));
+        assertTrue(
+            bridgeHub.proveL2MessageInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _message: l2Message,
+                _proof: mockProof
+            })
+        );
         vm.clearMockedCalls();
     }
 
@@ -490,7 +498,15 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(true)
         );
 
-        assertTrue(bridgeHub.proveL2LogInclusion(mockChainId, mockBatchNumber, mockIndex, l2Log, mockProof));
+        assertTrue(
+            bridgeHub.proveL2LogInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _log: l2Log,
+                _proof: mockProof
+            })
+        );
         vm.clearMockedCalls();
     }
 
@@ -969,7 +985,15 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(true)
         );
 
-        assertTrue(bridgeHub.proveL2MessageInclusion(mockChainId, mockBatchNumber, mockIndex, l2Message, mockProof));
+        assertTrue(
+            bridgeHub.proveL2MessageInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _message: l2Message,
+                _proof: mockProof
+            })
+        );
     }
 
     function test_proveL2LogInclusion_old(
@@ -1011,7 +1035,15 @@ contract ExperimentalBridgeTest is Test {
             abi.encode(true)
         );
 
-        assertTrue(bridgeHub.proveL2LogInclusion(mockChainId, mockBatchNumber, mockIndex, l2Log, mockProof));
+        assertTrue(
+            bridgeHub.proveL2LogInclusion({
+                _chainId: mockChainId,
+                _batchNumber: mockBatchNumber,
+                _index: mockIndex,
+                _log: l2Log,
+                _proof: mockProof
+            })
+        );
     }
 
     function test_proveL1ToL2TransactionStatus_old(

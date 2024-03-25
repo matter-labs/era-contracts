@@ -27,27 +27,57 @@ contract DepositTest is L1Erc20BridgeTest {
 
     function test_RevertWhen_legacyDepositAmountIsZero() public {
         vm.expectRevert(bytes("0T"));
-        bridge.deposit(randomSigner, address(token), 0, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: 0,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_depositTokenIsNotContract() public {
         vm.expectRevert();
-        bridge.deposit(randomSigner, makeAddr("EOA"), 1, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: makeAddr("EOA"),
+            _amount: 1,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_legacyDepositTokenIsNotContract() public {
         vm.expectRevert();
-        bridge.deposit(randomSigner, makeAddr("EOA"), 1, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: makeAddr("EOA"),
+            _amount: 1,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_depositTokenTransferFailed() public {
         vm.expectRevert("ERC20: insufficient allowance");
-        bridge.deposit(randomSigner, address(token), 1, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: 1,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_legacyDepositTokenTransferFailed() public {
         vm.expectRevert("ERC20: insufficient allowance");
-        bridge.deposit(randomSigner, address(token), 1, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: 1,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_depositTransferAmountIsDifferent() public {
@@ -56,7 +86,13 @@ contract DepositTest is L1Erc20BridgeTest {
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));
         vm.prank(alice);
-        bridge.deposit(randomSigner, address(feeOnTransferToken), amount, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(feeOnTransferToken),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_RevertWhen_legacyDepositTransferAmountIsDifferent() public {
@@ -65,7 +101,13 @@ contract DepositTest is L1Erc20BridgeTest {
         feeOnTransferToken.approve(address(bridge), amount);
         vm.expectRevert(bytes("3T"));
         vm.prank(alice);
-        bridge.deposit(randomSigner, address(feeOnTransferToken), amount, 0, 0);
+        bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(feeOnTransferToken),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function test_depositSuccessfully() public {
@@ -73,7 +115,9 @@ contract DepositTest is L1Erc20BridgeTest {
         vm.prank(alice);
         token.approve(address(bridge), amount);
         vm.prank(alice);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
+        // solhint-disable-next-line func-named-parameters
         emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
         bytes32 txHash = bridge.deposit({
             _l2Receiver: randomSigner,
@@ -97,9 +141,17 @@ contract DepositTest is L1Erc20BridgeTest {
         vm.prank(alice);
         token.approve(address(bridge), amount);
         vm.prank(alice);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
+        // solhint-disable-next-line func-named-parameters
         emit DepositInitiated(dummyL2DepositTxHash, alice, randomSigner, address(token), amount);
-        bytes32 txHash = bridge.deposit(randomSigner, address(token), amount, 0, 0);
+        bytes32 txHash = bridge.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
         assertEq(txHash, dummyL2DepositTxHash);
 
         uint256 depositedAmount = bridge.depositAmount(alice, address(token), dummyL2DepositTxHash);
