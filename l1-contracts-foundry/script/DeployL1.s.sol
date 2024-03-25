@@ -33,6 +33,7 @@ import {InitializeData as DiamondInitInitializeData} from "contracts/state-trans
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 
 contract DeployL1Script is Script {
     using stdToml for string;
@@ -41,7 +42,6 @@ contract DeployL1Script is Script {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
         BridgesDeployedAddresses bridges;
-        address baseToken;
         address transparentProxyAdmin;
         address governance;
         address blobVersionedHashRetriever;
@@ -64,7 +64,6 @@ contract DeployL1Script is Script {
         address gettersFacet;
         address diamondInit;
         address genesisUpgrade;
-        address diamondUpgradeInit;
         address defaultUpgrade;
         address diamondProxy;
     }
@@ -127,15 +126,19 @@ contract DeployL1Script is Script {
         deployStateTransitionManagerContract();
         setStateTransitionManagerInValidatorTimelock();
 
+        deployDiamondProxy();
+
         deployErc20BridgeProxy();
         deploySharedBridgeContracts();
         deployErc20BridgeImplementation();
         upgradeL1Erc20Bridge();
+
+        saveOutput();
     }
 
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/deploy-l1.toml");
+        string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
         // Config file must be parsed key by key, otherwise values returned
@@ -418,6 +421,25 @@ contract DeployL1Script is Script {
         console.log("StateTransitionManager set in ValidatorTimelock");
     }
 
+    function deployDiamondProxy() internal {
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: addresses.stateTransition.adminFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(0),
+            initCalldata: hex""
+        });
+        bytes memory bytecode = abi.encodePacked(type(DiamondProxy).creationCode, abi.encode(chainId, diamondCut));
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("DiamondProxy deployed at:", contractAddress);
+        addresses.stateTransition.diamondProxy = contractAddress;
+    }
+
     function deployErc20BridgeProxy() internal {
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
@@ -461,6 +483,7 @@ contract DeployL1Script is Script {
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("SharedBridgeProxy deployed at:", contractAddress);
+        addresses.bridges.sharedBridgeProxy = contractAddress;
     }
 
     function registerSharedBridge() internal {
@@ -516,6 +539,74 @@ contract DeployL1Script is Script {
         governance.execute(operation);
         vm.stopBroadcast();
         console.log("L1Erc20Bridge upgraded");
+    }
+
+    function saveOutput() internal {
+        vm.serializeAddress("l1", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
+        vm.serializeAddress("l1", "governance_addr", addresses.governance);
+        vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
+        vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
+
+        vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+        string memory l1Bridgehub = vm.serializeAddress(
+            "l1.bridgehub",
+            "bridgehub_implementation_addr",
+            addresses.bridgehub.bridgehubImplementation
+        );
+
+        vm.serializeAddress(
+            "l1.state_transition",
+            "state_transition_proxy_addr",
+            addresses.stateTransition.stateTransitionProxy
+        );
+        vm.serializeAddress(
+            "l1.state_transition",
+            "state_transition_implementation_addr",
+            addresses.stateTransition.stateTransitionImplementation
+        );
+        vm.serializeAddress("l1.state_transition", "verifier_addr", addresses.stateTransition.verifier);
+        vm.serializeAddress("l1.state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
+        vm.serializeAddress("l1.state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
+        vm.serializeAddress("l1.state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
+        vm.serializeAddress("l1.state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
+        vm.serializeAddress("l1.state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
+        vm.serializeAddress("l1.state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+        vm.serializeAddress("l1.state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        string memory l1StateTransition = vm.serializeAddress(
+            "l1.state_transition",
+            "diamond_proxy_addr",
+            addresses.stateTransition.diamondProxy
+        );
+
+        vm.serializeAddress(
+            "l1.bridges",
+            "erc20_bridge_implementation_addr",
+            addresses.bridges.erc20BridgeImplementation
+        );
+        vm.serializeAddress("l1.bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
+        vm.serializeAddress(
+            "l1.bridges",
+            "shared_bridge_implementation_addr",
+            addresses.bridges.sharedBridgeImplementation
+        );
+        string memory l1Bridges = vm.serializeAddress(
+            "l1.bridges",
+            "shared_bridge_proxy_addr",
+            addresses.bridges.sharedBridgeProxy
+        );
+
+        vm.serializeUint("l1", "chain_id", chainId);
+        vm.serializeString("l1", "network", network);
+        vm.serializeString("l1", "bridgehub", l1Bridgehub);
+        vm.serializeString("l1", "state_transition", l1StateTransition);
+        vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);
+        string memory l1 = vm.serializeString("l1", "bridges", l1Bridges);
+
+        string memory toml = vm.serializeString("toml", "l1", l1);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        vm.writeToml(toml, path);
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
