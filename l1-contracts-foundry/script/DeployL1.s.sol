@@ -3,10 +3,12 @@ pragma solidity 0.8.20;
 
 // solhint-disable no-console
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {Script} from "./Script.sol";
+import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {SingletonFactory} from "contracts/dev-contracts/SingletonFactory.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
@@ -74,8 +76,6 @@ contract DeployL1Script is Script {
     uint256 deployerPrivateKey;
     address deployerAddress;
     bytes32 create2Salt;
-    uint256 chainId;
-    string network;
 
     DeployedAddresses addresses;
 
@@ -269,25 +269,25 @@ contract DeployL1Script is Script {
             facet: addresses.stateTransition.adminFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getAllSelectors(addresses.stateTransition.adminFacet.code)
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
         });
         facetCuts[1] = Diamond.FacetCut({
             facet: addresses.stateTransition.gettersFacet,
             action: Diamond.Action.Add,
             isFreezable: false,
-            selectors: getAllSelectors(addresses.stateTransition.gettersFacet.code)
+            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
         });
         facetCuts[2] = Diamond.FacetCut({
             facet: addresses.stateTransition.mailboxFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: addresses.stateTransition.executorFacet,
             action: Diamond.Action.Add,
             isFreezable: true,
-            selectors: getAllSelectors(addresses.stateTransition.executorFacet.code)
+            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
         });
 
         VerifierParams memory verifierParams;
@@ -484,10 +484,6 @@ contract DeployL1Script is Script {
         console.log("L1Erc20Bridge upgraded");
     }
 
-    function isNetworkLocal() internal view returns (bool) {
-        return keccak256(abi.encodePacked(network)) == keccak256(abi.encodePacked("local"));
-    }
-
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
@@ -502,31 +498,6 @@ contract DeployL1Script is Script {
         }
 
         return contractAddress;
-    }
-
-    function getAllSelectors(bytes memory bytecode) internal returns (bytes4[] memory) {
-        string[] memory input = new string[](3);
-        input[0] = "cast";
-        input[1] = "selectors";
-        input[2] = vm.toString(bytecode);
-        bytes memory result = vm.ffi(input);
-        string memory stringResult = string(abi.encodePacked(result));
-
-        // Extract selectors from the result
-        string[] memory parts = vm.split(stringResult, "\n");
-        bytes4[] memory selectors = new bytes4[](parts.length);
-        for (uint256 i = 0; i < parts.length; i++) {
-            bytes memory part = bytes(parts[i]);
-            bytes memory extractedSelector = new bytes(10);
-            // Selector length 10 is 0x + 4 bytes
-            for (uint256 j = 0; j < 10; j++) {
-                extractedSelector[j] = part[j];
-            }
-            bytes4 selector = bytes4(vm.parseBytes(string(extractedSelector)));
-            selectors[i] = selector;
-        }
-
-        return selectors;
     }
 
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
