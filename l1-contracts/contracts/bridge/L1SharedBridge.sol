@@ -67,6 +67,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         public isWithdrawalFinalized;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
@@ -187,6 +188,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
+        // slither-disable-next-line arbitrary-send-erc20
         _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 

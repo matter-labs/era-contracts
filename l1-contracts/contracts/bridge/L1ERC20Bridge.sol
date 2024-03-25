@@ -24,6 +24,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
         public isWithdrawalFinalized;
 
@@ -33,12 +34,15 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         public depositAmount;
 
     /// @dev The address that is used as a L2 bridge counterpart in zkSync Era.
+    // slither-disable-next-line uninitialized-state
     address public l2Bridge;
 
     /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
+    // slither-disable-next-line uninitialized-state
     address public l2TokenBeacon;
 
     /// @dev Stores the hash of the L2 token proxy contract's bytecode on zkSync Era.
+    // slither-disable-next-line uninitialized-state
     bytes32 public l2TokenProxyBytecodeHash;
 
     /// @dev Deprecated storage variable related to withdrawal limitations.
