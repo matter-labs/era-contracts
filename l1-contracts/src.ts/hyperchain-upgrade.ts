@@ -19,10 +19,25 @@ import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgr
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, readBytecode, readInterface, type L2CanonicalTransaction, type ProposedUpgrade, type VerifierParams } from "./utils";
+import {
+  ADDRESS_ONE,
+  readBytecode,
+  readInterface,
+  type L2CanonicalTransaction,
+  type ProposedUpgrade,
+  type VerifierParams,
+} from "./utils";
 
 // import { L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE, L2_SHARED_BRIDGE_ABI, BEACON_PROXY_BYTECODE} from "../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, priorityTxMaxGasLimit, applyL1ToL2Alias, hashL2Bytecode, computeL2Create2Address, create2DeployFromL1, publishBytecodeFromL1} from "../../l2-contracts/src/utils";
+import {
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  priorityTxMaxGasLimit,
+  applyL1ToL2Alias,
+  hashL2Bytecode,
+  computeL2Create2Address,
+  create2DeployFromL1,
+  publishBytecodeFromL1,
+} from "../../l2-contracts/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
@@ -45,7 +60,7 @@ export async function upgradeToHyperchains1(
   create2Salt?: string,
   nonce?: number
 ) {
-    // does not interfere with existing system
+  // does not interfere with existing system
   // note other contract were already deployed
   if (deployer.verbose) {
     console.log("Deploying new contracts");
@@ -94,7 +109,7 @@ export async function upgradeToHyperchains(
   gasPrice: BigNumberish,
   create2Salt?: string,
   nonce?: number
-) { 
+) {
   await upgradeToHyperchains1(deployer, gasPrice, create2Salt, nonce);
   await upgradeToHyperchains2(deployer, gasPrice, create2Salt, nonce);
 }
@@ -236,31 +251,49 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
-
   // todo deploy l2 bridge here
   // L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE
   const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
- 
 
-  // upgrade from L1 governance. This has to come from governacne on L1. 
-  const l2Bridge= L2_SHARED_BRIDGE_INTERFACE;
-  const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [deployer.addresses.Bridges.SharedBridgeProxy, deployer.addresses.Bridges.ERC20BridgeProxy, hashL2Bytecode(BEACON_PROXY_BYTECODE), applyL1ToL2Alias(deployer.addresses.Governance)]);
-  const bridgeProxy : ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(ADDRESS_ONE, deployer.deployWallet); // we just need the interface, so wrong address
+  // upgrade from L1 governance. This has to come from governacne on L1.
+  const l2Bridge = L2_SHARED_BRIDGE_INTERFACE;
+  const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [
+    deployer.addresses.Bridges.SharedBridgeProxy,
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    hashL2Bytecode(BEACON_PROXY_BYTECODE),
+    applyL1ToL2Alias(deployer.addresses.Governance),
+  ]);
+  const bridgeProxy: ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(
+    ADDRESS_ONE,
+    deployer.deployWallet
+  ); // we just need the interface, so wrong address
 
-  const l2ProxyCalldata = bridgeProxy.interface.encodeFunctionData("upgradeToAndCall", [l2BridgeImplementationAddress, l2BridgeCalldata]);
+  const l2ProxyCalldata = bridgeProxy.interface.encodeFunctionData("upgradeToAndCall", [
+    l2BridgeImplementationAddress,
+    l2BridgeCalldata,
+  ]);
 
   const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
-  const factoryDeps = [] ; 
-  const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR, 0, l2ProxyCalldata, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, factoryDeps, deployer.deployWallet.address]); 
-  const gasPrice = await deployer.deployWallet.getGasPrice();
-  const requiredValueForL2Tx = await deployer.bridgehubContract(deployer.deployWallet).l2TransactionBaseCost(
-    deployer.chainId,
-    gasPrice,
+  const factoryDeps = [];
+  const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [
+    process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR,
+    0,
+    l2ProxyCalldata,
     priorityTxMaxGasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-  );//"1000000000000000000";
-  console.log("KL todo", requiredValueForL2Tx)
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, requiredValueForL2Tx.mul(10) , mailboxCalldata)
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    factoryDeps,
+    deployer.deployWallet.address,
+  ]);
+  const gasPrice = await deployer.deployWallet.getGasPrice();
+  const requiredValueForL2Tx = await deployer
+    .bridgehubContract(deployer.deployWallet)
+    .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
+  console.log("KL todo", requiredValueForL2Tx);
+  await deployer.executeUpgrade(
+    deployer.addresses.StateTransition.DiamondProxy,
+    requiredValueForL2Tx.mul(10),
+    mailboxCalldata
+  );
 }
 
 async function migrateAssets(deployer: Deployer) {
@@ -270,7 +303,7 @@ async function migrateAssets(deployer: Deployer) {
   }
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
   const ethTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
-  ADDRESS_ONE,
+    ADDRESS_ONE,
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.chainId,
   ]);
