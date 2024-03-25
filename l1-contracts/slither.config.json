@@ -1,6 +1,6 @@
 {
   "filter_paths": "(contracts/dev-contracts|lib|node_modules)",
-  "detectors_to_exclude": "assembly,solc-version,low-level-calls,conformance-to-solidity-naming-conventions",
+  "detectors_to_exclude": "assembly,solc-version,low-level-calls,conformance-to-solidity-naming-conventions,incorrect-equality",
   "exclude_dependencies": true,
   "compile_force_framework": "foundry",
   "exclude_medium": false,

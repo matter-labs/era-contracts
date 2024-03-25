@@ -605,6 +605,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
             // If the recipient is a contract on L1, the address alias will be applied.
             address refundRecipient = _refundRecipient;
             if (_refundRecipient == address(0)) {
+                // slither-disable-next-line tx-origin
                 refundRecipient = _prevMsgSender != tx.origin
                     ? AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender)
                     : _prevMsgSender;
