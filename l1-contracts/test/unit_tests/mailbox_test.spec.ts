@@ -1,13 +1,14 @@
 import { expect } from "chai";
 import * as hardhat from "hardhat";
 import { Action, facetCut, diamondCut } from "../../src.ts/diamondCut";
-import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest } from "../../typechain";
+import type { MailboxFacet, MockExecutorFacet, Forwarder, MailboxFacetTest, GettersFacet } from "../../typechain";
 import {
   MailboxFacetTestFactory,
   MailboxFacetFactory,
   MockExecutorFacetFactory,
   DiamondInitFactory,
   ForwarderFactory,
+  GettersFacetFactory,
 } from "../../typechain";
 import {
   DEFAULT_REVERT_REASON,
@@ -215,6 +216,8 @@ describe("Mailbox tests", function () {
 
   describe("L2 gas price", async () => {
     let testContract: MailboxFacetTest;
+    let proxyGetters: GettersFacet;
+    let diamondProxyContract: ethers.Contract;
     const TEST_GAS_PRICES = [];
 
     async function testOnAllGasPrices(
@@ -229,6 +232,54 @@ describe("Mailbox tests", function () {
       const mailboxTestContractFactory = await hardhat.ethers.getContractFactory("MailboxFacetTest");
       const mailboxTestContract = await mailboxTestContractFactory.deploy();
       testContract = MailboxFacetTestFactory.connect(mailboxTestContract.address, mailboxTestContract.signer);
+
+      const gettersFactory = await hardhat.ethers.getContractFactory("GettersFacet");
+      const gettersContract = await gettersFactory.deploy();
+      const gettersFacet = GettersFacetFactory.connect(gettersContract.address, gettersContract.signer);
+
+      // Note, that while this testsuit is focused on testing MailboxFaucet only,
+      // we still need to initialize its storage via DiamondProxy
+      const diamondInitFactory = await hardhat.ethers.getContractFactory("DiamondInit");
+      const diamondInitContract = await diamondInitFactory.deploy();
+      const diamondInit = DiamondInitFactory.connect(diamondInitContract.address, diamondInitContract.signer);
+
+      const dummyHash = new Uint8Array(32);
+      dummyHash.set([1, 0, 0, 1]);
+      const dummyAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+      const diamondInitData = diamondInit.interface.encodeFunctionData("initialize", [
+        {
+          verifier: dummyAddress,
+          governor: dummyAddress,
+          admin: dummyAddress,
+          genesisBatchHash: ethers.constants.HashZero,
+          genesisIndexRepeatedStorageChanges: 0,
+          genesisBatchCommitment: ethers.constants.HashZero,
+          verifierParams: {
+            recursionCircuitsSetVksHash: ethers.constants.HashZero,
+            recursionLeafLevelVkHash: ethers.constants.HashZero,
+            recursionNodeLevelVkHash: ethers.constants.HashZero,
+          },
+          zkPorterIsAvailable: false,
+          l2BootloaderBytecodeHash: dummyHash,
+          l2DefaultAccountBytecodeHash: dummyHash,
+          priorityTxMaxGasLimit: 10000000,
+          initialProtocolVersion: 0,
+          feeParams: defaultFeeParams(),
+        },
+      ]);
+
+      const facetCuts = [
+        facetCut(gettersFacet.address, gettersFacet.interface, Action.Add, false),
+        facetCut(testContract.address, testContract.interface, Action.Add, false),
+      ];
+      const diamondCutData = diamondCut(facetCuts, diamondInit.address, diamondInitData);
+
+      const diamondProxyFactory = await hardhat.ethers.getContractFactory("DiamondProxy");
+      const chainId = hardhat.network.config.chainId;
+      diamondProxyContract = await diamondProxyFactory.deploy(chainId, diamondCutData);
+
+      proxyGetters = GettersFacetFactory.connect(diamondProxyContract.address, gettersContract.signer);
+      testContract = MailboxFacetTestFactory.connect(diamondProxyContract.address, mailboxTestContract.signer);
 
       // Generating 10 more gas prices for test suit
       let priceGwei = 0.001;
@@ -250,6 +301,9 @@ describe("Mailbox tests", function () {
         })
       ).wait();
 
+      const pubdataPricingMode = await proxyGetters.getPubdataPricingMode();
+      expect(pubdataPricingMode).to.equal(PubdataPricingMode.Rollup);
+
       // Testing the logic under low / medium / high L1 gas price
       testOnAllGasPrices(expectedLegacyL2GasPrice);
     });
@@ -262,6 +316,9 @@ describe("Mailbox tests", function () {
           batchOverheadL1Gas: 0,
         })
       ).wait();
+
+      const pubdataPricingMode = await proxyGetters.getPubdataPricingMode();
+      expect(pubdataPricingMode).to.equal(PubdataPricingMode.Validium);
 
       // The gas price per pubdata is still constant, however, the L2 gas price is always equal to the minimalL2GasPrice
       testOnAllGasPrices(() => {
