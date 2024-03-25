@@ -62,7 +62,7 @@ interface IStateTransitionManager {
 
     function protocolVersion() external view returns (uint256);
 
-    function protocolVersionTimestamp(uint256 _protocolVersion) external view returns (uint256);
+    function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
 
@@ -88,7 +88,7 @@ interface IStateTransitionManager {
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionTimestamp,
+        uint256 _oldprotocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external;
 

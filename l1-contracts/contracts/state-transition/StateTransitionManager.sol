@@ -42,7 +42,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     uint256 public protocolVersion;
 
     /// @dev timestamp when protocolVersion can be last used
-    mapping(uint256 _protocolVersion => uint256) public protocolVersionTimestamp;
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
@@ -87,7 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
-        protocolVersionTimestamp[_initializeData.protocolVersion] = type(uint256).max;
+        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -147,23 +147,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionTimestamp,
+        uint256 _oldprotocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        protocolVersionTimestamp[_oldProtocolVersion] = _oldProtocolVersionTimestamp;
+        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
-        protocolVersionTimestamp[_newProtocolVersion] = type(uint256).max;
+        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
     }
 
     /// @dev check that the protocolVersion is active
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
-        return block.timestamp <= protocolVersionTimestamp[_protocolVersion];
+        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
     }
 
     /// @dev set the protocol version timestamp
-    function setProtocolVersionTimestamp(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionTimestamp[_protocolVersion] = _timestamp;
+    function setprotocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
