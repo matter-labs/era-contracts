@@ -451,7 +451,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Upgrade scheduled");
     }
-    const executeTX = await governance.execute(operation, {value: value});
+    const executeTX = await governance.execute(operation, { value: value });
     await executeTX.wait();
     if (this.verbose) {
       console.log(
@@ -572,7 +572,6 @@ export class Deployer {
 
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
-
 
   public async deployHyperchainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;

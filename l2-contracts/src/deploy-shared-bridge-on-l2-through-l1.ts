@@ -34,8 +34,13 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   const L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE = hre.artifacts.readArtifactSync("UpgradeableBeacon").bytecode;
   const L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2StandardERC20").bytecode;
 
-  await publishBytecodeFromL1(chainId, deployer.deployWallet, [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE], gasPrice);
-  
+  await publishBytecodeFromL1(
+    chainId,
+    deployer.deployWallet,
+    [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
+    gasPrice
+  );
+
   if (deployer.verbose) {
     console.log("Bytecodes published on L2");
   }

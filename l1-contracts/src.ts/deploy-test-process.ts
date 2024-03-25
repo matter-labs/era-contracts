@@ -56,7 +56,7 @@ export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress
 }
 
 export async function defaultEraDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<EraDeployer> {
-  const deployer =  new EraDeployer({
+  const deployer = new EraDeployer({
     deployWallet,
     ownerAddress,
     verbose: false, // change here to view deployment
@@ -180,7 +180,7 @@ export async function initialEraTestnetDeploymentProcess(
 }
 
 export class EraDeployer extends Deployer {
-  public syncWallet : zkethers.Wallet;
+  public syncWallet: zkethers.Wallet;
   public async deployDiamondProxy(extraFacets: FacetCut[], ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     ethTxOptions.gasPrice ??= 30_000_000; // to fix gasPrice

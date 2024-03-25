@@ -153,47 +153,47 @@ export async function publishBytecodeFromL1(
   chainId: ethers.BigNumberish,
   wallet: ethers.Wallet,
   factoryDeps: ethers.BytesLike[],
-  gasPrice?: ethers.BigNumberish,
-  ){
-    const deployedAddresses = deployedAddressesFromEnv();
-    const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
-    const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
-    const nonce = await wallet.getTransactionCount();
+  gasPrice?: ethers.BigNumberish
+) {
+  const deployedAddresses = deployedAddressesFromEnv();
+  const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
+  const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
+  const nonce = await wallet.getTransactionCount();
 
-    const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
-      chainId,
-      gasPrice,
-      priorityTxMaxGasLimit,
-      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-    );
+  const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
+    chainId,
+    gasPrice,
+    priorityTxMaxGasLimit,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+  );
 
-    const baseToken = deployedAddresses.BaseToken;
-    const ethIsBaseToken = ADDRESS_ONE == baseToken;
-    if (!ethIsBaseToken) {
-      const erc20 = ERC20Factory.connect(baseToken, (wallet));
-  
-      const approveTx = await erc20.approve(
-        deployedAddresses.Bridges.SharedBridgeProxy,
-        requiredValueToPublishBytecodes.add(requiredValueToPublishBytecodes)
-      );
-      await approveTx.wait(1);
-    }
-    const tx1 = await bridgehub.requestL2TransactionDirect(
-      {
-        chainId,
-        l2Contract: ethers.constants.AddressZero,
-        mintValue: requiredValueToPublishBytecodes,
-        l2Value: 0,
-        l2Calldata: "0x",
-        l2GasLimit: priorityTxMaxGasLimit,
-        l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        factoryDeps: factoryDeps,
-        refundRecipient: wallet.address,
-      },
-      { gasPrice, nonce, value: ethIsBaseToken ? requiredValueToPublishBytecodes : 0 }
+  const baseToken = deployedAddresses.BaseToken;
+  const ethIsBaseToken = ADDRESS_ONE == baseToken;
+  if (!ethIsBaseToken) {
+    const erc20 = ERC20Factory.connect(baseToken, wallet);
+
+    const approveTx = await erc20.approve(
+      deployedAddresses.Bridges.SharedBridgeProxy,
+      requiredValueToPublishBytecodes.add(requiredValueToPublishBytecodes)
     );
-    await tx1.wait();
+    await approveTx.wait(1);
   }
+  const tx1 = await bridgehub.requestL2TransactionDirect(
+    {
+      chainId,
+      l2Contract: ethers.constants.AddressZero,
+      mintValue: requiredValueToPublishBytecodes,
+      l2Value: 0,
+      l2Calldata: "0x",
+      l2GasLimit: priorityTxMaxGasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps: factoryDeps,
+      refundRecipient: wallet.address,
+    },
+    { gasPrice, nonce, value: ethIsBaseToken ? requiredValueToPublishBytecodes : 0 }
+  );
+  await tx1.wait();
+}
 
 export async function awaitPriorityOps(
   zksProvider: Provider,
