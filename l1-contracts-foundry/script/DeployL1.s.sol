@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 // solhint-disable no-console
 
 import {console2 as console} from "forge-std/Script.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -34,6 +35,8 @@ import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 
 contract DeployL1Script is Script {
+    using stdToml for string;
+
     struct DeployedAddresses {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
@@ -73,10 +76,34 @@ contract DeployL1Script is Script {
         address sharedBridgeProxy;
     }
 
-    uint256 deployerPrivateKey;
-    address deployerAddress;
-    bytes32 create2Salt;
+    struct Config {
+        uint256 deployerPrivateKey;
+        address deployerAddress;
+        uint256 gasPrice;
+        ContractsConfig contracts;
+        TokensConfig tokens;
+    }
 
+    struct ContractsConfig {
+        bytes32 create2_factory_salt;
+        address create2_factory_addr;
+        uint256 validator_timelock_execution_delay;
+        bytes32 genesis_root;
+        uint256 genesis_rollup_leaf_index;
+        bytes32 genesis_batch_commitment;
+        uint256 latest_protocol_version;
+        bytes32 recursion_node_level_vk_hash;
+        bytes32 recursion_leaf_level_vk_hash;
+        bytes32 recursion_circuits_set_vks_hash;
+        uint256 priority_tx_max_gas_limit;
+        uint256 shared_bridge_upgrade_storage_switch;
+    }
+
+    struct TokensConfig {
+        address token_weth_address;
+    }
+
+    Config config;
     DeployedAddresses addresses;
 
     function run() public {
@@ -107,33 +134,52 @@ contract DeployL1Script is Script {
     }
 
     function initializeConfig() internal {
-        deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        deployerAddress = vm.addr(deployerPrivateKey);
-        console.log("Using deployer wallet:", deployerAddress);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-config/deploy-l1.toml");
+        string memory toml = vm.readFile(path);
 
-        uint256 gasPrice = vm.envOr("GAS_PRICE", uint256(0));
-        if (gasPrice != 0) {
-            vm.txGasPrice(gasPrice);
-            console.log("Using gas price:", gasPrice);
-        } else {
-            console.log("Using provider's gas price");
-        }
+        // Config file must be parsed key by key, otherwise values returned
+        // are parsed alfabetically and not by key.
+        // https://book.getfoundry.sh/cheatcodes/parse-toml
+        chainId = toml.readUint("$.chain_id");
+        network = toml.readString("$.chain_eth_network");
 
-        chainId = vm.envUint("CHAIN_ID");
-        create2Salt = vm.envBytes32("CONTRACTS_CREATE2_FACTORY_SALT");
-        network = vm.envString("CHAIN_ETH_NETWORK");
+        config.deployerPrivateKey = toml.readUint("$.deployer_private_key");
+        config.deployerAddress = vm.addr(config.deployerPrivateKey);
+        config.gasPrice = toml.readUint("$.gas_price");
+
+        config.contracts.create2_factory_salt = toml.readBytes32("$.contracts.create2_factory_salt");
+        config.contracts.create2_factory_addr = toml.readAddress("$.contracts.create2_factory_addr");
+        config.contracts.validator_timelock_execution_delay = toml.readUint(
+            "$.contracts.validator_timelock_execution_delay"
+        );
+        config.contracts.genesis_root = toml.readBytes32("$.contracts.genesis_root");
+        config.contracts.genesis_rollup_leaf_index = toml.readUint("$.contracts.genesis_rollup_leaf_index");
+        config.contracts.genesis_batch_commitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
+        config.contracts.latest_protocol_version = toml.readUint("$.contracts.latest_protocol_version");
+        config.contracts.recursion_node_level_vk_hash = toml.readBytes32("$.contracts.recursion_node_level_vk_hash");
+        config.contracts.recursion_leaf_level_vk_hash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
+        config.contracts.recursion_circuits_set_vks_hash = toml.readBytes32(
+            "$.contracts.recursion_circuits_set_vks_hash"
+        );
+        config.contracts.priority_tx_max_gas_limit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
+        config.contracts.shared_bridge_upgrade_storage_switch = toml.readUint(
+            "$.contracts.shared_bridge_upgrade_storage_switch"
+        );
+
+        config.tokens.token_weth_address = toml.readAddress("$.tokens.token_weth_address");
     }
 
     function deployOrInstantiateCreate2Factory() internal returns (address) {
         // Create2Factory is already deployed on the public networks
         address contractAddress;
         if (isNetworkLocal()) {
-            vm.broadcast(deployerPrivateKey);
+            vm.broadcast(config.deployerPrivateKey);
             SingletonFactory factory = new SingletonFactory();
             contractAddress = address(factory);
             console.log("Create2Factory deployed at:", contractAddress);
         } else {
-            contractAddress = vm.envAddress("CONTRACTS_CREATE2_FACTORY_ADDR");
+            contractAddress = config.contracts.create2_factory_addr;
             console.log("Using Create2Factory address:", contractAddress);
         }
         addresses.create2Factory = contractAddress;
@@ -166,10 +212,10 @@ contract DeployL1Script is Script {
     }
 
     function deployValidatorTimelock() internal {
-        uint32 executionDelay = uint32(vm.envUint("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY"));
+        uint32 executionDelay = uint32(config.contracts.validator_timelock_execution_delay);
         bytes memory bytecode = abi.encodePacked(
             type(ValidatorTimelock).creationCode,
-            abi.encode(deployerAddress, executionDelay, chainId)
+            abi.encode(config.deployerAddress, executionDelay, chainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ValidatorTimelock deployed at:", contractAddress);
@@ -179,7 +225,7 @@ contract DeployL1Script is Script {
     function deployGovernance() internal {
         bytes memory bytecode = abi.encodePacked(
             type(Governance).creationCode,
-            abi.encode(deployerAddress, address(0), uint256(0))
+            abi.encode(config.deployerAddress, address(0), uint256(0))
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Governance deployed at:", contractAddress);
@@ -203,7 +249,7 @@ contract DeployL1Script is Script {
             abi.encode(
                 bridgehubImplementation,
                 addresses.transparentProxyAdmin,
-                abi.encodeCall(Bridgehub.initialize, (deployerAddress))
+                abi.encodeCall(Bridgehub.initialize, (config.deployerAddress))
             )
         );
         address bridgehubProxy = deployViaCreate2(bytecode);
@@ -259,10 +305,10 @@ contract DeployL1Script is Script {
     }
 
     function deployStateTransitionManagerProxy() internal {
-        bytes32 genesisBatchHash = vm.envBytes32("CONTRACTS_GENESIS_ROOT");
-        uint256 genesisRollupLeafIndex = vm.envUint("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
-        bytes32 genesisBatchCommitment = vm.envBytes32("CONTRACTS_GENESIS_BATCH_COMMITMENT");
-        uint256 protocolVersion = vm.envUint("CONTRACTS_LATEST_PROTOCOL_VERSION");
+        bytes32 genesisBatchHash = config.contracts.genesis_root;
+        uint256 genesisRollupLeafIndex = config.contracts.genesis_rollup_leaf_index;
+        bytes32 genesisBatchCommitment = config.contracts.genesis_batch_commitment;
+        uint256 protocolVersion = config.contracts.latest_protocol_version;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -290,23 +336,11 @@ contract DeployL1Script is Script {
             selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
         });
 
-        VerifierParams memory verifierParams;
-        if (
-            keccak256(abi.encodePacked(vm.envOr("CONTRACTS_PROVER_AT_GENESIS", string("")))) ==
-            keccak256(abi.encodePacked("fri"))
-        ) {
-            verifierParams = VerifierParams({
-                recursionNodeLevelVkHash: vm.envBytes32("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
-                recursionLeafLevelVkHash: vm.envBytes32("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
-                recursionCircuitsSetVksHash: bytes32(0)
-            });
-        } else {
-            verifierParams = VerifierParams({
-                recursionNodeLevelVkHash: vm.envBytes32("CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH"),
-                recursionLeafLevelVkHash: vm.envBytes32("CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH"),
-                recursionCircuitsSetVksHash: vm.envBytes32("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH")
-            });
-        }
+        VerifierParams memory verifierParams = VerifierParams({
+            recursionNodeLevelVkHash: config.contracts.recursion_node_level_vk_hash,
+            recursionLeafLevelVkHash: config.contracts.recursion_leaf_level_vk_hash,
+            recursionCircuitsSetVksHash: config.contracts.recursion_circuits_set_vks_hash
+        });
 
         FeeParams memory feeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -331,7 +365,7 @@ contract DeployL1Script is Script {
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: bytes32(getBatchBootloaderBytecodeHash()),
             l2DefaultAccountBytecodeHash: bytes32(readSystemContractsBytecode("DefaultAccount")),
-            priorityTxMaxGasLimit: vm.envUint("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"),
+            priorityTxMaxGasLimit: config.contracts.priority_tx_max_gas_limit,
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
         });
@@ -344,7 +378,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            governor: deployerAddress,
+            governor: config.deployerAddress,
             validatorTimelock: addresses.validatorTimelock,
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: genesisBatchHash,
@@ -370,14 +404,14 @@ contract DeployL1Script is Script {
 
     function registerStateTransitionManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(deployerPrivateKey);
+        vm.broadcast(config.deployerPrivateKey);
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast(deployerPrivateKey);
+        vm.broadcast(config.deployerPrivateKey);
         validatorTimelock.setStateTransitionManager(
             IStateTransitionManager(addresses.stateTransition.stateTransitionProxy)
         );
@@ -405,7 +439,7 @@ contract DeployL1Script is Script {
             type(L1SharedBridge).creationCode,
             // solhint-disable-next-line func-named-parameters
             abi.encode(
-                vm.envAddress("TOKEN_WETH_ADDRESS"),
+                config.tokens.token_weth_address,
                 addresses.bridgehub.bridgehubProxy,
                 addresses.bridges.erc20BridgeProxy,
                 chainId,
@@ -419,7 +453,7 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        uint256 storageSwitch = vm.envUint("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
+        uint256 storageSwitch = config.contracts.shared_bridge_upgrade_storage_switch;
         bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (addresses.governance, storageSwitch));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
@@ -431,7 +465,7 @@ contract DeployL1Script is Script {
 
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast(config.deployerPrivateKey);
         bridgehub.addToken(address(0x01));
         bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         vm.stopBroadcast();
@@ -477,7 +511,7 @@ contract DeployL1Script is Script {
 
         Governance governance = Governance(payable(addresses.governance));
 
-        vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast(config.deployerPrivateKey);
         governance.scheduleTransparent(operation, 0);
         governance.execute(operation);
         vm.stopBroadcast();
@@ -490,8 +524,8 @@ contract DeployL1Script is Script {
         }
 
         SingletonFactory create2Factory = SingletonFactory(addresses.create2Factory);
-        vm.broadcast(deployerPrivateKey);
-        address contractAddress = create2Factory.deploy(_bytecode, create2Salt);
+        vm.broadcast(config.deployerPrivateKey);
+        address contractAddress = create2Factory.deploy(_bytecode, config.contracts.create2_factory_salt);
 
         if (contractAddress == address(0)) {
             revert("Failed to deploy contract via create2");
