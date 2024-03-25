@@ -13,7 +13,6 @@ write smart contracts in C++, Rust and other popular languages.
 
 Compile the solidity and yul contracts: `yarn l1 build`
 
-
 ### Testing
 
 To run uint tests, execute `yarn l1 test`.
