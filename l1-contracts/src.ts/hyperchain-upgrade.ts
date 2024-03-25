@@ -40,7 +40,7 @@ const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath,
 const SYSTEM_CONTEXT_BYTECODE = readBytecode(systemContractsArtifactsPath, "SystemContext");
 
 export async function upgradeToHyperchains(
-  deployer: EraDeployer,
+  deployer: Deployer,
   gasPrice: BigNumberish,
   create2Salt?: string,
   nonce?: number
@@ -50,6 +50,7 @@ export async function upgradeToHyperchains(
   if (deployer.verbose) {
     console.log("Deploying new contracts");
   }
+  // const deployFacets = process.env.CHAIN_ETH_NETWORK === "hardhat";
   await deployNewContracts(deployer, gasPrice, create2Salt, nonce); //done
 
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
@@ -81,7 +82,7 @@ export async function upgradeToHyperchains(
   await migrateAssets(deployer); // done
 }
 
-async function deployNewContracts(deployer: EraDeployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
+async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
   nonce = nonce || (await deployer.deployWallet.getTransactionCount());
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
@@ -114,80 +115,80 @@ async function deployNewContracts(deployer: EraDeployer, gasPrice: BigNumberish,
 }
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {
-  // publish L2 system contracts
-  await publishBytecodeFromL1(deployer.chainId, deployer.deployWallet, SYSTEM_CONTEXT_BYTECODE, gasPrice);
+  // // publish L2 system contracts
+  // await publishBytecodeFromL1(deployer.chainId, deployer.deployWallet, SYSTEM_CONTEXT_BYTECODE, gasPrice);
 
-  // era facet cut
-  const upgradeHyperchains = new Interface(hardhat.artifacts.readArtifactSync("UpgradeHyperchains").abi);
-  const newProtocolVersion = 24;
-  const toAddress: string = ethers.constants.AddressZero;
-  const calldata: string = ethers.constants.HashZero;
-  const l2ProtocolUpgradeTx: L2CanonicalTransaction = {
-    txType: SYSTEM_UPGRADE_TX_TYPE,
-    from: FORCE_DEPLOYER_ADDRESS,
-    to: toAddress,
-    gasLimit: 72_000_000,
-    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    maxFeePerGas: 0,
-    maxPriorityFeePerGas: 0,
-    paymaster: 0,
-    nonce: newProtocolVersion,
-    value: 0,
-    reserved: [0, 0, 0, 0],
-    data: calldata,
-    signature: "0x",
-    factoryDeps: [],
-    paymasterInput: "0x",
-    reservedDynamic: "0x",
-  };
-  const upgradeTimestamp = BigNumber.from(100);
-  const verifierParams: VerifierParams = {
-    recursionNodeLevelVkHash: ethers.constants.HashZero,
-    recursionLeafLevelVkHash: ethers.constants.HashZero,
-    recursionCircuitsSetVksHash: ethers.constants.HashZero,
-  };
-  const proposedUpgrade: ProposedUpgrade = {
-    l2ProtocolUpgradeTx,
-    factoryDeps: [],
-    bootloaderHash: ethers.constants.HashZero,
-    defaultAccountHash: ethers.constants.HashZero,
-    verifier: ethers.constants.AddressZero,
-    verifierParams: verifierParams,
-    l1ContractsUpgradeCalldata: ethers.constants.HashZero,
-    postUpgradeCalldata: ethers.constants.HashZero,
-    upgradeTimestamp: upgradeTimestamp,
-    newProtocolVersion: 24,
-  };
-  const defaultUpgradeData = upgradeHyperchains.encodeFunctionData("upgradeWithAdditionalData", [
-    proposedUpgrade,
-    new ethers.utils.AbiCoder().encode(
-      ["uint256", "address", "address", "address"],
-      [
-        deployer.chainId,
-        deployer.addresses.Bridgehub.BridgehubProxy,
-        deployer.addresses.StateTransition.StateTransitionProxy,
-        deployer.addresses.Bridges.SharedBridgeProxy,
-      ]
-    ),
-  ]);
+  // // era facet cut
+  // const newProtocolVersion = 24;
+  // const toAddress: string = ethers.constants.AddressZero;
+  // const calldata: string = ethers.constants.HashZero;
+  // const l2ProtocolUpgradeTx: L2CanonicalTransaction = {
+  //   txType: SYSTEM_UPGRADE_TX_TYPE,
+  //   from: FORCE_DEPLOYER_ADDRESS,
+  //   to: toAddress,
+  //   gasLimit: 72_000_000,
+  //   gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  //   maxFeePerGas: 0,
+  //   maxPriorityFeePerGas: 0,
+  //   paymaster: 0,
+  //   nonce: newProtocolVersion,
+  //   value: 0,
+  //   reserved: [0, 0, 0, 0],
+  //   data: calldata,
+  //   signature: "0x",
+  //   factoryDeps: [],
+  //   paymasterInput: "0x",
+  //   reservedDynamic: "0x",
+  // };
+  // const upgradeTimestamp = BigNumber.from(100);
+  // const verifierParams: VerifierParams = {
+  //   recursionNodeLevelVkHash: ethers.constants.HashZero,
+  //   recursionLeafLevelVkHash: ethers.constants.HashZero,
+  //   recursionCircuitsSetVksHash: ethers.constants.HashZero,
+  // };
+  // const proposedUpgrade: ProposedUpgrade = {
+  //   l2ProtocolUpgradeTx,
+  //   factoryDeps: [],
+  //   bootloaderHash: ethers.constants.HashZero,
+  //   defaultAccountHash: ethers.constants.HashZero,
+  //   verifier: ethers.constants.AddressZero,
+  //   verifierParams: verifierParams,
+  //   l1ContractsUpgradeCalldata: ethers.constants.HashZero,
+  //   postUpgradeCalldata: ethers.constants.HashZero,
+  //   upgradeTimestamp: upgradeTimestamp,
+  //   newProtocolVersion: 24,
+  // };
+  // const upgradeHyperchains = new Interface(hardhat.artifacts.readArtifactSync("UpgradeHyperchains").abi);
+  // const defaultUpgradeData = upgradeHyperchains.encodeFunctionData("upgradeWithAdditionalData", [
+  //   proposedUpgrade,
+  //   new ethers.utils.AbiCoder().encode(
+  //     ["uint256", "address", "address", "address"],
+  //     [
+  //       deployer.chainId,
+  //       deployer.addresses.Bridgehub.BridgehubProxy,
+  //       deployer.addresses.StateTransition.StateTransitionProxy,
+  //       deployer.addresses.Bridges.SharedBridgeProxy,
+  //     ]
+  //   ),
+  // ]);
 
-  const facetCuts = await getFacetCutsForUpgrade(
-    deployer.deployWallet,
-    deployer.addresses.StateTransition.DiamondProxy,
-    deployer.addresses.StateTransition.AdminFacet,
-    deployer.addresses.StateTransition.GettersFacet,
-    deployer.addresses.StateTransition.MailboxFacet,
-    deployer.addresses.StateTransition.ExecutorFacet
-  );
-  const diamondCut: DiamondCut = {
-    facetCuts,
-    initAddress: deployer.addresses.StateTransition.DefaultUpgrade,
-    initCalldata: defaultUpgradeData,
-  };
-  const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet2").abi);
+  // const facetCuts = await getFacetCutsForUpgrade(
+  //   deployer.deployWallet,
+  //   deployer.addresses.StateTransition.DiamondProxy,
+  //   deployer.addresses.StateTransition.AdminFacet,
+  //   deployer.addresses.StateTransition.GettersFacet,
+  //   deployer.addresses.StateTransition.MailboxFacet,
+  //   deployer.addresses.StateTransition.ExecutorFacet
+  // );
+  // const diamondCut: DiamondCut = {
+  //   facetCuts,
+  //   initAddress: deployer.addresses.StateTransition.DefaultUpgrade,
+  //   initCalldata: defaultUpgradeData,
+  // };
+  // const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet2").abi);
 
-  const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
+  // const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
+  // await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
 
   // register Era in Bridgehub, STM
   const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);

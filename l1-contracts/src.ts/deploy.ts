@@ -557,6 +557,18 @@ export class Deployer {
     this.addresses.StateTransition.DefaultUpgrade = contractAddress;
   }
 
+
+  public async deployHyperchainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const contractAddress = await this.deployViaCreate2("UpgradeHyperchains", [], create2Salt, ethTxOptions);
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_HYPERCHAIN_UPGRADE_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+  }
+
   public async deployGenesisUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2("GenesisUpgrade", [], create2Salt, ethTxOptions);
