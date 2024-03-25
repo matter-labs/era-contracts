@@ -75,7 +75,8 @@
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
     "display-governance": "ts-node scripts/display-governance.ts",
     "upgrade-system": "ts-node upgrade-system/index.ts",
-    "hyperchain-upgrade": "ts-node scripts/hyperchain-upgrade.ts"
+    "hyperchain-upgrade-1": "ts-node scripts/hyperchain-upgrade-1.ts",
+    "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",
