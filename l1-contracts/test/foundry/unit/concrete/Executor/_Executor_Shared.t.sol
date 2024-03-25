@@ -7,6 +7,7 @@ import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
@@ -134,7 +135,11 @@ contract ExecutorTest is Test {
         mailbox = new MailboxFacet(eraChainId);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
-
+        vm.mockCall(
+            address(stateTransitionManager),
+            abi.encodeWithSelector(IStateTransitionManager.protocolVersionIsActive.selector),
+            abi.encode(bool(true))
+        );
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;

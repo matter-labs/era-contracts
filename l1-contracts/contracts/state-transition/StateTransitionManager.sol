@@ -87,6 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        protocolVersionTimestamp[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -151,13 +152,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyOwner {
         protocolVersionTimestamp[_oldProtocolVersion] = _oldProtocolVersionTimestamp;
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        protocolVersionTimestamp[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
     }
 
     /// @dev check that the protocolVersion is active
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
-        return (protocolVersionTimestamp[_protocolVersion] == 0 ||
-            block.timestamp <= protocolVersionTimestamp[_protocolVersion]);
+        return (block.timestamp <= protocolVersionTimestamp[_protocolVersion]);
     }
 
     /// @dev set the protocol version timestamp
