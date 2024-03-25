@@ -92,7 +92,7 @@ const params = {
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 260kb of pubdata is spent
-// on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
+  // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
   // accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
   // roughly 43212000 bytes needed for calldata.
   // 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
