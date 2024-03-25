@@ -76,7 +76,6 @@ contract DeployL1Script is Script {
     }
 
     struct Config {
-        uint256 deployerPrivateKey;
         address deployerAddress;
         uint256 gasPrice;
         ContractsConfig contracts;
@@ -147,8 +146,7 @@ contract DeployL1Script is Script {
         chainId = toml.readUint("$.chain_id");
         network = toml.readString("$.chain_eth_network");
 
-        config.deployerPrivateKey = toml.readUint("$.deployer_private_key");
-        config.deployerAddress = vm.addr(config.deployerPrivateKey);
+        config.deployerAddress = msg.sender;
         config.gasPrice = toml.readUint("$.gas_price");
 
         config.contracts.create2_factory_salt = toml.readBytes32("$.contracts.create2_factory_salt");
@@ -177,7 +175,7 @@ contract DeployL1Script is Script {
         // Create2Factory is already deployed on the public networks
         address contractAddress;
         if (isNetworkLocal()) {
-            vm.broadcast(config.deployerPrivateKey);
+            vm.broadcast();
             SingletonFactory factory = new SingletonFactory();
             contractAddress = address(factory);
             console.log("Create2Factory deployed at:", contractAddress);
@@ -407,14 +405,14 @@ contract DeployL1Script is Script {
 
     function registerStateTransitionManager() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(config.deployerPrivateKey);
+        vm.broadcast();
         bridgehub.addStateTransitionManager(addresses.stateTransition.stateTransitionProxy);
         console.log("StateTransitionManager registered");
     }
 
     function setStateTransitionManagerInValidatorTimelock() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
-        vm.broadcast(config.deployerPrivateKey);
+        vm.broadcast();
         validatorTimelock.setStateTransitionManager(
             IStateTransitionManager(addresses.stateTransition.stateTransitionProxy)
         );
@@ -488,7 +486,7 @@ contract DeployL1Script is Script {
 
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(config.deployerPrivateKey);
+        vm.startBroadcast();
         bridgehub.addToken(address(0x01));
         bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         vm.stopBroadcast();
@@ -534,7 +532,7 @@ contract DeployL1Script is Script {
 
         Governance governance = Governance(payable(addresses.governance));
 
-        vm.startBroadcast(config.deployerPrivateKey);
+        vm.startBroadcast();
         governance.scheduleTransparent(operation, 0);
         governance.execute(operation);
         vm.stopBroadcast();
@@ -615,7 +613,7 @@ contract DeployL1Script is Script {
         }
 
         SingletonFactory create2Factory = SingletonFactory(addresses.create2Factory);
-        vm.broadcast(config.deployerPrivateKey);
+        vm.broadcast();
         address contractAddress = create2Factory.deploy(_bytecode, config.contracts.create2_factory_salt);
 
         if (contractAddress == address(0)) {

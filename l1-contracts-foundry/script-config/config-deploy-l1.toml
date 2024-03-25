@@ -1,4 +1,3 @@
-deployer_private_key = "0x0000000000000000000000000000000000000000000000000000000000000000"
 gas_price = 0
 chain_id = 31337
 chain_eth_network = "local"
