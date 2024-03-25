@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
 import {IExecutor} from "./interfaces/IExecutor.sol";
