@@ -18,7 +18,13 @@ contract createNewChainTest is StateTransitionManagerTest {
 
         vm.expectRevert(bytes("StateTransition: only bridgehub"));
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(initialDiamondCutData));
+        chainContractAddress.createNewChain({
+            _chainId: chainId,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: admin,
+            _diamondCut: abi.encode(initialDiamondCutData)
+        });
     }
 
     function test_SuccessfulCreationOfNewChain() public {

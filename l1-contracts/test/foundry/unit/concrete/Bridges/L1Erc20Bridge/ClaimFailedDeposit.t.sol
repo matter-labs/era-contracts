@@ -42,6 +42,7 @@ contract ClaimFailedDepositTest is L1Erc20BridgeTest {
         assertEq(depositedAmountAfterDeposit, amount);
 
         vm.prank(alice);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(bridge));
         emit ClaimedFailedDeposit(alice, address(token), amount);
         bytes32[] memory merkleProof;

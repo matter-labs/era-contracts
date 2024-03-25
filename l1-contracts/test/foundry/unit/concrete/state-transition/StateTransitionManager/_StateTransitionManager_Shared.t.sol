@@ -130,7 +130,13 @@ contract StateTransitionManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, newChainAdmin, abi.encode(_diamondCut));
+        chainContractAddress.createNewChain({
+            _chainId: chainId,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: newChainAdmin,
+            _diamondCut: abi.encode(_diamondCut)
+        });
     }
 
     // add this to be excluded from coverage report
