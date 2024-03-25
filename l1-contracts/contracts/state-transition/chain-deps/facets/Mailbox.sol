@@ -165,7 +165,6 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(s.baseTokenGasPriceMultiplierDenominator > 0, "Mailbox: baseTokenGasPriceDenominator not set");
         uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
             s.baseTokenGasPriceMultiplierDenominator;
-        // slither-disable-next-line uninitialized-local
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
@@ -264,7 +263,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
-        
+
         WritePriorityOpParams memory params = WritePriorityOpParams({
             sender: l2Sender,
             txId: 0,
