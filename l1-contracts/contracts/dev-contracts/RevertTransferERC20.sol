@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "./TestnetERC20Token.sol";
+import {TestnetERC20Token} from "./TestnetERC20Token.sol";
 
 /// @title RevertTransferERC20Token - A ERC20 token contract which can revert transfers depending on a flag
 /// @dev Used for testing failed ERC-20 withdrawals from the zkSync smart contract

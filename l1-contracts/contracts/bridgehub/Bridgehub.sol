@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-import "./IBridgehub.sol";
-import "../bridge/interfaces/IL1SharedBridge.sol";
-import "../state-transition/IStateTransitionManager.sol";
-import "../common/ReentrancyGuard.sol";
-import "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
+import {IStateTransitionManager} from "../state-transition/IStateTransitionManager.sol";
+import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
+import {IZkSyncStateTransition} from "../state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import "../vendor/AddressAliasHelper.sol";
+import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
 contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     /// @notice all the ether is held by the weth bridge
@@ -115,7 +115,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         uint256 _chainId,
         address _stateTransitionManager,
         address _baseToken,
-        uint256, //_salt
+        // solhint-disable-next-line no-unused-vars
+        uint256 _salt,
         address _admin,
         bytes calldata _initData
     ) external onlyOwnerOrAdmin nonReentrant returns (uint256 chainId) {
@@ -134,13 +135,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
         stateTransitionManager[_chainId] = _stateTransitionManager;
         baseToken[_chainId] = _baseToken;
 
-        IStateTransitionManager(_stateTransitionManager).createNewChain(
-            _chainId,
-            _baseToken,
-            address(sharedBridge),
-            _admin,
-            _initData
-        );
+        IStateTransitionManager(_stateTransitionManager).createNewChain({
+            _chainId: _chainId,
+            _baseToken: _baseToken,
+            _sharedBridge: address(sharedBridge),
+            _admin: _admin,
+            _diamondCut: _initData
+        });
 
         emit NewChain(_chainId, _stateTransitionManager, _admin);
         return _chainId;
@@ -184,14 +185,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
     ) external view override returns (bool) {
         address stateTransition = getStateTransition(_chainId);
         return
-            IZkSyncStateTransition(stateTransition).proveL1ToL2TransactionStatus(
-                _l2TxHash,
-                _l2BatchNumber,
-                _l2MessageIndex,
-                _l2TxNumberInBatch,
-                _merkleProof,
-                _status
-            );
+            IZkSyncStateTransition(stateTransition).proveL1ToL2TransactionStatus({
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId

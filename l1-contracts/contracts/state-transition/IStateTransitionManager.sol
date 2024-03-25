@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
@@ -66,7 +66,7 @@ interface IStateTransitionManager {
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
 
-    function initialize(StateTransitionManagerInitializeData calldata _initalizeData) external;
+    function initialize(StateTransitionManagerInitializeData calldata _initializeData) external;
 
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external;
 

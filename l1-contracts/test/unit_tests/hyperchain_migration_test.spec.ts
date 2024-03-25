@@ -51,7 +51,6 @@ describe("Hyperchain migration test", function () {
       gasLimit: 100000,
       gasPrice: gasPrice,
     };
-
     await owner.sendTransaction(tx);
 
     const dummyAdminFacetFactory = await hardhat.ethers.getContractFactory("DummyAdminFacet");

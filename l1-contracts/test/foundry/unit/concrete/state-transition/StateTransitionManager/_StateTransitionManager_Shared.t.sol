@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -8,17 +8,16 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {GenesisUpgrade} from "solpp/upgrades/GenesisUpgrade.sol";
-import {IDiamondInit} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {StateTransitionManager} from "solpp/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "solpp/state-transition/IStateTransitionManager.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
+import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract StateTransitionManagerTest is Test {
     StateTransitionManager internal stateTransitionManager;
@@ -33,6 +32,7 @@ contract StateTransitionManagerTest is Test {
     address internal constant validator = address(0x5050505);
     address internal newChainAdmin;
     uint256 chainId = block.chainid;
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     Diamond.FacetCut[] internal facetCuts;
 
@@ -118,8 +118,8 @@ contract StateTransitionManagerTest is Test {
         vm.startPrank(governor);
     }
 
-    function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
+    function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
 
         bytes memory initCalldata = abi.encode(initializeData);
 
@@ -130,7 +130,13 @@ contract StateTransitionManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(bridgehub);
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, newChainAdmin, abi.encode(_diamondCut));
+        chainContractAddress.createNewChain({
+            _chainId: chainId,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: newChainAdmin,
+            _diamondCut: abi.encode(_diamondCut)
+        });
     }
 
     // add this to be excluded from coverage report

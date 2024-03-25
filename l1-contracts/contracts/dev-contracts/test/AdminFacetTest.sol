@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "../../state-transition/chain-deps/facets/Admin.sol";
+import {AdminFacet} from "../../state-transition/chain-deps/facets/Admin.sol";
 
 contract AdminFacetTest is AdminFacet {
     // add this to be excluded from coverage report

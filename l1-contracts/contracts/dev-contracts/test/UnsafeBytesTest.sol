@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "../../common/libraries/UnsafeBytes.sol";
+import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
 
 contract UnsafeBytesTest {
     // add this to be excluded from coverage report

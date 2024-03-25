@@ -106,6 +106,7 @@ library L2ContractHelper {
     ) internal pure returns (address) {
         bytes32 senderBytes = bytes32(uint256(uint160(_sender)));
         bytes32 data = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, senderBytes, _salt, _bytecodeHash, _constructorInputHash)
         );
 

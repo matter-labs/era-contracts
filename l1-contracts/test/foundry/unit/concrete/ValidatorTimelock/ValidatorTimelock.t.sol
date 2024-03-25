@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {ValidatorTimelock, IExecutor} from "solpp/state-transition/ValidatorTimelock.sol";
-import {DummyStateTransitionManagerForValidatorTimelock} from "solpp/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
-import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
-import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
+import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
+import {DummyStateTransitionManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyStateTransitionManagerForValidatorTimelock.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.
@@ -30,6 +29,7 @@ contract ValidatorTimelockTest is Test {
     address bob;
     address dan;
     uint256 chainId;
+    uint256 eraChainId;
     uint256 lastBatchNumber;
     uint32 executionDelay;
 
@@ -40,23 +40,25 @@ contract ValidatorTimelockTest is Test {
         bob = makeAddr("bob");
         dan = makeAddr("dan");
         chainId = 1;
+        eraChainId = 9;
         lastBatchNumber = 123;
         executionDelay = 10;
 
         stateTransitionManager = new DummyStateTransitionManagerForValidatorTimelock(owner, zkSync);
-        validator = new ValidatorTimelock(owner, executionDelay);
+        validator = new ValidatorTimelock(owner, executionDelay, eraChainId);
         vm.prank(owner);
         validator.setStateTransitionManager(IStateTransitionManager(address(stateTransitionManager)));
         vm.prank(owner);
         validator.addValidator(chainId, alice);
         vm.prank(owner);
-        validator.addValidator(ERA_CHAIN_ID, dan);
+        validator.addValidator(eraChainId, dan);
     }
 
     function test_addValidator() public {
         assert(validator.validators(chainId, bob) == false);
 
         vm.prank(owner);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(validator));
         emit ValidatorAdded(chainId, bob);
         validator.addValidator(chainId, bob);
@@ -70,6 +72,7 @@ contract ValidatorTimelockTest is Test {
         assert(validator.validators(chainId, bob) == true);
 
         vm.prank(owner);
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(validator));
         emit ValidatorRemoved(chainId, bob);
         validator.removeValidator(chainId, bob);
@@ -122,7 +125,7 @@ contract ValidatorTimelockTest is Test {
         uint64 timestamp = 123456;
 
         vm.warp(timestamp);
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(ERA_CHAIN_ID));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatches.selector), abi.encode(eraChainId));
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -134,7 +137,7 @@ contract ValidatorTimelockTest is Test {
         vm.prank(dan);
         validator.commitBatches(storedBatch, batchesToCommit);
 
-        assert(validator.getCommittedBatchTimestamp(ERA_CHAIN_ID, batchNumber) == timestamp);
+        assert(validator.getCommittedBatchTimestamp(eraChainId, batchNumber) == timestamp);
     }
 
     function test_commitBatches() public {

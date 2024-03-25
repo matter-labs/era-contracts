@@ -1,9 +1,8 @@
 // // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
@@ -19,7 +18,13 @@ contract createNewChainTest is StateTransitionManagerTest {
 
         vm.expectRevert(bytes("StateTransition: only bridgehub"));
 
-        chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(initialDiamondCutData));
+        chainContractAddress.createNewChain({
+            _chainId: chainId,
+            _baseToken: baseToken,
+            _sharedBridge: sharedBridge,
+            _admin: admin,
+            _diamondCut: abi.encode(initialDiamondCutData)
+        });
     }
 
     function test_SuccessfulCreationOfNewChain() public {

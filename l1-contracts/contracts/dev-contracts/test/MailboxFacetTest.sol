@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {FeeParams} from "../../state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
@@ -10,7 +10,7 @@ contract MailboxFacetTest is MailboxFacet {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    constructor() {
+    constructor(uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.admin = msg.sender;
     }
 

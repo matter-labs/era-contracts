@@ -81,7 +81,7 @@ object "SHA256" {
             let numRounds := div(paddedBytesSize, BLOCK_SIZE())
             let precompileParams := unsafePackPrecompileParams(
                 0,                        // input offset in words
-                // Always dividable by 32, since `BLOCK_SIZE()` is 64 bytes
+                // Always divisible by 32, since `BLOCK_SIZE()` is 64 bytes
                 div(paddedBytesSize, 32), // input length in words (safe to pass, never exceed `type(uint32).max`)
                 0,                        // output offset in words
                 1,                        // output length in words

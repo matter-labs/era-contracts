@@ -280,11 +280,11 @@ async function main() {
 
       console.log("Refund recipient: ", refundRecipient);
 
-      const upgradeInfos = JSON.parse(cmd.upgradesInfo) as UpgradeInfo[];
-      upgradeInfos.forEach(validateUpgradeInfo);
+      const upgradesInfo = JSON.parse(cmd.upgradesInfo) as UpgradeInfo[];
+      upgradesInfo.forEach(validateUpgradeInfo);
 
       const governanceCalls = [];
-      for (const info of upgradeInfos) {
+      for (const info of upgradesInfo) {
         console.log("Generating upgrade transaction for contract: ", info.contract);
         console.log("Target address: ", info.target);
         const txInfo = await getTxInfo(

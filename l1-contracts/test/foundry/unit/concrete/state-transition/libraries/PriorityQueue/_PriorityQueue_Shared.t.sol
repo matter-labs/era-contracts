@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {PriorityQueueTest, PriorityOperation} from "solpp/dev-contracts/test/PriorityQueueTest.sol";
+import {PriorityQueueTest, PriorityOperation} from "contracts/dev-contracts/test/PriorityQueueTest.sol";
 
 contract PriorityQueueSharedTest is Test {
     PriorityQueueTest internal priorityQueue;
@@ -13,8 +13,8 @@ contract PriorityQueueSharedTest is Test {
     }
 
     // Pushes 'count' entries into the priority queue.
-    function push_mock_entries(uint count) public {
-        for (uint i = 0; i < count; ++i) {
+    function push_mock_entries(uint256 count) public {
+        for (uint256 i = 0; i < count; ++i) {
             PriorityOperation memory dummyOp = PriorityOperation({
                 canonicalTxHash: keccak256(abi.encode(i)),
                 expirationTimestamp: uint64(i),

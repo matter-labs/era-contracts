@@ -22,13 +22,13 @@ describe("P256Verify tests", function () {
   let correctR: string;
 
   function compileSignature(options: { digest?: string; x?: string; y?: string; r?: string; s?: string }) {
-    const { digest: providedDigest, x: providedX, y: providedY, r: providedR, s: proviedS } = options;
+    const { digest: providedDigest, x: providedX, y: providedY, r: providedR, s: providedS } = options;
 
     const digest = providedDigest || correctDigest;
     const x = providedX || correctX;
     const y = providedY || correctY;
     const r = providedR || correctR;
-    const s = proviedS || correctS;
+    const s = providedS || correctS;
 
     // Concatenate the digest, r, s, x and y.
     // Note that for r,s,x,y we need to remove the 0x prefix

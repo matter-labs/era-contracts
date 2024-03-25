@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
@@ -90,6 +90,12 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is committed
         s.feeParams.pubdataPricingMode = _validiumMode;
         emit ValidiumModeStatusUpdate(_validiumMode);
+    }
+
+    function setTransactionFilterer(address _transactionFilterer) external onlyAdmin {
+        address oldTransactionFilterer = s.transactionFilterer;
+        s.transactionFilterer = _transactionFilterer;
+        emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
     /*//////////////////////////////////////////////////////////////

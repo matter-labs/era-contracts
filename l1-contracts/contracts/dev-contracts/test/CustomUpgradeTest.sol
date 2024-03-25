@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "../../state-transition/libraries/Diamond.sol";
-import "../../upgrades/BaseZkSyncUpgrade.sol";
+import {Diamond} from "../../state-transition/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade, ProposedUpgrade} from "../../upgrades/BaseZkSyncUpgrade.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
     // add this to be excluded from coverage report

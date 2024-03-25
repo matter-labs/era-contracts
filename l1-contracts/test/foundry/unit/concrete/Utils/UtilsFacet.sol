@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {FeeParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {ZkSyncStateTransitionBase} from "contracts/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract UtilsFacet is ZkSyncStateTransitionBase {
     function util_setChainId(uint256 _chainId) external {
@@ -102,6 +102,14 @@ contract UtilsFacet is ZkSyncStateTransitionBase {
 
     function util_getValidator(address _validator) external view returns (bool) {
         return s.validators[_validator];
+    }
+
+    function util_setTransactionFilterer(address _filterer) external {
+        s.transactionFilterer = _filterer;
+    }
+
+    function util_setBaseTokenGasPriceMultiplierDenominator(uint128 _denominator) external {
+        s.baseTokenGasPriceMultiplierDenominator = _denominator;
     }
 
     function util_setZkPorterAvailability(bool _available) external {

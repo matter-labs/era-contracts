@@ -12,9 +12,9 @@ import {IL2StandardToken} from "./interfaces/IL2StandardToken.sol";
 
 import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, L2_BASE_TOKEN_ADDRESS, IContractDeployer} from "../L2ContractHelper.sol";
+import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
-import {ERA_CHAIN_ID, ERA_WETH_ADDRESS} from "../Config.sol";
+import {ERA_CHAIN_ID} from "../Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

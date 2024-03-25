@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncStateTransitionBase} from "../../state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
 
 contract DummyAdminFacet2 is ZkSyncStateTransitionBase {
     // add this to be excluded from coverage report

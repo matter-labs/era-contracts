@@ -69,6 +69,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IL2S
     /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
+    // solhint-disable-next-line no-unused-vars
     function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         revert("bridgeMint is not implemented! Use deposit/depositTo methods instead.");
     }
