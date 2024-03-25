@@ -6,11 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {InitializeData} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {ZkSyncStateTransitionBase} from "contracts/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestFacet is ZkSyncStateTransitionBase {
     function func() public pure returns (bool) {
@@ -23,6 +24,7 @@ contract TestFacet is ZkSyncStateTransitionBase {
 
 contract DiamondProxyTest is Test {
     Diamond.FacetCut[] internal facetCuts;
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
@@ -49,7 +51,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -62,7 +64,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhen_calledWithEmptyMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -78,7 +80,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -94,7 +96,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -110,7 +112,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhenFacetIsFrozen() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -129,7 +131,7 @@ contract DiamondProxyTest is Test {
     }
 
     function test_successfulExecution() public {
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -154,7 +156,7 @@ contract DiamondProxyTest is Test {
             selectors: getTestFacetSelectors()
         });
 
-        InitializeData memory initializeData = Utils.makeInitializeData();
+        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,

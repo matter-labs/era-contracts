@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
-import {VerifierParams} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract GetVerifierParamsTest is GettersFacetTest {
     function test() public {

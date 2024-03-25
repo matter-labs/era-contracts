@@ -62,21 +62,21 @@ describe("Keccak256 tests", function () {
   });
 
   it("keccak upgrade test", async () => {
-    const deployerInterfact = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
+    const deployerInterface = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
 
-    const eraseInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [alwaysRevertCodeHash]);
+    const eraseInput = deployerInterface.encodeFunctionData("forceDeployKeccak256", [alwaysRevertCodeHash]);
 
-    const upgradeInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [correctKeccakCodeHash]);
+    const upgradeInput = deployerInterface.encodeFunctionData("forceDeployKeccak256", [correctKeccakCodeHash]);
 
     await keccakTest.keccakUpgradeTest(eraseInput, upgradeInput);
   });
 
   it("keccak validation test", async () => {
-    const deployerInterfact = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
+    const deployerInterface = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
 
-    const upgradeInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [correctKeccakCodeHash]);
+    const upgradeInput = deployerInterface.encodeFunctionData("forceDeployKeccak256", [correctKeccakCodeHash]);
 
-    const resetInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [oldKeccakCodeHash]);
+    const resetInput = deployerInterface.encodeFunctionData("forceDeployKeccak256", [oldKeccakCodeHash]);
 
     const seed = ethers.utils.randomBytes(32);
     // Displaying seed for reproducible tests
@@ -108,9 +108,9 @@ describe("Keccak256 tests", function () {
   });
 
   it("keccak upgrade if needed test", async () => {
-    const deployerInterfact = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
+    const deployerInterface = new ethers.utils.Interface((await loadArtifact("ContractDeployer")).abi);
 
-    const mockKeccakInput = deployerInterfact.encodeFunctionData("forceDeployKeccak256", [keccakMockCodeHash]);
+    const mockKeccakInput = deployerInterface.encodeFunctionData("forceDeployKeccak256", [keccakMockCodeHash]);
 
     await keccakTest.keccakPerformUpgrade(mockKeccakInput);
 

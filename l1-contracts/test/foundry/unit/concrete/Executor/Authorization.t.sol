@@ -5,7 +5,7 @@ import {Utils} from "../Utils/Utils.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {IExecutor} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;

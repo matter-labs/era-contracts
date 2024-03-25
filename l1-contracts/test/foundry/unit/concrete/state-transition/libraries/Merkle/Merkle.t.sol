@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {MerkleTest} from "solpp/dev-contracts/test/MerkleTest.sol";
+import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
 
 contract MerkleTestTest is Test {

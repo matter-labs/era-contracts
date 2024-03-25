@@ -82,18 +82,18 @@ library SystemContractsCaller {
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
 
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
-            0,
-            0,
-            dataStart,
-            dataLength,
-            gasLimit,
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI({
+            dataOffset: 0,
+            memoryPage: 0,
+            dataStart: dataStart,
+            dataLength: dataLength,
+            gasPassed: gasLimit,
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.UseHeap,
-            false,
-            true
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.UseHeap,
+            isConstructorCall: false,
+            isSystemCall: true
+        });
 
         if (value == 0) {
             // Doing the system call directly
@@ -223,13 +223,14 @@ library SystemContractsCaller {
         bool isSystemCall
     ) internal pure returns (uint256 farCallAbi) {
         // Fill in the call parameter fields
-        farCallAbi = getFarCallABIWithEmptyFatPointer(
-            gasPassed,
-            shardId,
-            forwardingMode,
-            isConstructorCall,
-            isSystemCall
-        );
+        farCallAbi = getFarCallABIWithEmptyFatPointer({
+            gasPassed: gasPassed,
+            shardId: shardId,
+            forwardingMode: forwardingMode,
+            isConstructorCall: isConstructorCall,
+            isSystemCall: isSystemCall
+        });
+
         // Fill in the fat pointer fields
         farCallAbi |= dataOffset;
         farCallAbi |= (uint256(memoryPage) << 32);

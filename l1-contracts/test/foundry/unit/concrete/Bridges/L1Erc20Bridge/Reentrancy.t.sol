@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L1Erc20BridgeTest} from "./_L1Erc20Bridge_Shared.t.sol";
-import {ReenterL1ERC20Bridge} from "solpp/dev-contracts/test/ReenterL1ERC20Bridge.sol";
+import {ReenterL1ERC20Bridge} from "contracts/dev-contracts/test/ReenterL1ERC20Bridge.sol";
 
 contract ReentrancyTest is L1Erc20BridgeTest {
     using stdStorage for StdStorage;
@@ -16,7 +16,14 @@ contract ReentrancyTest is L1Erc20BridgeTest {
 
         vm.prank(alice);
         vm.expectRevert(bytes("r1"));
-        bridgeReenterItself.deposit(randomSigner, address(token), amount, 0, 0, address(0));
+        bridgeReenterItself.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0,
+            _refundRecipient: address(0)
+        });
     }
 
     function _legacyDepositExpectRevertOnReentrancy() internal {
@@ -26,7 +33,13 @@ contract ReentrancyTest is L1Erc20BridgeTest {
 
         vm.prank(alice);
         vm.expectRevert(bytes("r1"));
-        bridgeReenterItself.deposit(randomSigner, address(token), amount, 0, 0);
+        bridgeReenterItself.deposit({
+            _l2Receiver: randomSigner,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: 0,
+            _l2TxGasPerPubdataByte: 0
+        });
     }
 
     function _claimFailedDepositExpectRevertOnReentrancy() internal {
@@ -42,7 +55,15 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         vm.prank(alice);
         bytes32[] memory merkleProof;
         vm.expectRevert(bytes("r1"));
-        bridgeReenterItself.claimFailedDeposit(alice, address(token), dummyL2DepositTxHash, 0, 0, 0, merkleProof);
+        bridgeReenterItself.claimFailedDeposit({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _l2TxHash: dummyL2DepositTxHash,
+            _l2BatchNumber: 0,
+            _l2MessageIndex: 0,
+            _l2TxNumberInBatch: 0,
+            _merkleProof: merkleProof
+        });
     }
 
     function _finalizeWithdrawalExpectRevertOnReentrancy() internal {
@@ -52,7 +73,13 @@ contract ReentrancyTest is L1Erc20BridgeTest {
         vm.prank(alice);
         vm.expectRevert(bytes("r1"));
         bytes32[] memory merkleProof;
-        bridgeReenterItself.finalizeWithdrawal(l2BatchNumber, l2MessageIndex, 0, "", merkleProof);
+        bridgeReenterItself.finalizeWithdrawal({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: 0,
+            _message: "",
+            _merkleProof: merkleProof
+        });
     }
 
     function test_depositReenterDeposit() public {

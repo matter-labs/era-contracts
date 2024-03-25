@@ -3,13 +3,13 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
-import {IGetters} from "solpp/state-transition/chain-interfaces/IGetters.sol";
-import {ILegacyGetters} from "solpp/state-transition/chain-interfaces/ILegacyGetters.sol";
-import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {PriorityOperation} from "solpp/state-transition/libraries/PriorityQueue.sol";
-import {VerifierParams} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract GettersFacetWrapper is GettersFacet {
     function util_setVerifier(address _verifier) external {

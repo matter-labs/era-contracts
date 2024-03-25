@@ -33,6 +33,7 @@ contract UnfreezeDiamondTest is AdminTest {
 
     //     utilsFacet.util_setIsFrozen(true);
 
+    //     solhint-disable-next-line func-named-parameters
     //     vm.expectEmit(true, true, true, true, address(adminFacet));
     //     emit Unfreeze();
 

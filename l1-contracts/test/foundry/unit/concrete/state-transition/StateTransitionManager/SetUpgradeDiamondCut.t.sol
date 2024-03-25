@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract setUpgradeDiamondCutTest is StateTransitionManagerTest {
     function test_SettingUpgradeDiamondCut() public {

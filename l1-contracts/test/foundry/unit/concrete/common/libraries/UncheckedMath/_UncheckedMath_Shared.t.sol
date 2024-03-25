@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {UncheckedMathTest} from "solpp/dev-contracts/test/UncheckedMathTest.sol";
+import {UncheckedMathTest} from "contracts/dev-contracts/test/UncheckedMathTest.sol";
 
 contract UncheckedMathSharedTest is Test {
     UncheckedMathTest uncheckedMath;

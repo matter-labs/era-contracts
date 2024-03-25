@@ -148,7 +148,13 @@ contract DefaultAccount is IAccount {
                 selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector ||
                 selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
         }
-        bool success = EfficientCall.rawCall(gas, to, value, data, isSystemCall);
+        bool success = EfficientCall.rawCall({
+            _gas: gas,
+            _address: to,
+            _value: value,
+            _data: data,
+            _isSystem: isSystemCall
+        });
         if (!success) {
             EfficientCall.propagateRevert();
         }

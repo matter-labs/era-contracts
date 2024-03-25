@@ -23,6 +23,7 @@ contract SetPendingAdminTest is AdminTest {
         address oldPendingAdmin = utilsFacet.util_getPendingAdmin();
         address newPendingAdmin = makeAddr("newPendingAdmin");
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewPendingAdmin(oldPendingAdmin, newPendingAdmin);
 

@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
-import {TransactionValidator} from "solpp/state-transition/libraries/TransactionValidator.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {TransactionValidator} from "contracts/state-transition/libraries/TransactionValidator.sol";
 
 contract TransactionValidatorSharedTest is Test {
     constructor() {}
