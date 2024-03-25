@@ -156,7 +156,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev check that the protocolVersion is active
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return (protocolVersionTimestamp[_protocolVersion] == 0 ||
-            block.timestamp < protocolVersionTimestamp[_protocolVersion]);
+            block.timestamp <= protocolVersionTimestamp[_protocolVersion]);
     }
 
     /// @dev set the protocol version timestamp
