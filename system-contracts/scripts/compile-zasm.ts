@@ -1,4 +1,3 @@
-// hardhat import should be the first import in the file
 import type { CompilerPaths } from "./utils";
 import { spawn, compilerLocation, prepareCompilerPaths } from "./utils";
 import * as fs from "fs";
