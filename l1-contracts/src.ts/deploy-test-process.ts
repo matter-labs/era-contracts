@@ -40,7 +40,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = ethers.constants.HashZero;
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
-  process.env.ERA_CHAIN_ID = "9";
+  process.env.CONTRACTS_ERA_CHAIN_ID = "9";
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
 }
 
@@ -208,7 +208,7 @@ export class EraDeployer extends Deployer {
     }
 
     this.addresses.StateTransition.DiamondProxy = contractAddress;
-    this.chainId = parseInt(getNumberFromEnv("ERA_CHAIN_ID"));
+    this.chainId = parseInt(getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID"));
     // notably, the DummyAdminFacet does not depend on the contracts containing the ERA_Diamond_Proxy address
     const diamondAdminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet2", contractAddress);
     // we separate the main diamond cut into an upgrade ( as this was copied from the the old diamond cut )
