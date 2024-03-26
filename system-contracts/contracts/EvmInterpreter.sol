@@ -375,21 +375,13 @@ contract EvmInterpreter {
     }
 
     function warmAccount(address _addr) internal returns (bool isWarm) {
-        bytes4 selector = EVM_GAS_MANAGER.warmAccount.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-            mstore(4, _addr)
-
-            let success := call(gas(), addr, 0, 0, 36, 0, 32)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-
-            isWarm := mload(0)
-        }
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.warmAccount, (_addr))
+		);
+        (isWarm) = abi.decode(returnData, (bool));
     }
 
     function doesAccountExist(address _addr) internal returns (bool accountExists) {
@@ -401,41 +393,23 @@ contract EvmInterpreter {
     }
 
     function isSlotWarm(uint256 key) internal returns (bool isWarm) {
-        bytes4 selector = EVM_GAS_MANAGER.isSlotWarm.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-            mstore(4, key)
-
-            let success := call(gas(), addr, 0, 0, 36, 0, 32)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-
-            isWarm := mload(0)
-        }
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.isSlotWarm, (_addr))
+		);
+        (isWarm) = abi.decode(returnData, (bool));
     }
 
     function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
-        bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-            mstore(4, key)
-            mstore(36, currentValue)
-
-            let success := call(gas(), addr, 0, 0, 68, 0, 64)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-
-            isWarm := mload(0)
-            originalValue := mload(32)
-        }
+         bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.warmSlot, (key,currentValue))
+		);
+        (isWarm, originalValue) = abi.decode(returnData, (bool));
     }
 
     // It is expected that for EVM <> EVM calls both returndata and calldata start with the `gas`.
@@ -2299,54 +2273,31 @@ contract EvmInterpreter {
     }
 
     function _pushEVMFrame(uint256 _passGas, bool _isStatic) internal {
-        bytes4 selector = EVM_GAS_MANAGER.pushEVMFrame.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-            mstore(4, _passGas)
-            mstore(36, _isStatic)
-
-            let success := call(gas(), addr, 0, 0, 68, 0, 0)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        }
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.pushEVMFrame, (_passGas,_isStatic))
+		);
     }
 
     function _popEVMFrame() internal {
-        bytes4 selector = EVM_GAS_MANAGER.popEVMFrame.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-
-            let success := call(gas(), addr, 0, 0, 4, 0, 0)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-        }
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.popEVMFrame, ())
+		);
     }
 
     function _consumeEvmFrame() internal returns (uint256 _passGas, bool isStatic, bool callerEVM) {
-        bytes4 selector = EVM_GAS_MANAGER.consumeEvmFrame.selector;
-        address addr = address(EVM_GAS_MANAGER);
-        assembly {
-            mstore(0, selector)
-
-            let success := call(gas(), addr, 0, 0, 4, 0, 64)
-
-            if iszero(success) {
-                // This error should never happen
-                revert(0, 0)
-            }
-
-            _passGas := mload(0)
-            isStatic := mload(32)
-        }
-
+        bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
+			uint32(gasleft()),
+			address(EVM_GAS_MANAGER),
+			0,
+			abi.encodeCall(EVM_GAS_MANAGER.consumeEvmFrame, ())
+		);
+        (_passGas, isStatic) = abi.decode(returnData, (bool));
         if (_passGas != INF_PASS_GAS) {
             callerEVM = true;
         }
