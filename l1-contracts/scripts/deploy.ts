@@ -60,7 +60,6 @@ async function main() {
         [],
         gasPrice,
         cmd.onlyVerifier,
-        cmd.diamondUpgradeInit,
         create2Salt,
         nonce
       );
