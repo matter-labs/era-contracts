@@ -3328,7 +3328,7 @@ object "Bootloader" {
                 }
     
                 let gasLimitValue := getGasLimit(innerTxDataOffset)
-                if iszero(validateUint32(gasLimitValue)) {
+                if iszero(validateUint64(gasLimitValue)) {
                     assertionError("Encoding gasLimit")
                 }
     
