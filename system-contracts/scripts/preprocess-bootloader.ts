@@ -87,7 +87,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
-  COMPRESSED_BYTECODES_SLOTS: 65536,
+  COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
