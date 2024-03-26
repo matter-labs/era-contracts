@@ -6,7 +6,7 @@ import "./EvmConstants.sol";
 import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
-import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
+import "./libraries/SystemContractHelper.sol";
 
 // TODO: move to Constants.sol (need to make contract interfaces)
 
@@ -377,7 +377,7 @@ contract EvmInterpreter {
     function warmAccount(address _addr) internal returns (bool isWarm) {
         bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
 			uint32(gasleft()),
-			address(SystemContractsCaller),
+			address(EVM_GAS_MANAGER),
 			0,
 			abi.encodeCall(EVM_GAS_MANAGER.warmAccount, (_addr))
 		);
@@ -395,9 +395,9 @@ contract EvmInterpreter {
     function isSlotWarm(uint256 key) internal returns (bool isWarm) {
         bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
 			uint32(gasleft()),
-			address(SystemContractsCaller),
+			address(EVM_GAS_MANAGER),
 			0,
-			abi.encodeCall(EVM_GAS_MANAGER.isSlotWarm, (key))
+			abi.encodeCall(EVM_GAS_MANAGER.isSlotWarm, (_addr))
 		);
         (isWarm) = abi.decode(returnData, (bool));
     }
@@ -405,11 +405,11 @@ contract EvmInterpreter {
     function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
          bytes memory returnData = SystemContractsCaller.systemCallWithPropagatedRevert(
 			uint32(gasleft()),
-			address(SystemContractsCaller),
+			address(EVM_GAS_MANAGER),
 			0,
 			abi.encodeCall(EVM_GAS_MANAGER.warmSlot, (key,currentValue))
 		);
-        (isWarm, originalValue) = abi.decode(returnData, (bool, uint256));
+        (isWarm, originalValue) = abi.decode(returnData, (bool));
     }
 
     // It is expected that for EVM <> EVM calls both returndata and calldata start with the `gas`.
@@ -2297,7 +2297,7 @@ contract EvmInterpreter {
 			0,
 			abi.encodeCall(EVM_GAS_MANAGER.consumeEvmFrame, ())
 		);
-        (_passGas, isStatic, callerEVM) = abi.decode(returnData, (uint256, bool, bool));
+        (_passGas, isStatic) = abi.decode(returnData, (bool));
         if (_passGas != INF_PASS_GAS) {
             callerEVM = true;
         }
