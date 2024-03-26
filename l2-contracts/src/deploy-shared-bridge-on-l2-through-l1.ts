@@ -9,11 +9,9 @@ import {
   priorityTxMaxGasLimit,
   hashL2Bytecode,
   applyL1ToL2Alias,
-  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   publishBytecodeFromL1,
 } from "./utils";
 
-import { ADDRESS_ONE } from "../../l1-contracts/src.ts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";

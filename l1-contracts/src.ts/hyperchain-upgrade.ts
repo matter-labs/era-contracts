@@ -13,36 +13,23 @@ import { getFacetCutsForUpgrade } from "./diamondCut";
 
 import { getTokens } from "./deploy-token";
 import type { Deployer } from "./deploy";
-import type { EraDeployer } from "./deploy-test-process";
 
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
 import { Interface } from "ethers/lib/utils";
-import {
-  ADDRESS_ONE,
-  readBytecode,
-  readInterface,
-  type L2CanonicalTransaction,
-  type ProposedUpgrade,
-  type VerifierParams,
-} from "./utils";
+import { ADDRESS_ONE, readBytecode, readInterface } from "./utils";
+import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
-// import { L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE, L2_SHARED_BRIDGE_ABI, BEACON_PROXY_BYTECODE} from "../../l2-contracts/src/deploy-shared-bridge-on-l2-through-l1";
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   priorityTxMaxGasLimit,
   applyL1ToL2Alias,
   hashL2Bytecode,
-  computeL2Create2Address,
-  create2DeployFromL1,
-  publishBytecodeFromL1,
 } from "../../l2-contracts/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
-// const CONTRACT_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008006";
-// const COMPLEX_UPGRADE_ADDRESS = "0x000000000000000000000000000000000000800f";
 
 const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
 const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge");
@@ -50,7 +37,7 @@ const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@
 // const systemContractsArtifactsPath = path.join("../.." as string, "contracts/system-contracts/??/");// kl todo
 
 const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
-const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
+// const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
 const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 // const SYSTEM_CONTEXT_BYTECODE = readBytecode(systemContractsArtifactsPath, "SystemContext");
 
@@ -69,12 +56,7 @@ export async function upgradeToHyperchains1(
   await deployNewContracts(deployer, gasPrice, create2Salt, nonce); //done
 }
 
-export async function upgradeToHyperchains2(
-  deployer: Deployer,
-  gasPrice: BigNumberish,
-  create2Salt?: string,
-  nonce?: number
-) {
+export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNumberish) {
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
   // this requires the sharedBridge to be deployed.
@@ -111,7 +93,7 @@ export async function upgradeToHyperchains(
   nonce?: number
 ) {
   await upgradeToHyperchains1(deployer, gasPrice, create2Salt, nonce);
-  await upgradeToHyperchains2(deployer, gasPrice, create2Salt, nonce);
+  await upgradeToHyperchains2(deployer, gasPrice);
 }
 
 async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
@@ -289,7 +271,7 @@ async function upgradeL2Bridge(deployer: Deployer) {
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
 
-    await deployer.executeUpgrade(
+  await deployer.executeUpgrade(
     deployer.addresses.StateTransition.DiamondProxy,
     requiredValueForL2Tx.mul(10),
     mailboxCalldata

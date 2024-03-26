@@ -89,8 +89,8 @@ export async function initialTestnetDeploymentProcess(
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   // deploy the verifier first
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   await registerHyperchain(deployer, false, extraFacets, gasPrice, baseTokenName);
   return deployer;
 }
@@ -99,8 +99,7 @@ export async function initialPreUpgradeContractsDeployment(
   deployWallet: Wallet,
   ownerAddress: string,
   gasPrice: BigNumberish,
-  extraFacets: FacetCut[],
-  baseTokenName?: string
+  extraFacets: FacetCut[]
 ): Promise<EraDeployer> {
   await loadDefaultEnvVarsForTests(deployWallet);
   const deployer = await defaultEraDeployerForTests(deployWallet, ownerAddress);
@@ -111,7 +110,7 @@ export async function initialPreUpgradeContractsDeployment(
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   let nonce = await deployer.deployWallet.getTransactionCount();
-  let create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
   if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
@@ -165,8 +164,8 @@ export async function initialEraTestnetDeploymentProcess(
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
   // deploy the verifier first
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
-  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
+  await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   await deployer.deployDiamondProxy(extraFacets, {});
   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
