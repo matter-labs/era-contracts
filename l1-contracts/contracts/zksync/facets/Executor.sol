@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 
 import {Base} from "./Base.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, MAX_CALLDATA_SIZE} from "../interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, BLOB_SIZE_BYTES} from "../interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
@@ -40,15 +40,14 @@ contract ExecutorFacet is Base, IExecutor {
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
-        bytes32[] memory blobHashes = _processBlobLogs(_newBatch);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pubdataSource == uint8(PubdataSource.Blob)) {
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
-            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
+            blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
-            require(_newBatch.pubdataCommitments.length <= MAX_CALLDATA_SIZE, "cz");
+            require(_newBatch.pubdataCommitments.length <= BLOB_SIZE_BYTES, "cz");
             require(
                 logOutput.pubdataHash ==
                     keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
@@ -71,7 +70,12 @@ contract ExecutorFacet is Base, IExecutor {
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
 
         // Create batch commitment for the proof verification
-        bytes32 commitment = _createBatchCommitment(_newBatch, logOutput.stateDiffHash, blobCommitments, blobHashes);
+        bytes32 commitment = _createBatchCommitment(
+            _newBatch,
+            logOutput.stateDiffHash,
+            blobCommitments,
+            logOutput.blobHashes
+        );
 
         return
             StoredBatchInfo(
@@ -124,6 +128,8 @@ contract ExecutorFacet is Base, IExecutor {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
 
+        logOutput.blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
+
         // Used as bitmap to set/check log processing happens exactly once.
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
@@ -161,10 +167,22 @@ contract ExecutorFacet is Base, IExecutor {
             } else if (logKey == uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
+            } else if (
+                logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) &&
+                logKey < uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
+            ) {
+                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
+                uint8 blobNumber = uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY);
+
+                // While the fact that `blobNumber` is a valid blob number is implicitly checked by the fact
+                // that Solidity provides array overflow protection, we still double check it manually in case
+                // we accidentally put `unchecked` at the top of the loop and generally for better error messages.
+                require(blobNumber < MAX_NUMBER_OF_BLOBS, "b6");
+                logOutput.blobHashes[blobNumber] = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bu");
                 require(_expectedSystemContractUpgradeTxHash == logValue, "ut");
-            } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
+            } else {
                 revert("ul");
             }
         }
@@ -176,43 +194,6 @@ contract ExecutorFacet is Base, IExecutor {
         } else {
             require(processedLogs == 16383, "b8");
         }
-    }
-
-    /// @dev Check that L2 blob logs are proper and batch contain all information for them
-    /// @dev The logs processed here should line up such that only one log for each key from the
-    ///      SystemLogKey enum in Constants.sol is processed per new batch.
-    function _processBlobLogs(CommitBatchInfo calldata _newBatch) internal pure returns (bytes32[] memory blobHashes) {
-        // Copy L2 to L1 logs into memory.
-        bytes memory emittedL2Logs = _newBatch.systemLogs;
-
-        // Used as bitmap to set/check log processing happens exactly once.
-        // See SystemLogKey enum in Constants.sol for ordering.
-        uint256 processedLogs;
-
-        blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
-
-        // linear traversal of the logs
-        for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
-            // Extract the values to be compared to/used such as the log sender, key, and value
-            (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
-            (uint256 logKey, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
-            (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
-
-            if (
-                logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) &&
-                logKey != uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
-            ) {
-                uint8 key = uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY);
-                // Ensure that the log hasn't been processed already
-                require(!_checkBit(processedLogs, key), "pk");
-                processedLogs = _setBit(processedLogs, key);
-
-                require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
-                blobHashes[logKey - uint256(SystemLogKey.BLOB_ONE_HASH_KEY)] = logValue;
-            }
-        }
-        // We have 6 logs so that corresponds to 2^6 - 1 = 63
-        require(processedLogs == 2 ** MAX_NUMBER_OF_BLOBS - 1, "l8");
     }
 
     /// @inheritdoc IExecutor
