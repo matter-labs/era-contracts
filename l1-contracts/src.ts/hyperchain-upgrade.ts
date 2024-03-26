@@ -288,8 +288,8 @@ async function upgradeL2Bridge(deployer: Deployer) {
   const requiredValueForL2Tx = await deployer
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
-  console.log("KL todo", requiredValueForL2Tx);
-  await deployer.executeUpgrade(
+
+    await deployer.executeUpgrade(
     deployer.addresses.StateTransition.DiamondProxy,
     requiredValueForL2Tx.mul(10),
     mailboxCalldata

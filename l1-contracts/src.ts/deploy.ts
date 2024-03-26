@@ -349,7 +349,8 @@ export class Deployer {
 
   public async deployMailboxFacet(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const contractAddress = await this.deployViaCreate2("MailboxFacet", [this.chainId], create2Salt, ethTxOptions);
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const contractAddress = await this.deployViaCreate2("MailboxFacet", [eraChainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
       console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
@@ -487,6 +488,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
       [
@@ -494,7 +496,7 @@ export class Deployer {
         this.addresses.Bridgehub.BridgehubProxy,
         // we load from process.env, as normally L1_ERC20 bridge will already be deployed
         process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR,
-        this.chainId,
+        eraChainId,
         this.addresses.Bridges.ERC20BridgeImplementation,
         this.addresses.StateTransition.DiamondProxy,
       ],
@@ -761,10 +763,10 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-
+    const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, executionDelay, this.chainId],
+      [this.ownerAddress, executionDelay, eraChainId],
       create2Salt,
       ethTxOptions
     );
