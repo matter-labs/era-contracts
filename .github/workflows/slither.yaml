@@ -39,7 +39,7 @@ jobs:
           rm -rf ./l1-contracts/contracts/state-transition/Verifier.sol |
           rm -rf ./l1-contracts/contracts/state-transition/TestnetVerifier.sol |
           rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierTest.sol |
-          rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol |
+          rm -rf ./l1-contracts/contracts/dev-contracts/test/VerifierRecursiveTest.sol
 
       - name: Run Slither
         run: slither --config ./l1-contracts/slither.config.json ./l1-contracts
