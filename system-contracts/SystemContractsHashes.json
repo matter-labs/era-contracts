@@ -108,8 +108,8 @@
     "contractName": "SystemContext",
     "bytecodePath": "artifacts-zk/contracts-preprocessed/SystemContext.sol/SystemContext.json",
     "sourceCodePath": "contracts-preprocessed/SystemContext.sol",
-    "bytecodeHash": "0x010001b1c8b35a58a5b1a48347d6fef0238403ef3eedb5ea8a24a07e899d842a",
-    "sourceCodeHash": "0x14875f357fe856c37c01374c07a3cf00307b7487fe30f89597d3431c3ee79971"
+    "bytecodeHash": "0x01000181f8cdd6e627b6e5861765ac0f8e9c59bf3b8b8b3f988d33a43576ba3f",
+    "sourceCodeHash": "0xdf53706589bfbd165d45c55a352fa1cbc40e7a32b7454c70ef50667a0f7c7a98"
   },
   {
     "contractName": "EventWriter",
