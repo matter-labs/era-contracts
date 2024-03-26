@@ -158,7 +158,6 @@ export async function publishBytecodeFromL1(
   const deployedAddresses = deployedAddressesFromEnv();
   const bridgehubAddress = deployedAddresses.Bridgehub.BridgehubProxy;
   const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
-  const nonce = await wallet.getTransactionCount();
 
   const requiredValueToPublishBytecodes = await bridgehub.l2TransactionBaseCost(
     chainId,
@@ -178,6 +177,7 @@ export async function publishBytecodeFromL1(
     );
     await approveTx.wait(1);
   }
+  let nonce = await wallet.getTransactionCount();
   const tx1 = await bridgehub.requestL2TransactionDirect(
     {
       chainId,

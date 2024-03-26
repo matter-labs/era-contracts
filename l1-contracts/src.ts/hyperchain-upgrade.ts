@@ -117,6 +117,9 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   });
   nonce++;
 
+  await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice, nonce });
+  nonce++;
+
   // kl todo: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
   // await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);

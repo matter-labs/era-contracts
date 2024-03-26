@@ -1,0 +1,59 @@
+$ ts-node scripts/hyperchain-upgrade-1.ts
+Using deployer wallet: 0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE
+Using owner address: 0x52312AD6f01657413b2eaE9287f6B9ADaD93D5FE
+Using gas price: 1.000000001 gwei
+Using nonce: 119
+Deploying new contracts
+Deploying GenesisUpgrade
+GenesisUpgrade deployed, gasUsed: 1892954
+CONTRACTS_GENESIS_UPGRADE_ADDR=0x1E7c024C21902157aC82c5faa17f0e0f18AD5C2F
+Deploying ValidatorTimelock
+ValidatorTimelock deployed, gasUsed: 1628936
+CONTRACTS_VALIDATOR_TIMELOCK_ADDR=0x3d68d4109Abf8163D9eF65C26DCf630Fdfabe303
+Deploying UpgradeHyperchains
+UpgradeHyperchains deployed, gasUsed: 2017745
+CONTRACTS_HYPERCHAIN_UPGRADE_ADDR=0x49E76E92b9ea0CF0aab4eD48F740B6e95B44A223
+Deploying Proxy Admin factory
+CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=0xAeEbB5d5f75Af20AD5733205C658a76034A3d316
+Proxy admin deployed, gasUsed: 539341
+ProxyAdmin ownership transferred to Governance in tx 0xc618ef0a2f5673011796a113cc2f89a750e58418b8fd5c45cdb296bf1a3edd23, gas used: 28540
+Deploying Bridgehub
+Bridgehub deployed, gasUsed: 2831065
+CONTRACTS_BRIDGEHUB_IMPL_ADDR=0x64f8Ca2FcCECDB68689f2dF9B51E8b6E19a8A3f3
+Deploying TransparentUpgradeableProxy
+TransparentUpgradeableProxy deployed, gasUsed: 796074
+CONTRACTS_BRIDGEHUB_PROXY_ADDR=0x207702278eD551a14950C71D6a20BbE4f4E26941
+Deploying ExecutorFacet
+ExecutorFacet deployed, gasUsed: 3691932
+CONTRACTS_EXECUTOR_FACET_ADDR=0x93dE326B1340D1abEe85Bd6576747Dd9C5104BCC
+Deploying AdminFacet
+AdminFacet deployed, gasUsed: 3211755
+CONTRACTS_ADMIN_FACET_ADDR=0x2405E6F1862Aed3F95C4Cd82d7E017Dd9D811171
+Deploying MailboxFacet
+MailboxFacet deployed, gasUsed: 2524876
+CONTRACTS_MAILBOX_FACET_ADDR=0x4a057Fc6DbF26dB331C0129AED5A100A21562c7d
+Deploying GettersFacet
+GettersFacet deployed, gasUsed: 1060889
+CONTRACTS_GETTERS_FACET_ADDR=0x481AEE58763323AB8AfA28FD0E2689fA27a3fa28
+Deploying DiamondInit
+DiamondInit deployed, gasUsed: 576125
+CONTRACTS_DIAMOND_INIT_ADDR=0x88214E5D5963dE4cf66bf09204Ca7E80b1A28Fe8
+Deploying StateTransitionManager
+StateTransitionManager deployed, gasUsed: 3673961
+CONTRACTS_STATE_TRANSITION_IMPL_ADDR=0xc5a5D0535009B38631D03264fAA90c00F29a0B46
+Deploying TransparentUpgradeableProxy
+TransparentUpgradeableProxy deployed, gasUsed: 966826
+StateTransitionManagerProxy deployed, with protocol version: 23
+CONTRACTS_STATE_TRANSITION_PROXY_ADDR=0x61F893eD220BfAfa7C8a158b6C57083AF7d29aFB
+StateTransition System registered, gas used: 53407
+StateTransitionManager was set in ValidatorTimelock, gas used: 46057
+Deploying L1SharedBridge
+L1SharedBridge deployed, gasUsed: 4390601
+CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR=0x203Acf381B3E0006e601bAcD455AEC8eA86975eA
+Deploying TransparentUpgradeableProxy
+TransparentUpgradeableProxy deployed, gasUsed: 822892
+CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR=0x35DA9E9f2f77eb3934F98411432F4af23d1635f1
+Shared bridge was registered, gas used: 53199 and 53179
+Deploying L1ERC20Bridge
+L1ERC20Bridge deployed, gasUsed: 1521538
+CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR=0xa24741C38010Bb996E3268B8e3DB81AE0c49312f
