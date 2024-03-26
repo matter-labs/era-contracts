@@ -611,8 +611,8 @@ contract DeployL1Script is Script {
         }
 
         address contractAddress = computeCreate2Address(
-            bytes32(config.contracts.create2_factory_salt),
-            bytes32(_bytecode),
+            config.contracts.create2_factory_salt,
+            keccak256(_bytecode),
             addresses.create2Factory
         );
         if (contractAddress.code.length != 0) {
