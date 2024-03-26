@@ -15,7 +15,7 @@ Compile the solidity and yul contracts: `yarn l1 build`
 
 ### Testing
 
-To run uint tests, execute `yarn l1 test`.
+To run unit tests, execute `yarn l1 test`.
 
 Similarly, to run tests in Foundry execute `yarn l1 test:foundry`.
 
