@@ -5,7 +5,7 @@
   "compile_force_framework": "foundry",
   "exclude_medium": false,
   "exclude_high": false,
-  "exclude_low": false,
+  "exclude_low": true,
   "exclude_informational": true,
   "exclude_optimization": true
 }
