@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyStateTransitionManager} from "contracts/dev-contracts/test/DummyStateTransitionManager.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
+import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -26,7 +27,7 @@ contract ExecutorTest is Test {
     address internal randomSigner;
     address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
-    ExecutorFacet internal executor;
+    TestExecutor internal executor;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
@@ -128,13 +129,17 @@ contract ExecutorTest is Test {
 
         eraChainId = 9;
 
-        executor = new ExecutorFacet();
+        executor = new TestExecutor();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet(eraChainId);
 
         DummyStateTransitionManager stateTransitionManager = new DummyStateTransitionManager();
-
+        vm.mockCall(
+            address(stateTransitionManager),
+            abi.encodeWithSelector(IStateTransitionManager.protocolVersionIsActive.selector),
+            abi.encode(bool(true))
+        );
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -213,7 +218,7 @@ contract ExecutorTest is Test {
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
-        executor = ExecutorFacet(address(diamondProxy));
+        executor = TestExecutor(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));

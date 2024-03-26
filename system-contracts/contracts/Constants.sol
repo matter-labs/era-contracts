@@ -19,6 +19,11 @@ import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = {{SYSTEM_CONTRACTS_OFFSET}}; // 2^15
 
+/// @dev Unlike the value above, it is not overridden for the purpose of testing and
+/// is identical to the constant value actually used as the system contracts offset on
+/// mainnet.
+uint160 constant REAL_SYSTEM_CONTRACTS_OFFSET = 0x8000;
+
 /// @dev All the system contracts must be located in the kernel space,
 /// i.e. their addresses must be below 2^16.
 uint160 constant MAX_SYSTEM_CONTRACT_ADDRESS = 0xffff; // 2^16 - 1
@@ -27,6 +32,13 @@ address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
+
+
+/// @dev The number of ergs that need to be spent for a single byte of pubdata regardless of the pubdata price.
+/// This variable is used to ensure the following:
+/// - That the long-term storage of the operator is compensated properly.
+/// - That it is not possible that the pubdata counter grows too high without spending proportional amount of computation.
+uint256 constant COMPUTATIONAL_PRICE_FOR_PUBDATA = 80;
 
 /// @dev The maximal possible address of an L1-like precompie. These precompiles maintain the following properties:
 /// - Their extcodehash is EMPTY_STRING_KECCAK
@@ -51,6 +63,7 @@ IL1Messenger constant L1_MESSENGER_CONTRACT = IL1Messenger(address(SYSTEM_CONTRA
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
 IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IBaseToken constant REAL_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 // Hardcoded because even for tests we should keep the address. (Instead `SYSTEM_CONTRACTS_OFFSET + 0x10`)
 // Precompile call depends on it.
@@ -58,6 +71,7 @@ IBaseToken constant BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(address(SYSTEM_CONTR
 address constant KECCAK256_SYSTEM_CONTRACT = address(0x8010);
 
 ISystemContext constant SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(SYSTEM_CONTRACTS_OFFSET + 0x0b)));
+ISystemContext constant REAL_SYSTEM_CONTEXT_CONTRACT = ISystemContext(payable(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x0b)));
 
 IBootloaderUtilities constant BOOTLOADER_UTILITIES = IBootloaderUtilities(address(SYSTEM_CONTRACTS_OFFSET + 0x0c));
 
@@ -89,10 +103,6 @@ bytes32 constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
-/// @dev While the "real" amount of pubdata that can be sent rarely exceeds the BLOB_SIZE_BYTES * MAX_NUMBER_OF_BLOBS, it is better to
-/// allow the operator to provide any reasonably large value in order to avoid unneeded constraints on the operator.
-uint256 constant MAX_ALLOWED_PUBDATA_PER_BATCH = 520000;
-
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
     TOTAL_L2_TO_L1_PUBDATA_KEY,
@@ -103,12 +113,16 @@ enum SystemLogKey {
     NUMBER_OF_LAYER_1_TXS_KEY,
     BLOB_ONE_HASH_KEY,
     BLOB_TWO_HASH_KEY,
+    BLOB_THREE_HASH_KEY,
+    BLOB_FOUR_HASH_KEY,
+    BLOB_FIVE_HASH_KEY,
+    BLOB_SIX_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
 /// @dev The number of leaves in the L2->L1 log Merkle tree.
-/// While formally a tree of any length is acceptable, the node supports only a constant length of 4096 leaves.
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 4096;
+/// While formally a tree of any length is acceptable, the node supports only a constant length of 16384 leaves.
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 
 /// @dev The length of the derived key in bytes inside compressed state diffs.
 uint256 constant DERIVED_KEY_LENGTH = 32;
@@ -140,4 +154,4 @@ uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+uint256 constant MAX_NUMBER_OF_BLOBS = 6;

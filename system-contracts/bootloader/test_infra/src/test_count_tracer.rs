@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use multivm::interface::dyn_tracers::vm_1_4_1::DynTracer;
+use multivm::interface::dyn_tracers::vm_1_5_0::DynTracer;
 use multivm::vm_latest::{HistoryMode, SimpleMemory, VmTracer};
 use multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
 use once_cell::sync::OnceCell;

@@ -143,6 +143,18 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
+  codeOracle: {
+    address: "0x0000000000000000000000000000000000008012",
+    codeName: "CodeOracle",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
+  p256Verify: {
+    address: "0x0000000000000000000000000000000000000100",
+    codeName: "P256Verify",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
   pubdataChunkPublisher: {
     address: "0x0000000000000000000000000000000000008011",
     codeName: "PubdataChunkPublisher",

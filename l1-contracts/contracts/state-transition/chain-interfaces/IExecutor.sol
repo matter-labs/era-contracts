@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
 
@@ -15,6 +15,10 @@ enum SystemLogKey {
     NUMBER_OF_LAYER_1_TXS_KEY,
     BLOB_ONE_HASH_KEY,
     BLOB_TWO_HASH_KEY,
+    BLOB_THREE_HASH_KEY,
+    BLOB_FOUR_HASH_KEY,
+    BLOB_FIVE_HASH_KEY,
+    BLOB_SIX_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -32,9 +36,13 @@ struct LogProcessingOutput {
     bytes32 stateDiffHash;
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
-    bytes32 blob1Hash;
-    bytes32 blob2Hash;
+    bytes32[] blobHashes;
 }
+
+/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
+/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
+/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -60,7 +68,12 @@ uint256 constant PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET = 16;
 uint256 constant PUBDATA_COMMITMENT_COMMITMENT_OFFSET = 48;
 
 /// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 2;
+uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+
+/// @dev The number of blobs that must be present in the commitment to a batch.
+/// It represents the maximal number of blobs that circuits can support and can be larger
+/// than the maximal number of blobs supported by the contract (`MAX_NUMBER_OF_BLOBS`).
+uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 /// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs

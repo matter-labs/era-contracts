@@ -128,7 +128,7 @@ export async function publishBytecode(bytecode: BytesLike) {
     to: ethers.constants.AddressZero,
     data: "0x",
     customData: {
-      factoryDeps: [bytecode],
+      factoryDeps: [ethers.utils.hexlify(bytecode)],
       gasPerPubdata: 50000,
     },
   });

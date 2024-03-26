@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 contract WETH9 {
     // add this to be excluded from coverage report
