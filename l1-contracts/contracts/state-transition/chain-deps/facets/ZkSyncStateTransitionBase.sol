@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ZkSyncStateTransitionBase is ReentrancyGuard {
+    // slither-disable-next-line uninitialized-state
     ZkSyncStateTransitionStorage internal s;
 
     /// @notice Checks that the message sender is an active admin
