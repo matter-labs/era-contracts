@@ -38,6 +38,8 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 contract DeployL1Script is Script {
     using stdToml for string;
 
+    address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+
     struct DeployedAddresses {
         BridgehubDeployedAddresses bridgehub;
         StateTransitionDeployedAddresses stateTransition;
@@ -109,7 +111,7 @@ contract DeployL1Script is Script {
 
         initializeConfig();
 
-        deployOrInstantiateCreate2Factory();
+        instantiateCreate2Factory();
         deployIfNeededMulticall3();
 
         deployVerifier();
@@ -141,15 +143,17 @@ contract DeployL1Script is Script {
         string memory toml = vm.readFile(path);
 
         chainId = block.chainid;
+        config.deployerAddress = msg.sender;
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.deployerAddress = msg.sender;
         config.gasPrice = toml.readUint("$.gas_price");
 
         config.contracts.create2_factory_salt = toml.readBytes32("$.contracts.create2_factory_salt");
-        config.contracts.create2_factory_addr = toml.readAddress("$.contracts.create2_factory_addr");
+        if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
+            config.contracts.create2_factory_addr = toml.readAddress("$.contracts.create2_factory_addr");
+        }
         config.contracts.validator_timelock_execution_delay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
@@ -170,19 +174,15 @@ contract DeployL1Script is Script {
         config.tokens.token_weth_address = toml.readAddress("$.tokens.token_weth_address");
     }
 
-    function deployOrInstantiateCreate2Factory() internal returns (address) {
-        // Create2Factory is already deployed on the public networks
+    function instantiateCreate2Factory() internal returns (address) {
         address contractAddress;
-        if (isNetworkLocal()) {
-            vm.broadcast();
-            SingletonFactory factory = new SingletonFactory();
-            contractAddress = address(factory);
-            console.log("Create2Factory deployed at:", contractAddress);
+        if (config.contracts.create2_factory_addr == address(0)) {
+            contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            console.log("Using deterministic Create2Factory address:", contractAddress);
         } else {
             contractAddress = config.contracts.create2_factory_addr;
             console.log("Using Create2Factory address:", contractAddress);
         }
-        addresses.create2Factory = contractAddress;
     }
 
     function deployIfNeededMulticall3() internal {
@@ -260,7 +260,7 @@ contract DeployL1Script is Script {
     function deployBlobVersionedHashRetriever() internal {
         // solc contracts/state-transition/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
         bytes memory bytecode = hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-        address contractAddress = deployViaCreate2(abi.encode(bytecode));
+        address contractAddress = deployViaCreate2(bytecode);
         console.log("BlobVersionedHashRetriever deployed at:", contractAddress);
         addresses.blobVersionedHashRetriever = contractAddress;
     }
@@ -609,8 +609,7 @@ contract DeployL1Script is Script {
         if (_bytecode.length == 0) {
             revert("Bytecode is not set");
         }
-
-        address contractAddress = computeCreate2Address(
+        address contractAddress = vm.computeCreate2Address(
             config.contracts.create2_factory_salt,
             keccak256(_bytecode),
             addresses.create2Factory
@@ -619,11 +618,13 @@ contract DeployL1Script is Script {
             return contractAddress;
         }
 
-        SingletonFactory create2Factory = SingletonFactory(addresses.create2Factory);
         vm.broadcast();
-        contractAddress = create2Factory.deploy(_bytecode, config.contracts.create2_factory_salt);
+        (bool success, bytes memory data) = addresses.create2Factory.call(
+            abi.encodePacked(config.contracts.create2_factory_salt, _bytecode)
+        );
+        contractAddress = Utils.bytesToAddress(data);
 
-        if (contractAddress == address(0)) {
+        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
         }
 
