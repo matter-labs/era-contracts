@@ -3,12 +3,11 @@ pragma solidity 0.8.20;
 
 // solhint-disable no-console
 
-import {console2 as console} from "forge-std/Script.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {Script} from "./Script.sol";
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {SingletonFactory} from "contracts/dev-contracts/SingletonFactory.sol";
@@ -105,6 +104,7 @@ contract DeployL1Script is Script {
 
     Config config;
     DeployedAddresses addresses;
+    uint256 chainId;
 
     function run() public {
         console.log("Deploying L1 contracts");
@@ -187,8 +187,8 @@ contract DeployL1Script is Script {
     }
 
     function deployIfNeededMulticall3() internal {
-        // Multicall3 is already deployed on the public networks
-        if (isNetworkLocal()) {
+        // Multicall3 is already deployed on public networks
+        if (MULTICALL3_ADDRESS.code.length == 0) {
             address contractAddress = deployViaCreate2(type(Multicall3).creationCode);
             console.log("Multicall3 deployed at:", contractAddress);
         }
@@ -508,7 +508,7 @@ contract DeployL1Script is Script {
         // as the operation could be scheduled for timestamp 1
         // which is also a magic number meaning the operation
         // is done.
-        if (isNetworkLocal()) {
+        if (chainId == 31337) {
             vm.warp(10);
         }
 
