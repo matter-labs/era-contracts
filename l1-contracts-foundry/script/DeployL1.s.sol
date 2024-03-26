@@ -10,7 +10,6 @@ import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openze
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {SingletonFactory} from "contracts/dev-contracts/SingletonFactory.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -28,7 +27,7 @@ import {StateTransitionManager} from "contracts/state-transition/StateTransition
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeData as DiamondInitInitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -370,16 +369,7 @@ contract DeployL1Script is Script {
             minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
         });
 
-        DiamondInitInitializeData memory initializeData = DiamondInitInitializeData({
-            chainId: 1,
-            bridgehub: address(0x1234),
-            stateTransitionManager: address(0x2234),
-            protocolVersion: 0x2234,
-            admin: address(0x3234),
-            validatorTimelock: address(0x4234),
-            baseToken: address(0x4234),
-            baseTokenBridge: address(0x4234),
-            storedBatchZero: hex"5432",
+        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             verifier: IVerifier(addresses.stateTransition.verifier),
             verifierParams: verifierParams,
             l2BootloaderBytecodeHash: bytes32(getBatchBootloaderBytecodeHash()),
@@ -388,12 +378,11 @@ contract DeployL1Script is Script {
             feeParams: feeParams,
             blobVersionedHashRetriever: addresses.blobVersionedHashRetriever
         });
-        bytes memory initCallData = abi.encodeCall(DiamondInit.initialize, (initializeData));
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: addresses.stateTransition.diamondInit,
-            initCalldata: initCallData
+            initCalldata: abi.encode(initializeData)
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
