@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncStateTransitionBase} from "./facets/ZkSyncStateTransitionBase.sol";

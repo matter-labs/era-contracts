@@ -54,4 +54,8 @@ interface ISystemContext {
     function getBatchNumberAndTimestamp() external view returns (uint128 blockNumber, uint128 blockTimestamp);
 
     function getL2BlockNumberAndTimestamp() external view returns (uint128 blockNumber, uint128 blockTimestamp);
+
+    function gasPerPubdataByte() external view returns (uint256 gasPerPubdataByte);
+
+    function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);
 }

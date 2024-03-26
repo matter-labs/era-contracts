@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {VerifierTestTest} from "./Verifier.t.sol";
 import {VerifierRecursiveTest} from "contracts/dev-contracts/test/VerifierRecursiveTest.sol";

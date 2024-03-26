@@ -154,6 +154,15 @@ this trick:
 - The contract on L1 accepts all sent messages and if the message came from this system contract it requires that the
   preimage of `value` be provided.
 
+#### L1 -> L2 Transaction filtering
+
+There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
+the `TransactionFilterer` contract in the `ZkSyncStateTransitionStorage`. If the filterer exists, it is being called in
+the `Mailbox` facet with the tx details and has to return whether the transaction can be executed or not. The filterer
+has to implement the `ITransactionFilterer` interface. The ones intended to use this feature, have to deploy the
+contract that implements `ITransactionFilterer` and use `setTransactionFilterer` function of `AdminFacet` to set the
+address of the transaction filterer. The same function called with `0` address will disable the filtering.
+
 #### ExecutorFacet
 
 A contract that accepts L2 batches, enforces data availability and checks the validity of zk-proofs.

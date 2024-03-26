@@ -6,7 +6,7 @@ import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
+import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, REAL_BASE_TOKEN_SYSTEM_CONTRACT} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -32,19 +32,36 @@ contract MsgValueSimulator is ISystemContract {
         to = address(uint160(addressAsUint));
     }
 
+    /// @notice The maximal number of gas out of the stipend that should be passed to the callee.
+    uint256 constant GAS_TO_PASS = 2300;
+
+    /// @notice The amount of gas that is passed to the MsgValueSimulator as a stipend.
+    /// This number servers to pay for the ETH transfer as well as to provide gas for the `GAS_TO_PASS` gas.
+    /// It is equal to the following constant: https://github.com/matter-labs/era-zkevm_opcode_defs/blob/7bf8016f5bb13a73289f321ad6ea8f614540ece9/src/system_params.rs#L96.
+    uint256 constant MSG_VALUE_SIMULATOR_STIPEND_GAS = 27000;
+
     /// @notice The fallback function that is the main entry point for the MsgValueSimulator.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
     /// @param _data The calldata to be passed to the callee.
     /// @return The return data from the callee.
     fallback(bytes calldata _data) external onlySystemCall returns (bytes memory) {
+        // Firstly we calculate how much gas has been actually provided by the user to the inner call.
+        // For that, we need to get the total gas available in this context and subtract the stipend from it.
+        uint256 gasInContext = gasleft();
+        // Note, that the `gasInContext` might be slightly less than the MSG_VALUE_SIMULATOR_STIPEND_GAS, since
+        // by the time we retrieve it, some gas might have already been spent, e.g. on the `gasleft` opcode itself.
+        uint256 userGas = gasInContext > MSG_VALUE_SIMULATOR_STIPEND_GAS
+            ? gasInContext - MSG_VALUE_SIMULATOR_STIPEND_GAS
+            : 0;
+
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 
         // Prevent mimic call to the MsgValueSimulator to prevent an unexpected change of callee.
         require(to != address(this), "MsgValueSimulator calls itself");
 
         if (value != 0) {
-            (bool success, ) = address(BASE_TOKEN_SYSTEM_CONTRACT).call(
-                abi.encodeCall(BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo, (msg.sender, to, value))
+            (bool success, ) = address(REAL_BASE_TOKEN_SYSTEM_CONTRACT).call(
+                abi.encodeCall(REAL_BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo, (msg.sender, to, value))
             );
 
             // If the transfer of ETH fails, we do the most Ethereum-like behaviour in such situation: revert(0,0)
@@ -53,6 +70,9 @@ contract MsgValueSimulator is ISystemContract {
                     revert(0, 0)
                 }
             }
+
+            // If value is non-zero, we also provide additional gas to the callee.
+            userGas += GAS_TO_PASS;
         }
 
         // For the next call this `msg.value` will be used.
@@ -60,7 +80,7 @@ contract MsgValueSimulator is ISystemContract {
 
         return
             EfficientCall.mimicCall({
-                _gas: gasleft(),
+                _gas: userGas,
                 _address: to,
                 _data: _data,
                 _whoToMimic: msg.sender,
