@@ -610,9 +610,18 @@ contract DeployL1Script is Script {
             revert("Bytecode is not set");
         }
 
+        address contractAddress = computeCreate2Address(
+            bytes32(config.contracts.create2_factory_salt),
+            bytes32(_bytecode),
+            addresses.create2Factory
+        );
+        if (contractAddress.code.length != 0) {
+            return contractAddress;
+        }
+
         SingletonFactory create2Factory = SingletonFactory(addresses.create2Factory);
         vm.broadcast();
-        address contractAddress = create2Factory.deploy(_bytecode, config.contracts.create2_factory_salt);
+        contractAddress = create2Factory.deploy(_bytecode, config.contracts.create2_factory_salt);
 
         if (contractAddress == address(0)) {
             revert("Failed to deploy contract via create2");
