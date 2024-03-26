@@ -112,7 +112,7 @@ describe("SystemContext tests", () => {
         systemContext
           .connect(bootloaderAccount)
           .setNewBatch(batchHash, batchData.batchTimestamp.add(1), batchData.batchNumber, 1)
-      ).to.be.rejectedWith("The provided block number is not correct");
+      ).to.be.rejectedWith("The provided batch number is not correct");
     });
 
     it("should set new batch", async () => {
