@@ -452,7 +452,7 @@ contract DeployL1Script is Script {
         });
         bytes memory bytecode = abi.encodePacked(
             type(DiamondProxy).creationCode,
-            abi.encode(config.eraChainId, diamondCut)
+            abi.encode(config.chainId, diamondCut)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
