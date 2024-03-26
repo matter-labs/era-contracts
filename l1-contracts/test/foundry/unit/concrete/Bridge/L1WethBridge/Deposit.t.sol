@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {L1WethBridgeTest} from "./_L1WethBridge_Shared.t.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../../cache/solpp-generated-contracts/zksync/Config.sol";

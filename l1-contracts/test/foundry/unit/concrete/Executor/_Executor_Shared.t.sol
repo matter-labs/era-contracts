@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
@@ -9,6 +9,7 @@ import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
 import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
+import {TestExecutor} from "solpp/dev-contracts/test/ExecutorTest.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
@@ -119,7 +120,7 @@ contract ExecutorTest is Test {
         randomSigner = makeAddr("randomSigner");
         blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
-        executor = new ExecutorFacet();
+        executor = new TestExecutor();
         admin = new AdminFacet();
         getters = new GettersFacet();
         mailbox = new MailboxFacet();

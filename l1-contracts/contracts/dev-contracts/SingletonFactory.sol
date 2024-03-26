@@ -1,4 +1,4 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /**
  * @title Singleton Factory (EIP-2470)

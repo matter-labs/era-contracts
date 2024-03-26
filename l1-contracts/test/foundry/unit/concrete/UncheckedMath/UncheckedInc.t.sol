@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {UncheckedMathTest} from "./_UncheckedMath_Shared.t.sol";
 import {UncheckedMath} from "solpp/common/libraries/UncheckedMath.sol";

@@ -16,7 +16,7 @@ describe("PubdataChunkPublisher tests", () => {
   const genRandHex = (size) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
 
   const blobSizeInBytes = 126_976;
-  const maxNumberBlobs = 2;
+  const maxNumberBlobs = 6;
 
   before(async () => {
     await prepareEnvironment();
@@ -44,7 +44,7 @@ describe("PubdataChunkPublisher tests", () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
         pubdataChunkPublisher.connect(l1MessengerAccount).chunkAndPublishPubdata(pubdata)
-      ).to.be.revertedWith("pubdata should fit in 2 blobs");
+      ).to.be.revertedWith("pubdata should fit in 6 blobs");
     });
 
     it("Publish 1 Blob", async () => {

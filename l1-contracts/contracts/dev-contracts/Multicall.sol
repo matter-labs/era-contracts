@@ -18,7 +18,7 @@ copies or substantial portions of the Software.
 
 */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @title Multicall - Aggregate results from multiple read-only function calls
 contract Multicall {

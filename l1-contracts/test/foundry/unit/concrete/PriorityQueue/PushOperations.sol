@@ -1,4 +1,4 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {PriorityOperation} from "../../../../../cache/solpp-generated-contracts/dev-contracts/test/PriorityQueueTest.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
