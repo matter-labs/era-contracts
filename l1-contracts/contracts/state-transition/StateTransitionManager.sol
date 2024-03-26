@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -40,6 +40,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev current protocolVersion
     uint256 public protocolVersion;
+
+    /// @dev timestamp when protocolVersion can be last used
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
@@ -84,6 +87,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -143,10 +147,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
+        uint256 _oldprotocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
+        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
+    }
+
+    /// @dev check that the protocolVersion is active
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
+    }
+
+    /// @dev set the protocol version timestamp
+    function setprotocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -170,6 +187,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev reverts batches on the specified chain
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+    }
+
+    /// @dev executes upgrade on chain
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// registration

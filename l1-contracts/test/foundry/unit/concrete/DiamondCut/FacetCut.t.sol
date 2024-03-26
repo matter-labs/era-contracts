@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";

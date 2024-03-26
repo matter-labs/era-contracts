@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_ADMIN} from "../Base/_Base_Shared.t.sol";
