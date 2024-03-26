@@ -178,8 +178,8 @@
     "contractName": "fee_estimate",
     "bytecodePath": "bootloader/build/artifacts/fee_estimate.yul.zbin",
     "sourceCodePath": "bootloader/build/fee_estimate.yul",
-    "bytecodeHash": "0x0100090b72a41272093bbc970bac6f7c3db70dc7c056ed02802974146f68702c",
-    "sourceCodeHash": "0xc9ffc4c484f9036ccceb2b61e75bed3293fbebd11994c09da23213538f0bd9c2"
+    "bytecodeHash": "0x0100095b7ec3351174a37c4704bc038abd22efd9063b2675899ad9f32dc2591c",
+    "sourceCodeHash": "0x11369bd387339dbd551d68c0eb504d2ff240698d2390cb15cd9db8b10f72161c"
   },
   {
     "contractName": "gas_test",
@@ -192,8 +192,8 @@
     "contractName": "playground_batch",
     "bytecodePath": "bootloader/build/artifacts/playground_batch.yul.zbin",
     "sourceCodePath": "bootloader/build/playground_batch.yul",
-    "bytecodeHash": "0x010009111734adba00ea6c574ec3ccee3720cd3ffec34e35b33567392c84084e",
-    "sourceCodeHash": "0x0c9af9e21a3bc26158bf7954fc9e2c11cb2bd206698c60592899b010606af4aa"
+    "bytecodeHash": "0x0100095f97a23b9cf5e09eb36d159786e6e0703bbd614605cad7d3c5b6432c46",
+    "sourceCodeHash": "0x9bb4bb44ff4e577b3313572e1e2e31c5a6717c6d4b0027e610eb64e26b937412"
   },
   {
     "contractName": "proved_batch",
