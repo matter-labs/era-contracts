@@ -154,7 +154,7 @@ this trick:
 - The contract on L1 accepts all sent messages and if the message came from this system contract it requires that the
   preimage of `value` be provided.
 
-_L1 -> L2 Transaction filtering_
+#### L1 -> L2 Transaction filtering
 
 There is a mechanism for applying custom filters to the L1 -> L2 communication. It is achieved by having an address of
 the `TransactionFilterer` contract in the `ZkSyncStateTransitionStorage`. If the filterer exists, it is being called in
