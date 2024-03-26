@@ -1,6 +1,6 @@
 [profile.default]
 src = 'contracts'
-out = "out"
+out = 'artifacts-forge'
 libs = ['node_modules', 'lib']
 cache_path = 'cache-forge'
 test = 'test/foundry'
