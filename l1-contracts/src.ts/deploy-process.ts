@@ -4,7 +4,7 @@ import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
 
-import type { BigNumberish, Wallet } from "ethers";
+import type { BigNumberish } from "ethers";
 import { ethers } from "ethers";
 
 import type { FacetCut } from "./diamondCut";
@@ -22,7 +22,6 @@ export async function initialBridgehubDeployment(
   extraFacets: FacetCut[],
   gasPrice: BigNumberish,
   onlyVerifier: boolean,
-  diamondUpgradeInit: number,
   create2Salt?: string,
   nonce?: number
 ) {

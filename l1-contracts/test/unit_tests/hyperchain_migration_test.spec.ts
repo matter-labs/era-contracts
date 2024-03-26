@@ -7,33 +7,12 @@ import { ethTestConfig } from "../../src.ts/utils";
 import type { EraDeployer } from "../../src.ts/deploy-test-process";
 
 import { upgradeToHyperchains } from "../../src.ts/hyperchain-upgrade";
-import type { FacetCut } from "../../src.ts/diamondCut";
-import { Action, facetCut } from "../../src.ts/diamondCut";
-
-import type { ExecutorFacet, GettersFacet } from "../../typechain";
-import { DummyAdminFacetFactory, ExecutorFacetFactory, GettersFacetFactory } from "../../typechain";
-import type { CommitBatchInfo, StoredBatchInfo } from "./utils";
-import {
-  buildCommitBatchInfoWithUpgrade,
-  genesisStoredBatchInfo,
-  EMPTY_STRING_KECCAK,
-  makeExecutedEqualCommitted,
-  getBatchStoredInfo,
-} from "./utils";
 
 // note this test presumes that it is ok to start out with the new contracts, and upgrade them to themselves
 describe("Hyperchain migration test", function () {
   let owner: ethers.Signer;
   let deployer: EraDeployer;
   let gasPrice;
-
-  let proxyExecutor: ExecutorFacet;
-  let proxyGetters: GettersFacet;
-
-  let batch1InfoChainIdUpgrade: CommitBatchInfo;
-  let storedBatch1InfoChainIdUpgrade: StoredBatchInfo;
-
-  let extraFacet: FacetCut;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
