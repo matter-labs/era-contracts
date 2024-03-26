@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 // solhint-disable no-console
 
@@ -96,6 +96,11 @@ contract DeployL1Script is Script {
         bytes32 recursionCircuitsSetVksHash;
         uint256 priorityTxMaxGasLimit;
         uint256 sharedBridgeUpgradeStorageSwitch;
+        uint256 diamondInitBatchOverheadL1Gas;
+        uint256 diamondInitMaxPubdataPerBatch;
+        uint256 diamondInitMaxL2GasPerBatch;
+        uint256 diamondInitPriorityTxMaxPubdata;
+        uint256 diamondInitMinimalL2GasPrice;
     }
 
     struct TokensConfig {
@@ -168,6 +173,17 @@ contract DeployL1Script is Script {
         config.contracts.sharedBridgeUpgradeStorageSwitch = toml.readUint(
             "$.contracts.shared_bridge_upgrade_storage_switch"
         );
+        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
+            "$.contracts.diamond_init_batch_overhead_l1_gas"
+        );
+        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
+            "$.contracts.diamond_init_max_pubdata_per_batch"
+        );
+        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.contracts.diamond_init_max_l2_gas_per_batch");
+        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
+            "$.contracts.diamond_init_priority_tx_max_pubdata"
+        );
+        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.contracts.diamond_init_minimal_l2_gas_price");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
@@ -343,11 +359,11 @@ contract DeployL1Script is Script {
 
         FeeParams memory feeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 1_000_000,
-            maxPubdataPerBatch: 120_000,
-            maxL2GasPerBatch: 80000000,
-            priorityTxMaxPubdata: 99000,
-            minimalL2GasPrice: 250000000
+            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
+            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
+            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
+            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
+            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
         });
 
         DiamondInitInitializeData memory initializeData = DiamondInitInitializeData({
