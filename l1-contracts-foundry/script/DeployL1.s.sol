@@ -183,6 +183,7 @@ contract DeployL1Script is Script {
             contractAddress = config.contracts.create2_factory_addr;
             console.log("Using Create2Factory address:", contractAddress);
         }
+        addresses.create2Factory = contractAddress;
     }
 
     function deployIfNeededMulticall3() internal {
