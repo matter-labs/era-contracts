@@ -167,9 +167,11 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+            // slither-disable-next-line divide-before-multiply
             pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
         }
 
+        // slither-disable-next-line divide-before-multiply
         uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
         uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
             batchOverheadBaseToken /
@@ -252,6 +254,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address l2Sender = _request.sender;
+        // slither-disable-next-line tx-origin
         if (l2Sender != tx.origin) {
             l2Sender = AddressAliasHelper.applyL1ToL2Alias(_request.sender);
         }
@@ -263,15 +266,18 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
-        // Here we manually assign fields for the struct to prevent "stack too deep" error
-        WritePriorityOpParams memory params;
-
-        params.sender = l2Sender;
-        params.l2Value = _request.l2Value;
-        params.contractAddressL2 = _request.contractL2;
-        params.l2GasLimit = _request.l2GasLimit;
-        params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
-        params.refundRecipient = _request.refundRecipient;
+        WritePriorityOpParams memory params = WritePriorityOpParams({
+            sender: l2Sender,
+            txId: 0,
+            l2Value: _request.l2Value,
+            contractAddressL2: _request.contractL2,
+            expirationTimestamp: 0,
+            l2GasLimit: _request.l2GasLimit,
+            l2GasPrice: 0,
+            l2GasPricePerPubdata: _request.l2GasPerPubdataByteLimit,
+            valueToMint: 0,
+            refundRecipient: _request.refundRecipient
+        });
 
         canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _request.l2Calldata, _request.factoryDeps);
     }

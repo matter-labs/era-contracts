@@ -20,3 +20,4 @@ l1-contracts/yarn-error.log*
 l1-contracts/lcov.info
 l1-contracts/report/*
 l1-contracts/coverage/*
+l1-contracts/out/*

@@ -303,6 +303,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         diamondCut.initCalldata = initData;
         // deploy stateTransitionContract
+        // slither-disable-next-line reentrancy-no-eth
         DiamondProxy stateTransitionContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
 
         // save data

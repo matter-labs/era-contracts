@@ -143,8 +143,11 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
+            // slither-disable-next-line unused-return
             (address logSender, ) = UnsafeBytes.readAddress(emittedL2Logs, i + L2_LOG_ADDRESS_OFFSET);
+            // slither-disable-next-line unused-return
             (uint256 logKey, ) = UnsafeBytes.readUint256(emittedL2Logs, i + L2_LOG_KEY_OFFSET);
+            // slither-disable-next-line unused-return
             (bytes32 logValue, ) = UnsafeBytes.readBytes32(emittedL2Logs, i + L2_LOG_VALUE_OFFSET);
 
             // Ensure that the log hasn't been processed already
