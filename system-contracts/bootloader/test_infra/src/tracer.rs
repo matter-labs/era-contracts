@@ -4,7 +4,7 @@ use colored::Colorize;
 use once_cell::sync::OnceCell;
 
 use multivm::interface::{
-    dyn_tracers::vm_1_4_1::DynTracer,
+    dyn_tracers::vm_1_5_0::DynTracer,
     tracer::{TracerExecutionStatus, TracerExecutionStopReason},
 };
 use multivm::vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState};

@@ -30,7 +30,6 @@ describe("Hyperchain migration test", function () {
       gasLimit: 100000,
       gasPrice: gasPrice,
     };
-
     await owner.sendTransaction(tx);
 
     // send some Eth to the diamond Proxy, we do it before it is deployed ( it is hard afterwards)

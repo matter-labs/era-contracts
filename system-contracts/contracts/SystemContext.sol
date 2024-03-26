@@ -88,6 +88,12 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 
+    /// @notice The current gas per pubdata byte
+    uint256 public gasPerPubdataByte;
+
+    /// @notice The number of pubdata spent as of the start of the transaction
+    uint256 internal basePubdataSpent;
+
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.
     function setTxOrigin(address _newOrigin) external onlyCallFromBootloader {
@@ -98,6 +104,23 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyCallFromBootloader {
         gasPrice = _gasPrice;
+    }
+
+    /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
+    /// @dev This value does not have any impact on the execution and purely serves as a way for users
+    /// to access the current gas price for the pubdata.
+    function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyCallFromBootloader {
+        basePubdataSpent = _basePubdataSpent;
+        gasPerPubdataByte = _gasPerPubdataByte;
+    }
+
+    function getCurrentPubdataSpent() public view returns (uint256) {
+        uint256 pubdataPublished = SystemContractHelper.getZkSyncMeta().pubdataPublished;
+        return pubdataPublished > basePubdataSpent ? pubdataPublished - basePubdataSpent : 0;
+    }
+
+    function getCurrentPubdataCost() external view returns (uint256) {
+        return gasPerPubdataByte * getCurrentPubdataSpent();
     }
 
     /// @notice The method that emulates `blockhash` opcode in EVM.

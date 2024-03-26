@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -12,7 +12,7 @@ contract setNewVersionUpgradeTest is StateTransitionManagerTest {
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
-        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 1);
+        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
         assertEq(chainContractAddress.protocolVersion(), 1, "New protocol version is not correct");

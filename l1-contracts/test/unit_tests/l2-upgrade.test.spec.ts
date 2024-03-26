@@ -826,6 +826,7 @@ async function executeUpgrade(
     await stateTransitionManager.setNewVersionUpgrade(
       diamondCutData,
       oldProtocolVersion,
+      999999999999,
       partialUpgrade.newProtocolVersion
     )
   ).wait();
@@ -856,6 +857,7 @@ async function rollBackToVersion(
     await stateTransition.setNewVersionUpgrade(
       diamondCutData,
       (parseInt(protocolVersion) - 1).toString(),
+      999999999999,
       protocolVersion
     )
   ).wait();
@@ -889,7 +891,12 @@ async function executeCustomUpgrade(
 
   // This promise will be handled in the tests
   (
-    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+    await stateTransition.setNewVersionUpgrade(
+      diamondCutData,
+      oldProtocolVersion,
+      999999999999,
+      partialUpgrade.newProtocolVersion
+    )
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }

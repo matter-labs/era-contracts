@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -417,61 +417,6 @@ contract L1SharedBridgeFailTest is Test {
             _merkleProof: merkleProof
         });
     }
-
-    // forge messes up low level calls
-    // function test_claimFailedDeposit_lowLevelCallFailed() public {
-    //     vm.deal(address(sharedBridge), amount);
-
-    //     bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-    //     vm.store(
-    //         address(sharedBridge),
-    //         keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-    //         txDataHash
-    //     );
-    //     require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
-
-    //     vm.store(
-    //         address(sharedBridge),
-    //         keccak256(
-    //             abi.encode(
-    //                 uint256(uint160(ETH_TOKEN_ADDRESS)),
-    //                 keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-    //             )
-    //         ),
-    //         bytes32(amount)
-    //     );
-
-    //     vm.mockCall(
-    //         bridgehubAddress,
-    //         abi.encodeWithSelector(
-    //             IBridgehub.proveL1ToL2TransactionStatus.selector,
-    //             chainId,
-    //             txHash,
-    //             l2BatchNumber,
-    //             l2MessageIndex,
-    //             l2TxNumberInBatch,
-    //             merkleProof,
-    //             TxStatus.Failure
-    //         ),
-    //         abi.encode(true)
-    //     );
-
-    //     vm.mockCall(alice, bytes(""), abi.encode(0));
-    //     vm.expectRevert(bytes("ShB: claimFailedDeposit failed"));
-    //     sharedBridge.claimFailedDeposit(
-    //         chainId,
-    //         alice,
-    //         ETH_TOKEN_ADDRESS,
-    //         amount,
-    //         txHash,
-    //         l2BatchNumber,
-    //         l2MessageIndex,
-    //         l2TxNumberInBatch,
-    //         merkleProof
-    //     );
-    //     // assertTrue(revertsAsExpected, "expectRevert: call did not revert");
-
-    // }
 
     function test_finalizeWithdrawal_EthOnEth_LegacyTxFinalizedInERC20Bridge() public {
         vm.deal(address(sharedBridge), amount);

@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -230,24 +230,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
             _input: _deployment.input,
             _isSystem: false,
             _callConstructor: _deployment.callConstructor
-        });
-    }
-
-    /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. This function and `Bootloader:upgradeKeccakIfNeeded`
-    /// are to be removed once the upgrade is complete. Unlike a normal forced deployment, it does not update account information as it requires
-    /// updating a mapping, and so requires Keccak256 precompile to work already.
-    /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256
-    /// precompile.
-    function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
-        _ensureBytecodeIsKnown(_keccak256BytecodeHash);
-
-        _constructContract({
-            _sender: msg.sender,
-            _newAddress: address(KECCAK256_SYSTEM_CONTRACT),
-            _bytecodeHash: _keccak256BytecodeHash,
-            _input: msg.data[0:0],
-            _isSystem: false,
-            _callConstructor: false
         });
     }
 

@@ -6,15 +6,14 @@ import {MAX_SYSTEM_CONTRACT_ADDRESS} from "../Constants.sol";
 
 import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_GAS_PER_PUBDATA_BYTE_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
 
-uint256 constant UINT32_MASK = 0xffffffff;
-uint256 constant UINT128_MASK = 0xffffffffffffffffffffffffffffffff;
-/// @dev The mask that is used to convert any uint256 to a proper address.
-/// It needs to be padded with `00` to be treated as uint256 by Solidity
-uint256 constant ADDRESS_MASK = 0x00ffffffffffffffffffffffffffffffffffffffff;
+uint256 constant UINT32_MASK = type(uint32).max;
+uint256 constant UINT64_MASK = type(uint64).max;
+uint256 constant UINT128_MASK = type(uint128).max;
+uint256 constant ADDRESS_MASK = type(uint160).max;
 
 /// @notice NOTE: The `getZkSyncMeta` that is used to obtain this struct will experience a breaking change in 2024.
 struct ZkSyncMeta {
-    uint32 gasPerPubdataByte;
+    uint32 pubdataPublished;
     uint32 heapSize;
     uint32 auxHeapSize;
     uint8 shardId;
@@ -147,14 +146,20 @@ library SystemContractHelper {
     /// system contracts corresponding to the list of precompiles above can do `precompileCall`.
     /// @dev If used not in the `sha256`, `keccak256` or `ecrecover` contracts, it will just burn the gas provided.
     /// @dev This method is `unsafe` because it does not check whether there is enough gas to burn.
-    function unsafePrecompileCall(uint256 _rawParams, uint32 _gasToBurn) internal view returns (bool success) {
+    function unsafePrecompileCall(
+        uint256 _rawParams,
+        uint32 _gasToBurn,
+        uint32 _pubdataToSpend
+    ) internal view returns (bool success) {
         address callAddr = PRECOMPILE_CALL_ADDRESS;
 
-        uint256 cleanupMask = UINT32_MASK;
+        uint256 params = uint256(_gasToBurn) + (uint256(_pubdataToSpend) << 32);
+
+        uint256 cleanupMask = UINT64_MASK;
         assembly {
             // Clearing input params as they are not cleaned by Solidity by default
-            _gasToBurn := and(_gasToBurn, cleanupMask)
-            success := staticcall(_rawParams, callAddr, _gasToBurn, 0xFFFF, 0, 0)
+            params := and(params, cleanupMask)
+            success := staticcall(_rawParams, callAddr, params, 0xFFFF, 0, 0)
         }
     }
 
@@ -219,9 +224,9 @@ library SystemContractHelper {
     /// that a single byte sent to L1 as pubdata costs.
     /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @param meta Packed representation of the ZkSyncMeta.
-    /// @return gasPerPubdataByte The current price in gas per pubdata byte.
-    function getGasPerPubdataByteFromMeta(uint256 meta) internal pure returns (uint32 gasPerPubdataByte) {
-        gasPerPubdataByte = uint32(extractNumberFromMeta(meta, META_GAS_PER_PUBDATA_BYTE_OFFSET, 32));
+    /// @return pubdataPublished The current price in gas per pubdata byte.
+    function getPubdataPublishedFromMeta(uint256 meta) internal pure returns (uint32 pubdataPublished) {
+        pubdataPublished = uint32(extractNumberFromMeta(meta, META_GAS_PER_PUBDATA_BYTE_OFFSET, 32));
     }
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of the current size
@@ -274,7 +279,7 @@ library SystemContractHelper {
     /// @return meta The ZkSyncMeta execution context parameters.
     function getZkSyncMeta() internal view returns (ZkSyncMeta memory meta) {
         uint256 metaPacked = getZkSyncMetaBytes();
-        meta.gasPerPubdataByte = getGasPerPubdataByteFromMeta(metaPacked);
+        meta.pubdataPublished = getPubdataPublishedFromMeta(metaPacked);
         meta.heapSize = getHeapSizeFromMeta(metaPacked);
         meta.auxHeapSize = getAuxHeapSizeFromMeta(metaPacked);
         meta.shardId = getShardIdFromMeta(metaPacked);
@@ -337,10 +342,11 @@ library SystemContractHelper {
 
     /// @notice Method used for burning a certain amount of gas.
     /// @param _gasToPay The number of gas to burn.
-    function burnGas(uint32 _gasToPay) internal view {
+    function burnGas(uint32 _gasToPay, uint32 _pubdataToSpend) internal view {
         bool precompileCallSuccess = unsafePrecompileCall(
             0, // The precompile parameters are formal ones. We only need the precompile call to burn gas.
-            _gasToPay
+            _gasToPay,
+            _pubdataToSpend
         );
         require(precompileCallSuccess, "Failed to charge gas");
     }

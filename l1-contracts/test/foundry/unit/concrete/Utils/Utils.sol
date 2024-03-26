@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
@@ -23,6 +23,9 @@ address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 address constant PUBDATA_PUBLISHER_ADDRESS = 0x0000000000000000000000000000000000008011;
+
+uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(
@@ -53,7 +56,7 @@ library Utils {
     }
 
     function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](13);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -93,6 +96,25 @@ library Utils {
         );
         logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
         logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
+        logs[9] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
+            bytes32(0)
+        );
+        logs[10] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FOUR_HASH_KEY),
+            bytes32(0)
+        );
+        logs[11] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FIVE_HASH_KEY),
+            bytes32(0)
+        );
+        logs[12] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0));
         return logs;
     }
 
@@ -276,57 +298,6 @@ library Utils {
         return selectors;
     }
 
-    // function initial_deployment() public returns (address[] memory) {
-    //     GettersFacet gettersFacet = new GettersFacet();
-    //     MailboxFacet mailboxFacet = new MailboxFacet();
-    //     // allowList = new AllowList(owner);
-    //     DiamondInit diamondInit = new DiamondInit();
-
-    //     bytes8 dummyHash = 0x1234567890123456;
-    //     address dummyAddress = makeAddr("dummyAddress");
-    //     bytes memory diamondInitData = abi.encodeWithSelector(
-    //         diamondInit.initialize.selector,
-    //         dummyAddress,
-    //         owner,
-    //         owner,
-    //         0,
-    //         0,
-    //         0,
-    //         allowList,
-    //         VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
-    //         false,
-    //         dummyHash,
-    //         dummyHash,
-    //         10000000
-    //     );
-
-    //     Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
-    //     facetCuts[0] = Diamond.FacetCut({
-    //         facet: address(gettersFacet),
-    //         action: Diamond.Action.Add,
-    //         isFreezable: false,
-    //         selectors: Utils.getGettersSelectors()
-    //     });
-    //     facetCuts[1] = Diamond.FacetCut({
-    //         facet: address(mailboxFacet),
-    //         action: Diamond.Action.Add,
-    //         isFreezable: true,
-    //         selectors: Utils.getMailboxSelectors()
-    //     });
-
-    //     Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-    //         facetCuts: facetCuts,
-    //         initAddress: address(diamondInit),
-    //         initCalldata: diamondInitData
-    //     });
-
-    //     uint256 chainId = block.chainid;
-    //     DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
-
-    //     vm.prank(owner);
-    //     allowList.setAccessMode(address(diamondProxy), IAllowList.AccessMode.Public);
-    // }
-
     function makeVerifier(address testnetVerifier) public pure returns (IVerifier) {
         return IVerifier(testnetVerifier);
     }
@@ -456,7 +427,7 @@ library Utils {
     function _batchMetaParameters() internal pure returns (bytes memory) {
         // Used in __Executor_Shared.t.sol
         bytes8 dummyHash = 0x1234567890123456;
-        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash));
+        return abi.encodePacked(false, bytes32(dummyHash), bytes32(dummyHash), bytes32(dummyHash));
     }
 
     function _batchAuxiliaryOutput(
@@ -469,21 +440,42 @@ library Utils {
 
         return
             // solhint-disable-next-line func-named-parameters
-            abi.encode(
+            abi.encodePacked(
                 l2ToL1LogsHash,
                 _stateDiffHash,
                 _batch.bootloaderHeapInitialContentsHash,
                 _batch.eventsQueueStateHash,
-                // for each blob we have:
-                // linear hash (hash of preimage from system logs) and
-                // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
-                // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
-                // If we only utilize a single blob, _blobHash[1] and _blobCommitments[1] will be bytes32(0)
-                _blobHashes[0],
-                _blobCommitments[0],
-                _blobHashes[1],
-                _blobCommitments[1]
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
             );
+    }
+
+    /// @dev Encodes the commitment to blobs to be used in the auxiliary output of the batch commitment
+    /// @param _blobCommitments - the commitments to the blobs
+    /// @param _blobHashes - the hashes of the blobs
+    /// @param blobAuxOutputWords - The circuit commitment to the blobs split into 32-byte words
+    function _encodeBlobAuxiliaryOutput(
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
+        // These invariants should be checked by the caller of this function, but we double check
+        // just in case.
+        require(_blobCommitments.length == MAX_NUMBER_OF_BLOBS, "b10");
+        require(_blobHashes.length == MAX_NUMBER_OF_BLOBS, "b11");
+
+        // for each blob we have:
+        // linear hash (hash of preimage from system logs) and
+        // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
+        // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
+        //
+        // For now, only up to 2 blobs are supported by the contract, while 16 are required by the circuits.
+        // All the unfilled blobs will have their commitment as 0, including the case when we use only 1 blob.
+
+        blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
+
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+            blobAuxOutputWords[i * 2] = _blobHashes[i];
+            blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
+        }
     }
 
     // add this to be excluded from coverage report
