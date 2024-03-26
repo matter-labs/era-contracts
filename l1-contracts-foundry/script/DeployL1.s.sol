@@ -77,6 +77,8 @@ contract DeployL1Script is Script {
     }
 
     struct Config {
+        uint256 chainId;
+        uint256 eraChainId;
         address deployerAddress;
         uint256 gasPrice;
         ContractsConfig contracts;
@@ -109,7 +111,6 @@ contract DeployL1Script is Script {
 
     Config config;
     DeployedAddresses addresses;
-    uint256 chainId;
 
     function run() public {
         console.log("Deploying L1 contracts");
@@ -147,13 +148,14 @@ contract DeployL1Script is Script {
         string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
-        chainId = block.chainid;
+        config.chainId = block.chainid;
         config.deployerAddress = msg.sender;
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.gasPrice = toml.readUint("$.gas_price");
+        config.eraChainId = toml.readUint("$.era_chain_id");
 
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
@@ -230,7 +232,7 @@ contract DeployL1Script is Script {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         bytes memory bytecode = abi.encodePacked(
             type(ValidatorTimelock).creationCode,
-            abi.encode(config.deployerAddress, executionDelay, chainId)
+            abi.encode(config.deployerAddress, executionDelay, config.eraChainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("ValidatorTimelock deployed at:", contractAddress);
@@ -296,7 +298,9 @@ contract DeployL1Script is Script {
         console.log("AdminFacet deployed at:", adminFacet);
         addresses.stateTransition.adminFacet = adminFacet;
 
-        address mailboxFacet = deployViaCreate2(abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(chainId)));
+        address mailboxFacet = deployViaCreate2(
+            abi.encodePacked(type(MailboxFacet).creationCode, abi.encode(config.eraChainId))
+        );
         console.log("MailboxFacet deployed at:", mailboxFacet);
         addresses.stateTransition.mailboxFacet = mailboxFacet;
 
@@ -446,7 +450,10 @@ contract DeployL1Script is Script {
             initAddress: address(0),
             initCalldata: hex""
         });
-        bytes memory bytecode = abi.encodePacked(type(DiamondProxy).creationCode, abi.encode(chainId, diamondCut));
+        bytes memory bytecode = abi.encodePacked(
+            type(DiamondProxy).creationCode,
+            abi.encode(config.eraChainId, diamondCut)
+        );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
         addresses.stateTransition.diamondProxy = contractAddress;
@@ -476,7 +483,7 @@ contract DeployL1Script is Script {
                 config.tokens.tokenWethAddress,
                 addresses.bridgehub.bridgehubProxy,
                 addresses.bridges.erc20BridgeProxy,
-                chainId,
+                config.eraChainId,
                 addresses.bridges.erc20BridgeImplementation,
                 addresses.stateTransition.diamondProxy
             )
@@ -522,7 +529,7 @@ contract DeployL1Script is Script {
         // as the operation could be scheduled for timestamp 1
         // which is also a magic number meaning the operation
         // is done.
-        if (chainId == 31337) {
+        if (config.chainId == 31337) {
             vm.warp(10);
         }
 
@@ -608,7 +615,8 @@ contract DeployL1Script is Script {
             addresses.bridges.sharedBridgeProxy
         );
 
-        vm.serializeUint("l1", "chain_id", chainId);
+        vm.serializeUint("l1", "chain_id", config.chainId);
+        vm.serializeUint("l1", "era_chain_id", config.eraChainId);
         vm.serializeString("l1", "bridgehub", l1Bridgehub);
         vm.serializeString("l1", "state_transition", l1StateTransition);
         vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);
