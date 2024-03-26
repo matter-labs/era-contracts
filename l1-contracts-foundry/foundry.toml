@@ -13,4 +13,4 @@ fs_permissions = [
     { access = "read", path = "./script-config" },
     { access = "write", path = "./script-out" }
 ]
-evm_version = "shanghai"
+evm_version="cancun"
