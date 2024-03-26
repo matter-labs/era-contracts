@@ -623,12 +623,21 @@ object "Bootloader" {
                         <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                         switch isETHCall
                             case 1 {
-                                let gasLimit := getGasLimit(innerTxDataOffset)
-                                let nearCallAbi := getNearCallABI(gasLimit)
-                                checkEnoughGas(gasLimit)
+                                let gasLimitForTx, reservedGas := getGasLimitForTx(
+                                    innerTxDataOffset, 
+                                    transactionIndex, 
+                                    gasPerPubdata,
+                                    L2_TX_INTRINSIC_GAS(), 
+                                    L2_TX_INTRINSIC_PUBDATA()
+                                )
 
-                                if iszero(gasLimit) {
-                                    // If success is 0, we need to revert
+                                let nearCallAbi := getNearCallABI(gasLimitForTx)
+                                checkEnoughGas(gasLimitForTx)
+
+                                if iszero(gasLimitForTx) {
+                                    // We disallow providing 0 gas limit for an eth call transaction.
+                                    // Note, in case it is 0 `ZKSYNC_NEAR_CALL_ethCall` will get the entire
+                                    // gas of the bootloader.
                                     revertWithReason(
                                         ETH_CALL_ERR_CODE(),
                                         0
@@ -638,7 +647,9 @@ object "Bootloader" {
                                 ZKSYNC_NEAR_CALL_ethCall(
                                     nearCallAbi,
                                     txDataOffset,
-                                    resultPtr
+                                    resultPtr,
+                                    reservedGas,
+                                    gasPerPubdata
                                 )
                             }
                             default {
@@ -1875,8 +1886,14 @@ object "Bootloader" {
             function ZKSYNC_NEAR_CALL_ethCall(
                 abi,
                 txDataOffset,
-                resultPtr
+                resultPtr,
+                reservedGas,
+                gasPerPubdata
             ) {
+                let basePubdataSpent := getPubdataCounter()
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let to := getTo(innerTxDataOffset)
                 let from := getFrom(innerTxDataOffset)
@@ -1909,6 +1926,19 @@ object "Bootloader" {
                     revertWithReason(
                         ETH_CALL_ERR_CODE(),
                         1
+                    )
+                }
+
+                if isNotEnoughGasForPubdata(
+                    basePubdataSpent,
+                    gas(),
+                    reservedGas,
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata, eth call reverts too
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        0
                     )
                 }
 
