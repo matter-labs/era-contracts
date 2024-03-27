@@ -39,4 +39,23 @@ library Utils {
             addr := mload(add(bys, 20))
         }
     }
+
+    function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
+        return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
+    }
+
+    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory file = vm.readFile(
+            // solhint-disable-next-line func-named-parameters
+            string.concat(
+                "../system-contracts/artifacts-zk/contracts-preprocessed/",
+                filename,
+                ".sol/",
+                filename,
+                ".json"
+            )
+        );
+        bytes memory bytecode = vm.parseJson(file, "$.bytecode");
+        return bytecode;
+    }
 }

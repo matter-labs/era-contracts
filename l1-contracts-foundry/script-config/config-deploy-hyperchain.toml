@@ -1,0 +1,25 @@
+era_chain_id = 9
+
+[addresses]
+base_token = "0x0000000000000000000000000000000000000001"
+bridgehub = "0x55ee14619f9CCAFfc31F274dFbc7349eC5Ed843E"
+state_transition_proxy = "0x9bd862668DA56D4fd12b9d74Dc3D36f34e41a070"
+admin_facet = "0x6553b81cfFC8D66f26a8F092671684d169c6a7eA"
+getters_facet = "0x33629655669A2646330cB87F5f4cCAD3f53Bd2Ad"
+mailbox_facet = "0x77C741b7613e92a1f8ceFFB6ce64B8AeF45efd49"
+executor_facet = "0x61876057619b36e6Ed6Ac27d1db28192EF29eC4d"
+verifier = "0xA0034Dddb75447a6e199268d1191418029780c59"
+blob_versioned_hash_retriever = "0xA4cB26d6933D2c3E76718D30de8547bCDF8dD241"
+diamond_init = "0xF0b74eF4f35c4ab160ecFc0Dd827CC9A6D70C512"
+
+[contracts]
+bridgehub_create_new_chain_salt = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+recursion_node_level_vk_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit=0
