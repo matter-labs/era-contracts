@@ -6,7 +6,7 @@ import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
 import type { DeployedAddresses } from "./deploy-utils";
 import { deployedAddressesFromEnv, deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
-import { getOptionalAddressFromEnv, readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
+import { readBatchBootloaderBytecode, readSystemContractsBytecode, SYSTEM_CONFIG } from "../scripts/utils";
 import { getTokens } from "./deploy-token";
 import {
   ADDRESS_ONE,
@@ -754,7 +754,7 @@ export class Deployer {
 
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddresses],
+      [this.ownerAddress, executionDelay, this.chainId],
       create2Salt,
       ethTxOptions
     );
