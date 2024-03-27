@@ -610,10 +610,49 @@ contract DeployL1Script is Script {
             addresses.bridges.sharedBridgeProxy
         );
 
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_batch_overhead_l1_gas",
+            config.contracts.diamondInitBatchOverheadL1Gas
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_max_pubdata_per_batch",
+            config.contracts.diamondInitMaxPubdataPerBatch
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_max_l2_gas_per_batch",
+            config.contracts.diamondInitMaxL2GasPerBatch
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_priority_tx_max_pubdata",
+            config.contracts.diamondInitPriorityTxMaxPubdata
+        );
+        vm.serializeUint(
+            "l1.config",
+            "diamond_init_minimal_l2_gas_price",
+            config.contracts.diamondInitMinimalL2GasPrice
+        );
+        vm.serializeBytes32("l1.config", "recursion_node_level_vk_hash", config.contracts.recursionNodeLevelVkHash);
+        vm.serializeBytes32("l1.config", "recursion_leaf_level_vk_hash", config.contracts.recursionLeafLevelVkHash);
+        vm.serializeBytes32(
+            "l1.config",
+            "recursion_circuits_set_vks_hash",
+            config.contracts.recursionCircuitsSetVksHash
+        );
+        string memory l1Config = vm.serializeUint(
+            "l1.config",
+            "priority_tx_max_gas_limit",
+            config.contracts.priorityTxMaxGasLimit
+        );
+
         vm.serializeUint("l1", "chain_id", config.chainId);
         vm.serializeUint("l1", "era_chain_id", config.eraChainId);
         vm.serializeString("l1", "bridgehub", l1Bridgehub);
         vm.serializeString("l1", "state_transition", l1StateTransition);
+        vm.serializeString("l1", "config", l1Config);
         vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);
         string memory l1 = vm.serializeString("l1", "bridges", l1Bridges);
 

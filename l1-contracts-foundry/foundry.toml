@@ -11,6 +11,6 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts"},
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed"},
     { access = "read", path = "./script-config" },
-    { access = "write", path = "./script-out" }
+    { access = "read-write", path = "./script-out" }
 ]
 evm_version="cancun"
