@@ -2,6 +2,7 @@ import * as hardhat from "hardhat";
 import { expect } from "chai";
 import type { ExecutorProvingTest } from "../../typechain";
 import { ExecutorProvingTestFactory } from "../../typechain";
+import { PubdataPricingMode } from "./utils";
 
 describe("Executor test", function () {
   let executor: ExecutorProvingTest;
@@ -13,7 +14,7 @@ describe("Executor test", function () {
   });
 
   /// This test is based on a block generated in a local system.
-  it("Test hashes", async () => {
+  it("Test hashes (Rollup)", async () => {
     const bootloaderHash = "0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a";
     const aaHash = "0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0";
     const setResult = await executor.setHashes(aaHash, bootloaderHash);
@@ -41,7 +42,58 @@ describe("Executor test", function () {
 
     const processL2Logs = await executor.processL2Logs(
       nextBatch,
-      "0x0000000000000000000000000000000000000000000000000000000000000000"
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      PubdataPricingMode.Rollup
+    );
+    expect(processL2Logs.stateDiffHash, "State diff hash computation failed").is.equal(
+      "0x9a67073c2df8f53087fcfc32d82c98bba591da35df6ce1fb55a23b677d37f9fc"
+    );
+
+    const nextCommitment = await executor.createBatchCommitment(nextBatch, processL2Logs.stateDiffHash);
+    console.log("This block Commitment is : " + nextCommitment);
+    expect(nextCommitment, "Commitment computation failed").is.equal(
+      "0xae36e9bed834f99d427adb8958935f38f46b6431c31c5711587d39cf2c93da90"
+    );
+
+    const prevCommitment = "0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404";
+    const result = await executor.getBatchProofPublicInput(prevCommitment, nextCommitment, {
+      recursionNodeLevelVkHash: "0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080",
+      recursionLeafLevelVkHash: "0x72167c43a46cf38875b267d67716edc4563861364a3c03ab7aee73498421e828",
+      // ignored.
+      recursionCircuitsSetVksHash: "0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac",
+    });
+    expect(result.toHexString(), "").to.be.equal("0x66876e724acc551e35d48f5c091447a245efcc79d70bb840533ddf83");
+  });
+
+  it("Test hashes (Validium)", async () => {
+    const bootloaderHash = "0x010009416e909e0819593a9806bbc841d25c5cdfed3f4a1523497c6814e5194a";
+    const aaHash = "0x0100065d134a862a777e50059f5e0fbe68b583f3617a67820f7edda0d7f253a0";
+    const setResult = await executor.setHashes(aaHash, bootloaderHash);
+    const finish = await setResult.wait();
+    expect(finish.status == 1);
+
+    const nextBatch = {
+      // ignored
+      batchNumber: 1,
+      // ignored
+      timestamp: 100,
+      indexRepeatedStorageChanges: 84,
+      newStateRoot: "0x9cf7bb72401a56039ca097cabed20a72221c944ed9b0e515c083c04663ab45a6",
+      // ignored
+      numberOfLayer1Txs: 10,
+      // ignored
+      priorityOperationsHash: "0x167f4ca80269c9520ad951eeeda28dd3deb0715e9e2917461e81a60120a14183",
+      bootloaderHeapInitialContentsHash: "0x540442e48142fa061a81822184f7790e7b69dea92153d38ef623802c6f0411c0",
+      eventsQueueStateHash: "0xda42ab7994d4695a25f4ea8a9a485a592b7a31c20d5dae6363828de86d8826ea",
+      systemLogs:
+        "0x00000000000000000000000000000000000000000000800b000000000000000000000000000000000000000000000000000000000000000416914ac26bb9cafa0f1dfaeaab10745a9094e1b60c7076fedf21651d6a25b5740000000a000000000000000000000000000000000000800b0000000000000000000000000000000000000000000000000000000000000003000000000000000000000000651bcde0000000000000000000000000651bcde20001000a00000000000000000000000000000000000080010000000000000000000000000000000000000000000000000000000000000005167f4ca80269c9520ad951eeeda28dd3deb0715e9e2917461e81a60120a141830001000a00000000000000000000000000000000000080010000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a0001000a00000000000000000000000000000000000080080000000000000000000000000000000000000000000000000000000000000000ee6ee8f50659bd8be3d86c32efb02baa5571cf3b46dd7ea3db733ae181747b8b0001000a0000000000000000000000000000000000008008000000000000000000000000000000000000000000000000000000000000000160fc5fb513ca8e6f6232a7410797954dcb6edbf9081768da24b483aca91c54db0001000a000000000000000000000000000000000000800800000000000000000000000000000000000000000000000000000000000000029a67073c2df8f53087fcfc32d82c98bba591da35df6ce1fb55a23b677d37f9fc",
+      totalL2ToL1Pubdata: "0x",
+    };
+
+    const processL2Logs = await executor.processL2Logs(
+      nextBatch,
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      PubdataPricingMode.Validium
     );
     expect(processL2Logs.stateDiffHash, "State diff hash computation failed").is.equal(
       "0x9a67073c2df8f53087fcfc32d82c98bba591da35df6ce1fb55a23b677d37f9fc"

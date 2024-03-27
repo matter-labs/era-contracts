@@ -8,7 +8,7 @@ import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET
 import {PriorityQueue, PriorityOperation} from "../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../common/libraries/UnsafeBytes.sol";
-import {VerifierParams} from "../Storage.sol";
+import {VerifierParams, PubdataPricingMode} from "../Storage.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../common/L2ContractAddresses.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -39,7 +39,11 @@ contract ExecutorFacet is Base, IExecutor {
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
+        LogProcessingOutput memory logOutput = _processL2Logs(
+            _newBatch,
+            _expectedSystemContractUpgradeTxHash,
+            s.feeParams.pubdataPricingMode
+        );
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
@@ -52,11 +56,13 @@ contract ExecutorFacet is Base, IExecutor {
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], blobHashes);
         } else if (pubdataSource == uint8(PubdataSource.Calldata)) {
             // In this scenario pubdataCommitments is actual pubdata consisting of l2 to l1 logs, l2 to l1 message, compressed smart contract bytecode, and compressed state diffs
-            require(
-                logOutput.pubdataHash ==
-                    keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
-                "wp"
-            );
+            if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+                require(
+                    logOutput.pubdataHash ==
+                        keccak256(_newBatch.pubdataCommitments[1:_newBatch.pubdataCommitments.length - 32]),
+                    "wp"
+                );
+            }
             blobHashes[0] = logOutput.blob1Hash;
             blobCommitments[0] = bytes32(
                 _newBatch.pubdataCommitments[_newBatch.pubdataCommitments.length - 32:_newBatch
@@ -123,7 +129,8 @@ contract ExecutorFacet is Base, IExecutor {
     /// @dev Data returned from here will be used to form the batch commitment.
     function _processL2Logs(
         CommitBatchInfo calldata _newBatch,
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32 _expectedSystemContractUpgradeTxHash,
+        PubdataPricingMode pubdataPricingMode
     ) internal pure returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
@@ -148,8 +155,10 @@ contract ExecutorFacet is Base, IExecutor {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lm");
                 logOutput.l2LogsTreeRoot = logValue;
             } else if (logKey == uint256(SystemLogKey.TOTAL_L2_TO_L1_PUBDATA_KEY)) {
-                require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
-                logOutput.pubdataHash = logValue;
+                if (pubdataPricingMode == PubdataPricingMode.Rollup) {
+                    require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "ln");
+                    logOutput.pubdataHash = logValue;
+                }
             } else if (logKey == uint256(SystemLogKey.STATE_DIFF_HASH_KEY)) {
                 require(logSender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, "lb");
                 logOutput.stateDiffHash = logValue;
@@ -527,9 +536,10 @@ contract ExecutorFacet is Base, IExecutor {
     ) internal view returns (bytes32[] memory blobCommitments) {
         uint256 versionedHashIndex = 0;
 
-        require(_pubdataCommitments.length > 0, "pl");
+        require(_pubdataCommitments.length > 0, "plr");
         require(_pubdataCommitments.length <= PUBDATA_COMMITMENT_SIZE * MAX_NUMBER_OF_BLOBS, "bd");
         require(_pubdataCommitments.length % PUBDATA_COMMITMENT_SIZE == 0, "bs");
+
         blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
 
         for (uint256 i = 0; i < _pubdataCommitments.length; i += PUBDATA_COMMITMENT_SIZE) {
@@ -567,7 +577,7 @@ contract ExecutorFacet is Base, IExecutor {
             require(
                 (_blobHashes[i] == bytes32(0) && blobCommitments[i] == bytes32(0)) ||
                     (_blobHashes[i] != bytes32(0) && blobCommitments[i] != bytes32(0)),
-                "bh"
+                "bhr"
             );
         }
     }

@@ -26,7 +26,7 @@ import {
 } from "../scripts/utils";
 import { deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
-import { PubdataPricingMode } from "../test/unit_tests/utils";
+import type { PubdataPricingMode } from "../test/unit_tests/utils";
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
@@ -50,7 +50,7 @@ export class Deployer {
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
   }
 
-  public async initialProxyDiamondCut() {
+  public async initialProxyDiamondCut(pubdataPricingMode: PubdataPricingMode) {
     const facetCuts = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.ZkSync.AdminFacet,
@@ -80,7 +80,7 @@ export class Deployer {
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
     const feeParams = {
-      pubdataPricingMode: PubdataPricingMode.Rollup,
+      pubdataPricingMode,
       batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
       maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
       priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
@@ -362,11 +362,15 @@ export class Deployer {
     this.addresses.ZkSync.DefaultUpgrade = contractAddress;
   }
 
-  public async deployDiamondProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
+  public async deployDiamondProxy(
+    pubdataPricingMode: PubdataPricingMode,
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
 
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
-    const initialDiamondCut = await this.initialProxyDiamondCut();
+    const initialDiamondCut = await this.initialProxyDiamondCut(pubdataPricingMode);
     const contractAddress = await this.deployViaCreate2(
       "DiamondProxy",
       [chainId, initialDiamondCut],
@@ -381,7 +385,12 @@ export class Deployer {
     this.addresses.ZkSync.DiamondProxy = contractAddress;
   }
 
-  public async deployZkSyncContract(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
+  public async deployZkSyncContract(
+    pubdataPricingMode: PubdataPricingMode,
+    create2Salt: string,
+    gasPrice?: BigNumberish,
+    nonce?
+  ) {
     nonce = nonce ? parseInt(nonce) : await this.deployWallet.getTransactionCount();
 
     // deploy zkSync contract
@@ -395,7 +404,7 @@ export class Deployer {
     await Promise.all(independentZkSyncDeployPromises);
     nonce += 5;
 
-    await this.deployDiamondProxy(create2Salt, { gasPrice, nonce });
+    await this.deployDiamondProxy(pubdataPricingMode, create2Salt, { gasPrice, nonce });
   }
 
   public async deployBridgeContracts(create2Salt: string, gasPrice?: BigNumberish, nonce?) {
