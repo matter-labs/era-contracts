@@ -2,6 +2,9 @@ gas_price = 0
 era_chain_id = 9
 
 [contracts]
+governor_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+governance_min_delay = 0
 create2_factory_salt = "0x00000000000000000000000000000000000000000000000000000000000000ff"
 create2_factory_addr = "0x0000000000000000000000000000000000000000"
 validator_timelock_execution_delay = 0

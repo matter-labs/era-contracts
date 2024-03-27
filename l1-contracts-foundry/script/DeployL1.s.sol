@@ -102,6 +102,9 @@ contract DeployL1Script is Script {
         uint256 diamondInitMaxL2GasPerBatch;
         uint256 diamondInitPriorityTxMaxPubdata;
         uint256 diamondInitMinimalL2GasPrice;
+        address governorAddress;
+        address governanceSecurityCouncilAddress;
+        uint256 governanceMinDelay;
     }
 
     struct TokensConfig {
@@ -156,6 +159,11 @@ contract DeployL1Script is Script {
         config.gasPrice = toml.readUint("$.gas_price");
         config.eraChainId = toml.readUint("$.era_chain_id");
 
+        config.contracts.governorAddress = toml.readAddress("$.contracts.governor_address");
+        config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
+            "$.contracts.governance_security_council_address"
+        );
+        config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -252,7 +260,11 @@ contract DeployL1Script is Script {
     function deployGovernance() internal {
         bytes memory bytecode = abi.encodePacked(
             type(Governance).creationCode,
-            abi.encode(config.deployerAddress, address(0), uint256(0))
+            abi.encode(
+                config.contracts.governorAddress,
+                config.contracts.governanceSecurityCouncilAddress,
+                config.contracts.governanceMinDelay
+            )
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Governance deployed at:", contractAddress);
@@ -610,6 +622,7 @@ contract DeployL1Script is Script {
             addresses.bridges.sharedBridgeProxy
         );
 
+        vm.serializeAddress("l1.config", "governor_addr", config.contracts.governorAddress);
         vm.serializeUint(
             "l1.config",
             "diamond_init_batch_overhead_l1_gas",
