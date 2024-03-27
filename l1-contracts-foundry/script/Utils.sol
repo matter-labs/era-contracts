@@ -7,6 +7,8 @@ library Utils {
     // Cheat code address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     bytes4 internal constant GET_NAME_SELECTOR = bytes4(keccak256("getName()"));
+    bytes internal constant CREATE2_FACTORY_BYTECODE =
+        hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
     Vm internal constant vm = Vm(VM_ADDRESS);
 
@@ -75,5 +77,18 @@ library Utils {
         );
         bytes memory bytecode = vm.parseJson(file, "$.bytecode");
         return bytecode;
+    }
+
+    function deployCreate2Factory() internal returns (address) {
+        address child;
+        bytes memory bytecode = CREATE2_FACTORY_BYTECODE;
+        vm.startBroadcast();
+        assembly {
+            child := create(0, add(bytecode, 0x20), mload(bytecode))
+        }
+        vm.stopBroadcast();
+        require(child != address(0), "Failed to deploy Create2Factory");
+        require(child.code.length > 0, "Failed to deploy Create2Factory");
+        return child;
     }
 }

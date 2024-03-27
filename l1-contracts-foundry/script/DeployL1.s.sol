@@ -189,15 +189,26 @@ contract DeployL1Script is Script {
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
-    function instantiateCreate2Factory() internal returns (address) {
+    function instantiateCreate2Factory() internal {
         address contractAddress;
-        if (config.contracts.create2FactoryAddr == address(0)) {
+
+        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
+        bool isConfigured = config.contracts.create2FactoryAddr != address(0);
+
+        if (isConfigured) {
+            if (config.contracts.create2FactoryAddr.length == 0) {
+                revert("Create2Factory configured address is empty");
+            }
+            contractAddress = config.contracts.create2FactoryAddr;
+            console.log("Using configured Create2Factory address:", contractAddress);
+        } else if (isDeterministicDeployed) {
             contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
             console.log("Using deterministic Create2Factory address:", contractAddress);
         } else {
-            contractAddress = config.contracts.create2FactoryAddr;
-            console.log("Using Create2Factory address:", contractAddress);
+            contractAddress = Utils.deployCreate2Factory();
+            console.log("Create2Factory deployed at:", contractAddress);
         }
+
         addresses.create2Factory = contractAddress;
     }
 
