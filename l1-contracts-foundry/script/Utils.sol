@@ -6,6 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 library Utils {
     // Cheat code address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    bytes4 internal constant GET_NAME_SELECTOR = bytes4(keccak256("getName()"));
 
     Vm internal constant vm = Vm(VM_ADDRESS);
 
@@ -29,6 +30,23 @@ library Utils {
             }
             bytes4 selector = bytes4(vm.parseBytes(string(extractedSelector)));
             selectors[i] = selector;
+        }
+
+        // Remove `getName()` selector if existing
+        bool hasGetName = false;
+        for (uint256 i = 0; i < selectors.length; i++) {
+            if (selectors[i] == GET_NAME_SELECTOR) {
+                selectors[i] = selectors[selectors.length - 1];
+                hasGetName = true;
+                break;
+            }
+        }
+        if (hasGetName) {
+            bytes4[] memory newSelectors = new bytes4[](selectors.length - 1);
+            for (uint256 i = 0; i < selectors.length - 1; i++) {
+                newSelectors[i] = selectors[i];
+            }
+            return newSelectors;
         }
 
         return selectors;
