@@ -209,14 +209,14 @@ contract DeployL1Script is Script {
 
         vm.broadcast();
         vm.recordLogs();
-        bridgehub.createNewChain(
-            config.eraChainId,
-            config.addresses.stateTransitionProxy,
-            config.addresses.baseToken,
-            config.contracts.bridgehubCreateNewChainSalt,
-            msg.sender,
-            abi.encode(initData)
-        );
+        bridgehub.createNewChain({
+            _chainId: config.eraChainId,
+            _stateTransitionManager: config.addresses.stateTransitionProxy,
+            _baseToken: config.addresses.baseToken,
+            _salt: config.contracts.bridgehubCreateNewChainSalt,
+            _admin: msg.sender,
+            _initData: abi.encode(initData)
+        });
         console.log("Hyperchain registered");
 
         // Get new diamond proxy address from emitted events
