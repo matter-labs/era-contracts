@@ -4,11 +4,13 @@ pragma solidity 0.8.24;
 // solhint-disable no-console
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IZkSyncStateTransition} from "contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -18,6 +20,7 @@ contract DeployL1Script is Script {
     using stdToml for string;
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
+    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("StateTransitionNewChain(uint256,address)");
 
     struct Config {
         ContractsConfig contracts;
@@ -37,6 +40,9 @@ contract DeployL1Script is Script {
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
         uint256 priorityTxMaxGasLimit;
+        bool validiumMode;
+        address validatorSenderOperatorCommitEth;
+        address validatorSenderOperatorBlobsEth;
     }
 
     struct AddressesConfig {
@@ -50,6 +56,8 @@ contract DeployL1Script is Script {
         address verifier;
         address blobVersionedHashRetriever;
         address diamondInit;
+        address validatorTimelock;
+        address newDiamondProxy;
     }
 
     Config config;
@@ -62,6 +70,8 @@ contract DeployL1Script is Script {
         checkTokenAddress();
         registerTokenOnBridgehub();
         registerHyperchain();
+        addValidators();
+        configureZkSyncStateTransition();
     }
 
     function initializeConfig() internal {
@@ -85,6 +95,7 @@ contract DeployL1Script is Script {
         config.addresses.verifier = toml.readAddress("$.l1.state_transition.verifier_addr");
         config.addresses.blobVersionedHashRetriever = toml.readAddress("$.l1.blob_versioned_hash_retriever_addr");
         config.addresses.diamondInit = toml.readAddress("$.l1.state_transition.diamond_init_addr");
+        config.addresses.validatorTimelock = toml.readAddress("$.l1.validator_timelock_addr");
 
         config.contracts.bridgehubCreateNewChainSalt = 0; //TODO: grab from config
         config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
@@ -102,6 +113,9 @@ contract DeployL1Script is Script {
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.l1.config.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.l1.config.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.l1.config.priority_tx_max_gas_limit");
+        config.contracts.validiumMode = false; //TODO grab from config
+        config.contracts.validatorSenderOperatorCommitEth = address(0x0000000000000000000000000000000000000000); //TODO grab from config
+        config.contracts.validatorSenderOperatorBlobsEth = address(0x0000000000000000000000000000000000000001); //TODO grab from config
     }
 
     function checkTokenAddress() internal {
@@ -194,6 +208,7 @@ contract DeployL1Script is Script {
         IBridgehub bridgehub = IBridgehub(config.addresses.bridgehub);
 
         vm.broadcast();
+        vm.recordLogs();
         bridgehub.createNewChain(
             config.eraChainId,
             config.addresses.stateTransitionProxy,
@@ -202,5 +217,45 @@ contract DeployL1Script is Script {
             msg.sender,
             abi.encode(initData)
         );
+        console.log("Hyperchain registered");
+
+        // Get new diamond proxy address from emitted events
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        address diamondProxyAddress;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == STATE_TRANSITION_NEW_CHAIN_HASH) {
+                diamondProxyAddress = address(uint160(uint256(logs[i].topics[2])));
+                break;
+            }
+        }
+        if (diamondProxyAddress == address(0)) {
+            revert("Diamond proxy address not found");
+        }
+        config.addresses.newDiamondProxy = diamondProxyAddress;
+    }
+
+    function addValidators() internal {
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(config.addresses.validatorTimelock);
+
+        vm.startBroadcast();
+        validatorTimelock.addValidator(config.eraChainId, config.contracts.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidator(config.eraChainId, config.contracts.validatorSenderOperatorBlobsEth);
+        vm.stopBroadcast();
+
+        console.log("Validators added");
+    }
+
+    function configureZkSyncStateTransition() internal {
+        IZkSyncStateTransition zkSyncStateTransition = IZkSyncStateTransition(config.addresses.newDiamondProxy);
+
+        vm.startBroadcast();
+        zkSyncStateTransition.setTokenMultiplier(1, 1);
+
+        if (config.contracts.validiumMode) {
+            zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
+        }
+
+        vm.stopBroadcast();
+        console.log("ZkSync State Transition configured");
     }
 }
