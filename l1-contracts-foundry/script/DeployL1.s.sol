@@ -323,11 +323,6 @@ contract DeployL1Script is Script {
     }
 
     function deployStateTransitionManagerProxy() internal {
-        bytes32 genesisBatchHash = config.contracts.genesisRoot;
-        uint256 genesisRollupLeafIndex = config.contracts.genesisRollupLeafIndex;
-        bytes32 genesisBatchCommitment = config.contracts.genesisBatchCommitment;
-        uint256 protocolVersion = config.contracts.latestProtocolVersion;
-
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: addresses.stateTransition.adminFacet,
@@ -389,11 +384,11 @@ contract DeployL1Script is Script {
             governor: config.deployerAddress,
             validatorTimelock: addresses.validatorTimelock,
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
-            genesisBatchHash: genesisBatchHash,
-            genesisIndexRepeatedStorageChanges: uint64(genesisRollupLeafIndex),
-            genesisBatchCommitment: genesisBatchCommitment,
+            genesisBatchHash: config.contracts.genesisRoot,
+            genesisIndexRepeatedStorageChanges: uint64(config.contracts.genesisRollupLeafIndex),
+            genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             diamondCut: diamondCut,
-            protocolVersion: protocolVersion
+            protocolVersion: config.contracts.latestProtocolVersion
         });
 
         address contractAddress = deployViaCreate2(
