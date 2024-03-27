@@ -196,7 +196,7 @@ contract DeployL1Script is Script {
         bool isConfigured = config.contracts.create2FactoryAddr != address(0);
 
         if (isConfigured) {
-            if (config.contracts.create2FactoryAddr.length == 0) {
+            if (config.contracts.create2FactoryAddr.code.length == 0) {
                 revert("Create2Factory configured address is empty");
             }
             contractAddress = config.contracts.create2FactoryAddr;
