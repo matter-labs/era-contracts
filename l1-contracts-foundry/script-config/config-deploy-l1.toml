@@ -1,0 +1,27 @@
+gas_price = 0
+era_chain_id = 9
+
+[contracts]
+governor_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+governance_min_delay = 0
+create2_factory_salt = "0x00000000000000000000000000000000000000000000000000000000000000ff"
+create2_factory_addr = "0x0000000000000000000000000000000000000000"
+validator_timelock_execution_delay = 0
+genesis_root = "0x0000000000000000000000000000000000000000000000000000000000000000"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000000"
+latest_protocol_version = 0
+recursion_node_level_vk_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash="0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit=80000000
+shared_bridge_upgrade_storage_switch=0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+
+[tokens]
+token_weth_address="0x0000000000000000000000000000000000000000"
