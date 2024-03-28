@@ -12,16 +12,16 @@ import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
 import type { IGovernance } from "../../typechain/IGovernance";
 import { IMailboxFactory } from "../../typechain/IMailboxFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
-import { IZkSyncFactory } from "../../typechain/IZkSyncFactory";
-import type { IZkSync } from "../../typechain/IZkSync";
+import { IBridgehubFactory } from "../../typechain/IBridgehubFactory";
+import type { IBridgehub } from "../../typechain/IBridgehub";
 import { ethers } from "ethers";
 
-// TODO: change to the mainet config
+// TODO: change to the mainnet config
 const DIAMOND_PROXY_ADDRESS = "0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319";
 
 describe("Diamond proxy upgrade fork test", function () {
   let governor: ethers.Signer;
-  let diamondProxy: IZkSync;
+  let diamondProxy: IBridgehub;
 
   let newDiamondCutFacet: IDiamondCut;
   let newExecutorFacet: IExecutor;
@@ -33,8 +33,8 @@ describe("Diamond proxy upgrade fork test", function () {
 
   before(async () => {
     const signers = await hardhat.ethers.getSigners();
-    diamondProxy = IZkSyncFactory.connect(DIAMOND_PROXY_ADDRESS, signers[0]);
-    const governorAddress = await diamondProxy.getGovernor();
+    diamondProxy = IBridgehubFactory.connect(DIAMOND_PROXY_ADDRESS, signers[0]);
+    const governorAddress = await diamondProxy.getAdmin();
 
     await hardhat.network.provider.request({ method: "hardhat_impersonateAccount", params: [governorAddress] });
     governor = await hardhat.ethers.provider.getSigner(governorAddress);
@@ -57,7 +57,7 @@ describe("Diamond proxy upgrade fork test", function () {
     const governanceFacet = await governanceFacetFactory.deploy();
     newGovernanceFacet = IGovernanceFactory.connect(governanceFacet.address, governanceFacet.signer);
 
-    const mailboxFacetFactory = await hardhat.ethers.getContractFactory("MailboxFacet");
+    const mailboxFacetFactory = await hardhat.ethers.getContractFactory("Mailbox");
     const mailboxFacet = await mailboxFacetFactory.deploy();
     newMailboxFacet = IMailboxFactory.connect(mailboxFacet.address, mailboxFacet.signer);
 
@@ -149,7 +149,7 @@ describe("Diamond proxy upgrade fork test", function () {
   });
 
   it("check getters functions", async () => {
-    const governorAddr = await diamondProxy.getGovernor();
+    const governorAddr = await diamondProxy.getAdmin();
     expect(governorAddr).to.be.eq(await governor.getAddress());
 
     const isFrozen = await diamondProxy.isDiamondStorageFrozen();

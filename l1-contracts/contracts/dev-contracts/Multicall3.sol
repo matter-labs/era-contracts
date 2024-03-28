@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @title Multicall3
 /// @notice Aggregate results from multiple function calls
@@ -11,6 +11,9 @@ pragma solidity 0.8.20;
 /// @author Andreas Bigger <andreas@nascent.xyz>
 /// @author Matt Solomon <matt@mattsolomon.dev>
 contract Multicall3 {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     struct Call {
         address target;
         bytes callData;
@@ -196,7 +199,7 @@ contract Multicall3 {
 
     /// @notice Returns the block difficulty
     function getCurrentBlockDifficulty() public view returns (uint256 difficulty) {
-        difficulty = block.difficulty;
+        difficulty = block.prevrandao;
     }
 
     /// @notice Returns the block gas limit

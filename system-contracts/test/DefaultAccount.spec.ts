@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import * as zksync from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
+import * as zksync from "zksync-ethers";
 import { serialize } from "zksync-web3/build/src/utils";
 import type { DefaultAccount, DelegateCaller, MockContract } from "../typechain";
 import { DefaultAccountFactory } from "../typechain";
@@ -252,7 +252,7 @@ describe("DefaultAccount tests", function () {
       );
     });
 
-    it("successfully payed", async () => {
+    it("successfully paid", async () => {
       const legacyTx = await account.populateTransaction({
         type: 0,
         to: callable.address,

@@ -58,7 +58,7 @@ interface IContractDeployer {
  * @custom:security-contact security@matterlabs.dev
  * @notice Interface for the contract that is used to simulate ETH on L2.
  */
-interface IEthToken {
+interface IBaseToken {
     /// @notice Allows the withdrawal of ETH to a given L1 receiver along with an additional message.
     /// @param _l1Receiver The address on L1 to receive the withdrawn ETH.
     /// @param _additionalData Additional message or data to be sent alongside the withdrawal.
@@ -73,7 +73,7 @@ address constant DEPLOYER_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x
 
 IL2Messenger constant L2_MESSENGER = IL2Messenger(address(SYSTEM_CONTRACTS_OFFSET + 0x08));
 
-IEthToken constant L2_ETH_ADDRESS = IEthToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
+IBaseToken constant L2_BASE_TOKEN_ADDRESS = IBaseToken(address(SYSTEM_CONTRACTS_OFFSET + 0x0a));
 
 /**
  * @author Matter Labs
@@ -106,6 +106,7 @@ library L2ContractHelper {
     ) internal pure returns (address) {
         bytes32 senderBytes = bytes32(uint256(uint160(_sender)));
         bytes32 data = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, senderBytes, _salt, _bytecodeHash, _constructorInputHash)
         );
 

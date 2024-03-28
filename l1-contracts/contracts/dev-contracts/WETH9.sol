@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 contract WETH9 {
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
+
     string public name = "Wrapped Ether";
     string public symbol = "WETH";
     uint8 public decimals = 18;
@@ -25,7 +28,7 @@ contract WETH9 {
     }
 
     function withdraw(uint256 wad) public {
-        require(balanceOf[msg.sender] >= wad);
+        require(balanceOf[msg.sender] >= wad, "weth9, 1");
         balanceOf[msg.sender] -= wad;
         payable(msg.sender).transfer(wad);
         emit Withdrawal(msg.sender, wad);
@@ -46,10 +49,10 @@ contract WETH9 {
     }
 
     function transferFrom(address src, address dst, uint256 wad) public returns (bool) {
-        require(balanceOf[src] >= wad);
+        require(balanceOf[src] >= wad, "weth9, 2");
 
         if (src != msg.sender && allowance[src][msg.sender] != type(uint256).max) {
-            require(allowance[src][msg.sender] >= wad);
+            require(allowance[src][msg.sender] >= wad, "weth9, 3");
             allowance[src][msg.sender] -= wad;
         }
 

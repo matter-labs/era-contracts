@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import * as zksync from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
+import * as zksync from "zksync-ethers";
 import { serialize } from "zksync-web3/build/src/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";

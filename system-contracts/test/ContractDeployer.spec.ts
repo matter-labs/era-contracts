@@ -1,8 +1,8 @@
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
-import { utils } from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
+import { utils } from "zksync-ethers";
 import type { ContractDeployer } from "../typechain";
 import { ContractDeployerFactory, DeployableFactory } from "../typechain";
 import {

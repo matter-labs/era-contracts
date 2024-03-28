@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
-import type { Wallet } from "zksync-web3";
+import type { Wallet } from "zksync-ethers";
 import type { KnownCodesStorage } from "../typechain";
 import { KnownCodesStorageFactory } from "../typechain";
 import {
@@ -55,7 +55,7 @@ describe("KnownCodesStorage tests", function () {
       );
     });
 
-    it("incorrectly fomatted bytecode hash failed to call", async () => {
+    it("incorrectly formatted bytecode hash failed to call", async () => {
       await expect(
         knownCodesStorage.connect(compressorAccount).markBytecodeAsPublished(INCORRECTLY_FORMATTED_HASH)
       ).to.be.revertedWith("Incorrectly formatted bytecodeHash");
@@ -67,7 +67,7 @@ describe("KnownCodesStorage tests", function () {
       ).to.be.revertedWith("Code length in words must be odd");
     });
 
-    it("successfuly marked", async () => {
+    it("successfully marked", async () => {
       await expect(knownCodesStorage.connect(compressorAccount).markBytecodeAsPublished(BYTECODE_HASH_1))
         .to.emit(knownCodesStorage, "MarkedAsKnown")
         .withArgs(BYTECODE_HASH_1.toLowerCase(), false)
@@ -90,7 +90,7 @@ describe("KnownCodesStorage tests", function () {
       );
     });
 
-    it("incorrectly fomatted bytecode hash failed to call", async () => {
+    it("incorrectly formatted bytecode hash failed to call", async () => {
       await expect(
         knownCodesStorage
           .connect(bootloaderAccount)
@@ -104,7 +104,7 @@ describe("KnownCodesStorage tests", function () {
       ).to.be.revertedWith("Code length in words must be odd");
     });
 
-    it("successfuly marked", async () => {
+    it("successfully marked", async () => {
       await expect(
         knownCodesStorage.connect(bootloaderAccount).markFactoryDeps(false, [BYTECODE_HASH_2, BYTECODE_HASH_3])
       )

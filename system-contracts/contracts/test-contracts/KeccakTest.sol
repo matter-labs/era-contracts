@@ -3,11 +3,10 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-import "../libraries/SystemContractsCaller.sol";
-import "../Constants.sol";
-import "../libraries/EfficientCall.sol";
+import {LOAD_LATEST_RETURNDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, SystemContractsCaller, CalldataForwardingMode, RAW_FAR_CALL_BY_REF_CALL_ADDRESS} from "../libraries/SystemContractsCaller.sol";
+import {EfficientCall, KECCAK256_SYSTEM_CONTRACT} from "../libraries/EfficientCall.sol";
 
-// In this test it is important to actuall change the real Keccak256's contract's bytecode,
+// In this test it is important to actually change the real Keccak256's contract's bytecode,
 // which requires changes in the real AccountCodeStorage contract
 address constant REAL_DEPLOYER_SYSTEM_CONTRACT = address(0x8006);
 address constant REAL_FORCE_DEPLOYER_ADDRESS = address(0x8007);
@@ -16,21 +15,21 @@ contract KeccakTest {
     bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     // Just some computation-heavy function, it will be used to test out of gas
-    function infiniteFuction(uint256 n) public pure returns (uint256 sumOfSquares) {
-        for (uint i = 0; i < n; i++) {
+    function infiniteFunction(uint256 n) public pure returns (uint256 sumOfSquares) {
+        for (uint256 i = 0; i < n; i++) {
             sumOfSquares += i * i;
         }
     }
 
     function _loadFarCallABIIntoActivePtr(uint256 _gas) private view {
-        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer(
-            uint32(_gas),
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABIWithEmptyFatPointer({
+            gasPassed: uint32(_gas),
             // Only rollup is supported for now
-            0,
-            CalldataForwardingMode.ForwardFatPointer,
-            false,
-            false
-        );
+            shardId: 0,
+            forwardingMode: CalldataForwardingMode.ForwardFatPointer,
+            isConstructorCall: false,
+            isSystemCall: false
+        });
         _ptrPackIntoActivePtr(farCallAbi);
     }
 
@@ -56,7 +55,7 @@ contract KeccakTest {
     }
 
     function zeroPointerTest() external {
-        try this.infiniteFuction{gas: 1000000}(1000000) returns (uint256) {
+        try this.infiniteFunction{gas: 1000000}(1000000) returns (uint256) {
             revert("The transaction should have failed");
         } catch {}
 
@@ -85,14 +84,14 @@ contract KeccakTest {
         bytes calldata upgradeCalldata
     ) external returns (bytes32 hash) {
         // Firstly, we reset keccak256 bytecode to be some random bytecode
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            eraseCallData,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: eraseCallData,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         // Since the keccak contract has been erased, it should not work anymore
         try this.callKeccak(msg.data[0:0]) returns (bytes32) {
@@ -100,14 +99,14 @@ contract KeccakTest {
         } catch {}
 
         // Upgrading it back to the correct version:
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         // Now it should work again
         hash = this.callKeccak(msg.data[0:0]);
@@ -115,14 +114,14 @@ contract KeccakTest {
     }
 
     function keccakPerformUpgrade(bytes calldata upgradeCalldata) external {
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
     }
 
     function callKeccak(bytes calldata _data) external pure returns (bytes32 hash) {
@@ -138,14 +137,14 @@ contract KeccakTest {
         require(testInputs.length == expectedOutputs.length, "mismatch between number of inputs and outputs");
 
         // Firstly, we upgrade keccak256 bytecode to the correct version.
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            upgradeCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: upgradeCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
 
         bytes32[] memory result = new bytes32[](testInputs.length);
 
@@ -159,13 +158,13 @@ contract KeccakTest {
         }
 
         // Upgrading it back to the original version:
-        EfficientCall.mimicCall(
-            gasleft(),
-            address(REAL_DEPLOYER_SYSTEM_CONTRACT),
-            resetCalldata,
-            REAL_FORCE_DEPLOYER_ADDRESS,
-            false,
-            false
-        );
+        EfficientCall.mimicCall({
+            _gas: gasleft(),
+            _address: address(REAL_DEPLOYER_SYSTEM_CONTRACT),
+            _data: resetCalldata,
+            _whoToMimic: REAL_FORCE_DEPLOYER_ADDRESS,
+            _isConstructor: false,
+            _isSystem: false
+        });
     }
 }

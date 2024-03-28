@@ -2,11 +2,11 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "./interfaces/IPaymaster.sol";
-import "./interfaces/IPaymasterFlow.sol";
-import "./L2ContractHelper.sol";
+import {IPaymaster, ExecutionResult, PAYMASTER_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IPaymaster.sol";
+import {IPaymasterFlow} from "./interfaces/IPaymasterFlow.sol";
+import {Transaction, BOOTLOADER_ADDRESS} from "./L2ContractHelper.sol";
 
 // This is a dummy paymaster. It expects the paymasterInput to contain its "signature" as well as the needed exchange rate.
 // It supports only approval-based paymaster flow.

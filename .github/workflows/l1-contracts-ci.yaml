@@ -23,6 +23,9 @@ jobs:
       - name: Build artifacts
         run: yarn l1 build
 
+      - name: Build L2 artifacts
+        run: yarn l2 build
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -31,6 +34,9 @@ jobs:
             l1-contracts/artifacts
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
   lint:
     runs-on: ubuntu-latest
@@ -112,6 +118,9 @@ jobs:
             l1-contracts/artifacts
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
       - name: Run tests
         run: yarn l1 test --no-compile
@@ -135,4 +144,4 @@ jobs:
         run: cargo run
 
       - name: Compare
-        run: diff tools/data/Verifier.sol l1-contracts/contracts/zksync/Verifier.sol
+        run: diff tools/data/Verifier.sol l1-contracts/contracts/state-transition/Verifier.sol

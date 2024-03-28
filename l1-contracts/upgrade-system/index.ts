@@ -1,3 +1,6 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { program } from "commander";
 import { command as facetCuts } from "./facets";
 import { command as verifier } from "./verifier";

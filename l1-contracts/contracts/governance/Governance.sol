@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IGovernance} from "./IGovernance.sol";
@@ -11,7 +11,7 @@ import {IGovernance} from "./IGovernance.sol";
 /// @notice This contract manages operations (calls with preconditions) for governance tasks.
 /// The contract allows for operations to be scheduled, executed, and canceled with
 /// appropriate permissions and delays. It is used for managing and coordinating upgrades
-/// and changes in all zkSync Era governed contracts.
+/// and changes in all zkSync hyperchain governed contracts.
 ///
 /// Operations can be proposed as either fully transparent upgrades with on-chain data,
 /// or "shadow" upgrades where upgrade data is not published on-chain before execution. Proposed operations
@@ -80,7 +80,7 @@ contract Governance is IGovernance, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns whether an id corresponds to a registered operation. This
-    /// includes both Waiting, Ready, and Done operations.
+    /// includes Waiting, Ready, and Done operations.
     function isOperation(bytes32 _id) public view returns (bool) {
         return getOperationState(_id) != OperationState.Unset;
     }
@@ -164,6 +164,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @notice Executes the scheduled operation after the delay passed.
     /// @dev Both the owner and security council may execute delayed operations.
     /// @param _operation The operation parameters will be executed with the upgrade.
+    //  slither-disable-next-line reentrancy-eth
     function execute(Operation calldata _operation) external payable onlyOwnerOrSecurityCouncil {
         bytes32 id = hashOperation(_operation);
         // Check if the predecessor operation is completed.
@@ -171,6 +172,7 @@ contract Governance is IGovernance, Ownable2Step {
         // Ensure that the operation is ready to proceed.
         require(isOperationReady(id), "Operation must be ready before execution");
         // Execute operation.
+        // slither-disable-next-line reentrancy-eth
         _execute(_operation.calls);
         // Reconfirming that the operation is still ready after execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
@@ -183,6 +185,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @notice Executes the scheduled operation with the security council instantly.
     /// @dev Only the security council may execute an operation instantly.
     /// @param _operation The operation parameters will be executed with the upgrade.
+    //  slither-disable-next-line reentrancy-eth
     function executeInstant(Operation calldata _operation) external payable onlySecurityCouncil {
         bytes32 id = hashOperation(_operation);
         // Check if the predecessor operation is completed.
@@ -190,6 +193,7 @@ contract Governance is IGovernance, Ownable2Step {
         // Ensure that the operation is in a pending state before proceeding.
         require(isOperationPending(id), "Operation must be pending before execution");
         // Execute operation.
+        // slither-disable-next-line reentrancy-eth
         _execute(_operation.calls);
         // Reconfirming that the operation is still pending before execution.
         // This is needed to avoid unexpected reentrancy attacks of re-executing the same operation.
@@ -223,6 +227,7 @@ contract Governance is IGovernance, Ownable2Step {
     /// @param _calls The array of calls to be executed.
     function _execute(Call[] calldata _calls) internal {
         for (uint256 i = 0; i < _calls.length; ++i) {
+            // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (!success) {
                 // Propagate an error if the call fails.

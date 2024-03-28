@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "./interfaces/IVerifier.sol";
+import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
-/// Modifications have been made to optimize the proof system for zkSync Era circuits.
+/// Modifications have been made to optimize the proof system for zkSync hyperchain circuits.
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
@@ -279,11 +279,11 @@ contract Verifier is IVerifier {
         uint256[] calldata, // _publicInputs
         uint256[] calldata, // _proof
         uint256[] calldata // _recursiveAggregationInput
-    ) external view returns (bool) {
+    ) public view virtual returns (bool) {
         // No memory was accessed yet, so keys can be loaded into the right place and not corrupt any other memory.
         _loadVerificationKey();
 
-        // Begining of the big inline assembly block that makes all the verification work.
+        // Beginning of the big inline assembly block that makes all the verification work.
         // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
         // Solidity code.
         assembly {

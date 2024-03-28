@@ -15,13 +15,13 @@ export interface SystemContractDescription {
   codeName: string;
 }
 
-export interface YulContractDescrption extends SystemContractDescription {
+export interface YulContractDescription extends SystemContractDescription {
   lang: Language.Yul;
   path: string;
 }
 
 // Currently used only for the tests
-export interface ZasmContractDescrption extends SystemContractDescription {
+export interface ZasmContractDescription extends SystemContractDescription {
   lang: Language.Zasm;
   path: string;
 }
@@ -31,7 +31,7 @@ export interface SolidityContractDescription extends SystemContractDescription {
 }
 
 interface ISystemContracts {
-  [key: string]: YulContractDescrption | SolidityContractDescription;
+  [key: string]: YulContractDescription | SolidityContractDescription;
 }
 
 export const SYSTEM_CONTRACTS: ISystemContracts = {
@@ -106,9 +106,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "MsgValueSimulator",
     lang: Language.Solidity,
   },
-  l2EthToken: {
+  L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2EthToken",
+    codeName: "L2BaseToken",
     lang: Language.Solidity,
   },
   systemContext: {
@@ -140,6 +140,18 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   keccak256: {
     address: "0x0000000000000000000000000000000000008010",
     codeName: "Keccak256",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
+  codeOracle: {
+    address: "0x0000000000000000000000000000000000008012",
+    codeName: "CodeOracle",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
+  p256Verify: {
+    address: "0x0000000000000000000000000000000000000100",
+    codeName: "P256Verify",
     lang: Language.Yul,
     path: "precompiles",
   },
@@ -402,7 +414,7 @@ function getValidateTxStructure(
 }
 
 export function getTransactionUtils(): string {
-  let result = `/// 
+  let result = `///
             /// TransactionData utilities
             ///\n`;
 

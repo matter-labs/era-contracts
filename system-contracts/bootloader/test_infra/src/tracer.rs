@@ -4,18 +4,18 @@ use colored::Colorize;
 use once_cell::sync::OnceCell;
 
 use multivm::interface::{
-    dyn_tracers::vm_1_4_1::DynTracer,
+    dyn_tracers::vm_1_5_0::DynTracer,
     tracer::{TracerExecutionStatus, TracerExecutionStopReason},
 };
 use multivm::vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState};
-use multivm::zk_evm_1_4_1::tracing::{BeforeExecutionData, VmLocalStateData};
+use multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
 
 use zksync_state::{StoragePtr, WriteStorage};
 
 use crate::hook::TestVmHook;
 
 /// Bootloader test tracer that is executing while the bootloader tests are running.
-/// It can check the assers, return information about the running tests (and amount of tests) etc.
+/// It can check the asserts, return information about the running tests (and amount of tests) etc.
 pub struct BootloaderTestTracer {
     /// Set if the currently running test has failed.
     test_result: Arc<OnceCell<Result<(), String>>>,

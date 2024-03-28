@@ -20,23 +20,23 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build L2 artifacts
-        run: yarn l2 build
-
       - name: Build L1 artifacts
         run: yarn l1 build
+
+      - name: Build L2 artifacts
+        run: yarn l2 build
 
       - name: Create cache
         uses: actions/cache/save@v3
         with:
           key: artifacts-l2-${{ github.sha }}
           path: |
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
             l1-contracts/artifacts
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
   lint:
     runs-on: ubuntu-latest
@@ -82,12 +82,12 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l2-${{ github.sha }}
           path: |
-            l2-contracts/artifacts-zk
-            l2-contracts/cache-zk
-            l2-contracts/typechain
             l1-contracts/artifacts
             l1-contracts/cache
             l1-contracts/typechain
+            l2-contracts/artifacts-zk
+            l2-contracts/cache-zk
+            l2-contracts/typechain
 
       - name: Run Era test node
         uses: dutterbutter/era-test-node-action@v0.1.3

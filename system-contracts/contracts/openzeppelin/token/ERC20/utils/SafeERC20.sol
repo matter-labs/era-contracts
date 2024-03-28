@@ -3,9 +3,9 @@
 
 pragma solidity ^0.8.0;
 
-import "../IERC20.sol";
-import "../extensions/IERC20Permit.sol";
-import "../../../utils/Address.sol";
+import {IERC20} from "../IERC20.sol";
+import {IERC20Permit} from "../extensions/IERC20Permit.sol";
+import {Address} from "../../../utils/Address.sol";
 
 /**
  * @title SafeERC20
@@ -117,7 +117,7 @@ library SafeERC20 {
         bytes32 s
     ) internal {
         uint256 nonceBefore = token.nonces(owner);
-        token.permit(owner, spender, value, deadline, v, r, s);
+        token.permit({owner: owner, spender: spender, value: value, deadline : deadline, v: v, r: r, s: s});
         uint256 nonceAfter = token.nonces(owner);
         require(
             nonceAfter == nonceBefore + 1,

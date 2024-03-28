@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {Governance} from "../../../../../cache/solpp-generated-contracts/governance/Governance.sol";
-import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
-import {EventOnFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/EventOnFallback.sol";
-import {Forwarder} from "../../../../../cache/solpp-generated-contracts/dev-contracts/Forwarder.sol";
-import {RevertFallback} from "../../../../../cache/solpp-generated-contracts/dev-contracts/RevertFallback.sol";
+
+import {Governance} from "contracts/governance/Governance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {EventOnFallback} from "contracts/dev-contracts/EventOnFallback.sol";
+import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
+import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 
 contract GovernanceTest is Test, EventOnFallback {
     address internal owner;
@@ -45,7 +46,7 @@ contract GovernanceTest is Test, EventOnFallback {
 
     function _checkEventBeforeExecution(IGovernance.Operation memory op) private {
         for (uint256 i = 0; i < op.calls.length; i++) {
-            require(op.calls[i].target == address(eventOnFallback), "EventOnFallbak target expected");
+            require(op.calls[i].target == address(eventOnFallback), "EventOnFallback target expected");
             // Check event
             vm.expectEmit(false, false, false, true);
             emit Called(address(governance), op.calls[i].value, op.calls[i].data);
@@ -56,9 +57,12 @@ contract GovernanceTest is Test, EventOnFallback {
         address _target,
         uint256 _value,
         bytes memory _data
-    ) internal returns (IGovernance.Operation memory) {
+    ) internal pure returns (IGovernance.Operation memory) {
         IGovernance.Call[] memory calls = new IGovernance.Call[](1);
         calls[0] = IGovernance.Call({target: _target, value: _value, data: _data});
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});
     }
+
+    // add this to be excluded from coverage report
+    function test() internal override {}
 }

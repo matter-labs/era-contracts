@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {ImmutableData} from "./interfaces/IImmutableSimulator.sol";
 import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
-import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, ETH_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, KECCAK256_SYSTEM_CONTRACT} from "./Constants.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
@@ -103,6 +103,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         bytes32 constructorInputHash = EfficientCall.keccak(_input);
 
         bytes32 hash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             bytes.concat(CREATE2_PREFIX, bytes32(uint256(uint160(_sender))), _salt, _bytecodeHash, constructorInputHash)
         );
 
@@ -129,7 +130,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _salt The CREATE2 salt
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata
-    /// @dev In case of a revert, the zero address should be returned.
     function create2(
         bytes32 _salt,
         bytes32 _bytecodeHash,
@@ -143,7 +143,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _input The constructor calldata
     /// @dev This method also accepts nonce as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
-    /// @dev In case of a revert, the zero address should be returned.
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create(
@@ -159,7 +158,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _bytecodeHash The correctly formatted hash of the bytecode.
     /// @param _input The constructor calldata.
     /// @param _aaVersion The account abstraction version to use.
-    /// @dev In case of a revert, the zero address should be returned.
     /// Note: this method may be callable only in system mode,
     /// that is checked in the `createAccount` by `onlySystemCall` modifier.
     function create2Account(
@@ -182,7 +180,6 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
     /// @param _aaVersion The account abstraction version to use.
     /// @dev This method also accepts salt as one of its parameters.
     /// It is not used anywhere and it needed simply for the consistency for the compiler
-    /// @dev In case of a revert, the zero address should be returned.
     function createAccount(
         bytes32, // salt
         bytes32 _bytecodeHash,
@@ -226,32 +223,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_deployment.newAddress, newAccountInfo);
 
-        _constructContract(
-            _sender,
-            _deployment.newAddress,
-            _deployment.bytecodeHash,
-            _deployment.input,
-            false,
-            _deployment.callConstructor
-        );
-    }
-
-    /// @notice The method that is temporarily needed to upgrade the Keccak256 precompile. This function and `Bootloader:upgradeKeccakIfNeeded`
-    /// are to be removed once the upgrade is complete. Unlike a normal forced deployment, it does not update account information as it requires
-    /// updating a mapping, and so requires Keccak256 precompile to work already.
-    /// @dev This method expects the sender (FORCE_DEPLOYER) to provide the correct bytecode hash for the Keccak256
-    /// precompile.
-    function forceDeployKeccak256(bytes32 _keccak256BytecodeHash) external payable onlyCallFrom(FORCE_DEPLOYER) {
-        _ensureBytecodeIsKnown(_keccak256BytecodeHash);
-
-        _constructContract(
-            msg.sender,
-            address(KECCAK256_SYSTEM_CONTRACT),
-            _keccak256BytecodeHash,
-            msg.data[0:0],
-            false,
-            false
-        );
+        _constructContract({
+            _sender: _sender,
+            _newAddress: _deployment.newAddress,
+            _bytecodeHash: _deployment.bytecodeHash,
+            _input: _deployment.input,
+            _isSystem: false,
+            _callConstructor: _deployment.callConstructor
+        });
     }
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
@@ -316,7 +295,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         newAccountInfo.nonceOrdering = AccountNonceOrdering.Sequential;
         _storeAccountInfo(_newAddress, newAccountInfo);
 
-        _constructContract(msg.sender, _newAddress, _bytecodeHash, _input, false, true);
+        _constructContract({
+            _sender: msg.sender,
+            _newAddress: _newAddress,
+            _bytecodeHash: _bytecodeHash,
+            _input: _input,
+            _isSystem: false,
+            _callConstructor: true
+        });
     }
 
     /// @notice Check that bytecode hash is marked as known on the `KnownCodeStorage` system contracts
@@ -352,7 +338,7 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
         if (_callConstructor) {
             // 1. Transfer the balance to the new address on the constructor call.
             if (value > 0) {
-                ETH_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
+                BASE_TOKEN_SYSTEM_CONTRACT.transferFromTo(address(this), _newAddress, value);
             }
             // 2. Set the constructed code hash on the account
             _storeConstructingByteCodeHashOnAddress(_newAddress, _bytecodeHash);
@@ -362,7 +348,14 @@ contract ContractDeployer is IContractDeployer, ISystemContract {
                 // Safe to cast value, because `msg.value` <= `uint128.max` due to `MessageValueSimulator` invariant
                 SystemContractHelper.setValueForNextFarCall(uint128(value));
             }
-            bytes memory returnData = EfficientCall.mimicCall(gasleft(), _newAddress, _input, _sender, true, _isSystem);
+            bytes memory returnData = EfficientCall.mimicCall({
+                _gas: gasleft(),
+                _address: _newAddress,
+                _data: _input,
+                _whoToMimic: _sender,
+                _isConstructor: true,
+                _isSystem: _isSystem
+            });
             // 4. Mark bytecode hash as constructed
             ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.markAccountCodeHashAsConstructed(_newAddress);
             // 5. Set the contract immutables

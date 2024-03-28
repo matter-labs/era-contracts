@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {GovernanceTest} from "./_Governance_Shared.t.sol";
-import {IGovernance} from "../../../../../cache/solpp-generated-contracts/governance/IGovernance.sol";
+import {IGovernance} from "contracts/governance/IGovernance.sol";
 
 contract Authorization is GovernanceTest {
     function test_RevertWhen_SchedulingByUnauthorisedAddress() public {

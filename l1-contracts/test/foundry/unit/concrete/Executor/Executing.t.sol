@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
-
-// solhint-disable max-line-length
+pragma solidity 0.8.24;
 
 import {Vm} from "forge-std/Test.sol";
-import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../../../../../cache/solpp-generated-contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
-import {IExecutor, SystemLogKey} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
 
-// solhint-enable max-line-length
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
+
+import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutingTest is ExecutorTest {
     function setUp() public {
@@ -211,15 +209,15 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        mailbox.requestL2Transaction{value: totalCost}(
-            address(0),
-            l2Value,
-            bytes(""),
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            factoryDeps,
-            address(0)
-        );
+        mailbox.requestL2Transaction{value: totalCost}({
+            _contractL2: address(0),
+            _l2Value: l2Value,
+            _calldata: bytes(""),
+            _l2GasLimit: l2GasLimit,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _factoryDeps: factoryDeps,
+            _refundRecipient: address(0)
+        });
 
         vm.prank(validator);
         vm.expectRevert(bytes.concat("x"));
@@ -227,6 +225,7 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function test_RevertWhen_CommittingBlockWithWrongPreviousBatchHash() public {
+        // solhint-disable-next-line func-named-parameters
         bytes memory correctL2Logs = abi.encodePacked(
             bytes4(0x00000001),
             bytes4(0x00000000),

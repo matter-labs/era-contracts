@@ -1,3 +1,6 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
 import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
