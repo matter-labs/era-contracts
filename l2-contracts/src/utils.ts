@@ -177,7 +177,7 @@ export async function publishBytecodeFromL1(
     );
     await approveTx.wait(1);
   }
-  let nonce = await wallet.getTransactionCount();
+  const nonce = await wallet.getTransactionCount();
   const tx1 = await bridgehub.requestL2TransactionDirect(
     {
       chainId,
