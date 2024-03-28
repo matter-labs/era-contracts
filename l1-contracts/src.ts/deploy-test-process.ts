@@ -21,7 +21,7 @@ import {
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import * as fs from "fs";
 import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
-import { CONTRACTS_LATEST_PROTOCOL_VERSION } from "../test/unit_tests/utils";
+import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
 // import { DummyAdminFacet } from "../typechain";
 import * as zkethers from "zksync-ethers";
 
@@ -29,7 +29,7 @@ const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.js
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
 
 export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
-  process.env.CONTRACTS_LATEST_PROTOCOL_VERSION = (21).toString();
+  process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
   process.env.CONTRACTS_GENESIS_ROOT = ethers.constants.HashZero;
   process.env.CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX = "0";
   process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = ethers.constants.HashZero;
@@ -272,7 +272,7 @@ export class EraDeployer extends Deployer {
         chainId: this.chainId, // era chain Id
         bridgehub: this.addresses.Bridgehub.BridgehubProxy,
         stateTransitionManager: this.addresses.StateTransition.StateTransitionProxy,
-        protocolVersion: CONTRACTS_LATEST_PROTOCOL_VERSION,
+        protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,
         validatorTimelock: ADDRESS_ONE,
         baseToken: ETH_ADDRESS_IN_CONTRACTS,

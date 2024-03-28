@@ -301,7 +301,7 @@ export class Deployer {
     const genesisRollupLeafIndex = getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX");
     const genesisBatchCommitment = getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT");
     const diamondCut = await this.initialZkSyncStateTransitionDiamondCut(extraFacets);
-    const protocolVersion = getNumberFromEnv("CONTRACTS_LATEST_PROTOCOL_VERSION");
+    const protocolVersion = getNumberFromEnv("CONTRACTS_GENESIS_PROTOCOL_VERSION");
 
     const stateTransitionManager = new Interface(hardhat.artifacts.readArtifactSync("StateTransitionManager").abi);
 
@@ -704,14 +704,14 @@ export class Deployer {
     const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
     const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
     const validatorTimelock = this.validatorTimelock(this.deployWallet);
-    const tx2 = await validatorTimelock.addValidator(chainId, validatorOneAddress, {
+    const txRegisterValidator = await validatorTimelock.addValidator(chainId, validatorOneAddress, {
       gasPrice,
       nonce,
       gasLimit,
     });
-    const receipt2 = await tx2.wait();
+    const receiptRegisterValidator = await txRegisterValidator.wait();
     if (this.verbose) {
-      console.log(`Validator registered, gas used: ${receipt2.gasUsed.toString()}`);
+      console.log(`Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${txRegisterValidator.hash}`);
     }
 
     nonce++;
@@ -723,7 +723,7 @@ export class Deployer {
     });
     const receipt3 = await tx3.wait();
     if (this.verbose) {
-      console.log(`Validator registered, gas used: ${receipt3.gasUsed.toString()}`);
+      console.log(`Validator 2 registered, gas used: ${receipt3.gasUsed.toString()}`);
     }
 
     const diamondProxy = this.stateTransitionContract(this.deployWallet);
