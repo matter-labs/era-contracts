@@ -7,7 +7,7 @@ import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
 import "./libraries/SystemContractHelper.sol";
-import {SYSTEM_CALL_CALL_ADDRESS, CalldataForwardingMode} from "./libraries/SystemContractsCaller.sol";
+import {SYSTEM_CALL_CALL_ADDRESS, CalldataForwardingMode, SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 
 // TODO: move to Constants.sol (need to make contract interfaces)
 
@@ -375,65 +375,21 @@ contract EvmInterpreter {
         }
     }
 
-    function getFarCallABIWithEmptyFatPointer(
-        uint32 gasPassed,
-        uint8 shardId,
-        CalldataForwardingMode forwardingMode,
-        bool isConstructorCall,
-        bool isSystemCall
-    ) internal pure returns (uint256 farCallAbiWithEmptyFatPtr) {
-        farCallAbiWithEmptyFatPtr |= (uint256(gasPassed) << 192);
-        farCallAbiWithEmptyFatPtr |= (uint256(forwardingMode) << 224);
-        farCallAbiWithEmptyFatPtr |= (uint256(shardId) << 232);
-        if (isConstructorCall) {
-            farCallAbiWithEmptyFatPtr |= (1 << 240);
-        }
-        if (isSystemCall) {
-            farCallAbiWithEmptyFatPtr |= (1 << 248);
-        }
-    }
-
-    function getFarCallABI(
-        uint32 dataOffset,
-        uint32 memoryPage,
-        uint32 dataStart,
-        uint32 dataLength,
-        uint32 gasPassed,
-        uint8 shardId,
-        CalldataForwardingMode forwardingMode,
-        bool isConstructorCall,
-        bool isSystemCall
-    ) internal pure returns (uint256 farCallAbi) {
-        // Fill in the call parameter fields
-        farCallAbi = getFarCallABIWithEmptyFatPointer(
-            gasPassed,
-            shardId,
-            forwardingMode,
-            isConstructorCall,
-            isSystemCall
-        );
-        // Fill in the fat pointer fields
-        farCallAbi |= dataOffset;
-        farCallAbi |= (uint256(memoryPage) << 32);
-        farCallAbi |= (uint256(dataStart) << 64);
-        farCallAbi |= (uint256(dataLength) << 96);
-    }
-
     function systemCall(
-        uint32 gas,
+        uint32 gasLimit,
         address addr,
         uint32 value,
         uint32 dataStart,
         uint32 dataLength,
-        uint32 returnDataStart,
-        uint32 returnDataLength
+        uint32 outputDataStart,
+        uint32 outputDataLength
     ) internal returns (bool success) {
-        uint256 farCallAbi = getFarCallABI(
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
             0,
             0,
             dataStart,
             dataLength,
-            gas,
+            gasLimit,
             // Only rollup is supported for now
             0,
             CalldataForwardingMode.UseHeap,
@@ -444,7 +400,7 @@ contract EvmInterpreter {
         if (value == 0) {
             // Doing the system call directly
             assembly {
-                success := call(addr, callAddr, 0, 0, farCallAbi, returnDataStart, returnDataLength)
+                success := call(addr, callAddr, 0, 0, farCallAbi, outputDataStart, outputDataLength)
             }
         } else {
             address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
@@ -455,6 +411,28 @@ contract EvmInterpreter {
             assembly {
                 success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
             }
+        }
+    }
+
+    function systemCallWithReturndata(
+        uint32 gasLimit,
+        address addr,
+        uint32 value,
+        uint32 dataStart,
+        uint32 dataLength,
+        uint32 outputDataStart,
+        uint32 outputDataLength
+    ) internal returns (bool success, bytes memory returnData) {
+        success = systemCall(gasLimit, addr, value, dataStart, dataLength, outputDataStart, outputDataLength);
+
+        uint256 size;
+        assembly {
+            size := returndatasize()
+        }
+
+        returnData = new bytes(size);
+        assembly {
+            returndatacopy(add(returnData, 0x20), 0, size)
         }
     }
 
@@ -518,7 +496,6 @@ contract EvmInterpreter {
         }
         bool success = systemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 0);
         assembly {
-            //success := call(gas(), addr, 0, 0, 68, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2399,7 +2376,6 @@ contract EvmInterpreter {
         }
         bool success = systemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 0);
         assembly {
-            //success := call(gas(), addr, 0, 0, 68, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2415,7 +2391,6 @@ contract EvmInterpreter {
         }
         bool success = systemCall(uint32(gasleft()), addr, 0, 0, 4, 0, 0);
         assembly {
-            //  success := call(gas(), addr, 0, 0, 4, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2429,18 +2404,13 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        //bool success = systemCall(uint32(gasleft()), addr, 0, 0, 4,0, 64);
-        bool success;
+        (bool success, bytes memory returnData) = systemCallWithReturndata(uint32(gasleft()), addr, 0, 0, 4, 0, 64);
+        (_passGas, isStatic) = abi.decode(returnData, (uint256, bool));
         assembly {
-            success := call(gas(), addr, 0, 0, 4, 0, 64)
-
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
-
-            _passGas := mload(0)
-            isStatic := mload(32)
         }
 
         if (_passGas != INF_PASS_GAS) {
