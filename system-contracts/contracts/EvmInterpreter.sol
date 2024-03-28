@@ -7,6 +7,7 @@ import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
 import "./libraries/SystemContractHelper.sol";
+import {SYSTEM_CALL_CALL_ADDRESS, CalldataForwardingMode, SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 
 // TODO: move to Constants.sol (need to make contract interfaces)
 
@@ -401,15 +402,81 @@ contract EvmInterpreter {
         }
     }
 
+    function systemCall(
+        uint32 gasLimit,
+        address addr,
+        uint32 value,
+        uint32 dataStart,
+        uint32 dataLength,
+        uint32 outputDataStart,
+        uint32 outputDataLength
+    ) internal returns (bool success) {
+        uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            gasLimit,
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
+        if (value == 0) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, outputDataStart, outputDataLength)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+    }
+
+    function systemCallWithReturndata(
+        uint32 gasLimit,
+        address addr,
+        uint32 value,
+        uint32 dataStart,
+        uint32 dataLength,
+        uint32 outputDataStart,
+        uint32 outputDataLength
+    ) internal returns (bool success, bytes memory returnData) {
+        success = systemCall(gasLimit, addr, value, dataStart, dataLength, outputDataStart, outputDataLength);
+
+        uint256 size;
+        assembly {
+            size := returndatasize()
+        }
+
+        returnData = new bytes(size);
+        assembly {
+            returndatacopy(add(returnData, 0x20), 0, size)
+        }
+    }
+
     function warmAccount(address _addr) internal returns (bool isWarm) {
         bytes4 selector = EVM_GAS_MANAGER.warmAccount.selector;
         address addr = address(EVM_GAS_MANAGER);
+
         assembly {
             mstore(0, selector)
             mstore(4, _addr)
+        }
 
-            let success := call(gas(), addr, 0, 0, 36, 0, 32)
+        uint32 dataStart = 0;
+        uint32 dataLength = 36;
 
+        bool success = systemCall(uint32(gasleft()), addr, 0, 0, 36, 0, 32);
+        assembly {
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -448,13 +515,14 @@ contract EvmInterpreter {
     function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
         bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
         address addr = address(EVM_GAS_MANAGER);
+
         assembly {
             mstore(0, selector)
             mstore(4, key)
             mstore(36, currentValue)
-
-            let success := call(gas(), addr, 0, 0, 68, 0, 64)
-
+        }
+        bool success = systemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 0);
+        assembly {
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2356,9 +2424,9 @@ contract EvmInterpreter {
             mstore(0, selector)
             mstore(4, _passGas)
             mstore(36, _isStatic)
-
-            let success := call(gas(), addr, 0, 0, 68, 0, 0)
-
+        }
+        bool success = systemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 0);
+        assembly {
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2371,9 +2439,9 @@ contract EvmInterpreter {
         address addr = address(EVM_GAS_MANAGER);
         assembly {
             mstore(0, selector)
-
-            let success := call(gas(), addr, 0, 0, 4, 0, 0)
-
+        }
+        bool success = systemCall(uint32(gasleft()), addr, 0, 0, 4, 0, 0);
+        assembly {
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2386,16 +2454,14 @@ contract EvmInterpreter {
         address addr = address(EVM_GAS_MANAGER);
         assembly {
             mstore(0, selector)
-
-            let success := call(gas(), addr, 0, 0, 4, 0, 64)
-
+        }
+        (bool success, bytes memory returnData) = systemCallWithReturndata(uint32(gasleft()), addr, 0, 0, 4, 0, 64);
+        (_passGas, isStatic) = abi.decode(returnData, (uint256, bool));
+        assembly {
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
-
-            _passGas := mload(0)
-            isStatic := mload(32)
         }
 
         if (_passGas != INF_PASS_GAS) {
