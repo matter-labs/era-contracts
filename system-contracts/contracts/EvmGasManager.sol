@@ -145,7 +145,7 @@ contract EvmGasManager is ISystemContract, IEvmGasManager {
         evmStackFrames[evmStackFrames.length - 1].passGas = INF_PASS_GAS;
     }
 
-    function popEVMFrame() external onlySystemEvm onlySystemCall{
+    function popEVMFrame() external onlySystemEvm onlySystemCall {
         evmStackFrames.pop();
     }
 }
