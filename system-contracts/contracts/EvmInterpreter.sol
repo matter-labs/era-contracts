@@ -7,7 +7,7 @@ import "./EvmGasManager.sol";
 import "./ContractDeployer.sol";
 import "./EvmOpcodes.sol";
 import "./libraries/SystemContractHelper.sol";
-
+import {SYSTEM_CALL_CALL_ADDRESS,CalldataForwardingMode} from "./libraries/SystemContractsCaller.sol";
 // TODO: move to Constants.sol (need to make contract interfaces)
 
 function _words(uint256 n) pure returns (uint256) {
@@ -373,16 +373,131 @@ contract EvmInterpreter {
             opcode := and(mload(sub(ip, 31)), 0xff)
         }
     }
+    function getFarCallABIWithEmptyFatPointer(
+        uint32 gasPassed,
+        uint8 shardId,
+        CalldataForwardingMode forwardingMode,
+        bool isConstructorCall,
+        bool isSystemCall
+    ) internal pure returns (uint256 farCallAbiWithEmptyFatPtr) {
+        farCallAbiWithEmptyFatPtr |= (uint256(gasPassed) << 192);
+        farCallAbiWithEmptyFatPtr |= (uint256(forwardingMode) << 224);
+        farCallAbiWithEmptyFatPtr |= (uint256(shardId) << 232);
+        if (isConstructorCall) {
+            farCallAbiWithEmptyFatPtr |= (1 << 240);
+        }
+        if (isSystemCall) {
+            farCallAbiWithEmptyFatPtr |= (1 << 248);
+        }
+    }
+    function getFarCallABI(
+        uint32 dataOffset,
+        uint32 memoryPage,
+        uint32 dataStart,
+        uint32 dataLength,
+        uint32 gasPassed,
+        uint8 shardId,
+        CalldataForwardingMode forwardingMode,
+        bool isConstructorCall,
+        bool isSystemCall
+    ) internal pure returns (uint256 farCallAbi) {
+        // Fill in the call parameter fields
+        farCallAbi = getFarCallABIWithEmptyFatPointer(
+            gasPassed,
+            shardId,
+            forwardingMode,
+            isConstructorCall,
+            isSystemCall
+        );
+        // Fill in the fat pointer fields
+        farCallAbi |= dataOffset;
+        farCallAbi |= (uint256(memoryPage) << 32);
+        farCallAbi |= (uint256(dataStart) << 64);
+        farCallAbi |= (uint256(dataLength) << 96);
+    }
+
+    function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
+
+        uint32 dataStart;
+        assembly {
+            dataStart := add(data, 0x20)
+        }
+        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+
+        uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            gasLimit,
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+
+        if (value == 0) {
+            // Doing the system call directly
+            assembly {
+                success := call(to, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, to, farCallAbi, forwardMask, 0)
+            }
+        }
+    }
 
     function warmAccount(address _addr) internal returns (bool isWarm) {
         bytes4 selector = EVM_GAS_MANAGER.warmAccount.selector;
         address addr = address(EVM_GAS_MANAGER);
+        bool success;
         assembly {
             mstore(0, selector)
             mstore(4, _addr)
+        }
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
-            let success := call(gas(), addr, 0, 0, 36, 0, 32)
+        uint32 dataStart = 0;
+        uint32 dataLength = 36;
 
+        uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            uint32(gasleft()),
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        uint32 value = 0;
+        if (false) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+        assembly{
+            
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -406,9 +521,9 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
             mstore(4, key)
-
+            
             let success := call(gas(), addr, 0, 0, 36, 0, 32)
-
+            
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -421,13 +536,47 @@ contract EvmInterpreter {
     function warmSlot(uint256 key, uint256 currentValue) internal returns (bool isWarm, uint256 originalValue) {
         bytes4 selector = EVM_GAS_MANAGER.warmSlot.selector;
         address addr = address(EVM_GAS_MANAGER);
+        bool success;
         assembly {
             mstore(0, selector)
             mstore(4, key)
             mstore(36, currentValue)
+        }
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
-            let success := call(gas(), addr, 0, 0, 68, 0, 64)
+        uint32 dataStart = 0;
+        uint32 dataLength = 68;
 
+        uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            uint32(gasleft()),
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        uint32 value = 0;
+        if (false) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+        assembly{
+            //success := call(gas(), addr, 0, 0, 68, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2301,13 +2450,48 @@ contract EvmInterpreter {
     function _pushEVMFrame(uint256 _passGas, bool _isStatic) internal {
         bytes4 selector = EVM_GAS_MANAGER.pushEVMFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
+        bool success;
         assembly {
             mstore(0, selector)
             mstore(4, _passGas)
             mstore(36, _isStatic)
+            
+        }
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
-            let success := call(gas(), addr, 0, 0, 68, 0, 0)
+        uint32 dataStart = 0;
+        uint32 dataLength = 68;
 
+        uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            uint32(gasleft()),
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        uint32 value = 0;
+        if (false) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+        assembly{
+            //success := call(gas(), addr, 0, 0, 68, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2318,11 +2502,46 @@ contract EvmInterpreter {
     function _popEVMFrame() internal {
         bytes4 selector = EVM_GAS_MANAGER.popEVMFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
+        bool success;
         assembly {
             mstore(0, selector)
+        }
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
-            let success := call(gas(), addr, 0, 0, 4, 0, 0)
+        uint32 dataStart = 0;
+        uint32 dataLength = 4;
 
+        uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            uint32(gasleft()),
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        uint32 value = 0;
+        if (false) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+        
+        assembly{
+          //  success := call(gas(), addr, 0, 0, 4, 0, 0)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
@@ -2333,10 +2552,46 @@ contract EvmInterpreter {
     function _consumeEvmFrame() internal returns (uint256 _passGas, bool isStatic, bool callerEVM) {
         bytes4 selector = EVM_GAS_MANAGER.consumeEvmFrame.selector;
         address addr = address(EVM_GAS_MANAGER);
+        bool success;
         assembly {
             mstore(0, selector)
+        }
+        address callAddr = SYSTEM_CALL_CALL_ADDRESS;
 
-            let success := call(gas(), addr, 0, 0, 4, 0, 64)
+        uint32 dataStart = 0;
+        uint32 dataLength = 4;
+
+        /*uint256 farCallAbi = getFarCallABI(
+            0,
+            0,
+            dataStart,
+            dataLength,
+            uint32(gasleft()),
+            // Only rollup is supported for now
+            0,
+            CalldataForwardingMode.UseHeap,
+            false,
+            true
+        );
+        uint32 value = 0;
+        if (false) {
+            // Doing the system call directly
+            assembly {
+                success := call(addr, callAddr, 0, 0, farCallAbi, 0, 0)
+            }
+        } else {
+            address msgValueSimulator = MSG_VALUE_SYSTEM_CONTRACT;
+            // We need to supply the mask to the MsgValueSimulator to denote
+            // that the call should be a system one.
+            uint256 forwardMask = MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT;
+
+            assembly {
+                success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
+            }
+        }
+        */
+        assembly{
+            success := call(gas(), addr, 0, 0, 4, 0, 64)
 
             if iszero(success) {
                 // This error should never happen
