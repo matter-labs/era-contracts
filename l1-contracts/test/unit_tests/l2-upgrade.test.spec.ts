@@ -85,7 +85,7 @@ describe("L2 upgrade test", function () {
     const extraFacet = facetCut(dummyAdminFacetContract.address, dummyAdminFacetContract.interface, Action.Add, true);
 
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
-    initialProtocolVersion = parseInt(process.env.CONTRACTS_LATEST_PROTOCOL_VERSION);
+    initialProtocolVersion = parseInt(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION);
 
     chainId = deployer.chainId;
     verifier = deployer.addresses.StateTransition.Verifier;
