@@ -12,7 +12,8 @@ import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import type { Dependency, DeployedDependency } from "./utils";
-import { checkMarkers, filterPublishedFactoryDeps, getBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
+import { DEFAULT_ACCOUNT_CONTRACT_NAME, checkMarkers, filterPublishedFactoryDeps, getBytecodes, getSystemContractsBytecodes, publishFactoryDeps, readYulBytecode } from "./utils";
+import { types } from "zksync-web3";
 
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
@@ -20,7 +21,6 @@ const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, {
 // Maximum length of the combined length of dependencies
 const MAX_COMBINED_LENGTH = 90000;
 
-const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
 const BOOTLOADER_CONTRACT_NAME = "Bootloader";
 
 const CONSOLE_COLOR_RESET = "\x1b[0m";
@@ -207,19 +207,17 @@ class ZkSyncDeployer {
 
   // Returns the contracts to be published.
   async prepareContractsForPublishing(): Promise<Dependency[]> {
-    const dependenciesToPublish: Dependency[] = [];
-    for (const contract of Object.values(SYSTEM_CONTRACTS)) {
-      const contractName = contract.codeName;
-      let factoryDeps: string[] = [];
-      if (contract.lang == Language.Solidity) {
-        const artifact = await this.deployer.loadArtifact(contractName);
-        factoryDeps = [...(await this.deployer.extractFactoryDeps(artifact)), artifact.bytecode];
-      } else {
-        // Yul files have only one dependency
-        factoryDeps = [readYulBytecode(contract)];
-      }
+    const bytecodes = await getSystemContractsBytecodes(this.deployer);
 
-      const contractBytecodeHash = ethers.utils.hexlify(hashBytecode(factoryDeps[factoryDeps.length - 1]));
+    const dependenciesToPublish: Dependency[] = [];
+    for (const contract of bytecodes) {
+      const contractName = contract.name;
+      const totalFactoryDeps = [
+        contract.bytecode,
+        ...contract.factoryDeps
+      ].map((dep) => ethers.utils.hexlify(dep));
+
+      const contractBytecodeHash = ethers.utils.hexlify(hashBytecode(contract.bytecode));
       if (await this.shouldUpgradeSystemContract(contract.address, contractBytecodeHash)) {
         this.dependenciesToUpgrade.push({
           name: contractName,
@@ -230,7 +228,7 @@ class ZkSyncDeployer {
 
       const [bytecodesToPublish, currentLength] = await filterPublishedFactoryDeps(
         contractName,
-        factoryDeps,
+        totalFactoryDeps,
         this.deployer
       );
       if (bytecodesToPublish.length == 0) {

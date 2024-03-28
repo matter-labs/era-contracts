@@ -16,6 +16,15 @@ import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
+export const DEFAULT_ACCOUNT_CONTRACT_NAME = "DefaultAccount";
+
+export interface SystemContractBytecodeInfo {
+  name: string;
+  bytecode: BytesLike;
+  factoryDeps: BytesLike[];
+  address: string;
+}
+
 export interface Dependency {
   name: string;
   bytecodes: BytesLike[];
@@ -252,4 +261,32 @@ export function prepareCompilerPaths(path: string): CompilerPaths {
   const absolutePathArtifacts = `${__dirname}/../${path}/artifacts`;
 
   return new CompilerPaths(absolutePathSources, absolutePathArtifacts);
+}
+
+export async function getSystemContractsBytecodes(deployer: Deployer): Promise<SystemContractBytecodeInfo[]> {
+  const dependencies: SystemContractBytecodeInfo[] = [];
+
+  for (const contract of Object.values(SYSTEM_CONTRACTS)) {
+    const contractName = contract.codeName;
+    let bytecode: BytesLike = '';
+    let factoryDeps: string[] = [];
+    if (contract.lang == Language.Solidity) {
+      const artifact = await deployer.loadArtifact(contractName);
+
+      bytecode = artifact.bytecode;
+      factoryDeps = await deployer.extractFactoryDeps(artifact);
+    } else {
+      // Yul files have only one dependency
+      bytecode = readYulBytecode(contract);
+    }
+
+    dependencies.push({
+      name: contractName,
+      bytecode,
+      factoryDeps,
+      address: contract.address,
+    });
+  }
+
+  return dependencies;
 }
