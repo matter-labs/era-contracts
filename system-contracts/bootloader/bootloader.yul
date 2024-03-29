@@ -83,7 +83,7 @@ object "Bootloader" {
             /// @dev The maximal allowed gasPerPubdata, we want it multiplied by the u32::MAX 
             /// (i.e. the maximal possible value of the pubdata counter) to be a safe JS integer with a good enough margin.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
-                ret := 1048576
+                ret := 50000
             }
 
             /// @dev The overhead for the interaction with L1.
