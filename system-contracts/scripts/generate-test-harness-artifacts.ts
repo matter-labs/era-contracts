@@ -1,4 +1,4 @@
-/// This script generates the `predeployed_contracts.json` needed for the https://github.com/matter-labs/test-contract
+/// This script generates the `predeployed_contracts_artifacts.json` needed for the https://github.com/matter-labs/test-contract
 /// It will output a mapping from the address to the bytecode of the corresponding contract.
 
 // hardhat import should be the first import in the file
