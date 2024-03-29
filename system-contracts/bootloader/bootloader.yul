@@ -539,12 +539,6 @@ object "Bootloader" {
                 ret := 1000000
             }
 
-            /// @dev The maximal amount of pubdata that can be safely used by a transaction.
-            /// If a transaction uses more pubdata than this, it will be reverted.
-            function MAX_PUBDATA_FOR_TX() -> ret {
-                ret := 120000
-            }
-
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
                 switch or(eq(x, 0), eq(y, 0))
@@ -2764,11 +2758,8 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
-
-                let notEnoughGas := lt(allowedGasLimit, spentErgs)
-                let tooMuchPubdata := gt(getCurrentPubdataSpent(basePubdataSpent), MAX_PUBDATA_FOR_TX())
-
-                ret := or(notEnoughGas, tooMuchPubdata)
+                
+                ret := lt(allowedGasLimit, spentErgs)
             }
 
             /// @dev Set the new value for the tx origin context value
