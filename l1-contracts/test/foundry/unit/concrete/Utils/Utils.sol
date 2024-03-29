@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
@@ -43,7 +43,7 @@ library Utils {
     }
 
     function createSystemLogs() public pure returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](13);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -83,6 +83,25 @@ library Utils {
         );
         logs[7] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0));
         logs[8] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0));
+        logs[9] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
+            bytes32(0)
+        );
+        logs[10] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FOUR_HASH_KEY),
+            bytes32(0)
+        );
+        logs[11] = constructL2Log(
+            true,
+            PUBDATA_PUBLISHER_ADDRESS,
+            uint256(SystemLogKey.BLOB_FIVE_HASH_KEY),
+            bytes32(0)
+        );
+        logs[12] = constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0));
         return logs;
     }
 
