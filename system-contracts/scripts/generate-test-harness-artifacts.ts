@@ -10,6 +10,8 @@ import { DEFAULT_ACCOUNT_CONTRACT_NAME, getSystemContractsBytecodes } from "./ut
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import { Provider, Wallet } from "zksync-web3";
 
+const FILENAME = 'predeployed_contracts_artifacts.json';
+
 interface PredeployedContractsOutput {
   predeployed_contracts: {
     [address: string]: string;
@@ -18,7 +20,8 @@ interface PredeployedContractsOutput {
 }
 
 async function main() {
-  // We won't need the functionality of the wallet, but we still need to create the `Deployer` object.
+  // We won't need the functionality of the wallet, but we still need to create the `Deployer` object to
+  // easily work with artifacts.
   // We'll create a provider with testnet URL and a random wallet.
   const deployer = new Deployer(hre, Wallet.createRandom().connect(new Provider('https://zksync2-testnet.zksync.dev')));
 
@@ -36,7 +39,7 @@ async function main() {
     result.predeployed_contracts[contract.address] = ethers.utils.hexlify(contract.bytecode);
   }
 
-  fs.writeFileSync('predeployed_contracts_artifacts.json', JSON.stringify(result, null, 2));
+  fs.writeFileSync(FILENAME, JSON.stringify(result, null, 2));
 }
 
 main()

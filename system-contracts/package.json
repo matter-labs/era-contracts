@@ -64,6 +64,6 @@
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag v0.0.1-vm1.5.0",
     "test:bootloader": "cd bootloader/test_infra && cargo run",
-    "predeployed-contracts": "yarn build && ts-node ./scripts/predeployed-contracts.ts"
+    "generate-test-harness-artifacts": "yarn build && ts-node ./scripts/generate-test-harness-artifacts.ts"
   }
 }
