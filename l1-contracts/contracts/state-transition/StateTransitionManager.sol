@@ -126,7 +126,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         delete pendingAdmin;
 
         emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
     /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
