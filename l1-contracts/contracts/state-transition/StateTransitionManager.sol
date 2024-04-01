@@ -98,7 +98,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             timestamp: 0,
             commitment: _initializeData.genesisBatchCommitment
         });
-
         storedBatchZero = keccak256(abi.encode(batchZero));
 
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
