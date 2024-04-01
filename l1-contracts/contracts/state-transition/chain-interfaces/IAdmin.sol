@@ -2,15 +2,15 @@
 
 pragma solidity 0.8.20;
 
-import {IZkSyncStateTransitionBase} from "../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncStateTransitionBase {
+interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin

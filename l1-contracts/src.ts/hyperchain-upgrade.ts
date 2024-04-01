@@ -210,7 +210,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   if (deployer.verbose) {
     console.log("registering Era in stateTransitionManager");
   }
-  const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedStateTransition", [
+  const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedHyperchain", [
     deployer.chainId,
     deployer.addresses.StateTransition.DiamondProxy,
   ]);

@@ -3,14 +3,15 @@
 pragma solidity 0.8.20;
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {ZkSyncStateTransitionBase} from "./facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "./facets/ZkSyncHyperchainBase.sol";
+import {FeeParams} from "./ZkSyncHyperchainStorage.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
-contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
+contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
 

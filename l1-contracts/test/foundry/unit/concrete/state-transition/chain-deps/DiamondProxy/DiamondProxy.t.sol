@@ -10,10 +10,10 @@ import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamo
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {ZkSyncStateTransitionBase} from "contracts/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
-contract TestFacet is ZkSyncStateTransitionBase {
+contract TestFacet is ZkSyncHyperchainBase {
     function func() public pure returns (bool) {
         return true;
     }

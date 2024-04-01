@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
-import {PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
+import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
+import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityQueue, PriorityOperation} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -12,16 +12,16 @@ import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
+contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
-    /// @inheritdoc IZkSyncStateTransitionBase
+    /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////

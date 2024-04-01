@@ -31,7 +31,7 @@ contract createNewChainTest is StateTransitionManagerTest {
         createNewChain(getDiamondCutData(diamondInit));
 
         address admin = chainContractAddress.getChainAdmin(chainId);
-        address newChainAddress = chainContractAddress.stateTransition(chainId);
+        address newChainAddress = chainContractAddress.hyperchain(chainId);
 
         assertEq(newChainAdmin, admin);
         assertNotEq(newChainAddress, address(0));

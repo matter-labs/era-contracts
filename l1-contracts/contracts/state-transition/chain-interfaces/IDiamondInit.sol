@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {IVerifier, VerifierParams} from "./IVerifier.sol";
-import {FeeParams} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract

@@ -33,7 +33,7 @@ interface IStateTransitionManager {
 
     /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(
-        address indexed _stateTransitionChain,
+        address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
     );
@@ -63,7 +63,7 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
-    function stateTransition(uint256 _chainId) external view returns (address);
+    function hyperchain(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
 
@@ -91,7 +91,7 @@ interface IStateTransitionManager {
         bytes calldata _diamondCut
     ) external;
 
-    function registerAlreadyDeployedStateTransition(uint256 _chainId, address _stateTransitionContract) external;
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external;
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

@@ -64,7 +64,7 @@ interface IBridgehub {
 
     function sharedBridge() external view returns (IL1SharedBridge);
 
-    function getStateTransition(uint256 _chainId) external view returns (address);
+    function getHyperchain(uint256 _chainId) external view returns (address);
 
     /// Mailbox forwarder
 
