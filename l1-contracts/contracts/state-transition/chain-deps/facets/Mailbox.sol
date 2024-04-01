@@ -39,8 +39,8 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(s.chainId == ERA_CHAIN_ID, "transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
-        address sharedBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(sharedBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
+        address baseTokenBridgeAddress = s.baseTokenBridge;
+        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub

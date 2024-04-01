@@ -79,8 +79,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "StateTransition: governor zero");
-        _transferOwnership(_initializeData.governor);
+        require(_initializeData.owner != address(0), "StateTransition: owner zero");
+        _transferOwnership(_initializeData.owner);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
