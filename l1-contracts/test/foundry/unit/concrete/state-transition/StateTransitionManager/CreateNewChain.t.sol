@@ -9,7 +9,7 @@ contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_InitialDiamondCutHashMismatch() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
 
-        vm.expectRevert(bytes("StateTransition: initial cutHash mismatch"));
+        vm.expectRevert(bytes("STM: initial cutHash mismatch"));
 
         createNewChain(initialDiamondCutData);
     }
@@ -17,7 +17,7 @@ contract createNewChainTest is StateTransitionManagerTest {
     function test_RevertWhen_CalledNotByBridgehub() public {
         Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(diamondInit);
 
-        vm.expectRevert(bytes("StateTransition: only bridgehub"));
+        vm.expectRevert(bytes("STM: only bridgehub"));
 
         chainContractAddress.createNewChain(chainId, baseToken, sharedBridge, admin, abi.encode(initialDiamondCutData));
     }
