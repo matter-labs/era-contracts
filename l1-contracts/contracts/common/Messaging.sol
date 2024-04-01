@@ -53,16 +53,10 @@ struct L2Message {
 /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
 /// this address will receive the `l2Value`.
 struct WritePriorityOpParams {
-    address sender;
     uint256 txId;
-    uint256 l2Value;
-    address contractAddressL2;
-    uint64 expirationTimestamp;
-    uint256 l2GasLimit;
     uint256 l2GasPrice;
-    uint256 l2GasPricePerPubdata;
-    uint256 valueToMint;
-    address refundRecipient;
+    uint64 expirationTimestamp;
+    BridgehubL2TransactionRequest request;
 }
 
 /// @dev Structure that includes all fields of the L2 transaction
