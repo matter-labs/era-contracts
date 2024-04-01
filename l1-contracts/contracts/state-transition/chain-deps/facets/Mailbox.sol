@@ -46,7 +46,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest memory _request
-    ) external payable onlyBridgehub returns (bytes32 canonicalTxHash) {
+    ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
