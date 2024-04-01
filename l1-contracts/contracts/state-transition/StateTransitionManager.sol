@@ -283,10 +283,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
     /// @param _hyperchainContract the chain's contract
-    function registerAlreadyDeployedHyperchain(
-        uint256 _chainId,
-        address _hyperchainContract
-    ) external onlyOwner {
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external onlyOwner {
         require(_hyperchainContract != address(0), "STM: hyperchain zero");
 
         hyperchain[_chainId] = _hyperchainContract;
