@@ -30,7 +30,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         require(_initializeData.stateTransitionManager != address(0), "DiamondInit: stm0");
         require(_initializeData.baseToken != address(0), "DiamondInit: bt0");
         require(_initializeData.baseTokenBridge != address(0), "DiamondInit: btb0");
-        require(_initializeData.blobVersionedHashRetriever != 0, "DiamondInit: bvhr0");
+        require(_initializeData.blobVersionedHashRetriever != address(0), "DiamondInit: bvhr0");
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
