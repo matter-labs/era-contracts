@@ -118,16 +118,10 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
             "AdminFacet: cutHash mismatch"
         );
 
-        require(
-            s.protocolVersion == _oldProtocolVersion,
-            "AdminFacet: protocolVersion mismatch in STC when upgrading"
-        );
+        require(s.protocolVersion == _oldProtocolVersion, "AdminFacet: protocolVersion mismatch in STC when upgrading");
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
-        require(
-            s.protocolVersion > _oldProtocolVersion,
-            "AdminFacet: protocolVersion mismatch in STC after upgrading"
-        );
+        require(s.protocolVersion > _oldProtocolVersion, "AdminFacet: protocolVersion mismatch in STC after upgrading");
     }
 
     /// @inheritdoc IAdmin
