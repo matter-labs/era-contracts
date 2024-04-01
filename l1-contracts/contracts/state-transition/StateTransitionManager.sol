@@ -227,10 +227,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
-    function registerAlreadyDeployedHyperchain(
-        uint256 _chainId,
-        address _hyperchainContract
-    ) external onlyOwner {
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external onlyOwner {
         hyperchain[_chainId] = _hyperchainContract;
         emit StateTransitionNewChain(_chainId, _hyperchainContract);
     }
