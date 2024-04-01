@@ -412,7 +412,7 @@ contract EvmInterpreter {
                 success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
             }
         }
-        if (success){
+        if (success) {
             assembly {
                 let returndataSize := returndatasize()
                 returndatacopy(0, 0, returndataSize)
