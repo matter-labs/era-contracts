@@ -121,4 +121,6 @@ interface IStateTransitionManager {
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;
 
     function setValidator(uint256 _chainId, address _validator, bool _active) external;
+
+    function setPorterAvailability(bool _zkPorterIsAvailable) external;
 }

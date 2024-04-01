@@ -218,6 +218,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncStateTransition(stateTransition[_chainId]).setValidator(_validator, _active);
     }
 
+    /// @dev setPorterAvailability for the specified chain
+    function setPorterAvailability(bool _zkPorterIsAvailable) external {
+        IZkSyncStateTransition(stateTransition[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
+    }
+
     /// registration
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
