@@ -38,7 +38,12 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
         PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
-        require(pricingMode == PubdataPricingMode.Validium || pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
+        require(
+            pricingMode == PubdataPricingMode.Validium ||
+                pubdataSource == uint8(PubdataSource.Calldata) ||
+                pubdataSource == uint8(PubdataSource.Blob),
+            "us"
+        );
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
