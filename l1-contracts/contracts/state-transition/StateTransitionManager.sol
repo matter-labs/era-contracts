@@ -27,31 +27,31 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// @notice chainId => chainContract
-    mapping(uint256 => address) public stateTransition;
+    /// @notice The mapping from chainId => chainContract 
+    mapping(uint256 chainId => address chainContract) public stateTransition;
 
-    /// @dev Batch hash zero, calculated at initialization
+    /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
 
-    /// @dev Stored cutData for diamond cut
+    /// @dev The stored cutData for diamond cut
     bytes32 public initialCutHash;
 
-    /// @dev genesisUpgrade contract address, used to setChainId
+    /// @dev The genesisUpgrade contract address, used to setChainId
     address public genesisUpgrade;
 
-    /// @dev current protocolVersion
+    /// @dev The current protocolVersion
     uint256 public protocolVersion;
 
-    /// @dev validatorTimelock contract address, used to setChainId
+    /// @dev The validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
 
-    /// @dev Stored cutData for upgrade diamond cut. protocolVersion => cutHash
-    mapping(uint256 => bytes32) public upgradeCutHash;
+    /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
-    /// @dev used to manage non critical updates
+    /// @dev The address used to manage non critical updates
     address public admin;
 
-    /// @dev used to accept the admin role
+    /// @dev The address to accept the admin role
     address private pendingAdmin;
 
     /// @dev Contract is expected to be used as proxy implementation.
