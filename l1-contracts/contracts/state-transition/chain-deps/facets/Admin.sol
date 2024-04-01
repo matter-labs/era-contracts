@@ -90,7 +90,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
     }
 
     function setValidiumMode(PubdataPricingMode _validiumMode) external onlyAdmin {
-        require(s.totalBatchesExecuted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is executed
+        require(s.storedBatchHashes[1] == 0x00, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is committed        s.feeParams.pubdataPricingMode = _validiumMode;
         s.feeParams.pubdataPricingMode = _validiumMode;
         emit ValidiumModeStatusUpdate(_validiumMode);
     }
