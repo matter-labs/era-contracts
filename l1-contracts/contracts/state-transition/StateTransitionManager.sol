@@ -163,7 +163,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev freezes the specified chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
+        IZkSyncStateTransition(stateTransition[_chainId]).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
