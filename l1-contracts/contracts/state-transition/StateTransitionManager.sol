@@ -11,6 +11,7 @@ import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncStateTransition} from "./chain-interfaces/IZkSyncStateTransition.sol";
+import {FeeParams} from "./chain-deps/ZkSyncStateTransitionStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -169,6 +170,40 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev reverts batches on the specified chain
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
         IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+    }
+
+    /// @dev execute predefined upgrade
+    function upgradeChainFromVersion(
+        uint256 _chainId, 
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+    }
+
+    /// @dev executes upgrade on chain
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+    }
+
+    /// @dev setTokenMultiplier for the specified chain
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setTokenMultiplier(_nominator, _denominator);
+    }
+
+    /// @dev changeFeeParams for the specified chain
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).changeFeeParams(_newFeeParams);
+    }
+
+    /// @dev setValidator for the specified chain
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setValidator(_validator, _active);
     }
 
     /// registration
