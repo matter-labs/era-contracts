@@ -271,9 +271,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         canonicalTxHash = _requestL2Transaction(params);
     }
 
-    function _requestL2Transaction(
-        WritePriorityOpParams memory _params
-    ) internal returns (bytes32 canonicalTxHash) {
+    function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
         require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");

@@ -125,10 +125,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _commitBatchesInner(_chainId, _newBatchesData);
     }
 
-    function _commitBatchesInner(
-        uint256 _chainId,
-        CommitBatchInfo[] calldata _newBatchesData
-    ) internal {
+    function _commitBatchesInner(uint256 _chainId, CommitBatchInfo[] calldata _newBatchesData) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -140,6 +137,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
         _propagateToZkSyncStateTransition(_chainId);
     }
+
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
@@ -192,10 +190,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _executeBatchesInner(_chainId, _newBatchesData);
     }
 
-    function _executeBatchesInner(
-        uint256 _chainId,
-        StoredBatchInfo[] calldata _newBatchesData
-    ) internal {
+    function _executeBatchesInner(uint256 _chainId, StoredBatchInfo[] calldata _newBatchesData) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
