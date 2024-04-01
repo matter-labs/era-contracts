@@ -107,10 +107,10 @@ interface IStateTransitionManager {
     function unfreezeChain(uint256 _chainId) external;
 
     function upgradeChainFromVersion(
-        uint256 _chainId, 
+        uint256 _chainId,
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external ;
+    ) external;
 
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
 

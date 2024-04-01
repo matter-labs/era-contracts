@@ -186,7 +186,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev execute predefined upgrade
     function upgradeChainFromVersion(
-        uint256 _chainId, 
+        uint256 _chainId,
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
