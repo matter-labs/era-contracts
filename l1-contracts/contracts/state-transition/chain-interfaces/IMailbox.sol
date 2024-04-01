@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.20;
 
-import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
 /// @title The interface of the zkSync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IMailbox is IZkSyncStateTransitionBase {
+interface IMailbox is IZkSyncHyperchainBase {
     /// @notice Prove that a specific arbitrary-length message was sent in a specific L2 batch number
     /// @param _batchNumber The executed L2 batch number in which the message appeared
     /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message

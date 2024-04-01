@@ -23,7 +23,7 @@ import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionMan
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
-import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
 import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -799,7 +799,7 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+    return IZkSyncHyperchainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
   }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {

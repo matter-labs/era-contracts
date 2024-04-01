@@ -11,8 +11,8 @@ import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "solpp/state-transition/chain-deps/facets/Mailbox.sol";
-import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {IVerifier, VerifierParams} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "solpp/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
 

@@ -118,7 +118,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             }
         }
 
-        _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
@@ -137,21 +137,21 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
             }
         }
 
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatches(uint256) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
     function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -162,7 +162,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator(ERA_CHAIN_ID) {
-        _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
@@ -174,7 +174,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo[] calldata,
         ProofInput calldata
     ) external onlyValidator(_chainId) {
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -195,7 +195,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToZkSyncStateTransition(ERA_CHAIN_ID);
+        _propagateToZkSyncHyperchain(ERA_CHAIN_ID);
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -217,13 +217,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
             }
         }
-        _propagateToZkSyncStateTransition(_chainId);
+        _propagateToZkSyncHyperchain(_chainId);
     }
 
     /// @dev Call the hyperchain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the hyperchain diamond contract, not delegatecalled!
-    function _propagateToZkSyncStateTransition(uint256 _chainId) internal {
-        address contractAddress = stateTransitionManager.stateTransition(_chainId);
+    function _propagateToZkSyncHyperchain(uint256 _chainId) internal {
+        address contractAddress = stateTransitionManager.hyperchain(_chainId);
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())

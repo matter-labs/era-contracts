@@ -10,7 +10,7 @@ contract DummyStateTransitionManagerWBH is StateTransitionManager {
     /// @notice Constructor
     constructor(address bridgeHub) StateTransitionManager(bridgeHub) {}
 
-    function setStateTransition(uint256 _chainId, address _stateTransition) external {
-        stateTransition[_chainId] = _stateTransition;
+    function setHyperchain(uint256 _chainId, address _hyperchain) external {
+        hyperchain[_chainId] = _hyperchain;
     }
 }

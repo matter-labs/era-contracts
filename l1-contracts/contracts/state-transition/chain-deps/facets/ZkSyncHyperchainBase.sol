@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionStorage} from "../ZkSyncStateTransitionStorage.sol";
+import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ZkSyncStateTransitionBase is ReentrancyGuard {
-    ZkSyncStateTransitionStorage internal s;
+contract ZkSyncHyperchainBase is ReentrancyGuard {
+    ZkSyncHyperchainStorage internal s;
 
     /// @notice Checks that the message sender is an active admin
     modifier onlyAdmin() {

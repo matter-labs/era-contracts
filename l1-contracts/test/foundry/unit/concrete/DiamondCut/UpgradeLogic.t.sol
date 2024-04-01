@@ -13,7 +13,7 @@ import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {InitializeData} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {IVerifier} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {DummyStateTransitionManager} from "solpp/dev-contracts/test/DummyStateTransitionManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {

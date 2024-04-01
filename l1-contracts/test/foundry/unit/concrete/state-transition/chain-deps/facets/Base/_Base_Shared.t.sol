@@ -7,9 +7,9 @@ import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";
+import {ZkSyncHyperchainBase} from "solpp/state-transition/chain-deps/facets/Admin.sol";
 
-contract TestBaseFacet is ZkSyncStateTransitionBase {
+contract TestBaseFacet is ZkSyncHyperchainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
 
     function functionWithOnlyValidatorModifier() external onlyValidator {}
@@ -36,7 +36,7 @@ bytes constant ERROR_ONLY_BRIDGEHUB = "StateTransition Chain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "StateTransition Chain: Only by validator or state transition manager";
 
-contract ZkSyncStateTransitionBaseTest is Test {
+contract ZkSyncHyperchainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
 

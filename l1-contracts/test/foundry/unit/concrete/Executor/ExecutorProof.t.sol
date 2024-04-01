@@ -9,7 +9,7 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "solpp/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "solpp/state-transition/chain-interfaces/IExecutor.sol";
-import {VerifierParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {VerifierParams, PubdataPricingMode} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     function createBatchCommitment(

@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_BRIDGEHUB} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest, ERROR_ONLY_BRIDGEHUB} from "./_Base_Shared.t.sol";
 
-contract OnlyBridgehubTest is ZkSyncStateTransitionBaseTest {
+contract OnlyBridgehubTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonBridgehub() public {
         address nonBridgehub = makeAddr("nonBridgehub");
 

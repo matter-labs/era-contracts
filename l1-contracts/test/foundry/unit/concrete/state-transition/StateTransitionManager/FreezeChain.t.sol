@@ -10,7 +10,7 @@ contract freezeChainTest is StateTransitionManagerTest {
     function test_FreezingChain() public {
         createNewChain(getDiamondCutData(diamondInit));
 
-        address newChainAddress = chainContractAddress.stateTransition(chainId);
+        address newChainAddress = chainContractAddress.hyperchain(chainId);
         GettersFacet gettersFacet = GettersFacet(newChainAddress);
         bool isChainFrozen = gettersFacet.isDiamondStorageFrozen();
         assertEq(isChainFrozen, false);
