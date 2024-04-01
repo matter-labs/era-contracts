@@ -577,7 +577,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
