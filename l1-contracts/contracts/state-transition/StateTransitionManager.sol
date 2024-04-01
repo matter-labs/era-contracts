@@ -231,7 +231,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         address _stateTransitionContract
     ) external onlyOwner {
-        require(_chainId != 0, "STM: chainId zero");
         require(_stateTransitionContract != address(0), "STM: STC zero");
 
         stateTransition[_chainId] = _stateTransitionContract;
