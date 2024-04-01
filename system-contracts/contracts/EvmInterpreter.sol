@@ -412,27 +412,11 @@ contract EvmInterpreter {
                 success := call(msgValueSimulator, callAddr, value, addr, farCallAbi, forwardMask, 0)
             }
         }
-    }
-
-    function systemCallWithReturndata(
-        uint32 gasLimit,
-        address addr,
-        uint32 value,
-        uint32 dataStart,
-        uint32 dataLength,
-        uint32 outputDataStart,
-        uint32 outputDataLength
-    ) internal returns (bool success, bytes memory returnData) {
-        success = systemCall(gasLimit, addr, value, dataStart, dataLength, outputDataStart, outputDataLength);
-
-        uint256 size;
-        assembly {
-            size := returndatasize()
-        }
-
-        returnData = new bytes(size);
-        assembly {
-            returndatacopy(add(returnData, 0x20), 0, size)
+        if (success){
+            assembly {
+                let returndataSize := returndatasize()
+                returndatacopy(0, 0, returndataSize)
+            }
         }
     }
 
@@ -2404,9 +2388,10 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        (bool success, bytes memory returnData) = systemCallWithReturndata(uint32(gasleft()), addr, 0, 0, 4, 0, 64);
-        (_passGas, isStatic) = abi.decode(returnData, (uint256, bool));
+        bool success = systemCall(uint32(gasleft()), addr, 0, 0, 4, 0, 64);
         assembly {
+            _passGas := mload(0)
+            isStatic := mload(32)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
