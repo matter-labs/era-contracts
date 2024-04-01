@@ -219,7 +219,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setPorterAvailability for the specified chain
-    function setPorterAvailability(bool _zkPorterIsAvailable) external {
+    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external {
         IZkSyncStateTransition(stateTransition[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
     }
 

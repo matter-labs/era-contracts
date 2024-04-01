@@ -122,5 +122,5 @@ interface IStateTransitionManager {
 
     function setValidator(uint256 _chainId, address _validator, bool _active) external;
 
-    function setPorterAvailability(bool _zkPorterIsAvailable) external;
+    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
 }
