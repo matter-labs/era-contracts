@@ -26,7 +26,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// @notice The mapping from chainId => chainContract 
+    /// @notice The mapping from chainId => chainContract
     mapping(uint256 chainId => address chainContract) public stateTransition;
 
     /// @dev The batch zero hash, calculated at initialization
