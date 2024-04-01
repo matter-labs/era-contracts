@@ -131,12 +131,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+        address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
+        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
     /// @dev set initial cutHash
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        bytes32 oldInitialCutHash = initialCutHash;
         initialCutHash = keccak256(abi.encode(_diamondCut));
+        emit NewInitialCutHash(oldInitialCutHash, initialCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
@@ -145,8 +149,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        uint256 previousProtocolVersion = protocolVersion;
         protocolVersion = _newProtocolVersion;
+        emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -155,6 +163,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion
     ) external onlyOwner {
         upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        emit NewUpgradeCutHash(_oldProtocolVersion, upgradeCutHash[_oldProtocolVersion]);
     }
 
     /// @dev freezes the specified chain

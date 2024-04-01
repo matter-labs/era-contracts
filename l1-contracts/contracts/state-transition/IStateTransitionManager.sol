@@ -40,6 +40,18 @@ interface IStateTransitionManager {
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
+    /// @notice ValidatorTimelock changed
+    event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
+
+    /// @notice InitialCutHash changed
+    event NewInitialCutHash(bytes32 indexed oldInitialCutHash, bytes32 indexed newInitialCutHash);
+
+    /// @notice new UpgradeCutHash
+    event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
+
+    /// @notice new ProtocolVersion
+    event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
+
     function bridgehub() external view returns (address);
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
