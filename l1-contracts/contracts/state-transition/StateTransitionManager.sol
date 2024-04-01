@@ -188,7 +188,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            // Note, that the priority protocol version is used as "nonce" for L1->L2 transactions
+            // Note, that the protocol version is used as "nonce" for system upgrade transactions
             nonce: protocolVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
