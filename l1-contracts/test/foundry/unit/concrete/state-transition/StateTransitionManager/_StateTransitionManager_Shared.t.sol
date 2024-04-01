@@ -79,7 +79,7 @@ contract StateTransitionManagerTest is Test {
         );
 
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            governor: address(0),
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
@@ -89,7 +89,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("STM: governor zero"));
+        vm.expectRevert(bytes.concat("STM: owner zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
@@ -97,7 +97,7 @@ contract StateTransitionManagerTest is Test {
         );
 
         StateTransitionManagerInitializeData memory stmInitializeData = StateTransitionManagerInitializeData({
-            governor: governor,
+            owner: governor,
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),

@@ -41,7 +41,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Change the pubdata pricing mode before the first batch is processed
     /// @param _validiumMode The new pubdata pricing mode
-    function setValidiumMode(PubdataPricingMode _validiumMode) external;
+    function setPubdataPricingMode(PubdataPricingMode _validiumMode) external;
 
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;

@@ -9,7 +9,7 @@ import {StateTransitionManagerInitializeData} from "contracts/state-transition/I
 contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            governor: address(0),
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
@@ -19,7 +19,7 @@ contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes("STM: governor zero"));
+        vm.expectRevert(bytes("STM: owner zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
