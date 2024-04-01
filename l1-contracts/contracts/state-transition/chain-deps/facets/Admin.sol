@@ -115,18 +115,18 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         require(
             cutHashInput == IStateTransitionManager(s.stateTransitionManager).upgradeCutHash(_oldProtocolVersion),
-            "StateTransition: cutHash mismatch"
+            "AdminFacet: cutHash mismatch"
         );
 
         require(
             s.protocolVersion == _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC when upgrading"
+            "AdminFacet: protocolVersion mismatch in STC when upgrading"
         );
         Diamond.diamondCut(_diamondCut);
         emit ExecuteUpgrade(_diamondCut);
         require(
             s.protocolVersion > _oldProtocolVersion,
-            "StateTransition: protocolVersion mismatch in STC after upgrading"
+            "AdminFacet: protocolVersion mismatch in STC after upgrading"
         );
     }
 

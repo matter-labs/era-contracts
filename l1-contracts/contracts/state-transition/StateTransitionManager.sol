@@ -62,13 +62,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == bridgehub, "StateTransition: only bridgehub");
+        require(msg.sender == bridgehub, "STM: only bridgehub");
         _;
     }
 
     /// @notice the admin can call, for non-critical updates
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == admin || msg.sender == owner(), "Bridgehub: not owner or admin");
+        require(msg.sender == admin || msg.sender == owner(), "STM: not owner or admin");
         _;
     }
 
@@ -80,7 +80,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "StateTransition: governor zero");
+        require(_initializeData.governor != address(0), "STM: governor zero");
         _transferOwnership(_initializeData.governor);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
@@ -242,7 +242,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            // Note, that the priority protocol version is used as "nonce" for L1->L2 transactions
             nonce: protocolVersion,
             value: 0,
             reserved: [uint256(0), 0, 0, 0],
@@ -319,7 +319,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         // check input
         bytes32 cutHashInput = keccak256(_diamondCut);
-        require(cutHashInput == initialCutHash, "StateTransition: initial cutHash mismatch");
+        require(cutHashInput == initialCutHash, "STM: initial cutHash mismatch");
 
         // construct init data
         bytes memory initData;
