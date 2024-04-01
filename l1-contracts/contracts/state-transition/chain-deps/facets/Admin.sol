@@ -90,6 +90,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
         emit NewBaseTokenMultiplier(oldNominator, oldDenominator, _nominator, _denominator);
     }
 
+    /// @inheritdoc IAdmin
     function setValidiumMode(PubdataPricingMode _validiumMode) external onlyAdmin {
         require(s.totalBatchesCommitted == 0, "AdminFacet: set validium only after genesis"); // Validium mode can be set only before the first batch is processed
         s.feeParams.pubdataPricingMode = _validiumMode;
@@ -106,7 +107,7 @@ contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-    /// upgrade a specific chain
+    /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut

@@ -39,12 +39,16 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @notice Change the token multiplier for L1->L2 transactions
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
 
-    /// @notice Used to set to validium directly after genesis
+    /// @notice Change the pubdata pricing mode before the first batch is processed
+    /// @param _validiumMode The new pubdata pricing mode
     function setValidiumMode(PubdataPricingMode _validiumMode) external;
 
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
+    /// @param _protocolVersion The current protocol version from which upgrade is executed
+    /// @param _cutData The diamond cut parameters that is executed in the upgrade
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade
