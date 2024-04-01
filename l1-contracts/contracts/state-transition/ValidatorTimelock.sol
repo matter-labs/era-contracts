@@ -68,7 +68,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator(uint256 _chainId) {
-        require(validators[_chainId][msg.sender] == true, "ValidatorTimelock: only validator");
+        require(validators[_chainId][msg.sender], "ValidatorTimelock: only validator");
         _;
     }
 
@@ -112,16 +112,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo calldata,
         CommitBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(eraChainId) {
-        unchecked {
-            // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
-            // It is safe to cast.
-            uint32 timestamp = uint32(block.timestamp);
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                committedBatchTimestamp[eraChainId].set(_newBatchesData[i].batchNumber, timestamp);
-            }
-        }
-
-        _propagateToZkSyncStateTransition(eraChainId);
+        _commitBatchesInner(eraChainId, _newBatchesData);
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
@@ -131,6 +122,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         StoredBatchInfo calldata,
         CommitBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(_chainId) {
+        _commitBatchesInner(_chainId, _newBatchesData);
+    }
+
+    function _commitBatchesInner(
+        uint256 _chainId,
+        CommitBatchInfo[] calldata _newBatchesData
+    ) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -142,7 +140,6 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
         _propagateToZkSyncStateTransition(_chainId);
     }
-
     /// @dev Make a call to the hyperchain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
@@ -183,20 +180,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the hyperchain diamond contract with the same calldata.
     function executeBatches(StoredBatchInfo[] calldata _newBatchesData) external onlyValidator(eraChainId) {
-        uint256 delay = executionDelay; // uint32
-        unchecked {
-            for (uint256 i = 0; i < _newBatchesData.length; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[eraChainId].get(_newBatchesData[i].batchNumber);
-
-                // Note: if the `commitBatchTimestamp` is zero, that means either:
-                // * The batch was committed, but not through this contract.
-                // * The batch wasn't committed at all, so execution will fail in the zkSync contract.
-                // We allow executing such batches.
-
-                require(block.timestamp >= commitBatchTimestamp + delay, "5c"); // The delay is not passed
-            }
-        }
-        _propagateToZkSyncStateTransition(eraChainId);
+        _executeBatchesInner(eraChainId, _newBatchesData);
     }
 
     /// @dev Check that batches were committed at least X time ago and
@@ -205,6 +189,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 _chainId,
         StoredBatchInfo[] calldata _newBatchesData
     ) external onlyValidator(_chainId) {
+        _executeBatchesInner(_chainId, _newBatchesData);
+    }
+
+    function _executeBatchesInner(
+        uint256 _chainId,
+        StoredBatchInfo[] calldata _newBatchesData
+    ) internal {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = 0; i < _newBatchesData.length; ++i) {
