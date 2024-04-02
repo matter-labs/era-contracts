@@ -114,11 +114,9 @@ library SystemContractsCaller {
                 success := call(msgValueSimulator, callAddr, value, to, farCallAbi, forwardMask, 0)
             }
         }
-        if (success) {
-            assembly {
-                let returndataSize := returndatasize()
-                returndatacopy(0, returnDataStart, returndataLength)
-            }
+        assembly {
+            let returndataSize := returndatasize()
+            returndatacopy(0, returnDataStart, returndataLength)
         }
     }
 

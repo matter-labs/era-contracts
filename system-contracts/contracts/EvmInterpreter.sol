@@ -384,9 +384,6 @@ contract EvmInterpreter {
             mstore(4, _addr)
         }
 
-        uint32 dataStart = 0;
-        uint32 dataLength = 36;
-
         bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 36, 0, 32);
         assembly {
             if iszero(success) {
