@@ -83,7 +83,8 @@ library SystemContractsCaller {
         uint256 value,
         uint32 dataStart,
         uint32 dataLength,
-        bool returnDataCopy
+        uint32 returnDataStart,
+        uint32 returndataLength
     ) internal returns (bool success) {
         address callAddr = SYSTEM_CALL_CALL_ADDRESS;
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
@@ -113,10 +114,10 @@ library SystemContractsCaller {
                 success := call(msgValueSimulator, callAddr, value, to, farCallAbi, forwardMask, 0)
             }
         }
-        if (success && returnDataCopy) {
+        if (success) {
             assembly {
                 let returndataSize := returndatasize()
-                returndatacopy(0, 0, returndataSize)
+                returndatacopy(0, returnDataStart, returndataLength)
             }
         }
     }
@@ -134,7 +135,7 @@ library SystemContractsCaller {
             dataStart := add(data, 0x20)
         }
         uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
-        success = rawSystemCall(gasLimit, to, value, dataStart, dataLength, false);
+        success = rawSystemCall(gasLimit, to, value, dataStart, dataLength, 0, 0);
     }
 
     /// @notice Makes a call with the `isSystem` flag.

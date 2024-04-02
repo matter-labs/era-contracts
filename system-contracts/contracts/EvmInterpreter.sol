@@ -387,7 +387,7 @@ contract EvmInterpreter {
         uint32 dataStart = 0;
         uint32 dataLength = 36;
 
-        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 36, true);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 36, 0, 32);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -433,7 +433,7 @@ contract EvmInterpreter {
             mstore(4, key)
             mstore(36, currentValue)
         }
-        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, true);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 64);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2313,7 +2313,7 @@ contract EvmInterpreter {
             mstore(4, _passGas)
             mstore(36, _isStatic)
         }
-        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, true);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, 0, 0);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2328,7 +2328,7 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, true);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, 0, 0);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2343,14 +2343,15 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, true);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, 0, 64);
         assembly {
-            _passGas := mload(0)
-            isStatic := mload(32)
             if iszero(success) {
                 // This error should never happen
                 revert(0, 0)
             }
+
+            _passGas := mload(0)
+            isStatic := mload(32)
         }
 
         if (_passGas != INF_PASS_GAS) {
