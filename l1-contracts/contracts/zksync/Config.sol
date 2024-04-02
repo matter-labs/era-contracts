@@ -81,6 +81,9 @@ uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = $(REQUIRED_L2_GAS_PRICE_PER
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;
 
+/// @dev Address of the point evaluation precompile used for EIP-4844 blob verification.
+address constant POINT_EVALUATION_PRECOMPILE_ADDR = address(0x0A);
+
 /// @dev The overhead for a transaction slot in L2 gas.
 /// It is roughly equal to 80kk/MAX_TRANSACTIONS_IN_BATCH, i.e. how many gas would an L1->L2 transaction
 /// need to pay to compensate for the batch being closed.

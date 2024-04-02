@@ -2874,7 +2874,7 @@ checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 [[package]]
 name = "multivm"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "hex",
@@ -6033,7 +6033,7 @@ dependencies = [
 [[package]]
 name = "vlog"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "chrono",
  "sentry",
@@ -6752,7 +6752,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "serde",
  "serde_json",
@@ -6762,7 +6762,7 @@ dependencies = [
 [[package]]
 name = "zksync_concurrency"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "once_cell",
@@ -6780,7 +6780,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "serde",
@@ -6790,7 +6790,7 @@ dependencies = [
 [[package]]
 name = "zksync_consensus_crypto"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "blst",
@@ -6808,7 +6808,7 @@ dependencies = [
 [[package]]
 name = "zksync_consensus_roles"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "bit-vec",
@@ -6828,7 +6828,7 @@ dependencies = [
 [[package]]
 name = "zksync_consensus_storage"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6836,6 +6836,7 @@ dependencies = [
  "rand 0.8.5",
  "thiserror",
  "tracing",
+ "vise",
  "zksync_concurrency",
  "zksync_consensus_roles",
  "zksync_protobuf",
@@ -6845,7 +6846,7 @@ dependencies = [
 [[package]]
 name = "zksync_consensus_utils"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "thiserror",
  "zksync_concurrency",
@@ -6854,7 +6855,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "envy",
  "ethabi",
@@ -6868,7 +6869,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "base64 0.13.1",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -6883,7 +6884,7 @@ dependencies = [
 [[package]]
 name = "zksync_dal"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -6917,7 +6918,7 @@ dependencies = [
 [[package]]
 name = "zksync_health_check"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "async-trait",
  "futures",
@@ -6930,7 +6931,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -6940,7 +6941,7 @@ dependencies = [
 [[package]]
 name = "zksync_protobuf"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "bit-vec",
@@ -6958,7 +6959,7 @@ dependencies = [
 [[package]]
 name = "zksync_protobuf_build"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/era-consensus.git?rev=84cdd9e45fd84bc1fac0b394c899ae33aef91afa#84cdd9e45fd84bc1fac0b394c899ae33aef91afa"
+source = "git+https://github.com/matter-labs/era-consensus.git?rev=5727a3e0b22470bb90092388f9125bcb366df613#5727a3e0b22470bb90092388f9125bcb366df613"
 dependencies = [
  "anyhow",
  "heck 0.4.1",
@@ -6974,7 +6975,7 @@ dependencies = [
 [[package]]
 name = "zksync_state"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "itertools 0.10.5",
@@ -6991,7 +6992,7 @@ dependencies = [
 [[package]]
 name = "zksync_storage"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "num_cpus",
  "once_cell",
@@ -7003,7 +7004,7 @@ dependencies = [
 [[package]]
 name = "zksync_system_constants"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "bigdecimal",
@@ -7021,7 +7022,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "blake2 0.10.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -7058,7 +7059,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=sb-short-term-fee-model-1-4-1#f938464fb8a9e2b03685a8ca957ed950deecef52"
+source = "git+https://github.com/matter-labs/zksync-era.git?branch=zk-bootloader-memory-increase#2520a6f1dc90a26016f3d4641b8a6d7b11731d6a"
 dependencies = [
  "anyhow",
  "bigdecimal",

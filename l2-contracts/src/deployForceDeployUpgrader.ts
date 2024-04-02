@@ -1,10 +1,12 @@
+// hardhat import should be the first import in the file
+import * as hre from "hardhat";
+
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { computeL2Create2Address, create2DeployFromL1, getNumberFromEnv } from "./utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 import * as fs from "fs";
 import * as path from "path";
-import * as hre from "hardhat";
 
 // Create a Web3 provider.
 const provider = web3Provider();
