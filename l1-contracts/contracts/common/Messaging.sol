@@ -119,7 +119,7 @@ struct L2CanonicalTransaction {
 /// @param l2Calldata The calldata for the L2 transaction.
 /// @param l2GasLimit The limit of the L2 gas for the L2 transaction
 /// @param l2GasPerPubdataByteLimit The price for a single pubdata byte in L2 gas.
-/// @param factoryDeps The array of L2 bytecodes that the tx depends on. 
+/// @param factoryDeps The array of L2 bytecodes that the tx depends on.
 /// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
 /// this address will receive the `l2Value`.
 struct BridgehubL2TransactionRequest {
