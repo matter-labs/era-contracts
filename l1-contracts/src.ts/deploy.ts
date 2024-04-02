@@ -308,7 +308,7 @@ export class Deployer {
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
-        governor: this.ownerAddress,
+        governor: this.addresses.Governance,
         validatorTimelock: this.addresses.ValidatorTimeLock,
         genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
         genesisBatchHash,
