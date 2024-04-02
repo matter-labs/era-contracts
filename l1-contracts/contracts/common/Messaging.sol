@@ -42,16 +42,10 @@ struct L2Message {
 
 /// @dev Internal structure that contains the parameters for the writePriorityOp
 /// internal function.
-/// @param sender The sender's address.
 /// @param txId The id of the priority transaction.
-/// @param l2Value The msg.value of the L2 transaction.
-/// @param contractAddressL2 The address of the contract on L2 to call.
+/// @param l2GasPrice The gas price for the l2 priority operation.
 /// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
-/// @param l2GasLimit The limit of the L2 gas for the L2 transaction
-/// @param l2GasPricePerPubdata The price for a single pubdata byte in L2 gas.
-/// @param valueToMint The amount of ether that should be minted on L2 as the result of this transaction.
-/// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
-/// this address will receive the `l2Value`.
+/// @param request The external calldata request for the priority operation.
 struct WritePriorityOpParams {
     uint256 txId;
     uint256 l2GasPrice;
@@ -118,6 +112,16 @@ struct L2CanonicalTransaction {
     bytes reservedDynamic;
 }
 
+/// @param sender The sender's address.
+/// @param contractAddressL2 The address of the contract on L2 to call.
+/// @param valueToMint The amount of base token that should be minted on L2 as the result of this transaction.
+/// @param l2Value The msg.value of the L2 transaction.
+/// @param l2Calldata The calldata for the L2 transaction.
+/// @param l2GasLimit The limit of the L2 gas for the L2 transaction
+/// @param l2GasPerPubdataByteLimit The price for a single pubdata byte in L2 gas.
+/// @param factoryDeps The array of L2 bytecodes that the tx depends on. 
+/// @param refundRecipient The recipient of the refund for the transaction on L2. If the transaction fails, then
+/// this address will receive the `l2Value`.
 struct BridgehubL2TransactionRequest {
     address sender;
     address contractL2;
