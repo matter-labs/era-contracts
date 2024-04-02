@@ -70,14 +70,20 @@ enum CalldataForwardingMode {
  * @dev It is needed to call ContractDeployer and NonceHolder.
  */
 library SystemContractsCaller {
-    /// @notice Makes a call with the `isSystem` flag.
+    /// @notice executes a low-level call with the `isSystem` flag.
     /// @param gasLimit The gas limit for the call.
     /// @param to The address to call.
     /// @param value The value to pass with the transaction.
-    /// @param data The calldata.
+    /// @param dataStart Beggining of the calldata
+    /// @param dataLength The size of the calldata.
     /// @return success Whether the transaction has been successful.
-    /// @dev Note, that the `isSystem` flag can only be set when calling system contracts.
-    function contractCall(uint32 gasLimit, address to, uint256 value, uint32 dataStart, uint32 dataLength) internal returns (bool success) {
+    function contractCall(
+        uint32 gasLimit,
+        address to,
+        uint256 value,
+        uint32 dataStart,
+        uint32 dataLength
+    ) internal returns (bool success) {
         address callAddr = SYSTEM_CALL_CALL_ADDRESS;
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
             0,
@@ -113,6 +119,14 @@ library SystemContractsCaller {
             }
         }
     }
+
+    /// @notice Makes a call with the `isSystem` flag.
+    /// @param gasLimit The gas limit for the call.
+    /// @param to The address to call.
+    /// @param value The value to pass with the transaction.
+    /// @param data The calldata.
+    /// @return success Whether the transaction has been successful.
+    /// @dev Note, that the `isSystem` flag can only be set when calling system contracts.
     function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
         uint32 dataStart;
         assembly {
