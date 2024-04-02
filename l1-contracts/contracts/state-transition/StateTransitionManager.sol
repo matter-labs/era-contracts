@@ -106,7 +106,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
-    /// @inheritdoc IStateTransitionManager
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
@@ -115,7 +117,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
-    /// @inheritdoc IStateTransitionManager
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
         require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
@@ -227,6 +229,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
+    /// @dev used to register already deployed hyperchain contracts
+    /// @param _chainId the chain's id
+    /// @param _stateTransitionContract the chain's contract
     function registerAlreadyDeployedStateTransition(
         uint256 _chainId,
         address _stateTransitionContract
@@ -236,6 +241,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice called by Bridgehub when a chain registers
+    /// @param _chainId the chain's id
+    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _admin the chain's admin address
+    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
         address _baseToken,

@@ -24,9 +24,10 @@ struct StateTransitionManagerInitializeData {
 }
 
 interface IStateTransitionManager {
-    // when a new Chain is added
+    /// @dev emitted when a new Chain is added
     event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(
         address indexed _stateTransitionChain,
         L2CanonicalTransaction _l2Transaction,
@@ -42,12 +43,8 @@ interface IStateTransitionManager {
 
     function bridgehub() external view returns (address);
 
-    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
-    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
-    /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external;
 
-    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external;
 
     function stateTransition(uint256 _chainId) external view returns (address);
@@ -70,7 +67,6 @@ interface IStateTransitionManager {
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
-    /// @notice
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
