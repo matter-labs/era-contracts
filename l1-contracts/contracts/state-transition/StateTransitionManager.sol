@@ -139,8 +139,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev set initial cutHash
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
         bytes32 oldInitialCutHash = initialCutHash;
-        initialCutHash = keccak256(abi.encode(_diamondCut));
-        emit NewInitialCutHash(oldInitialCutHash, initialCutHash);
+        bytes32 newCutHash =  keccak256(abi.encode(_diamondCut));
+        initialCutHash = newCutHash;
+        emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
@@ -162,8 +163,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
     ) external onlyOwner {
-        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
-        emit NewUpgradeCutHash(_oldProtocolVersion, upgradeCutHash[_oldProtocolVersion]);
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
     }
 
     /// @dev freezes the specified chain
