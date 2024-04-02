@@ -1625,7 +1625,7 @@ object "Bootloader" {
                     assertionError("refundInGas > gasLimit")
                 }
 
-                if iszero(validateUint32(refundInGas)) {
+                if iszero(validateUint64(refundInGas)) {
                     assertionError("refundInGas is not uint32")
                 }
 
