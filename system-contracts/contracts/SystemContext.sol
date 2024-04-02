@@ -103,31 +103,18 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     function getBlockHashEVM(uint256 _block) external view returns (bytes32 hash) {
         uint128 blockNumber = currentVirtualL2BlockInfo.number;
 
-        VirtualBlockUpgradeInfo memory currentVirtualBlockUpgradeInfo = virtualBlockUpgradeInfo;
-
         // Due to virtual blocks upgrade, we'll have to use the following logic for retreiving the blockhash:
         // 1. If the block number is out of the 256-block supported range, return 0.
-        // 2. If the block was created before the upgrade for the virtual blocks (i.e. there we used to use hashes of the batches),
-        // we return the hash of the batch.
-        // 3. If the block was created after the day when the virtual blocks have caught up with the L2 blocks, i.e.
-        // all the information which is returned for users should be for L2 blocks, we return the hash of the corresponding L2 block.
-        // 4. If the block queried is a virtual blocks, calculate it on the fly.
+        // 2. If the block was created on genesis - return the hash of the batch.
+        // 3. If the block was created after genesis all the information which is returned for users should be for L2 blocks, we return the hash of the corresponding L2 block.
+
         if (blockNumber <= _block || blockNumber - _block > 256) {
             hash = bytes32(0);
-        } else if (_block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch) {
-            // Note, that we will get into this branch only for a brief moment of time, right after the upgrade
-            // for virtual blocks before 256 virtual blocks are produced.
+        } else if (_block < 1) {
+            // Note, that we will get into this branch only for a brief moment of time, right after the genesis
             hash = batchHashes[_block];
-        } else if (
-            _block >= currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block &&
-            currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block > 0
-        ) {
-            hash = _getLatest257L2blockHash(_block);
         } else {
-            // Important: we do not want this number to ever collide with the L2 block hash (either new or old one) and so
-            // that's why the legacy L2 blocks' hashes are keccak256(abi.encodePacked(uint32(_block))), while these are equivalent to
-            // keccak256(abi.encodePacked(_block))
-            hash = keccak256(abi.encode(_block));
+            hash = _getLatest257L2blockHash(_block);
         }
     }
 
