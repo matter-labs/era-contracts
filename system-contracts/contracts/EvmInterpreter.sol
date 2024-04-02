@@ -387,7 +387,7 @@ contract EvmInterpreter {
         uint32 dataStart = 0;
         uint32 dataLength = 36;
 
-        bool success = SystemContractsCaller.contractCall(uint32(gasleft()), addr, 0, 0, 36);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 36, true);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -433,7 +433,7 @@ contract EvmInterpreter {
             mstore(4, key)
             mstore(36, currentValue)
         }
-        bool success = SystemContractsCaller.contractCall(uint32(gasleft()), addr, 0, 0, 68);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, true);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2313,7 +2313,7 @@ contract EvmInterpreter {
             mstore(4, _passGas)
             mstore(36, _isStatic)
         }
-        bool success = SystemContractsCaller.contractCall(uint32(gasleft()), addr, 0, 0, 68);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 68, true);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2328,7 +2328,7 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        bool success = SystemContractsCaller.contractCall(uint32(gasleft()), addr, 0, 0, 4);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, true);
         assembly {
             if iszero(success) {
                 // This error should never happen
@@ -2343,7 +2343,7 @@ contract EvmInterpreter {
         assembly {
             mstore(0, selector)
         }
-        bool success = SystemContractsCaller.contractCall(uint32(gasleft()), addr, 0, 0, 4);
+        bool success = SystemContractsCaller.rawSystemCall(uint32(gasleft()), addr, 0, 0, 4, true);
         assembly {
             _passGas := mload(0)
             isStatic := mload(32)
