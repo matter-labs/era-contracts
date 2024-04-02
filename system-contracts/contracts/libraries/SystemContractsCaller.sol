@@ -77,15 +77,8 @@ library SystemContractsCaller {
     /// @param data The calldata.
     /// @return success Whether the transaction has been successful.
     /// @dev Note, that the `isSystem` flag can only be set when calling system contracts.
-    function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
+    function contractCall(uint32 gasLimit, address to, uint256 value, uint32 dataStart, uint32 dataLength) internal returns (bool success) {
         address callAddr = SYSTEM_CALL_CALL_ADDRESS;
-
-        uint32 dataStart;
-        assembly {
-            dataStart := add(data, 0x20)
-        }
-        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
-
         uint256 farCallAbi = SystemContractsCaller.getFarCallABI(
             0,
             0,
@@ -98,7 +91,6 @@ library SystemContractsCaller {
             false,
             true
         );
-
         if (value == 0) {
             // Doing the system call directly
             assembly {
@@ -114,6 +106,20 @@ library SystemContractsCaller {
                 success := call(msgValueSimulator, callAddr, value, to, farCallAbi, forwardMask, 0)
             }
         }
+        if (success) {
+            assembly {
+                let returndataSize := returndatasize()
+                returndatacopy(0, 0, returndataSize)
+            }
+        }
+    }
+    function systemCall(uint32 gasLimit, address to, uint256 value, bytes memory data) internal returns (bool success) {
+        uint32 dataStart;
+        assembly {
+            dataStart := add(data, 0x20)
+        }
+        uint32 dataLength = uint32(Utils.safeCastToU32(data.length));
+        success = contractCall(gasLimit, to, value, dataStart, dataLength);
     }
 
     /// @notice Makes a call with the `isSystem` flag.
