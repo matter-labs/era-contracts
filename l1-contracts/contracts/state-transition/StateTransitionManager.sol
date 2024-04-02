@@ -138,7 +138,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev set initial cutHash
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
         bytes32 oldInitialCutHash = initialCutHash;
-        bytes32 newCutHash =  keccak256(abi.encode(_diamondCut));
+        bytes32 newCutHash = keccak256(abi.encode(_diamondCut));
         initialCutHash = newCutHash;
         emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
