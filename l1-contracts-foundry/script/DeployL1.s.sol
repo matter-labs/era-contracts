@@ -80,6 +80,7 @@ contract DeployL1Script is Script {
         uint256 l1ChainId;
         uint256 eraChainId;
         address deployerAddress;
+        address ownerAddress;
         uint256 gasPrice;
         ContractsConfig contracts;
         TokensConfig tokens;
@@ -161,6 +162,7 @@ contract DeployL1Script is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.gasPrice = toml.readUint("$.gas_price");
         config.eraChainId = toml.readUint("$.era_chain_id");
+        config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.contracts.governorAddress = toml.readAddress("$.contracts.governor_address");
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
@@ -579,13 +581,6 @@ contract DeployL1Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("l1", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
-        vm.serializeAddress("l1", "governance_addr", addresses.governance);
-        vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
-        vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
-        vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
-        vm.serializeAddress("l1", "multicall3_addr", config.contracts.multicall3Addr);
-
         vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         string memory l1Bridgehub = vm.serializeAddress(
             "l1.bridgehub",
@@ -673,12 +668,19 @@ contract DeployL1Script is Script {
             config.contracts.priorityTxMaxGasLimit
         );
 
+        vm.serializeAddress("l1", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
+        vm.serializeAddress("l1", "governance_addr", addresses.governance);
+        vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
+        vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
+        vm.serializeAddress("l1", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeUint("l1", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("l1", "era_chain_id", config.eraChainId);
         vm.serializeString("l1", "bridgehub", l1Bridgehub);
         vm.serializeString("l1", "state_transition", l1StateTransition);
         vm.serializeString("l1", "config", l1Config);
         vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);
+        vm.serializeAddress("l1", "owner_addr", config.ownerAddress);
         string memory l1 = vm.serializeString("l1", "bridges", l1Bridges);
 
         string memory toml = vm.serializeString("toml", "l1", l1);
