@@ -76,7 +76,7 @@ contract DeployL1Script is Script {
     }
 
     struct Config {
-        uint256 chainId;
+        uint256 l1ChainId;
         uint256 eraChainId;
         address deployerAddress;
         uint256 gasPrice;
@@ -150,7 +150,7 @@ contract DeployL1Script is Script {
         string memory path = string.concat(root, "/script-config/config-deploy-l1.toml");
         string memory toml = vm.readFile(path);
 
-        config.chainId = block.chainid;
+        config.l1ChainId = block.chainid;
         config.deployerAddress = msg.sender;
 
         // Config file must be parsed key by key, otherwise values returned
@@ -459,7 +459,7 @@ contract DeployL1Script is Script {
         });
         bytes memory bytecode = abi.encodePacked(
             type(DiamondProxy).creationCode,
-            abi.encode(config.chainId, diamondCut)
+            abi.encode(config.l1ChainId, diamondCut)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("DiamondProxy deployed at:", contractAddress);
@@ -536,7 +536,7 @@ contract DeployL1Script is Script {
         // as the operation could be scheduled for timestamp 1
         // which is also a magic number meaning the operation
         // is done.
-        if (config.chainId == 31337) {
+        if (config.l1ChainId == 31337) {
             vm.warp(10);
         }
 
@@ -661,7 +661,7 @@ contract DeployL1Script is Script {
             config.contracts.priorityTxMaxGasLimit
         );
 
-        vm.serializeUint("l1", "chain_id", config.chainId);
+        vm.serializeUint("l1", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("l1", "era_chain_id", config.eraChainId);
         vm.serializeString("l1", "bridgehub", l1Bridgehub);
         vm.serializeString("l1", "state_transition", l1StateTransition);
