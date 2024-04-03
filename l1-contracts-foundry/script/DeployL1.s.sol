@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -106,7 +107,6 @@ contract DeployL1Script is Script {
         uint256 diamondInitMaxL2GasPerBatch;
         uint256 diamondInitPriorityTxMaxPubdata;
         uint256 diamondInitMinimalL2GasPrice;
-        address governorAddress;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
     }
@@ -146,6 +146,8 @@ contract DeployL1Script is Script {
         deployErc20BridgeImplementation();
         upgradeL1Erc20Bridge();
 
+        updateOwners();
+
         saveOutput();
     }
 
@@ -164,7 +166,6 @@ contract DeployL1Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
 
-        config.contracts.governorAddress = toml.readAddress("$.contracts.governor_address");
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
         );
@@ -272,7 +273,7 @@ contract DeployL1Script is Script {
         bytes memory bytecode = abi.encodePacked(
             type(Governance).creationCode,
             abi.encode(
-                config.contracts.governorAddress,
+                config.deployerAddress,
                 config.contracts.governanceSecurityCouncilAddress,
                 config.contracts.governanceMinDelay
             )
@@ -417,7 +418,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            governor: config.deployerAddress,
+            governor: config.ownerAddress,
             validatorTimelock: addresses.validatorTimelock,
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
@@ -580,6 +581,20 @@ contract DeployL1Script is Script {
         console.log("L1Erc20Bridge upgraded");
     }
 
+    function updateOwners() internal {
+        vm.startBroadcast();
+
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
+        validatorTimelock.transferOwnership(config.ownerAddress);
+
+        Governance governance = Governance(payable(addresses.governance));
+        governance.transferOwnership(config.ownerAddress);
+
+        addresses.bridgehub.bridgehubProxy.call(abi.encodeCall(Ownable2Step.transferOwnership, (config.ownerAddress)));
+
+        vm.stopBroadcast();
+    }
+
     function saveOutput() internal {
         vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         string memory l1Bridgehub = vm.serializeAddress(
@@ -629,7 +644,6 @@ contract DeployL1Script is Script {
             addresses.bridges.sharedBridgeProxy
         );
 
-        vm.serializeAddress("l1.config", "governor_addr", config.contracts.governorAddress);
         vm.serializeUint(
             "l1.config",
             "diamond_init_batch_overhead_l1_gas",
