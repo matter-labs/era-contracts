@@ -26,11 +26,13 @@ contract DeployHyperchainScript is Script {
         ContractsConfig contracts;
         AddressesConfig addresses;
         address deployerAddress;
+        address ownerAddress;
         uint256 eraChainId;
     }
 
     struct ContractsConfig {
         uint256 bridgehubCreateNewChainSalt;
+        PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
         uint256 diamondInitMaxPubdataPerBatch;
         uint256 diamondInitMaxL2GasPerBatch;
@@ -84,6 +86,7 @@ contract DeployHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
+        config.ownerAddress = toml.readAddress("$.l1.owner_addr");
         config.eraChainId = toml.readUint("$.l1.era_chain_id");
         config.addresses.baseToken = ADDRESS_ONE; //TODO: grab from config
         config.addresses.bridgehub = toml.readAddress("$.l1.bridgehub.bridgehub_proxy_addr");
@@ -98,6 +101,9 @@ contract DeployHyperchainScript is Script {
         config.addresses.validatorTimelock = toml.readAddress("$.l1.validator_timelock_addr");
 
         config.contracts.bridgehubCreateNewChainSalt = 0; //TODO: grab from config
+        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+            toml.readUint("$.l1.config.diamond_init_pubdata_pricing_mode")
+        );
         config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
             "$.l1.config.diamond_init_batch_overhead_l1_gas"
         );
@@ -181,7 +187,7 @@ contract DeployHyperchainScript is Script {
         });
 
         FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
+            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
             batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
             maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
             maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),

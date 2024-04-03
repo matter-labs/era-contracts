@@ -646,6 +646,11 @@ contract DeployL1Script is Script {
 
         vm.serializeUint(
             "l1.config",
+            "diamond_init_pubdata_pricing_mode",
+            uint256(config.contracts.diamondInitPubdataPricingMode)
+        );
+        vm.serializeUint(
+            "l1.config",
             "diamond_init_batch_overhead_l1_gas",
             config.contracts.diamondInitBatchOverheadL1Gas
         );
