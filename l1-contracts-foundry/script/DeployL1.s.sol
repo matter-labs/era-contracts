@@ -98,6 +98,7 @@ contract DeployL1Script is Script {
         bytes32 recursionCircuitsSetVksHash;
         uint256 priorityTxMaxGasLimit;
         uint256 sharedBridgeUpgradeStorageSwitch;
+        PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
         uint256 diamondInitMaxPubdataPerBatch;
         uint256 diamondInitMaxL2GasPerBatch;
@@ -182,6 +183,9 @@ contract DeployL1Script is Script {
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
         config.contracts.sharedBridgeUpgradeStorageSwitch = toml.readUint(
             "$.contracts.shared_bridge_upgrade_storage_switch"
+        );
+        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
+            toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
         config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
             "$.contracts.diamond_init_batch_overhead_l1_gas"
@@ -383,7 +387,7 @@ contract DeployL1Script is Script {
         });
 
         FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: PubdataPricingMode.Rollup,
+            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
             batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
             maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
             maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
