@@ -4,9 +4,10 @@ pragma solidity 0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 
 library Utils {
-    // Cheat code address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
+    // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    bytes4 internal constant GET_NAME_SELECTOR = bytes4(keccak256("getName()"));
+    // Create2Factory deterministic bytecode.
+    // https://github.com/Arachnid/deterministic-deployment-proxy
     bytes internal constant CREATE2_FACTORY_BYTECODE =
         hex"604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3";
 
@@ -44,7 +45,7 @@ library Utils {
         // Remove `getName()` selector if existing
         bool hasGetName = false;
         for (uint256 i = 0; i < selectors.length; i++) {
-            if (selectors[i] == GET_NAME_SELECTOR) {
+            if (selectors[i] == bytes4(keccak256("getName()"))) {
                 selectors[i] = selectors[selectors.length - 1];
                 hasGetName = true;
                 break;
