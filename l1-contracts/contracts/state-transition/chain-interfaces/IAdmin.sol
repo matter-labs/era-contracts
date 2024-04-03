@@ -40,8 +40,8 @@ interface IAdmin is IZkSyncStateTransitionBase {
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
 
     /// @notice Change the pubdata pricing mode before the first batch is processed
-    /// @param _validiumMode The new pubdata pricing mode
-    function setPubdataPricingMode(PubdataPricingMode _validiumMode) external;
+    /// @param _pricingMode The new pubdata pricing mode
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;

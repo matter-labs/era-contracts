@@ -290,7 +290,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         require(_stateTransitionContract != address(0), "STM: STC zero");
 
         stateTransition[_chainId] = _stateTransitionContract;
-        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+        emit NewHyperchain(_chainId, _stateTransitionContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -350,6 +350,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);
 
-        emit StateTransitionNewChain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, stateTransitionAddress);
     }
 }

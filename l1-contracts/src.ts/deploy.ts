@@ -692,7 +692,7 @@ export class Deployer {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
-          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
+          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("NewHyperchain"))
           .topics[2].slice(26);
       this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
       if (this.verbose) {
