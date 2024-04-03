@@ -1,4 +1,4 @@
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {ExecutorFacet} from "../../zksync/facets/Executor.sol";
 import {VerifierParams, PubdataPricingMode} from "../../zksync/Storage.sol";

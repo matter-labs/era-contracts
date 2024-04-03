@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 
-multivm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
-vlog = { git = "https://github.com/matter-labs/zksync-era.git", branch = "zk-bootloader-memory-increase" }
+multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
+vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "5f04622255cd58d5c2fd868f4bf0317cfe4237fd" }
 
 colored = "2.0"
 hex = "0.4"

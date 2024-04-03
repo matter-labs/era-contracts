@@ -3,6 +3,7 @@ import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
+import type { Contract } from "ethers";
 import { Wallet } from "ethers";
 import { parseEther } from "ethers/lib/utils";
 import { web3Provider } from "./utils";
@@ -25,12 +26,65 @@ type Token = {
 
 type TokenDescription = Token & {
   implementation?: string;
+  contract?: Contract;
 };
 
-async function deployToken(token: TokenDescription, wallet: Wallet, nonce?: number): Promise<[Token, number]> {
-  if (nonce === undefined) {
-    nonce = await wallet.getTransactionCount();
+async function deployContracts(tokens: TokenDescription[], wallet: Wallet): Promise<number> {
+  let nonce = await wallet.getTransactionCount("pending");
+
+  for (const token of tokens) {
+    token.implementation = token.implementation || DEFAULT_ERC20;
+    const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
+    const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
+
+    token.contract = await tokenFactory.deploy(...args, { gasLimit: 5000000, nonce: nonce++ });
   }
+
+  await Promise.all(tokens.map(async (token) => token.contract.deployTransaction.wait()));
+
+  return nonce;
+}
+
+function getTestAddresses(): string[] {
+  return Array.from(
+    { length: 10 },
+    (_, i) =>
+      Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, `m/44'/60'/0'/0/${i}`).connect(provider).address
+  );
+}
+
+function unwrapToken(token: TokenDescription): Token {
+  token.address = token.contract.address;
+
+  delete token.contract;
+  if (token.implementation) {
+    delete token.implementation;
+  }
+
+  return token;
+}
+
+async function mintTokens(tokens: TokenDescription[], wallet: Wallet, nonce: number): Promise<Token[]> {
+  const targetAddresses = [wallet.address, ...getTestAddresses()];
+
+  const results = [];
+  const promises = [];
+  for (const token of tokens) {
+    if (token.implementation !== "WETH9") {
+      for (const address of targetAddresses) {
+        const tx = await token.contract.mint(address, parseEther("3000000000"), { nonce: nonce++ });
+        promises.push(tx.wait());
+      }
+    }
+
+    results.push(unwrapToken(token));
+  }
+  await Promise.all(promises);
+
+  return results;
+}
+
+async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Token> {
   token.implementation = token.implementation || DEFAULT_ERC20;
   const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
   const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
@@ -38,16 +92,14 @@ async function deployToken(token: TokenDescription, wallet: Wallet, nonce?: numb
   await erc20.deployTransaction.wait();
 
   if (token.implementation !== "WETH9") {
-    nonce += 1;
-    await erc20.mint(wallet.address, parseEther("3000000000"), { gasLimit: 5000000, nonce: nonce });
-  }
-  for (let i = 0; i < 10; ++i) {
-    const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
-      provider
-    );
-    if (token.implementation !== "WETH9") {
-      nonce += 1;
-      await erc20.mint(testWallet.address, parseEther("3000000000"), { gasLimit: 5000000, nonce: nonce });
+    await erc20.mint(wallet.address, parseEther("3000000000"));
+
+    for (let i = 0; i < 10; ++i) {
+      const testWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic as string, "m/44'/60'/0'/0/" + i).connect(
+        provider
+      );
+
+      await erc20.mint(testWallet.address, parseEther("3000000000"));
     }
   }
 
@@ -95,18 +147,13 @@ async function main() {
     .description("Adds a multiple tokens given in JSON format")
     .action(async (tokens_json: string, cmd) => {
       const tokens: Array<TokenDescription> = JSON.parse(tokens_json);
-      const result = [];
 
       const wallet = cmd.privateKey
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-      let nonce = await wallet.getTransactionCount();
-      for (const token of tokens) {
-        let token_result;
-        [token_result, nonce] = await deployToken(token, wallet, nonce);
-        result.push(token_result);
-      }
+      const nonce = await deployContracts(tokens, wallet);
+      const result = await mintTokens(tokens, wallet, nonce);
 
       console.log(JSON.stringify(result, null, 2));
     });

@@ -1,6 +1,8 @@
 // hardhat import should be the first import in the file
 import * as hre from "hardhat";
 
+// We need to import it in order to access correct typing for Hardhat config
+import "@matterlabs/hardhat-zksync-solc";
 import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
@@ -9,9 +11,10 @@ import { hashBytecode } from "zksync-web3/build/src/utils";
 import type { YulContractDescrption, ZasmContractDescrption } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
-import { getZksolcUrl, saltFromUrl } from "@matterlabs/hardhat-zksync-solc";
 import path from "path";
 import { spawn as _spawn } from "child_process";
+import { createHash } from "crypto";
+import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
 export interface Dependency {
   name: string;
@@ -193,14 +196,26 @@ export async function filterPublishedFactoryDeps(
   return [bytecodesToDeploy, currentLength];
 }
 
+export async function getSolcLocation(): Promise<string> {
+  const compilersCache = await getCompilersDir();
+  const compilerPlatform = CompilerDownloader.getCompilerPlatform();
+  const downloader = new CompilerDownloader(compilerPlatform, compilersCache);
+
+  const solcVersion = hre.config.solidity.compilers[0].version;
+
+  return (await downloader.getCompiler(solcVersion))!.compilerPath;
+}
+
 export async function compilerLocation(compilerVersion: string, isCompilerPreRelease: boolean): Promise<string> {
   const compilersCache = await getCompilersDir();
 
-  let salt = "";
+  const salt = "";
 
   if (isCompilerPreRelease) {
-    const url = getZksolcUrl("https://github.com/matter-labs/zksolc-prerelease", hre.config.zksolc.version);
-    salt = saltFromUrl(url);
+    const url = hre.config.zksolc.settings.compilerPath;
+    const salt = createHash("sha1").update(url!).digest("hex");
+    const compilerPath = `${compilersCache}/zksolc/zksolc-remote-${salt}.0`; // Path of the downloaded compiler
+    return compilerPath;
   }
 
   return path.join(compilersCache, "zksolc", `zksolc-v${compilerVersion}${salt ? "-" : ""}${salt}`);
