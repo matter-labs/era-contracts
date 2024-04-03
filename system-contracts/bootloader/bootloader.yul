@@ -1587,8 +1587,6 @@ object "Bootloader" {
                         let nearCallAbi := getNearCallABI(gasLeft)
                         let gasBeforePostOp := gas()
 
-                        // It was expected that before this point various `isNotEnoughGasForPubdata` methods would ensure that the user
-                        // has enough funds for pubdata. Now, we just subtract the leftovers from the user.
                         let spentOnPubdata := getErgsSpentForPubdata(
                             basePubdataSpent,
                             gasPerPubdata
