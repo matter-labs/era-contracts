@@ -100,8 +100,7 @@ describe("Legacy Era tests", function () {
       l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
       deployer.addresses.Bridges.ERC20BridgeProxy,
-      deployer.chainId,
-      deployer.addresses.Bridges.ERC20BridgeImplementation
+      deployer.chainId
     );
 
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
