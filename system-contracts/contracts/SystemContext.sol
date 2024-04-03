@@ -74,7 +74,21 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// - Their number will start from being equal to the number of the batch and it will increase until it reaches the L2 block number.
     /// - Their timestamp is updated each time a new virtual block is created.
     /// - Their hash is calculated as `keccak256(uint256(number))`
-    BlockInfo internal currentVirtualL2BlockInfo;
+    BlockInfo internal DEPRECATED_currentL2VirtualBlockInfo;
+
+    /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
+    struct DEPRECATED_VirtualBlockUpgradeInfo {
+        /// @notice In order to maintain consistent results for `blockhash` requests, we'll
+        /// have to remember the number of the batch when the upgrade to the virtual blocks has been done.
+        /// The hashes for virtual blocks before the upgrade are identical to the hashes of the corresponding batches.
+        uint128 virtualBlockStartBatch;
+        /// @notice L2 block when the virtual blocks have caught up with the L2 blocks. Starting from this block,
+        /// all the information returned to users for block.timestamp/number, etc should be the information about the L2 blocks and
+        /// not virtual blocks.
+        uint128 virtualBlockFinishL2Block;
+    }
+    DEPRECATED_VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
+
 
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
@@ -98,7 +112,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// its signature can not be changed to `getL2BlockHashEVM`.
     /// @return hash The blockhash of the block with the given number.
     function getBlockHashEVM(uint256 _block) external view returns (bytes32 hash) {
-        uint128 blockNumber = currentVirtualL2BlockInfo.number;
+        uint128 blockNumber = currentL2BlockInfo.number;
 
         // 1. If the block number is out of the 256-block supported range, return 0.
         // 2. If the block was created on genesis - return the hash of the batch.
@@ -142,7 +156,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// its signature can not be changed to `getL2BlockNumber`.
     /// @return blockNumber The current L2 block's number.
     function getBlockNumber() public view returns (uint128) {
-        return currentVirtualL2BlockInfo.number;
+        return currentL2BlockInfo.number;
     }
 
     /// @notice Returns the current L2 block's timestamp.
@@ -150,7 +164,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// its signature can not be changed to `getL2BlockTimestamp`.
     /// @return timestamp The current L2 block's timestamp.
     function getBlockTimestamp() public view returns (uint128) {
-        return currentVirtualL2BlockInfo.timestamp;
+        return currentL2BlockInfo.timestamp;
     }
 
     /// @notice Assuming that block is one of the last MINIBLOCK_HASHES_TO_STORE ones, returns its hash.
