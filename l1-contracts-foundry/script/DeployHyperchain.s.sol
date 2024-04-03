@@ -16,7 +16,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
-contract DeployL1Script is Script {
+contract DeployHyperchainScript is Script {
     using stdToml for string;
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
