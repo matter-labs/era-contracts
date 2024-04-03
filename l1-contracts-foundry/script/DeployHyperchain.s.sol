@@ -249,7 +249,7 @@ contract DeployL1Script is Script {
         IZkSyncStateTransition zkSyncStateTransition = IZkSyncStateTransition(config.addresses.newDiamondProxy);
 
         vm.startBroadcast();
-        zkSyncStateTransition.setTokenMultiplier(1, 1);
+        zkSyncStateTransition.setTokenMultiplier(1, 1); //TODO: grab from config
 
         if (config.contracts.validiumMode) {
             zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
