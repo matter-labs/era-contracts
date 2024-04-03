@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
@@ -13,7 +13,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2Step {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 

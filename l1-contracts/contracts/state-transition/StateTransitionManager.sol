@@ -13,7 +13,7 @@ import {ISystemContext} from "./l2-deps/ISystemContext.sol";
 import {IZkSyncStateTransition} from "./chain-interfaces/IZkSyncStateTransition.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
@@ -22,7 +22,7 @@ import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 /// @title StateTransition contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2Step {
+contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 

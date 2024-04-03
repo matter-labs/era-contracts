@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -27,7 +27,7 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Bridges assets between L1 and hyperchains, supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Ownable2Step {
+contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token on L1.
