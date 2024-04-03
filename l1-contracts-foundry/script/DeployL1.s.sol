@@ -141,10 +141,10 @@ contract DeployL1Script is Script {
 
         deployDiamondProxy();
 
-        deployErc20BridgeProxy();
         deploySharedBridgeContracts();
         deployErc20BridgeImplementation();
-        upgradeL1Erc20Bridge();
+        deployErc20BridgeProxy();
+        updateSharedBridge();
 
         updateOwners();
 
@@ -480,16 +480,6 @@ contract DeployL1Script is Script {
         addresses.stateTransition.diamondProxy = contractAddress;
     }
 
-    function deployErc20BridgeProxy() internal {
-        bytes memory bytecode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.transparentProxyAdmin, bytes(hex""))
-        );
-        address contractAddress = deployViaCreate2(bytecode);
-        console.log("Erc20BridgeProxy deployed at:", contractAddress);
-        addresses.bridges.erc20BridgeProxy = contractAddress;
-    }
-
     function deploySharedBridgeContracts() internal {
         deploySharedBridgeImplementation();
         deploySharedBridgeProxy();
@@ -515,7 +505,7 @@ contract DeployL1Script is Script {
 
     function deploySharedBridgeProxy() internal {
         uint256 storageSwitch = config.contracts.sharedBridgeUpgradeStorageSwitch;
-        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (addresses.governance, storageSwitch));
+        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress, storageSwitch));
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
@@ -544,40 +534,21 @@ contract DeployL1Script is Script {
         addresses.bridges.erc20BridgeImplementation = contractAddress;
     }
 
-    function upgradeL1Erc20Bridge() internal {
-        // In local network, we need to change the block.number
-        // as the operation could be scheduled for timestamp 1
-        // which is also a magic number meaning the operation
-        // is done.
-        if (config.l1ChainId == 31337) {
-            vm.warp(10);
-        }
-
-        bytes memory callData = abi.encodeCall(
-            ProxyAdmin.upgradeAndCall,
-            (
-                ITransparentUpgradeableProxy(addresses.bridges.erc20BridgeProxy),
-                addresses.bridges.erc20BridgeImplementation,
-                abi.encodeCall(L1ERC20Bridge.initialize, ())
-            )
+    function deployErc20BridgeProxy() internal {
+        bytes memory bytecode = abi.encodePacked(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.erc20BridgeImplementation, bytes(hex""))
         );
+        address contractAddress = deployViaCreate2(bytecode);
+        console.log("Erc20BridgeProxy deployed at:", contractAddress);
+        addresses.bridges.erc20BridgeProxy = contractAddress;
+    }
 
-        IGovernance.Call[] memory calls = new IGovernance.Call[](1);
-        calls[0] = IGovernance.Call({target: addresses.transparentProxyAdmin, value: 0, data: callData});
-
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: bytes32(0)
-        });
-
-        Governance governance = Governance(payable(addresses.governance));
-
-        vm.startBroadcast();
-        governance.scheduleTransparent(operation, 0);
-        governance.execute(operation);
-        vm.stopBroadcast();
-        console.log("L1Erc20Bridge upgraded");
+    function updateSharedBridge() internal {
+        L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
+        vm.broadcast();
+        sharedBridge.setL1Erc20Bridge(addresses.bridges.erc20BridgeProxy);
+        console.log("SharedBridge updated with ERC20Bridge address");
     }
 
     function updateOwners() internal {
@@ -589,9 +560,15 @@ contract DeployL1Script is Script {
         Governance governance = Governance(payable(addresses.governance));
         governance.transferOwnership(config.ownerAddress);
 
-        addresses.bridgehub.bridgehubProxy.call(abi.encodeCall(Ownable2Step.transferOwnership, (config.ownerAddress)));
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        bridgehub.transferOwnership(config.ownerAddress);
+
+        L1SharedBridge sharedBridge = L1SharedBridge(addresses.bridges.sharedBridgeProxy);
+        sharedBridge.transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
+
+        console.log("Owners updated");
     }
 
     function saveOutput() internal {

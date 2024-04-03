@@ -37,7 +37,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     IBridgehub public immutable override bridgehub;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public immutable override legacyBridge;
+    IL1ERC20Bridge public override legacyBridge;
 
     /// @dev Era's chainID
     uint256 immutable eraChainId;
@@ -97,14 +97,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     constructor(
         address _l1WethAddress,
         IBridgehub _bridgehub,
-        IL1ERC20Bridge _legacyBridge,
         uint256 _eraChainId,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
-        legacyBridge = _legacyBridge;
         eraChainId = _eraChainId;
         eraDiamondProxy = _eraDiamondProxy;
     }
@@ -257,6 +255,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
+    }
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
+        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
