@@ -711,7 +711,11 @@ export class Deployer {
     });
     const receiptRegisterValidator = await txRegisterValidator.wait();
     if (this.verbose) {
-      console.log(`Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${txRegisterValidator.hash}`);
+      console.log(
+        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
+          txRegisterValidator.hash
+        }`
+      );
     }
 
     nonce++;

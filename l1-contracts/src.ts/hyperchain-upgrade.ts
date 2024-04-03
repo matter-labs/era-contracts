@@ -205,16 +205,16 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
   }
   // register Era in Bridgehub, STM
-  const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
+  const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
   if (deployer.verbose) {
     console.log("registering Era in stateTransitionManager");
   }
-  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
+  const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedStateTransition", [
     deployer.chainId,
-    deployer.addresses.StateTransition.DiamondProxy
-  );
-  await tx0.wait();
+    deployer.addresses.StateTransition.DiamondProxy,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, registerData);
   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   if (deployer.verbose) {
     console.log("registering Era in Bridgehub");

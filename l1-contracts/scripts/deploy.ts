@@ -55,14 +55,7 @@ async function main() {
         verbose: true,
       });
 
-      await initialBridgehubDeployment(
-        deployer,
-        [],
-        gasPrice,
-        cmd.onlyVerifier,
-        create2Salt,
-        nonce
-      );
+      await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
     });
 
   await program.parseAsync(process.argv);

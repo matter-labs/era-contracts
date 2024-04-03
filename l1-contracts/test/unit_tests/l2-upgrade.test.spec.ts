@@ -16,6 +16,8 @@ import {
   StateTransitionManagerFactory,
 } from "../../typechain";
 
+import { Ownable2StepFactory } from "../../typechain/Ownable2StepFactory";
+
 import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from "../../src.ts/deploy-process";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
@@ -85,6 +87,12 @@ describe("L2 upgrade test", function () {
     const extraFacet = facetCut(dummyAdminFacetContract.address, dummyAdminFacetContract.interface, Action.Add, true);
 
     const deployer = await initialTestnetDeploymentProcess(deployWallet, ownerAddress, gasPrice, [extraFacet]);
+    const ownable = Ownable2StepFactory.connect(deployer.addresses.StateTransition.StateTransitionProxy, deployWallet);
+    const data = ownable.interface.encodeFunctionData("transferOwnership", [deployWallet.address]);
+    await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data);
+    const transferOwnershipTx = await ownable.acceptOwnership();
+    await transferOwnershipTx.wait();
+
     initialProtocolVersion = parseInt(process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION);
 
     chainId = deployer.chainId;
