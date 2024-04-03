@@ -87,6 +87,7 @@ contract DeployL1Script is Script {
     struct ContractsConfig {
         bytes32 create2FactorySalt;
         address create2FactoryAddr;
+        address multicall3Addr;
         uint256 validatorTimelockExecutionDelay;
         bytes32 genesisRoot;
         uint256 genesisRollupLeafIndex;
@@ -225,6 +226,9 @@ contract DeployL1Script is Script {
         if (MULTICALL3_ADDRESS.code.length == 0) {
             address contractAddress = deployViaCreate2(type(Multicall3).creationCode);
             console.log("Multicall3 deployed at:", contractAddress);
+            config.contracts.multicall3Addr = contractAddress;
+        } else {
+            config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
         }
     }
 
@@ -573,6 +577,7 @@ contract DeployL1Script is Script {
         vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
         vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
+        vm.serializeAddress("l1", "multicall3_addr", config.contracts.multicall3Addr);
 
         vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         string memory l1Bridgehub = vm.serializeAddress(
