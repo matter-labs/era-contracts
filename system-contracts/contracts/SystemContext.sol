@@ -103,7 +103,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     function getBlockHashEVM(uint256 _block) external view returns (bytes32 hash) {
         uint128 blockNumber = currentVirtualL2BlockInfo.number;
 
-        // Due to virtual blocks upgrade, we'll have to use the following logic for retreiving the blockhash:
         // 1. If the block number is out of the 256-block supported range, return 0.
         // 2. If the block was created on genesis - return the hash of the batch.
         // 3. If the block was created after genesis all the information which is returned for users should be for L2 blocks, we return the hash of the corresponding L2 block.
@@ -293,15 +292,11 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _l2BlockTimestamp The timestamp of the new L2 block.
     /// @param _expectedPrevL2BlockHash The expected hash of the previous L2 block.
     /// @param _isFirstInBatch Whether this method is called for the first time in the batch.
-    /// @param _maxVirtualBlocksToCreate The maximum number of virtual block to create with this L2 block.
-    /// @dev It is a strict requirement that a new virtual block is created at the start of the batch.
-    /// @dev It is also enforced that the number of the current virtual L2 block can not exceed the number of the L2 block.
     function setL2Block(
         uint128 _l2BlockNumber,
         uint128 _l2BlockTimestamp,
         bytes32 _expectedPrevL2BlockHash,
-        bool _isFirstInBatch,
-        uint128 _maxVirtualBlocksToCreate
+        bool _isFirstInBatch
     ) external onlyCallFromBootloader {
         // We check that the timestamp of the L2 block is consistent with the timestamp of the batch.
         if (_isFirstInBatch) {
@@ -310,7 +305,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
                 _l2BlockTimestamp >= currentBatchTimestamp,
                 "The timestamp of the L2 block must be greater than or equal to the timestamp of the current batch"
             );
-            require(_maxVirtualBlocksToCreate > 0, "There must be a virtual block created at the start of the batch");
         }
 
         (uint128 currentL2BlockNumber, uint128 currentL2BlockTimestamp) = getL2BlockNumberAndTimestamp();
@@ -328,7 +322,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
                 _expectedPrevL2BlockHash == _getLatest257L2blockHash(_l2BlockNumber - 1),
                 "The previous hash of the same L2 block must be same"
             );
-            require(_maxVirtualBlocksToCreate == 0, "Can not create virtual blocks in the middle of the miniblock");
         } else if (currentL2BlockNumber + 1 == _l2BlockNumber) {
             // From the checks in _upgradeL2Blocks it is known that currentL2BlockNumber can not be 0
             bytes32 prevL2BlockHash = _getLatest257L2blockHash(currentL2BlockNumber - 1);
@@ -351,8 +344,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         } else {
             revert("Invalid new L2 block number");
         }
-
-        _setVirtualBlock(_l2BlockNumber, _maxVirtualBlocksToCreate, _l2BlockTimestamp);
     }
 
     /// @notice Appends the transaction hash to the rolling hash of the current L2 block.
