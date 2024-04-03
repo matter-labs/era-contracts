@@ -2670,7 +2670,7 @@ object "Bootloader" {
                     SYSTEM_CONTEXT_ADDR(),
                     0,
                     0,
-                    108,
+                    132,
                     0,
                     0
                 )
