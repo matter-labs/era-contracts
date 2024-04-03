@@ -307,7 +307,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         bytes calldata _diamondCut
     ) external onlyBridgehub {
         if (hyperchain[_chainId] != address(0)) {
-            // StateTransition chain already registered
+            // Hyperchain already registered
             // note this can only happen if we added the chain manually, as chains are normally registered through the bridgehub
             // this is for legacy chains
             return;
