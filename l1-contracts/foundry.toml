@@ -5,6 +5,6 @@ libs = ['node_modules', 'lib']
 cache_path = 'cache-forge'
 test = 'test/foundry'
 solc_version = "0.8.24"
-evm_version="cancun"
+evm_version = "cancun"
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config

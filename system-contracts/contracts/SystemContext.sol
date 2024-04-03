@@ -449,7 +449,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     ) external onlyCallFromBootloader {
         (uint128 previousBatchNumber, uint128 previousBatchTimestamp) = getBatchNumberAndTimestamp();
         require(_newTimestamp > previousBatchTimestamp, "Timestamps should be incremental");
-        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided block number is not correct");
+        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided batch number is not correct");
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 
