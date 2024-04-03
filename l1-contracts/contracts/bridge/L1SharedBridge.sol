@@ -42,9 +42,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Era's chainID
     uint256 immutable eraChainId;
 
-    /// @dev The address of legacy L1 ERC20 bridge.
-    address immutable eraErc20BridgeAddress;
-
     /// @dev The address of zkSync Era diamond proxy contract.
     address immutable eraDiamondProxy;
 
@@ -102,7 +99,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         IBridgehub _bridgehub,
         IL1ERC20Bridge _legacyBridge,
         uint256 _eraChainId,
-        address _eraErc20BridgeAddress,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
@@ -110,7 +106,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         bridgehub = _bridgehub;
         legacyBridge = _legacyBridge;
         eraChainId = _eraChainId;
-        eraErc20BridgeAddress = _eraErc20BridgeAddress;
         eraDiamondProxy = _eraDiamondProxy;
     }
 
@@ -125,7 +120,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         _transferOwnership(_owner);
 
         eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
-        l2BridgeAddress[eraChainId] = eraErc20BridgeAddress;
+        l2BridgeAddress[eraChainId] = address(legacyBridge);
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process

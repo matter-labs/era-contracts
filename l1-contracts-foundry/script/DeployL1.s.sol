@@ -505,7 +505,6 @@ contract DeployL1Script is Script {
                 addresses.bridgehub.bridgehubProxy,
                 addresses.bridges.erc20BridgeProxy,
                 config.eraChainId,
-                addresses.bridges.erc20BridgeImplementation,
                 addresses.stateTransition.diamondProxy
             )
         );

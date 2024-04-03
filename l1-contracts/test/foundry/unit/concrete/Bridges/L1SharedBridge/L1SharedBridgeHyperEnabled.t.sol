@@ -81,7 +81,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
 
     uint256 eraChainId;
     address eraDiamondProxy;
-    address eraErc20BridgeAddress;
 
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
@@ -108,7 +107,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         chainId = 1;
         eraChainId = 9;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
-        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge({
@@ -116,7 +114,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
             _bridgehub: IBridgehub(bridgehubAddress),
             _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
             _eraChainId: eraChainId,
-            _eraErc20BridgeAddress: eraErc20BridgeAddress,
             _eraDiamondProxy: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(

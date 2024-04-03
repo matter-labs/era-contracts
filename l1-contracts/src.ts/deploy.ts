@@ -496,7 +496,6 @@ export class Deployer {
         // we load from process.env, as normally L1_ERC20 bridge will already be deployed
         process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR,
         this.chainId,
-        this.addresses.Bridges.ERC20BridgeImplementation,
         this.addresses.StateTransition.DiamondProxy,
       ],
       create2Salt,
