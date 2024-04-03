@@ -34,7 +34,9 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     uint256 public gasPrice;
 
     /// @notice The current block's gasLimit.
-    uint256 public blockGasLimit = type(uint32).max;
+    /// @dev The same limit is used for both batches and L2 blocks. At this moment this limit is not explicitly 
+    /// forced by the system, rather it is the responsibility of the operator to ensure that this value is never achieved.
+    uint256 public blockGasLimit = (1 << 50);
 
     /// @notice The `block.coinbase` in the current transaction.
     /// @dev For the support of coinbase, we will use the bootloader formal address for now
