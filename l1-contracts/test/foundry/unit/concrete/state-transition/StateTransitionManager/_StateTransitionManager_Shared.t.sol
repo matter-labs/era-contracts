@@ -79,7 +79,7 @@ contract StateTransitionManagerTest is Test {
         );
 
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            owner: governor,
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),

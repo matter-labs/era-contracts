@@ -1,133 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Test} from "forge-std/Test.sol";
+import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-contract L1SharedBridgeLegacyTest is Test {
-    event BridgehubDepositBaseTokenInitiated(
-        uint256 indexed chainId,
-        address indexed from,
-        address l1Token,
-        uint256 amount
-    );
-
-    event BridgehubDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
-    event BridgehubDepositFinalized(
-        uint256 indexed chainId,
-        bytes32 indexed txDataHash,
-        bytes32 indexed l2DepositTxHash
-    );
-
-    event WithdrawalFinalizedSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        address indexed l1Token,
-        uint256 amount
-    );
-
-    event ClaimedFailedDepositSharedBridge(
-        uint256 indexed chainId,
-        address indexed to,
-        address indexed l1Token,
-        uint256 amount
-    );
-
-    event LegacyDepositInitiated(
-        uint256 indexed chainId,
-        bytes32 indexed l2DepositTxHash,
-        address indexed from,
-        address to,
-        address l1Token,
-        uint256 amount
-    );
-
-    L1SharedBridge sharedBridgeImpl;
-    L1SharedBridge sharedBridge;
-    address bridgehubAddress;
-    address l1ERC20BridgeAddress;
-    address l2SharedBridge;
-    TestnetERC20Token token;
-
-    address owner;
-    address admin;
-    address zkSync;
-    address alice;
-    address bob;
-    uint256 chainId;
-    uint256 amount = 100;
-    bytes32 txHash;
-
-    uint256 eraChainId;
-    address eraDiamondProxy;
-    address eraErc20BridgeAddress;
-
-    uint256 l2BatchNumber;
-    uint256 l2MessageIndex;
-    uint16 l2TxNumberInBatch;
-    bytes32[] merkleProof;
-
-    function setUp() public {
-        owner = makeAddr("owner");
-        admin = makeAddr("admin");
-        // zkSync = makeAddr("zkSync");
-        bridgehubAddress = makeAddr("bridgehub");
-        alice = makeAddr("alice");
-        // bob = makeAddr("bob");
-        address l1WethAddress = makeAddr("weth");
-        l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
-        l2SharedBridge = makeAddr("l2SharedBridge");
-
-        txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
-        l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        merkleProof = new bytes32[](1);
-
-        chainId = 1;
-        eraChainId = 9;
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
-        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
-
-        token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: IBridgehub(bridgehubAddress),
-            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
-            _eraChainId: eraChainId,
-            _eraErc20BridgeAddress: eraErc20BridgeAddress,
-            _eraDiamondProxy: eraDiamondProxy
-        });
-        TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
-            address(sharedBridgeImpl),
-            admin,
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, 0)
-        );
-        sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
-        vm.prank(owner);
-        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
-    }
-
+contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     function test_depositLegacyERC20Bridge() public {
         uint256 l2TxGasLimit = 100000;
         uint256 l2TxGasPerPubdataByte = 100;
@@ -167,7 +50,6 @@ contract L1SharedBridgeLegacyTest is Test {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -222,7 +104,6 @@ contract L1SharedBridgeLegacyTest is Test {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -283,7 +164,6 @@ contract L1SharedBridgeLegacyTest is Test {
         token.mint(address(sharedBridge), amount);
 
         // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
@@ -292,7 +172,6 @@ contract L1SharedBridgeLegacyTest is Test {
         );
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
