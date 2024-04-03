@@ -36,6 +36,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 contract DeployL1Script is Script {
     using stdToml for string;
 
+    address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
     address constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     struct DeployedAddresses {
@@ -525,7 +526,7 @@ contract DeployL1Script is Script {
     function registerSharedBridge() internal {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast();
-        bridgehub.addToken(address(0x01));
+        bridgehub.addToken(ADDRESS_ONE);
         bridgehub.setSharedBridge(addresses.bridges.sharedBridgeProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");
