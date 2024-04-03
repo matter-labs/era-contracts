@@ -12,6 +12,13 @@ library Utils {
 
     Vm internal constant vm = Vm(VM_ADDRESS);
 
+    /**
+     * @dev Get all selectors from the bytecode.
+     *
+     * Selectors are extracted by calling `cast selectors <bytecode>` from foundry.
+     * Then, the result is parsed to extract the selectors, removing
+     * the `getName()` selector if existing.
+     */
     function getAllSelectors(bytes memory bytecode) internal returns (bytes4[] memory) {
         string[] memory input = new string[](3);
         input[0] = "cast";
@@ -54,16 +61,25 @@ library Utils {
         return selectors;
     }
 
+    /**
+     * @dev Extract an address from bytes.
+     */
     function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
         assembly {
             addr := mload(add(bys, 20))
         }
     }
 
+    /**
+     * @dev Returns the bytecode hash of the batch bootloader.
+     */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
         return vm.readFileBinary("../system-contracts/bootloader/build/artifacts/proved_batch.yul.zbin");
     }
 
+    /**
+     * @dev Returns the bytecode of a given system contract.
+     */
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
         string memory file = vm.readFile(
             // solhint-disable-next-line func-named-parameters
@@ -79,6 +95,9 @@ library Utils {
         return bytecode;
     }
 
+    /**
+     * @dev Deploy a Create2Factory contract.
+     */
     function deployCreate2Factory() internal returns (address) {
         address child;
         bytes memory bytecode = CREATE2_FACTORY_BYTECODE;
