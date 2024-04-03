@@ -1627,7 +1627,7 @@ object "Bootloader" {
                 }
 
                 if iszero(validateUint64(refundInGas)) {
-                    assertionError("refundInGas is not uint32")
+                    assertionError("refundInGas is not uint64")
                 }
 
                 let ethToRefund := safeMul(
