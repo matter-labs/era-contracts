@@ -28,6 +28,7 @@ diamond_init_minimal_l2_gas_price = 250000000
 token_weth_address = "0x0000000000000000000000000000000000000000"
 
 [hyperchain]
+hyperchain_chain_id = 9
 base_token_addr = "0x0000000000000000000000000000000000000001"
 bridgehub_create_new_chain_salt = 0
 validium_mode = false

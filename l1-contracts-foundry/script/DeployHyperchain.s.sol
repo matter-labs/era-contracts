@@ -27,7 +27,7 @@ contract DeployHyperchainScript is Script {
         AddressesConfig addresses;
         address deployerAddress;
         address ownerAddress;
-        uint256 eraChainId;
+        uint256 hyperchainChainId;
     }
 
     struct ContractsConfig {
@@ -90,7 +90,6 @@ contract DeployHyperchainScript is Script {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.l1.owner_addr");
-        config.eraChainId = toml.readUint("$.l1.era_chain_id");
 
         config.addresses.bridgehub = toml.readAddress("$.l1.bridgehub.bridgehub_proxy_addr");
         config.addresses.stateTransitionProxy = toml.readAddress("$.l1.state_transition.state_transition_proxy_addr");
@@ -127,6 +126,7 @@ contract DeployHyperchainScript is Script {
         path = string.concat(root, "/script-config/config-deploy-l1.toml");
         toml = vm.readFile(path);
 
+        config.hyperchainChainId = toml.readUint("$.hyperchain.hyperchain_chain_id");
         config.contracts.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
         config.addresses.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
         config.contracts.validiumMode = toml.readBool("$.hyperchain.validium_mode");
@@ -236,7 +236,7 @@ contract DeployHyperchainScript is Script {
         vm.broadcast();
         vm.recordLogs();
         bridgehub.createNewChain({
-            _chainId: config.eraChainId,
+            _chainId: config.hyperchainChainId,
             _stateTransitionManager: config.addresses.stateTransitionProxy,
             _baseToken: config.addresses.baseToken,
             _salt: config.contracts.bridgehubCreateNewChainSalt,
@@ -264,8 +264,8 @@ contract DeployHyperchainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.addresses.validatorTimelock);
 
         vm.startBroadcast();
-        validatorTimelock.addValidator(config.eraChainId, config.contracts.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.eraChainId, config.contracts.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidator(config.hyperchainChainId, config.contracts.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidator(config.hyperchainChainId, config.contracts.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");
