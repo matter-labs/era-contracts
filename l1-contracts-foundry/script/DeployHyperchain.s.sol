@@ -45,6 +45,8 @@ contract DeployHyperchainScript is Script {
         bool validiumMode;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
+        uint128 baseTokenGasPriceMultiplierNominator;
+        uint128 baseTokenGasPriceMultiplierDenominator;
     }
 
     struct AddressesConfig {
@@ -77,6 +79,7 @@ contract DeployHyperchainScript is Script {
     }
 
     function initializeConfig() internal {
+        // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
         string memory toml = vm.readFile(path);
@@ -88,7 +91,7 @@ contract DeployHyperchainScript is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.l1.owner_addr");
         config.eraChainId = toml.readUint("$.l1.era_chain_id");
-        config.addresses.baseToken = ADDRESS_ONE; //TODO: grab from config
+
         config.addresses.bridgehub = toml.readAddress("$.l1.bridgehub.bridgehub_proxy_addr");
         config.addresses.stateTransitionProxy = toml.readAddress("$.l1.state_transition.state_transition_proxy_addr");
         config.addresses.adminFacet = toml.readAddress("$.l1.state_transition.admin_facet_addr");
@@ -100,7 +103,6 @@ contract DeployHyperchainScript is Script {
         config.addresses.diamondInit = toml.readAddress("$.l1.state_transition.diamond_init_addr");
         config.addresses.validatorTimelock = toml.readAddress("$.l1.validator_timelock_addr");
 
-        config.contracts.bridgehubCreateNewChainSalt = 0; //TODO: grab from config
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.l1.config.diamond_init_pubdata_pricing_mode")
         );
@@ -119,9 +121,27 @@ contract DeployHyperchainScript is Script {
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.l1.config.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.l1.config.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.l1.config.priority_tx_max_gas_limit");
-        config.contracts.validiumMode = false; //TODO grab from config
-        config.contracts.validatorSenderOperatorCommitEth = address(0x0000000000000000000000000000000000000000); //TODO grab from config
-        config.contracts.validatorSenderOperatorBlobsEth = address(0x0000000000000000000000000000000000000001); //TODO grab from config
+
+        // Grab config from l1 deployment config
+        root = vm.projectRoot();
+        path = string.concat(root, "/script-config/config-deploy-l1.toml");
+        toml = vm.readFile(path);
+
+        config.contracts.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
+        config.addresses.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
+        config.contracts.validiumMode = toml.readBool("$.hyperchain.validium_mode");
+        config.contracts.validatorSenderOperatorCommitEth = toml.readAddress(
+            "$.hyperchain.validator_sender_operator_commit_eth"
+        );
+        config.contracts.validatorSenderOperatorBlobsEth = toml.readAddress(
+            "$.hyperchain.validator_sender_operator_blobs_eth"
+        );
+        config.contracts.baseTokenGasPriceMultiplierNominator = uint128(
+            toml.readUint("$.hyperchain.base_token_gas_price_multiplier_nominator")
+        );
+        config.contracts.baseTokenGasPriceMultiplierDenominator = uint128(
+            toml.readUint("$.hyperchain.base_token_gas_price_multiplier_denominator")
+        );
     }
 
     function checkTokenAddress() internal {
@@ -255,7 +275,10 @@ contract DeployHyperchainScript is Script {
         IZkSyncStateTransition zkSyncStateTransition = IZkSyncStateTransition(config.addresses.newDiamondProxy);
 
         vm.startBroadcast();
-        zkSyncStateTransition.setTokenMultiplier(1, 1); //TODO: grab from config
+        zkSyncStateTransition.setTokenMultiplier(
+            config.contracts.baseTokenGasPriceMultiplierNominator,
+            config.contracts.baseTokenGasPriceMultiplierDenominator
+        );
 
         if (config.contracts.validiumMode) {
             zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
