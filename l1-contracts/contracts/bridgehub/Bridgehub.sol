@@ -185,7 +185,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
     ) external view override returns (bool) {
         address hyperchain = getHyperchain(_chainId);
         return
-            IZkSyncHyperchain(stateTransition).proveL1ToL2TransactionStatus({
+            IZkSyncHyperchain(hyperchain).proveL1ToL2TransactionStatus({
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
                 _l2MessageIndex: _l2MessageIndex,

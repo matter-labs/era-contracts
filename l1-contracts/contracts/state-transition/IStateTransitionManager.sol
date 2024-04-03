@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {FeeParams} from "./chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error

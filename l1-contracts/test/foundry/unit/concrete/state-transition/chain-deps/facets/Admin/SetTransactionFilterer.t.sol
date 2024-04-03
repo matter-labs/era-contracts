@@ -36,7 +36,7 @@ contract SetTransactionFiltererTest is AdminTest {
     function test_revertWhen_notAdmin() public {
         address transactionFilterer = makeAddr("transactionFilterer");
 
-        vm.expectRevert("StateTransition Chain: not admin");
+        vm.expectRevert("Hyperchain: not admin");
         vm.startPrank(makeAddr("nonAdmin"));
         adminFacet.setTransactionFilterer(transactionFilterer);
     }

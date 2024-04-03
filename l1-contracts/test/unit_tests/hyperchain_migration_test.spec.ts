@@ -36,7 +36,7 @@ describe("Hyperchain migration test", function () {
     // send some Eth to the diamond Proxy, we do it before it is deployed ( it is hard afterwards)
     const tx2 = {
       from: await owner.getAddress(),
-      to: "0xd02a18Ab2d8314a81563d596960673b716383AC7", // the address of the diamondproxy
+      to: "0xA8DDB21c57fB15dceabDf027257D5cd6F1E6Bb73", // the address of the diamondproxy
       value: ethers.utils.parseEther("1000"),
       nonce: owner.getTransactionCount(),
       gasLimit: 100000,

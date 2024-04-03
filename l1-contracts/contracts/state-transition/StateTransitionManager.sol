@@ -80,7 +80,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.owner != address(0), "STM: governor zero");
+        require(_initializeData.owner != address(0), "STM: owner zero");
         _transferOwnership(_initializeData.owner);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
@@ -191,37 +191,37 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        IZkSyncHyperchain(hyperchain[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setTokenMultiplier(_nominator, _denominator);
+        IZkSyncHyperchain(hyperchain[_chainId]).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).changeFeeParams(_newFeeParams);
+        IZkSyncHyperchain(hyperchain[_chainId]).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
     function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setValidator(_validator, _active);
+        IZkSyncHyperchain(hyperchain[_chainId]).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
+        IZkSyncHyperchain(hyperchain[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration

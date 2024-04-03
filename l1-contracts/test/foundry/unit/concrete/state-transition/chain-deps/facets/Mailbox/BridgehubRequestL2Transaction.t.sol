@@ -20,7 +20,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(bridgehub));
-        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction{value: 10 ether}(req);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
@@ -37,7 +37,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
 
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(bridgehub));
-        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction{value: 10 ether}(req);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
 
@@ -55,7 +55,7 @@ contract BridgehubRequestL2TransactionTest is MailboxTest {
         vm.deal(bridgehub, 100 ether);
         vm.prank(address(bridgehub));
         vm.expectRevert(bytes("tf"));
-        mailboxFacet.bridgehubRequestL2Transaction{value: 10 ether}(req);
+        mailboxFacet.bridgehubRequestL2Transaction(req);
     }
 
     function getBridgehubRequestL2TransactionRequest() private returns (BridgehubL2TransactionRequest memory req) {

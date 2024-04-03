@@ -42,6 +42,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "9";
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
+  process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR = ADDRESS_ONE;
 }
 
 export async function defaultDeployerForTests(deployWallet: Wallet, ownerAddress: string): Promise<Deployer> {

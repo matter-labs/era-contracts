@@ -3,7 +3,7 @@
 pragma solidity 0.8.20;
 
 import {ZkSyncHyperchainBase} from "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+// import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
