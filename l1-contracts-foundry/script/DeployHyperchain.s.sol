@@ -129,7 +129,7 @@ contract DeployL1Script is Script {
         }
 
         if (config.addresses.baseToken.code.length == 0) {
-            revert("Token address is not set");
+            revert("Token address is not a contract address");
         }
 
         console.log("Using base token address:", config.addresses.baseToken);
