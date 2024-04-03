@@ -88,7 +88,7 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
   token.implementation = token.implementation || DEFAULT_ERC20;
   const tokenFactory = await hardhat.ethers.getContractFactory(token.implementation, wallet);
   const args = token.implementation !== "WETH9" ? [token.name, token.symbol, token.decimals] : [];
-  const erc20 = await tokenFactory.deploy(...args, { gasLimit: 5000000, nonce: nonce });
+  const erc20 = await tokenFactory.deploy(...args, { gasLimit: 5000000 });
   await erc20.deployTransaction.wait();
 
   if (token.implementation !== "WETH9") {
@@ -110,7 +110,7 @@ async function deployToken(token: TokenDescription, wallet: Wallet): Promise<Tok
     delete token.implementation;
   }
 
-  return [token, nonce + 1];
+  return token;
 }
 
 async function main() {
@@ -138,7 +138,7 @@ async function main() {
         ? new Wallet(cmd.privateKey, provider)
         : Wallet.fromMnemonic(ethTestConfig.mnemonic, "m/44'/60'/0'/0/1").connect(provider);
 
-      console.log(JSON.stringify((await deployToken(token, wallet), null, 2)[0]));
+      console.log(JSON.stringify(await deployToken(token, wallet), null, 2));
     });
 
   program
