@@ -65,6 +65,7 @@ export class Deployer {
       ? config.defaultAccountBytecodeHash
       : hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
     this.ownerAddress = config.ownerAddress != null ? config.ownerAddress : this.deployWallet.address;
+    this.chainId = parseInt(process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID!);
   }
 
   public async initialZkSyncStateTransitionDiamondCut(extraFacets?: FacetCut[]) {

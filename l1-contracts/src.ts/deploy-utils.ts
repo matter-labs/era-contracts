@@ -23,7 +23,7 @@ export async function deployViaCreate2(
     signer: deployWallet,
     libraries,
   });
-  const bytecode = contractFactory.getDeployTransaction(...[...args, ethTxOptions]).data;
+  const bytecode = contractFactory.getDeployTransaction(...args, ethTxOptions).data;
 
   return await deployBytecodeViaCreate2(
     deployWallet,
