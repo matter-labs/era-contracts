@@ -232,7 +232,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _stateTransitionContract
     ) external onlyOwner {
         stateTransition[_chainId] = _stateTransitionContract;
-        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+        emit NewHyperchain(_chainId, _stateTransitionContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -284,6 +284,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);
 
-        emit StateTransitionNewChain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, stateTransitionAddress);
     }
 }

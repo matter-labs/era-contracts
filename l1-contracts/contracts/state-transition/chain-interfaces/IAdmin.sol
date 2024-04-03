@@ -40,7 +40,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
 
     /// @notice Used to set to validium mode directly after genesis (rollup is default)
-    function setPubdataPricingMode(PubdataPricingMode _validiumMode) external;
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 

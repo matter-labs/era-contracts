@@ -25,7 +25,7 @@ struct StateTransitionManagerInitializeData {
 
 interface IStateTransitionManager {
     // when a new Chain is added
-    event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
+    event NewHyperchain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
     event SetChainIdUpgrade(
         address indexed _stateTransitionChain,
