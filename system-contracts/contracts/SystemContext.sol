@@ -76,9 +76,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// - Their hash is calculated as `keccak256(uint256(number))`
     BlockInfo internal currentVirtualL2BlockInfo;
 
-    /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
-    VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
-
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
 
@@ -213,56 +210,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         }
     }
 
-    /// @notice Creates new virtual blocks, while ensuring they don't exceed the L2 block number.
-    /// @param _l2BlockNumber The number of the new L2 block.
-    /// @param _maxVirtualBlocksToCreate The maximum number of virtual blocks to create with this L2 block.
-    /// @param _newTimestamp The timestamp of the new L2 block, which is also the timestamp of the new virtual block.
-    function _setVirtualBlock(
-        uint128 _l2BlockNumber,
-        uint128 _maxVirtualBlocksToCreate,
-        uint128 _newTimestamp
-    ) internal {
-        if (virtualBlockUpgradeInfo.virtualBlockFinishL2Block != 0) {
-            // No need to to do anything about virtual blocks anymore
-            // All the info is the same as for L2 blocks.
-            currentVirtualL2BlockInfo = currentL2BlockInfo;
-            return;
-        }
-
-        BlockInfo memory virtualBlockInfo = currentVirtualL2BlockInfo;
-
-        if (currentVirtualL2BlockInfo.number == 0 && virtualBlockInfo.timestamp == 0) {
-            uint128 currentBatchNumber = currentBatchInfo.number;
-
-            // The virtual block is set for the first time. We can count it as 1 creation of a virtual block.
-            // Note, that when setting the virtual block number we use the batch number to make a smoother upgrade from batch number to
-            // the L2 block number.
-            virtualBlockInfo.number = currentBatchNumber;
-            // Remembering the batch number on which the upgrade to the virtual blocks has been done.
-            virtualBlockUpgradeInfo.virtualBlockStartBatch = currentBatchNumber;
-
-            require(_maxVirtualBlocksToCreate > 0, "Can't initialize the first virtual block");
-            _maxVirtualBlocksToCreate -= 1;
-        } else if (_maxVirtualBlocksToCreate == 0) {
-            // The virtual blocks have been already initialized, but the operator didn't ask to create
-            // any new virtual blocks. So we can just return.
-            return;
-        }
-
-        virtualBlockInfo.number += _maxVirtualBlocksToCreate;
-        virtualBlockInfo.timestamp = _newTimestamp;
-
-        // The virtual block number must never exceed the L2 block number.
-        // We do not use a `require` here, since the virtual blocks are a temporary solution to let the Solidity's `block.number`
-        // catch up with the L2 block number and so the situation where virtualBlockInfo.number starts getting larger
-        // than _l2BlockNumber is expected once virtual blocks have caught up the L2 blocks.
-        if (virtualBlockInfo.number >= _l2BlockNumber) {
-            virtualBlockUpgradeInfo.virtualBlockFinishL2Block = _l2BlockNumber;
-            virtualBlockInfo.number = _l2BlockNumber;
-        }
-
-        currentVirtualL2BlockInfo = virtualBlockInfo;
-    }
+    
 
     /// @notice Sets the current block number and timestamp of the L2 block.
     /// @param _l2BlockNumber The number of the new L2 block.
