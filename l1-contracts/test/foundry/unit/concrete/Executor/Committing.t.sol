@@ -527,7 +527,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("pl"));
+        vm.expectRevert(bytes("plr"));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -766,7 +766,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bh"));
+        vm.expectRevert(bytes("bhr"));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
     }
 
@@ -816,7 +816,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
 
-        vm.expectRevert(bytes("bh"));
+        vm.expectRevert(bytes("bhr"));
         executor.commitBatches(genesisStoredBatchInfo, correctCommitBatchInfoArray);
 
         vm.clearMockedCalls();
