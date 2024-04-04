@@ -269,7 +269,7 @@ contract DeployL1Script is Script {
         bytes memory bytecode = abi.encodePacked(
             type(Governance).creationCode,
             abi.encode(
-                config.deployerAddress,
+                config.ownerAddress,
                 config.contracts.governanceSecurityCouncilAddress,
                 config.contracts.governanceMinDelay
             )
@@ -552,9 +552,6 @@ contract DeployL1Script is Script {
 
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
-
-        Governance governance = Governance(payable(addresses.governance));
-        governance.transferOwnership(config.ownerAddress);
 
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         bridgehub.transferOwnership(config.ownerAddress);
