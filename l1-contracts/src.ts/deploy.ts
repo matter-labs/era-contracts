@@ -10,7 +10,8 @@ import { L1ERC20BridgeFactory } from "../typechain/L1ERC20BridgeFactory";
 import { L1WethBridgeFactory } from "../typechain/L1WethBridgeFactory";
 import { ValidatorTimelockFactory } from "../typechain/ValidatorTimelockFactory";
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
-import { TransparentUpgradeableProxyFactory } from "../typechain/TransparentUpgradeableProxyFactory";
+import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import type { DeployedAddresses } from "../scripts/utils";
 import {
   readSystemContractsBytecode,
   hashL2Bytecode,
@@ -19,65 +20,21 @@ import {
   getNumberFromEnv,
   readBatchBootloaderBytecode,
   getTokens,
+  deployedAddressesFromEnv,
+  SYSTEM_CONFIG,
+  getOptionalAddressFromEnv,
 } from "../scripts/utils";
-import { deployViaCreate2 } from "./deploy-utils";
+import { deployBytecodeViaCreate2, deployViaCreate2 } from "./deploy-utils";
 import { IGovernanceFactory } from "../typechain/IGovernanceFactory";
+import { PubdataPricingMode } from "../test/unit_tests/utils";
 
 const L2_BOOTLOADER_BYTECODE_HASH = hexlify(hashL2Bytecode(readBatchBootloaderBytecode()));
 const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = hexlify(hashL2Bytecode(readSystemContractsBytecode("DefaultAccount")));
-
-export interface DeployedAddresses {
-  ZkSync: {
-    MailboxFacet: string;
-    AdminFacet: string;
-    ExecutorFacet: string;
-    GettersFacet: string;
-    Verifier: string;
-    DiamondInit: string;
-    DiamondUpgradeInit: string;
-    DefaultUpgrade: string;
-    DiamondProxy: string;
-  };
-  Bridges: {
-    ERC20BridgeImplementation: string;
-    ERC20BridgeProxy: string;
-    WethBridgeImplementation: string;
-    WethBridgeProxy: string;
-  };
-  Governance: string;
-  ValidatorTimeLock: string;
-  Create2Factory: string;
-}
 
 export interface DeployerConfig {
   deployWallet: Wallet;
   ownerAddress?: string;
   verbose?: boolean;
-}
-
-export function deployedAddressesFromEnv(): DeployedAddresses {
-  return {
-    ZkSync: {
-      MailboxFacet: getAddressFromEnv("CONTRACTS_MAILBOX_FACET_ADDR"),
-      AdminFacet: getAddressFromEnv("CONTRACTS_ADMIN_FACET_ADDR"),
-      ExecutorFacet: getAddressFromEnv("CONTRACTS_EXECUTOR_FACET_ADDR"),
-      GettersFacet: getAddressFromEnv("CONTRACTS_GETTERS_FACET_ADDR"),
-      DiamondInit: getAddressFromEnv("CONTRACTS_DIAMOND_INIT_ADDR"),
-      DiamondUpgradeInit: getAddressFromEnv("CONTRACTS_DIAMOND_UPGRADE_INIT_ADDR"),
-      DefaultUpgrade: getAddressFromEnv("CONTRACTS_DEFAULT_UPGRADE_ADDR"),
-      DiamondProxy: getAddressFromEnv("CONTRACTS_DIAMOND_PROXY_ADDR"),
-      Verifier: getAddressFromEnv("CONTRACTS_VERIFIER_ADDR"),
-    },
-    Bridges: {
-      ERC20BridgeImplementation: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR"),
-      ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
-      WethBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_IMPL_ADDR"),
-      WethBridgeProxy: getAddressFromEnv("CONTRACTS_L1_WETH_BRIDGE_PROXY_ADDR"),
-    },
-    Create2Factory: getAddressFromEnv("CONTRACTS_CREATE2_FACTORY_ADDR"),
-    ValidatorTimeLock: getAddressFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_ADDR"),
-    Governance: getAddressFromEnv("CONTRACTS_GOVERNANCE_ADDR"),
-  };
 }
 
 export class Deployer {
@@ -122,6 +79,15 @@ export class Deployer {
     const initialProtocolVersion = getNumberFromEnv("CONTRACTS_INITIAL_PROTOCOL_VERSION");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
+    const feeParams = {
+      pubdataPricingMode: PubdataPricingMode.Rollup,
+      batchOverheadL1Gas: SYSTEM_CONFIG.priorityTxBatchOverheadL1Gas,
+      maxPubdataPerBatch: SYSTEM_CONFIG.priorityTxPubdataPerBatch,
+      priorityTxMaxPubdata: SYSTEM_CONFIG.priorityTxMaxPubdata,
+      maxL2GasPerBatch: SYSTEM_CONFIG.priorityTxMaxGasPerBatch,
+      minimalL2GasPrice: SYSTEM_CONFIG.priorityTxMinimalGasPrice,
+    };
+
     const diamondInitCalldata = DiamondInit.encodeFunctionData("initialize", [
       {
         verifier: this.addresses.ZkSync.Verifier,
@@ -136,6 +102,8 @@ export class Deployer {
         l2DefaultAccountBytecodeHash: L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
         priorityTxMaxGasLimit,
         initialProtocolVersion,
+        feeParams,
+        blobVersionedHashRetriever: this.addresses.BlobVersionedHashRetriever,
       },
     ]);
 
@@ -182,6 +150,25 @@ export class Deployer {
       this.verbose,
       libraries
     );
+    return result[0];
+  }
+
+  private async deployBytecodeViaCreate2(
+    contractName: string,
+    bytecode: ethers.BytesLike,
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ): Promise<string> {
+    const result = await deployBytecodeViaCreate2(
+      this.deployWallet,
+      contractName,
+      bytecode,
+      create2Salt,
+      ethTxOptions,
+      this.addresses.Create2Factory,
+      this.verbose
+    );
+
     return result[0];
   }
 
@@ -428,10 +415,18 @@ export class Deployer {
   public async deployValidatorTimelock(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
-    const validatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const commitValidatorAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+    const blobValidatorAddress = getOptionalAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+
+    const validatorAddresses = [commitValidatorAddress];
+
+    if (blobValidatorAddress && blobValidatorAddress.length > 0) {
+      validatorAddresses.push(blobValidatorAddress);
+    }
+
     const contractAddress = await this.deployViaCreate2(
       "ValidatorTimelock",
-      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddress],
+      [this.ownerAddress, this.addresses.ZkSync.DiamondProxy, executionDelay, validatorAddresses],
       create2Salt,
       ethTxOptions
     );
@@ -452,8 +447,30 @@ export class Deployer {
     }
   }
 
+  public async deployBlobVersionedHashRetriever(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest
+  ) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
+    const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+
+    const contractAddress = await this.deployBytecodeViaCreate2(
+      "BlobVersionedHashRetriever",
+      bytecode,
+      create2Salt,
+      ethTxOptions
+    );
+
+    if (this.verbose) {
+      console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
+    }
+
+    this.addresses.BlobVersionedHashRetriever = contractAddress;
+  }
+
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
-    return TransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
+    return ITransparentUpgradeableProxyFactory.connect(address, signerOrProvider);
   }
 
   public create2FactoryContract(signerOrProvider: Signer | providers.Provider) {

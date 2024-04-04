@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
-import "./libraries/LibMap.sol";
-import "./interfaces/IExecutor.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {LibMap} from "./libraries/LibMap.sol";
+import {IExecutor} from "./interfaces/IExecutor.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,8 +26,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @notice The validator address is changed.
-    event NewValidator(address _oldValidator, address _newValidator);
+    /// @notice A new validator has been added.
+    event ValidatorAdded(address _addedValidator);
+
+    /// @notice A validator has been removed.
+    event ValidatorRemoved(address _removedValidator);
+
+    /// @notice Error for when an address is already a validator.
+    error AddressAlreadyValidator();
+
+    /// @notice Error for when an address is not a validator.
+    error ValidatorDoesNotExist();
 
     /// @dev The main zkSync smart contract.
     address public immutable zkSyncContract;
@@ -35,24 +44,38 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The mapping of L2 batch number => timestamp when it was committed.
     LibMap.Uint32Map internal committedBatchTimestamp;
 
-    /// @dev The address that can commit/revert/validate/execute batches.
-    address public validator;
-
-    /// @dev The delay between committing and executing batches.
+    /// @dev The delay between committing and executing batches.ValidatorTimelock
     uint32 public executionDelay;
 
-    constructor(address _initialOwner, address _zkSyncContract, uint32 _executionDelay, address _validator) {
+    /// @dev Mapping denoting if an address is also a validator
+    mapping(address => bool) public validators;
+
+    constructor(address _initialOwner, address _zkSyncContract, uint32 _executionDelay, address[] memory _validators) {
         _transferOwnership(_initialOwner);
         zkSyncContract = _zkSyncContract;
         executionDelay = _executionDelay;
-        validator = _validator;
+
+        for (uint256 i = 0; i < _validators.length; i++) {
+            validators[_validators[i]] = true;
+        }
     }
 
-    /// @dev Set new validator address.
-    function setValidator(address _newValidator) external onlyOwner {
-        address oldValidator = validator;
-        validator = _newValidator;
-        emit NewValidator(oldValidator, _newValidator);
+    /// @dev Sets an address as a validator.
+    function addValidator(address _newValidator) external onlyOwner {
+        if (validators[_newValidator]) {
+            revert AddressAlreadyValidator();
+        }
+        validators[_newValidator] = true;
+        emit ValidatorAdded(_newValidator);
+    }
+
+    /// @dev Removes an address as a validator.
+    function removeValidator(address _validator) external onlyOwner {
+        if (!validators[_validator]) {
+            revert ValidatorDoesNotExist();
+        }
+        validators[_validator] = false;
+        emit ValidatorRemoved(_validator);
     }
 
     /// @dev Set the delay between committing and executing batches.
@@ -63,7 +86,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
 
     /// @notice Checks if the caller is a validator.
     modifier onlyValidator() {
-        require(msg.sender == validator, "8h");
+        require(validators[msg.sender] == true, "8h");
         _;
     }
 

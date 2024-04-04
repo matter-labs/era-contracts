@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias, getNumberFromEnv, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, web3Provider } from "./utils";
+import { applyL1ToL2Alias, getNumberFromEnv, SYSTEM_CONFIG, web3Provider } from "./utils";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -73,7 +73,7 @@ async function main() {
       const requiredValueToInitializeBridge = await zkSync.l2TransactionBaseCost(
         gasPrice,
         DEPLOY_L2_BRIDGE_COUNTERPART_GAS_LIMIT,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        SYSTEM_CONFIG.requiredL2GasPricePerPubdata
       );
 
       const tx = await l1WethBridge.initialize(

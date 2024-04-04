@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.20;
 
+/// @title Governance contract interface
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IGovernance {
     /// @dev This enumeration includes the following states:
     /// @param Unset Default state, indicating the operation has not been set.

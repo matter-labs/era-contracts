@@ -13,6 +13,7 @@ export const L2_BOOTLOADER_ADDRESS = "0x0000000000000000000000000000000000008001
 export const L2_KNOWN_CODE_STORAGE_ADDRESS = "0x0000000000000000000000000000000000008004";
 export const L2_TO_L1_MESSENGER = "0x0000000000000000000000000000000000008008";
 export const L2_BYTECODE_COMPRESSOR_ADDRESS = "0x000000000000000000000000000000000000800e";
+export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x0000000000000000000000000000000000008011";
 
 export enum SYSTEM_LOG_KEYS {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -22,6 +23,8 @@ export enum SYSTEM_LOG_KEYS {
   PREV_BATCH_HASH_KEY,
   CHAINED_PRIORITY_TXN_HASH_KEY,
   NUMBER_OF_LAYER_1_TXS_KEY,
+  BLOB_ONE_HASH_KEY,
+  BLOB_TWO_HASH_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -116,6 +119,8 @@ export function createSystemLogs() {
     constructL2Log(true, L2_SYSTEM_CONTEXT_ADDRESS, SYSTEM_LOG_KEYS.PREV_BATCH_HASH_KEY, ethers.constants.HashZero),
     constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.CHAINED_PRIORITY_TXN_HASH_KEY, EMPTY_STRING_KECCAK),
     constructL2Log(true, L2_BOOTLOADER_ADDRESS, SYSTEM_LOG_KEYS.NUMBER_OF_LAYER_1_TXS_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_ONE_HASH_KEY, ethers.constants.HashZero),
+    constructL2Log(true, PUBDATA_CHUNK_PUBLISHER_ADDRESS, SYSTEM_LOG_KEYS.BLOB_TWO_HASH_KEY, ethers.constants.HashZero),
   ];
 }
 
@@ -142,6 +147,17 @@ export function packBatchTimestampAndBatchTimestamp(
   return ethers.utils.hexZeroPad(ethers.utils.hexlify(packedNum), 32);
 }
 
+export function defaultFeeParams(): FeeParams {
+  return {
+    pubdataPricingMode: PubdataPricingMode.Rollup,
+    batchOverheadL1Gas: 1_000_000,
+    maxPubdataPerBatch: 110_000,
+    maxL2GasPerBatch: 80_000_000,
+    priorityTxMaxPubdata: 99_000,
+    minimalL2GasPrice: 250_000_000, // 0.25 gwei
+  };
+}
+
 export interface StoredBatchInfo {
   batchNumber: BigNumberish;
   batchHash: BytesLike;
@@ -163,5 +179,19 @@ export interface CommitBatchInfo {
   bootloaderHeapInitialContentsHash: BytesLike;
   eventsQueueStateHash: BytesLike;
   systemLogs: BytesLike;
-  totalL2ToL1Pubdata: BytesLike;
+  pubdataCommitments: BytesLike;
+}
+
+export enum PubdataPricingMode {
+  Rollup,
+  Validium,
+}
+
+export interface FeeParams {
+  pubdataPricingMode: PubdataPricingMode;
+  batchOverheadL1Gas: number;
+  maxPubdataPerBatch: number;
+  maxL2GasPerBatch: number;
+  priorityTxMaxPubdata: number;
+  minimalL2GasPrice: BigNumberish;
 }

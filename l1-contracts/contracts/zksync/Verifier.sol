@@ -255,8 +255,7 @@ contract Verifier is IVerifier {
     uint256 internal constant G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
     uint256 internal constant G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
 
-    /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
-    /// @return vkHash The keccak256 hash of the loaded verification keys.
+    /// @inheritdoc IVerifier
     function verificationKeyHash() external pure returns (bytes32 vkHash) {
         _loadVerificationKey();
 
@@ -284,8 +283,8 @@ contract Verifier is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             // gate setup commitments
-            mstore(VK_GATE_SETUP_0_X_SLOT, 0x236c54d6ae3745765605abfdd3d1533aaf27c583bbac66c43f5555e2b087db42)
-            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x0b2b13c749c19a0be311c0eec76abddbc0848e2454cc7323605a714256ef101a)
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x03efa4fe0a5d7aa3d98e8becb5058987dddca95ecbe29b624ad274553bf9dd8e)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x24fb07eb5f0e62013938eb1dcae0aba367a7150a40a9ab2e1ae15e06bbe43853)
             mstore(VK_GATE_SETUP_1_X_SLOT, 0x04659caf7b05471ba5ba85b1ab62267aa6c456836e625f169f7119d55b9462d2)
             mstore(VK_GATE_SETUP_1_Y_SLOT, 0x0ea63403692148d2ad22189a1e5420076312f4d46e62036a043a6b0b84d5b410)
             mstore(VK_GATE_SETUP_2_X_SLOT, 0x0e6696d09d65fce1e42805be03fca1f14aea247281f688981f925e77d4ce2291)
@@ -296,8 +295,8 @@ contract Verifier is IVerifier {
             mstore(VK_GATE_SETUP_4_Y_SLOT, 0x22e404bc91350f3bc7daad1d1025113742436983c85eac5ab7b42221a181b81e)
             mstore(VK_GATE_SETUP_5_X_SLOT, 0x0d9b29613037a5025655c82b143d2b7449c98f3aea358307c8529249cc54f3b9)
             mstore(VK_GATE_SETUP_5_Y_SLOT, 0x15b3c4c946ad1babfc4c03ff7c2423fd354af3a9305c499b7fb3aaebe2fee746)
-            mstore(VK_GATE_SETUP_6_X_SLOT, 0x08aa077804a60caf18621f96c63d7d1b532f44b13c273956f81b4c41f1f8f076)
-            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x01fcb7c6e22aab56eb8b61bae6f457411bd41bcc5f1e8311421a98ccee23b72e)
+            mstore(VK_GATE_SETUP_6_X_SLOT, 0x1c541b6423211b65e42c1a52d0c8a07bf631fbf24606a4135e9e486f2bb9bb06)
+            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x057be8e4f2db0b66a9134809a33bae06d380c386fdce322e837d11a22ce0f9a9)
             mstore(VK_GATE_SETUP_7_X_SLOT, 0x283344a1ab3e55ecfd904d0b8e9f4faea338df5a4ead2fa9a42f0e103da40abc)
             mstore(VK_GATE_SETUP_7_Y_SLOT, 0x223b37b83b9687512d322993edd70e508dd80adb10bcf7321a3cc8a44c269521)
 
@@ -340,9 +339,7 @@ contract Verifier is IVerifier {
         }
     }
 
-    /// @dev Verifies a zk-SNARK proof.
-    /// @return A boolean value indicating whether the zk-SNARK proof is valid.
-    /// Note: The function may revert execution instead of returning false in some cases.
+    /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata, // _publicInputs
         uint256[] calldata, // _proof

@@ -7,18 +7,20 @@ import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH} from "../Utils/Utils.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER} from "../../../../../cache/solpp-generated-contracts/zksync/Config.sol";
 import {DiamondInit} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondInit.sol";
 import {DiamondProxy} from "../../../../../cache/solpp-generated-contracts/zksync/DiamondProxy.sol";
-import {VerifierParams} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "../../../../../cache/solpp-generated-contracts/zksync/Storage.sol";
 import {ExecutorFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Executor.sol";
 import {GettersFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Getters.sol";
 import {AdminFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Admin.sol";
 import {MailboxFacet} from "../../../../../cache/solpp-generated-contracts/zksync/facets/Mailbox.sol";
 import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+import {IVerifier} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IVerifier.sol";
 import {Diamond} from "../../../../../cache/solpp-generated-contracts/zksync/libraries/Diamond.sol";
 
 contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
+    address internal blobVersionedHashRetriever;
     AdminFacet internal admin;
     ExecutorFacet internal executor;
     GettersFacet internal getters;
@@ -100,10 +102,22 @@ contract ExecutorTest is Test {
         return selectors;
     }
 
+    function defaultFeeParams() private pure returns (FeeParams memory feeParams) {
+        feeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 250_000_000
+        });
+    }
+
     constructor() {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
+        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
 
         executor = new ExecutorFacet();
         admin = new AdminFacet();
@@ -114,21 +128,29 @@ contract ExecutorTest is Test {
 
         bytes8 dummyHash = 0x1234567890123456;
         address dummyAddress = makeAddr("dummyAddress");
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            dummyAddress, //verifier
-            owner,
-            owner,
-            0,
-            0,
-            0,
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0}),
-            false,
-            dummyHash,
-            dummyHash,
-            1000000,
-            0
-        );
+
+        DiamondInit.InitializeData memory params = DiamondInit.InitializeData({
+            verifier: IVerifier(dummyAddress), // verifier
+            governor: owner,
+            admin: owner,
+            genesisBatchHash: bytes32(0),
+            genesisIndexRepeatedStorageChanges: 0,
+            genesisBatchCommitment: bytes32(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: 0,
+                recursionLeafLevelVkHash: 0,
+                recursionCircuitsSetVksHash: 0
+            }),
+            zkPorterIsAvailable: false,
+            l2BootloaderBytecodeHash: dummyHash,
+            l2DefaultAccountBytecodeHash: dummyHash,
+            priorityTxMaxGasLimit: 1000000,
+            initialProtocolVersion: 0,
+            feeParams: defaultFeeParams(),
+            blobVersionedHashRetriever: blobVersionedHashRetriever
+        });
+
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -204,7 +226,7 @@ contract ExecutorTest is Test {
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
-            totalL2ToL1Pubdata: abi.encodePacked(uint256(0))
+            pubdataCommitments: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
     }
 }
