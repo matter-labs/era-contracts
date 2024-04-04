@@ -69,25 +69,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @dev Hashes of the blocks older than the ones which are stored here can be calculated as _calculateLegacyL2BlockHash(blockNumber).
     bytes32[MINIBLOCK_HASHES_TO_STORE] internal l2BlockHash;
 
-    /// @notice To make migration to L2 blocks smoother, we introduce a temporary concept of virtual L2 blocks, the data
-    /// about which will be returned by the EVM-like methods: block.number/block.timestamp/blockhash.
-    /// - Their number will start from being equal to the number of the batch and it will increase until it reaches the L2 block number.
-    /// - Their timestamp is updated each time a new virtual block is created.
-    /// - Their hash is calculated as `keccak256(uint256(number))`
     BlockInfo internal DEPRECATED_currentL2VirtualBlockInfo;
-
-    /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
-    struct DEPRECATED_VirtualBlockUpgradeInfo {
-        /// @notice In order to maintain consistent results for `blockhash` requests, we'll
-        /// have to remember the number of the batch when the upgrade to the virtual blocks has been done.
-        /// The hashes for virtual blocks before the upgrade are identical to the hashes of the corresponding batches.
-        uint128 virtualBlockStartBatch;
-        /// @notice L2 block when the virtual blocks have caught up with the L2 blocks. Starting from this block,
-        /// all the information returned to users for block.timestamp/number, etc should be the information about the L2 blocks and
-        /// not virtual blocks.
-        uint128 virtualBlockFinishL2Block;
-    }
-    DEPRECATED_VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
+    uint256 internal DEPRECATED_virtualBlockUpgradeInfo;
 
 
     /// @notice Number of current transaction in block.
@@ -120,7 +103,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
 
         if (blockNumber <= _block || blockNumber - _block > 256) {
             hash = bytes32(0);
-        } else if (_block < 1) {
+        } else if (_block == 0) {
             // Note, that we will get into this branch only for a brief moment of time, right after the genesis
             hash = batchHashes[_block];
         } else {
