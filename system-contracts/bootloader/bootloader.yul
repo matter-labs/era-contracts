@@ -620,6 +620,10 @@ object "Bootloader" {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
 
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
+                        <!-- @endif -->
+
                         <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                         switch isETHCall
                             case 1 {
@@ -1596,8 +1600,8 @@ object "Bootloader" {
                             // it should know about it
                             safeAdd(gasLeft, reservedGas, "jkl"),
                             basePubdataSpent,
-                            reservedGas,
-                            gasPerPubdata
+                            gasPerPubdata,
+                            reservedGas
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
