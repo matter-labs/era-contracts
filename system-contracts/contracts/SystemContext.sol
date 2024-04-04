@@ -34,7 +34,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     uint256 public gasPrice;
 
     /// @notice The current block's gasLimit.
-    /// @dev The same limit is used for both batches and L2 blocks. At this moment this limit is not explicitly 
+    /// @dev The same limit is used for both batches and L2 blocks. At this moment this limit is not explicitly
     /// forced by the system, rather it is the responsibility of the operator to ensure that this value is never achieved.
     uint256 public blockGasLimit = (1 << 50);
 
