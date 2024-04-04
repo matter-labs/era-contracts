@@ -118,7 +118,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         _transferOwnership(_owner);
 
         eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
-        l2BridgeAddress[eraChainId] = address(legacyBridge);
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
@@ -262,6 +261,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
         require(_legacyBridge != address(0), "ShB: legacy bridge 0");
         legacyBridge = IL1ERC20Bridge(_legacyBridge);
+        l2BridgeAddress[eraChainId] = address(legacyBridge);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract

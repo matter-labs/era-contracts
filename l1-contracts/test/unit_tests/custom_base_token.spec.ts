@@ -16,6 +16,7 @@ import { ADDRESS_ONE, ethTestConfig } from "../../src.ts/utils";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
+import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
 
 describe("Custom base token chain and bridge tests", () => {
   let owner: ethers.Signer;
@@ -62,6 +63,20 @@ describe("Custom base token chain and bridge tests", () => {
 
     // prepare the bridge
     l1SharedBridge = IL1SharedBridgeFactory.connect(deployer.addresses.Bridges.SharedBridgeProxy, deployWallet);
+
+    // accept ownership from governance for L1SharedBridge
+    const governance = IGovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
+    const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    const callData = sharedBridgeInterface.encodeFunctionData("acceptOwnership()", []);
+    const operation = {
+      calls: [{ target: deployer.addresses.Bridges.SharedBridgeProxy, value: 0, data: callData }],
+      predecessor: ethers.constants.HashZero,
+      salt: ethers.constants.HashZero,
+    };
+    const scheduleTx = await governance.scheduleTransparent(operation, 0);
+    await scheduleTx.wait();
+    const executeTX = await governance.execute(operation);
+    await executeTX.wait();
   });
 
   it("Should have correct base token", async () => {

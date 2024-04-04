@@ -29,6 +29,7 @@ import {
   getCallRevertReason,
   requestExecuteDirect,
 } from "./utils";
+import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
 
 describe("Legacy Era tests", function () {
   let owner: ethers.Signer;
@@ -121,6 +122,20 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
+
+    // accept ownership from governance for L1SharedBridge
+    const governance = IGovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
+    const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    const callData = sharedBridgeInterface.encodeFunctionData("acceptOwnership()", []);
+    const operation = {
+      calls: [{ target: deployer.addresses.Bridges.SharedBridgeProxy, value: 0, data: callData }],
+      predecessor: ethers.constants.HashZero,
+      salt: ethers.constants.HashZero,
+    };
+    const scheduleTx = await governance.scheduleTransparent(operation, 0);
+    await scheduleTx.wait();
+    const executeTX = await governance.execute(operation);
+    await executeTX.wait();
   });
 
   it("Check should initialize through governance", async () => {

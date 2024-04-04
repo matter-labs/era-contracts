@@ -88,9 +88,9 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
-    uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 4th so 4 -1 + dependency storage slots
+    uint256 depositLocationInStorage = uint256(4 - 1 + 1 + 1);
+    uint256 chainBalanceLocationInStorage = uint256(7 - 1 + 1 + 1);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -118,7 +118,6 @@ contract L1SharedBridgeTest is Test {
         sharedBridgeImpl = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(bridgehubAddress),
-            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
@@ -128,6 +127,8 @@ contract L1SharedBridgeTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+        vm.prank(owner);
+        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);

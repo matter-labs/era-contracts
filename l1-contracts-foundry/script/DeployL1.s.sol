@@ -6,8 +6,7 @@ pragma solidity 0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
@@ -15,7 +14,6 @@ import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -493,7 +491,6 @@ contract DeployL1Script is Script {
             abi.encode(
                 config.tokens.tokenWethAddress,
                 addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.erc20BridgeProxy,
                 config.eraChainId,
                 addresses.stateTransition.diamondProxy
             )
@@ -535,9 +532,10 @@ contract DeployL1Script is Script {
     }
 
     function deployErc20BridgeProxy() internal {
+        bytes memory initCalldata = abi.encodeCall(L1ERC20Bridge.initialize, ());
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.erc20BridgeImplementation, bytes(hex""))
+            abi.encode(addresses.bridges.erc20BridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("Erc20BridgeProxy deployed at:", contractAddress);

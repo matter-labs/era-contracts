@@ -11,6 +11,7 @@ import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import { getCallRevertReason, REQUIRED_L2_GAS_PRICE_PER_PUBDATA } from "./utils";
+import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
 
 describe("Shared Bridge tests", () => {
   let owner: ethers.Signer;
@@ -65,6 +66,20 @@ describe("Shared Bridge tests", () => {
 
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1SharedBridge.address, ethers.utils.parseUnits("10000", 18));
+
+    // accept ownership from governance for L1SharedBridge
+    const governance = IGovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
+    const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
+    const callData = sharedBridgeInterface.encodeFunctionData("acceptOwnership()", []);
+    const operation = {
+      calls: [{ target: deployer.addresses.Bridges.SharedBridgeProxy, value: 0, data: callData }],
+      predecessor: ethers.constants.HashZero,
+      salt: ethers.constants.HashZero,
+    };
+    const scheduleTx = await governance.scheduleTransparent(operation, 0);
+    await scheduleTx.wait();
+    const executeTX = await governance.execute(operation);
+    await executeTX.wait();
   });
 
   it("Check should initialize through governance", async () => {
