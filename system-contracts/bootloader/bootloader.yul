@@ -274,7 +274,7 @@ object "Bootloader" {
             /// - number of the block
             /// - timestamp of the block
             /// - hash of the previous block
-            /// - the maximal number of virtual blocks to create
+        
             function TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE() -> ret {
                 ret := 4
             }
@@ -2652,28 +2652,25 @@ object "Bootloader" {
                 let currentL2BlockNumber := mload(txL2BlockPosition)
                 let currentL2BlockTimestamp := mload(add(txL2BlockPosition, 32))
                 let previousL2BlockHash := mload(add(txL2BlockPosition, 64))
-                let virtualBlocksToCreate := mload(add(txL2BlockPosition, 96))
 
                 let isFirstInBatch := iszero(txId)
 
                 debugLog("Setting new L2 block: ", currentL2BlockNumber)
                 debugLog("Setting new L2 block: ", currentL2BlockTimestamp)
                 debugLog("Setting new L2 block: ", previousL2BlockHash)
-                debugLog("Setting new L2 block: ", virtualBlocksToCreate)
 
                 mstore(0, {{RIGHT_PADDED_SET_L2_BLOCK_SELECTOR}})
                 mstore(4, currentL2BlockNumber)
                 mstore(36, currentL2BlockTimestamp)
                 mstore(68, previousL2BlockHash)
                 mstore(100, isFirstInBatch)
-                mstore(132, virtualBlocksToCreate)
 
                 let success := call(
                     gas(),
                     SYSTEM_CONTEXT_ADDR(),
                     0,
                     0,
-                    164,
+                    132,
                     0,
                     0
                 )
@@ -3859,7 +3856,7 @@ object "Bootloader" {
             // non-empty L2 block has been already sealed. We can not override old L2 blocks, so we need to create a new empty "fictive" block for it.
             //
             // The other reason why we need to set this block is so that in case of empty batch (i.e. the one which has no transactions), 
-            // the virtual block number as well as miniblock number are incremented.
+            // the miniblock number is incremented.
             setL2Block(transactionIndex)
 
             callSystemContext({{RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR}})
