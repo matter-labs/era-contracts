@@ -80,7 +80,6 @@ contract DeployL1Script is Script {
         uint256 eraChainId;
         address deployerAddress;
         address ownerAddress;
-        uint256 gasPrice;
         ContractsConfig contracts;
         TokensConfig tokens;
     }
@@ -160,7 +159,6 @@ contract DeployL1Script is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.gasPrice = toml.readUint("$.gas_price");
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
 
