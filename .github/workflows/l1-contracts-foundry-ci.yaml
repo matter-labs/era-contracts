@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -47,6 +49,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
