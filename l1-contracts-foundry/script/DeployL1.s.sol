@@ -282,9 +282,9 @@ contract DeployL1Script is Script {
     function deployTransparentProxyAdmin() internal {
         vm.startBroadcast();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
-        console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         proxyAdmin.transferOwnership(addresses.governance);
         vm.stopBroadcast();
+        console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
         addresses.transparentProxyAdmin = address(proxyAdmin);
     }
 
