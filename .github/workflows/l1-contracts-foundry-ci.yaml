@@ -1,5 +1,9 @@
 name: L1 contracts foundry CI
 
+env:
+  ANVIL_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  ANVIL_RPC_URL: "http://127.0.0.1:8545"
+
 on:
   pull_request:
 jobs:
@@ -75,7 +79,7 @@ jobs:
 
           ANVIL_READY=0
           for i in {1..10}; do
-            if curl -s -o /dev/null http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}'; then
+            if curl -s -o /dev/null $ANVIL_RPC_URL -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}'; then
               echo "Anvil is ready"
               ANVIL_READY=1
               break
@@ -90,9 +94,10 @@ jobs:
             exit 1
           fi
 
-      - name: Run scripts
+      - name: Run DeployL1 script
         working-directory: ./l1-contracts-foundry
-        run: |
-          ANVIL_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-          forge script ./script/DeployL1.s.sol --ffi --rpc-url http://127.0.0.1:8545 --broadcast --private-key $ANVIL_PRIVATE_KEY
-          forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url http://127.0.0.1:8545 --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: forge script ./script/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+
+      - name: Run RegisterHyperchain script
+        working-directory: ./l1-contracts-foundry
+        run: forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
