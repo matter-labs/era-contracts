@@ -36,9 +36,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override bridgehub;
 
-    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public override legacyBridge;
-
     /// @dev Era's chainID
     uint256 immutable eraChainId;
 
@@ -49,6 +46,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraFirstPostUpgradeBatch;
+
+    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
+    IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
