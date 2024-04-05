@@ -81,12 +81,16 @@ contract L1SharedBridgeHyperEnabledTest is Test {
 
     uint256 eraChainId;
     address eraDiamondProxy;
-    address eraErc20BridgeAddress;
 
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
+
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 4th so 4 - 1 + dependency storage slots
+    uint256 depositLocationInStorage = uint256(4 - 1 + 1 + 1);
+    uint256 hyperBridgingEnabledLocationInStorage = uint256(6 - 1 + 1 + 1);
+    uint256 chainBalanceLocationInStorage = uint256(7 - 1 + 1 + 1);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -108,15 +112,12 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         chainId = 1;
         eraChainId = 9;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
-        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(bridgehubAddress),
-            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
             _eraChainId: eraChainId,
-            _eraErc20BridgeAddress: eraErc20BridgeAddress,
             _eraDiamondProxy: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
@@ -126,11 +127,12 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
+        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
+        vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
         ///// NOTE: this is the only difference: enabling hyper bridging
-        uint256 hyperBridgingEnabledLocationInStorage = uint256(5 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -236,8 +238,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_claimFailedDeposit_Erc() public {
         token.mint(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
@@ -246,7 +246,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         );
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -298,8 +297,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.store(
             address(sharedBridge),
@@ -309,7 +306,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -362,7 +358,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -417,7 +412,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -477,7 +471,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -537,7 +530,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
@@ -597,7 +589,6 @@ contract L1SharedBridgeHyperEnabledTest is Test {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
