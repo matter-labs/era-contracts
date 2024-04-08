@@ -51,6 +51,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
+    /// We use this both for Eth and erc20 token withdrawals, so we need to update the diamond and bridge simultaneously.
     uint256 internal eraFirstPostUpgradeBatch;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
@@ -116,15 +117,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy
     /// @param _owner Address which can change L2 token implementation and upgrade the bridge
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
-    function initialize(
-        address _owner,
-        uint256 _eraFirstPostUpgradeBatch
-    ) external reentrancyGuardInitializer initializer {
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
         _transferOwnership(_owner);
 
-        eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
         l2BridgeAddress[eraChainId] = eraErc20BridgeAddress;
+    }
+
+    function setEraFirstPostUpgradeBatch(uint256 _eraFirstPostUpgradeBatch) external onlyOwner {
+        eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process

@@ -58,6 +58,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
 
         l1Bridge = _l1Bridge;
+        l1LegacyBridge = _l1LegecyBridge;
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
 
         if (block.chainid != ERA_CHAIN_ID) {

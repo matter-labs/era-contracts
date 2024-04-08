@@ -514,10 +514,9 @@ export class Deployer {
 
   public async deploySharedBridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
     const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi).encodeFunctionData(
       "initialize",
-      [this.addresses.Governance, storageSwitch]
+      [this.addresses.Governance]
     );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
@@ -531,6 +530,17 @@ export class Deployer {
     }
 
     this.addresses.Bridges.SharedBridgeProxy = contractAddress;
+  }
+
+  public async sharedBridgeSetEraFirstPostUpgradeBatch(ethTxOptions: ethers.providers.TransactionRequest) {
+    ethTxOptions.gasLimit ??= 10_000_000;
+    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+    const storageSwitch = getNumberFromEnv("CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH");
+    const tx = await sharedBridge.setEraFirstPostUpgradeBatch(storageSwitch);
+    const receipt = await tx.wait();
+    if (this.verbose) {
+      console.log(`Era first post upgrade batch set, gas used: ${receipt.gasUsed.toString()}`);
+    }
   }
 
   public async registerSharedBridge(ethTxOptions: ethers.providers.TransactionRequest) {
