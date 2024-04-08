@@ -8,6 +8,7 @@ import { ethers } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import * as path from "path";
+import type { types } from "zksync-ethers";
 import { Provider, Wallet } from "zksync-ethers";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
