@@ -418,17 +418,12 @@ export class Deployer {
 
   public async updateSharedBridge() {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    await sharedBridge.setL1Erc20Bridge(this.addresses.Bridges.ERC20BridgeProxy);
+    const data = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+      this.addresses.Bridges.ERC20BridgeProxy,
+    ]);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
-    }
-  }
-
-  public async changeSharedBridgeOwner() {
-    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    await sharedBridge.transferOwnership(this.addresses.Governance);
-    if (this.verbose) {
-      console.log("Shared bridge ownership transferred to Governance");
     }
   }
 
@@ -484,7 +479,7 @@ export class Deployer {
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
-    const eraDiamondProxy = getNumberFromEnv("CONTRACTS_ERA_DIAMOND_PROXY");
+    const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
       [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],

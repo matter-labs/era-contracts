@@ -27,6 +27,7 @@ import * as zkethers from "zksync-ethers";
 
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
+export const CONTRACTS_ERA_DIAMOND_PROXY_ADDR = "0x50DC752D0aabD311C385F3899cdE8F66de3d62be";
 
 export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
@@ -41,6 +42,7 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "9";
+  process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = CONTRACTS_ERA_DIAMOND_PROXY_ADDR;
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR = ADDRESS_ONE;
 }
@@ -134,8 +136,7 @@ export async function initialPreUpgradeContractsDeployment(
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
 
-  // /// note the weird order is ok, it mimics historical deployment process
-  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+  // note we should also deploy the old ERC20Bridge here, but we can do that later.
 
   // // for Era we first deploy the DiamondProxy manually, set the vars manually,
   // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)

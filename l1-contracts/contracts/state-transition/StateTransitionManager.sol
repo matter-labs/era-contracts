@@ -211,16 +211,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncHyperchain(hyperchain[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
-    /// @dev executes upgrade on chain
-    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
-    }
-
-    /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
-    }
-
     /// @dev setTokenMultiplier for the specified chain
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
         IZkSyncHyperchain(hyperchain[_chainId]).setTokenMultiplier(_nominator, _denominator);
@@ -243,12 +233,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev executes upgrade on chain
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// registration

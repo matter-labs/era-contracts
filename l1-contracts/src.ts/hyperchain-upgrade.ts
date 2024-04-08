@@ -126,6 +126,8 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
 
   await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
+  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+  await deployer.updateSharedBridge();
 }
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {

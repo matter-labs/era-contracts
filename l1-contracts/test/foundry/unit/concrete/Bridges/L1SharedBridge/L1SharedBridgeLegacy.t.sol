@@ -163,7 +163,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
     function test_claimFailedDepositLegacyErc20Bridge_Erc() public {
         token.mint(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. 
+        // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),

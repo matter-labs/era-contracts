@@ -165,7 +165,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. 
+        // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.store(
             address(sharedBridge),
