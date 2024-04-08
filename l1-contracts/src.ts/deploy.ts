@@ -416,27 +416,19 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeImplementation = contractAddress;
   }
 
-  public async upgradeL1ERC20Bridge(alreadyInitialized: boolean = false) {
-    if (process.env.CHAIN_ETH_NETWORK === "localhost") {
-      // we need to wait here for a new block
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
-    const l1ERC20BridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi);
-    const calldata = alreadyInitialized
-      ? proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
-          this.addresses.Bridges.ERC20BridgeProxy,
-          this.addresses.Bridges.ERC20BridgeImplementation,
-        ])
-      : proxyAdminInterface.encodeFunctionData("upgradeAndCall(address,address,bytes)", [
-          this.addresses.Bridges.ERC20BridgeProxy,
-          this.addresses.Bridges.ERC20BridgeImplementation,
-          l1ERC20BridgeInterface.encodeFunctionData("initialize()", []),
-        ]);
-
-    await this.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
+  public async updateSharedBridge() {
+    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+    await sharedBridge.setL1Erc20Bridge(this.addresses.Bridges.ERC20BridgeProxy);
     if (this.verbose) {
-      console.log("L1ERC20Bridge upgrade sent");
+      console.log("Shared bridge updated with ERC20Bridge address");
+    }
+  }
+
+  public async changeSharedBridgeOwner() {
+    const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
+    await sharedBridge.transferOwnership(this.addresses.Governance);
+    if (this.verbose) {
+      console.log("Shared bridge ownership transferred to Governance");
     }
   }
 
@@ -468,13 +460,15 @@ export class Deployer {
   // we don't use the real implementation, as we need the address to be independent
   public async deployERC20BridgeProxy(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
+    const initCalldata = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi).encodeFunctionData(
+      "initialize"
+    );
     const contractAddress = await this.deployViaCreate2(
       "TransparentUpgradeableProxy",
-      [this.addresses.TransparentProxyAdmin, this.addresses.TransparentProxyAdmin, "0x"], // we have to use an  address where a contract is already deployed, so TransparentProxyAdmin
+      [this.addresses.Bridges.ERC20BridgeImplementation, this.addresses.TransparentProxyAdmin, initCalldata],
       create2Salt,
       ethTxOptions
     );
-    process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR = contractAddress; // we set this for process, so we can read from process in deploySharedBridgeImplementation
     if (this.verbose) {
       console.log(`CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR=${contractAddress}`);
     }
@@ -490,17 +484,10 @@ export class Deployer {
     const tokens = getTokens();
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
     const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
+    const eraDiamondProxy = getNumberFromEnv("CONTRACTS_ERA_DIAMOND_PROXY");
     const contractAddress = await this.deployViaCreate2(
       "L1SharedBridge",
-      [
-        l1WethToken,
-        this.addresses.Bridgehub.BridgehubProxy,
-        // we load from process.env, as normally L1_ERC20 bridge will already be deployed
-        process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR,
-        eraChainId,
-        this.addresses.Bridges.ERC20BridgeImplementation,
-        this.addresses.StateTransition.DiamondProxy,
-      ],
+      [l1WethToken, this.addresses.Bridgehub.BridgehubProxy, eraChainId, eraDiamondProxy],
       create2Salt,
       ethTxOptions
     );

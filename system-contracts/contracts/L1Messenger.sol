@@ -7,7 +7,7 @@ import {ISystemContract} from "./interfaces/ISystemContract.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, MAX_ALLOWED_PUBDATA_PER_BATCH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, COMPRESSOR_CONTRACT, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, PUBDATA_CHUNK_PUBLISHER, COMPUTATIONAL_PRICE_FOR_PUBDATA} from "./Constants.sol";
 
 /**
  * @author Matter Labs
@@ -87,7 +87,7 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) + 2 * keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay));
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), 0);
     }
 
     /// @notice Internal function to send L2ToL1Log.
@@ -134,9 +134,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         _processL2ToL1Log(l2ToL1Log);
 
         // Get cost of one byte pubdata in gas from context.
-        uint256 meta = SystemContractHelper.getZkSyncMetaBytes();
-        uint32 gasPerPubdataBytes = SystemContractHelper.getGasPerPubdataByteFromMeta(meta);
-
         uint256 pubdataLen;
         unchecked {
             // 4 bytes used to encode the length of the message (see `publishPubdataAndClearState`)
@@ -149,13 +146,13 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         // - keccakGasCost(64) and gasSpentOnMessageHashing when reconstructing Messages
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
-        uint256 gasToPay = pubdataLen *
-            gasPerPubdataBytes +
-            keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
+        uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
             3 *
             keccakGasCost(64) +
-            gasSpentOnMessageHashing;
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay));
+            gasSpentOnMessageHashing +
+            COMPUTATIONAL_PRICE_FOR_PUBDATA *
+            pubdataLen;
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit L1MessageSent(msg.sender, hash, _message);
     }
@@ -169,10 +166,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
 
         uint256 bytecodeLen = Utils.bytecodeLenInBytes(_bytecodeHash);
 
-        // Get cost of one byte pubdata in gas from context.
-        uint256 meta = SystemContractHelper.getZkSyncMetaBytes();
-        uint32 gasPerPubdataBytes = SystemContractHelper.getGasPerPubdataByteFromMeta(meta);
-
         uint256 pubdataLen;
         unchecked {
             // 4 bytes used to encode the length of the bytecode (see `publishPubdataAndClearState`)
@@ -180,8 +173,11 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         }
 
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`
-        uint256 gasToPay = pubdataLen * gasPerPubdataBytes + sha256GasCost(bytecodeLen) + keccakGasCost(64);
-        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay));
+        uint256 gasToPay = sha256GasCost(bytecodeLen) +
+            keccakGasCost(64) +
+            COMPUTATIONAL_PRICE_FOR_PUBDATA *
+            pubdataLen;
+        SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit BytecodeL1PublicationRequested(_bytecodeHash);
     }
@@ -299,8 +295,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         calldataPtr += compressedStateDiffSize;
 
         bytes calldata totalL2ToL1Pubdata = _totalL2ToL1PubdataAndStateDiffs[:calldataPtr];
-
-        require(calldataPtr <= MAX_ALLOWED_PUBDATA_PER_BATCH, "L1 Messenger pubdata is too long");
 
         uint32 numberOfStateDiffs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;

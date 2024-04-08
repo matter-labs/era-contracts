@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
@@ -165,7 +165,7 @@ contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
     function test_claimFailedDeposit_Eth() public {
         vm.deal(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
+        // storing depositHappened[chainId][l2TxHash] = txDataHash. 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         vm.store(
             address(sharedBridge),

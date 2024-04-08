@@ -1,5 +1,5 @@
 // // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";

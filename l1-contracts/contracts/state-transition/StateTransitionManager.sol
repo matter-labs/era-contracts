@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -41,6 +41,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev The current protocolVersion
     uint256 public protocolVersion;
+
+    /// @dev The timestamp when protocolVersion can be last used
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
@@ -85,6 +88,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -150,14 +154,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
+        uint256 _oldprotocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         uint256 previousProtocolVersion = protocolVersion;
+        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
+        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+    }
+
+    /// @dev check that the protocolVersion is active
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
+    }
+
+    /// @dev set the protocol version timestamp
+    function setprotocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -222,6 +239,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
         IZkSyncHyperchain(hyperchain[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
+    }
+
+    /// @dev executes upgrade on chain
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// registration
@@ -337,6 +364,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         diamondCut.initCalldata = initData;
         // deploy hyperchainContract
+        // slither-disable-next-line reentrancy-no-eth
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
 
         // save data

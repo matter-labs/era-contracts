@@ -13,6 +13,7 @@
     "no-complex-fallback": "off",
     "reason-string": "off",
     "func-name-mixedcase": "off",
+    "custom-errors": "off",
     "no-unused-vars": "error",
     "max-states-count": "off",
     "no-global-import": "error",

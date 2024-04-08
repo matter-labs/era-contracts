@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
@@ -9,6 +9,7 @@ import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract ZkSyncHyperchainBase is ReentrancyGuard {
+    // slither-disable-next-line uninitialized-state
     ZkSyncHyperchainStorage internal s;
 
     /// @notice Checks that the message sender is an active admin

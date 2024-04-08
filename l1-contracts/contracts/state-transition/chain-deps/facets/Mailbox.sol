@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -167,9 +167,11 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
             s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
+            // slither-disable-next-line divide-before-multiply
             pubdataPriceBaseToken = L1_GAS_PER_PUBDATA_BYTE * l1GasPriceConverted;
         }
 
+        // slither-disable-next-line divide-before-multiply
         uint256 batchOverheadBaseToken = uint256(feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
         uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
             batchOverheadBaseToken /
@@ -252,6 +254,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
         address l2Sender = _request.sender;
+        // slither-disable-next-line tx-origin
         if (l2Sender != tx.origin) {
             l2Sender = AddressAliasHelper.applyL1ToL2Alias(_request.sender);
         }

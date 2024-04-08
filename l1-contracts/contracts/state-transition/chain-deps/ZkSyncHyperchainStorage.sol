@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";

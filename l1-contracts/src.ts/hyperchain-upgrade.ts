@@ -74,10 +74,10 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   }
   await upgradeL2Bridge(deployer); // mostly finished
 
-  if (deployer.verbose) {
-    console.log("Upgrading L1 ERC20 bridge");
-  }
-  await deployer.upgradeL1ERC20Bridge(true); // done
+  // if (deployer.verbose) {
+  //   console.log("Upgrading L1 ERC20 bridge");
+  // }
+  // await deployer.upgradeL1ERC20Bridge(true); // done
 
   // note, withdrawals will not work until this step, but deposits will
   if (deployer.verbose) {

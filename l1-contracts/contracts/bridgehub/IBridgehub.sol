@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";

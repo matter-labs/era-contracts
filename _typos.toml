@@ -14,7 +14,8 @@ extend-exclude = [
     "/system-contracts/typechain",
     "*.json",
     "*.lock",
-    ".git/"
+    ".git/",
+    "SECURITY.md"
 ]
 
 [default.extend-words]

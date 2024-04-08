@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 // import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
@@ -36,14 +36,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override bridgehub;
 
-    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public immutable override legacyBridge;
-
     /// @dev Era's chainID
     uint256 immutable eraChainId;
-
-    /// @dev The address of legacy L1 ERC20 bridge.
-    address immutable eraErc20BridgeAddress;
 
     /// @dev The address of zkSync Era diamond proxy contract.
     address immutable eraDiamondProxy;
@@ -53,6 +47,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token withdrawals, so we need to update the diamond and bridge simultaneously.
     uint256 internal eraFirstPostUpgradeBatch;
+
+    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
+    IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
@@ -68,6 +65,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         public isWithdrawalFinalized;
 
     /// @dev Indicates whether the hyperbridging is enabled for a given chain.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool enabled) internal hyperbridgingEnabled;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
@@ -100,17 +98,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     constructor(
         address _l1WethAddress,
         IBridgehub _bridgehub,
-        IL1ERC20Bridge _legacyBridge,
         uint256 _eraChainId,
-        address _eraErc20BridgeAddress,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
-        legacyBridge = _legacyBridge;
         eraChainId = _eraChainId;
-        eraErc20BridgeAddress = _eraErc20BridgeAddress;
         eraDiamondProxy = _eraDiamondProxy;
     }
 
@@ -120,8 +114,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), "ShB owner 0");
         _transferOwnership(_owner);
-
-        l2BridgeAddress[eraChainId] = eraErc20BridgeAddress;
     }
 
     function setEraFirstPostUpgradeBatch(uint256 _eraFirstPostUpgradeBatch) external onlyOwner {
@@ -188,6 +180,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFunds(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
+        // slither-disable-next-line arbitrary-send-erc20
         _token.safeTransferFrom(_from, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
 
@@ -261,6 +254,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
+    }
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
+        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
+        l2BridgeAddress[eraChainId] = address(legacyBridge);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
@@ -604,6 +605,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
             // If the recipient is a contract on L1, the address alias will be applied.
             address refundRecipient = _refundRecipient;
             if (_refundRecipient == address(0)) {
+                // slither-disable-next-line tx-origin
                 refundRecipient = _prevMsgSender != tx.origin
                     ? AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender)
                     : _prevMsgSender;

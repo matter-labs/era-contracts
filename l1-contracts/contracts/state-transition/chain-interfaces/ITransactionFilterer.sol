@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @title The interface of the L1 -> L2 transaction filterer.
 /// @author Matter Labs

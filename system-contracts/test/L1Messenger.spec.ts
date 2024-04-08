@@ -38,7 +38,7 @@ describe("L1Messenger tests", () => {
     // setup
     stateDiffsSetupData = await setupStateDiffs();
     logData = setupLogData(l1MessengerAccount, l1Messenger);
-    bytecodeData = await setupBytecodeData(l1Messenger.address);
+    bytecodeData = await setupBytecodeData(ethers.constants.AddressZero);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
@@ -89,16 +89,16 @@ describe("L1Messenger tests", () => {
       await (
         await l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(), { gasLimit: 10000000 })
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs(), { gasLimit: 1000000000 })
       ).wait();
     });
 
     it("should revert Too many L2->L1 logs", async () => {
-      // set numberOfLogsBytes to 0x1100 to trigger the revert (max value is 0x1000)
+      // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
       await expect(
         l1Messenger
           .connect(bootloaderAccount)
-          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x1100 }))
+          .publishPubdataAndClearState(emulator.buildTotalL2ToL1PubdataAndStateDiffs({ numberOfLogs: 0x4002 }))
       ).to.be.rejectedWith("Too many L2->L1 logs");
     });
 
