@@ -128,7 +128,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
+    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         validatorTimelock = _validatorTimelock;
     }
