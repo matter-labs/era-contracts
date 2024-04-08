@@ -128,6 +128,8 @@ contract L1SharedBridgeTest is Test {
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
+        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
+        vm.prank(owner);
         sharedBridge.setEraFirstPostUpgradeBatch(eraFirstPostUpgradeBatch);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
