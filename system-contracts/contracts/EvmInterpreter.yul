@@ -190,6 +190,15 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, sub(a, b))
                 }
+                case 0x08 { // OP_ADDMOD
+                    let a, b, N
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+                    N, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, addmod(a, b, N))
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
