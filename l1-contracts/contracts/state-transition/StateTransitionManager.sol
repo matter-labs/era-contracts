@@ -133,12 +133,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
+        address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
+        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
     /// @dev set initial cutHash
     function setInitialCutHash(Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        initialCutHash = keccak256(abi.encode(_diamondCut));
+        bytes32 oldInitialCutHash = initialCutHash;
+        bytes32 newCutHash = keccak256(abi.encode(_diamondCut));
+        initialCutHash = newCutHash;
+        emit NewInitialCutHash(oldInitialCutHash, newCutHash);
     }
 
     /// @dev set New Version with upgrade from old version
@@ -147,8 +152,12 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        uint256 previousProtocolVersion = protocolVersion;
         protocolVersion = _newProtocolVersion;
+        emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -156,7 +165,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion
     ) external onlyOwner {
-        upgradeCutHash[_oldProtocolVersion] = keccak256(abi.encode(_cutData));
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
     }
 
     /// @dev freezes the specified chain
