@@ -79,9 +79,9 @@ export async function mintTokens(
 export function getTokens(): L1Token[] {
   const network = process.env.CHAIN_ETH_NETWORK || "localhost";
   const configPath =
-  network == "hardhat"
-    ? `./test/test_config/constant/${network}.json`
-    : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
+    network == "hardhat"
+      ? `./test/test_config/constant/${network}.json`
+      : `${process.env.ZKSYNC_HOME}/etc/tokens/${network}.json`;
   return JSON.parse(
     fs.readFileSync(configPath, {
       encoding: "utf-8",
