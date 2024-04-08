@@ -33,7 +33,7 @@ describe("Mailbox tests", function () {
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
   let forwarder: Forwarder;
-  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 270;
+  let chainId = process.env.CHAIN_ETH_ZKSYNC_NETWORK_ID || 271;
 
   before(async () => {
     [owner] = await hardhat.ethers.getSigners();
