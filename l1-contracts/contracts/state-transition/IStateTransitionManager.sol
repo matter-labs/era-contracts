@@ -7,13 +7,13 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
-/// @param _governor address who can manage non-critical updates in the contract
+/// @param _owner address who can manage non-critical updates in the contract
 /// @param _validatorTimelock address that serves as consensus, i.e. can submit blocks to be processed
 /// @param _genesisBatchHash Batch hash of the genesis (initial) batch
 /// @param _genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for genesis batch
 /// @param _genesisBatchCommitment The zk-proof commitment for the genesis batch
 struct StateTransitionManagerInitializeData {
-    address governor;
+    address owner;
     address validatorTimelock;
     address genesisUpgrade;
     bytes32 genesisBatchHash;
@@ -24,8 +24,8 @@ struct StateTransitionManagerInitializeData {
 }
 
 interface IStateTransitionManager {
-    /// @dev emitted when a new Chain is added
-    event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
+    /// @dev Emitted when a new Chain is added
+    event NewHyperchain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
     /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(

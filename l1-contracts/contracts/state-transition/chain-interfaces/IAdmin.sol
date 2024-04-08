@@ -41,7 +41,7 @@ interface IAdmin is IZkSyncStateTransitionBase {
 
     /// @notice Change the pubdata pricing mode before the first batch is processed
     /// @param _validiumMode The new pubdata pricing mode
-    function setValidiumMode(PubdataPricingMode _validiumMode) external;
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
