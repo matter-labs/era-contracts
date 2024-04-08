@@ -404,9 +404,7 @@ contract ExecutorFacet is Base, IExecutor {
                 keccak256(
                     abi.encodePacked(
                         _prevBatchCommitment,
-                        _currentBatchCommitment,
-                        _verifierParams.recursionNodeLevelVkHash,
-                        _verifierParams.recursionLeafLevelVkHash
+                        _currentBatchCommitment
                     )
                 )
             ) >> PUBLIC_INPUT_SHIFT;
