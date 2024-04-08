@@ -29,10 +29,10 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
     /// @notice A new validator has been added.
-    event ValidatorAdded(uint256 _chainId, address _addedValidator);
+    event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
 
     /// @notice A validator has been removed.
-    event ValidatorRemoved(uint256 _chainId, address _removedValidator);
+    event ValidatorRemoved(uint256 indexed _chainId, address _removedValidator);
 
     /// @notice Error for when an address is already a validator.
     error AddressAlreadyValidator(uint256 _chainId);
