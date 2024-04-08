@@ -4,12 +4,9 @@ pragma solidity 0.8.20;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZkSyncStateTransitionBase} from "./facets/ZkSyncStateTransitionBase.sol";
-import {FeeParams} from "./ZkSyncStateTransitionStorage.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-
-import "../l2-deps/ISystemContext.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -26,6 +23,11 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         require(_initializeData.admin != address(0), "vy");
         require(_initializeData.validatorTimelock != address(0), "hc");
         require(_initializeData.priorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION, "vu");
+        require(_initializeData.bridgehub != address(0), "DiamondInit: b0");
+        require(_initializeData.stateTransitionManager != address(0), "DiamondInit: stm0");
+        require(_initializeData.baseToken != address(0), "DiamondInit: bt0");
+        require(_initializeData.baseTokenBridge != address(0), "DiamondInit: btb0");
+        require(_initializeData.blobVersionedHashRetriever != address(0), "DiamondInit: bvhr0");
 
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;

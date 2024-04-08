@@ -16,7 +16,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, ERA_DIAMOND_PROXY, ERA_CHAIN_ID} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
@@ -79,24 +79,24 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "StateTransition: governor zero");
-        _transferOwnership(_initializeData.governor);
+        require(_initializeData.owner != address(0), "StateTransition: owner zero");
+        _transferOwnership(_initializeData.owner);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
-            0,
-            _initializeData.genesisBatchHash,
-            _initializeData.genesisIndexRepeatedStorageChanges,
-            0,
-            EMPTY_STRING_KECCAK,
-            DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            0,
-            _initializeData.genesisBatchCommitment
-        );
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _initializeData.genesisBatchHash,
+            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: _initializeData.genesisBatchCommitment
+        });
         storedBatchZero = keccak256(abi.encode(batchZero));
 
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
@@ -106,7 +106,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);
     }
 
-    /// @inheritdoc IStateTransitionManager
+    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
+    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
+    /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
@@ -115,7 +117,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
-    /// @inheritdoc IStateTransitionManager
+    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
         require(msg.sender == currentPendingAdmin, "n42"); // Only proposed by current admin address can claim the admin rights
@@ -125,10 +127,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         delete pendingAdmin;
 
         emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
+    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         validatorTimelock = _validatorTimelock;
     }
@@ -227,15 +229,25 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         emit SetChainIdUpgrade(_chainContract, l2ProtocolUpgradeTx, protocolVersion);
     }
 
+    /// @dev used to register already deployed hyperchain contracts
+    /// @param _chainId the chain's id
+    /// @param _stateTransitionContract the chain's contract
     function registerAlreadyDeployedStateTransition(
         uint256 _chainId,
         address _stateTransitionContract
     ) external onlyOwner {
+        require(_stateTransitionContract != address(0), "STM: STC zero");
+
         stateTransition[_chainId] = _stateTransitionContract;
-        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+        emit NewHyperchain(_chainId, _stateTransitionContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
+    /// @param _chainId the chain's id
+    /// @param _baseToken the base token address used to pay for gas fees
+    /// @param _sharedBridge the shared bridge address, used as base token bridge
+    /// @param _admin the chain's admin address
+    /// @param _diamondCut the diamond cut data that initializes the chains Diamond Proxy
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
@@ -284,6 +296,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);
 
-        emit StateTransitionNewChain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, stateTransitionAddress);
     }
 }

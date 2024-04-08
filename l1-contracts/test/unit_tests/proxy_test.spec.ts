@@ -84,7 +84,7 @@ describe("Diamond proxy tests", function () {
     const diamondInitCalldata = diamondInit.interface.encodeFunctionData("initialize", [
       {
         chainId,
-        bridgehub: "0x0000000000000000000000000000000000000000",
+        bridgehub: "0x0000000000000000000000000000000000000001",
         stateTransitionManager: await owner.getAddress(),
         protocolVersion: 0,
         admin: governorAddress,
@@ -98,7 +98,7 @@ describe("Diamond proxy tests", function () {
         l2DefaultAccountBytecodeHash: "0x0100000000000000000000000000000000000000000000000000000000000000",
         priorityTxMaxGasLimit: 500000, // priority tx max L2 gas limit
         feeParams: defaultFeeParams(),
-        blobVersionedHashRetriever: ethers.constants.AddressZero,
+        blobVersionedHashRetriever: "0x0000000000000000000000000000000000000001",
       },
     ]);
 
