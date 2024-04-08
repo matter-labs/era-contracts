@@ -34,6 +34,7 @@
     "lint:ts": "eslint .",
     "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yaml}\"",
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
+    "gas-snapshot": "yarn l1 gas-snapshot",
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
     "sc": "yarn workspace system-contracts"

@@ -16,4 +16,5 @@
 
 - [ ] PR title corresponds to the body of PR (we generate changelog entries from PRs).
 - [ ] Tests for the changes have been added / updated.
+- [ ] Gas snapshot have been updated.
 - [ ] Documentation comments have been added / updated.
