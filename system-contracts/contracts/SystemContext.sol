@@ -19,7 +19,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @dev EVM requires us to be able to query the hashes of previous 256 blocks.
     /// We could either:
     /// - Store the latest 256 hashes (and strictly rely that we do not accidentally override the hash of the block 256 blocks ago)
-    /// - Store the latest 257 blocks's hashes.
+    /// - Store the latest 257 blocks' hashes.
     uint256 internal constant MINIBLOCK_HASHES_TO_STORE = 257;
 
     /// @notice The chainId of the network. It is set at the genesis.
@@ -73,8 +73,20 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     uint256 internal DEPRECATED_virtualBlockUpgradeInfo;
 
 
+    /// @notice Set the chainId origin.
+    /// @param _newChainId The chainId
+    function setChainId(uint256 _newChainId) external onlyCallFromForceDeployer {
+        chainId = _newChainId;
+    }
+
     /// @notice Number of current transaction in block.
     uint16 public txNumberInBlock;
+
+    /// @notice The current gas per pubdata byte
+    uint256 public gasPerPubdataByte;
+
+    /// @notice The number of pubdata spent as of the start of the transaction
+    uint256 internal basePubdataSpent;
 
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.
@@ -86,6 +98,23 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyCallFromBootloader {
         gasPrice = _gasPrice;
+    }
+
+    /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
+    /// @dev This value does not have any impact on the execution and purely serves as a way for users
+    /// to access the current gas price for the pubdata.
+    function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyCallFromBootloader {
+        basePubdataSpent = _basePubdataSpent;
+        gasPerPubdataByte = _gasPerPubdataByte;
+    }
+
+    function getCurrentPubdataSpent() public view returns (uint256) {
+        uint256 pubdataPublished = SystemContractHelper.getZkSyncMeta().pubdataPublished;
+        return pubdataPublished > basePubdataSpent ? pubdataPublished - basePubdataSpent : 0;
+    }
+
+    function getCurrentPubdataCost() external view returns (uint256) {
+        return gasPerPubdataByte * getCurrentPubdataSpent();
     }
 
     /// @notice The method that emulates `blockhash` opcode in EVM.
@@ -220,7 +249,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
         // It is always assumed in production that _l2BlockNumber > 0
         _setL2BlockHash(_l2BlockNumber - 1, _prevL2BlockHash);
 
-        // Reseting the rolling hash
+        // Resetting the rolling hash
         currentL2BlockTxsRollingHash = bytes32(0);
     }
 
@@ -343,7 +372,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     ) external onlyCallFromBootloader {
         (uint128 previousBatchNumber, uint128 previousBatchTimestamp) = getBatchNumberAndTimestamp();
         require(_newTimestamp > previousBatchTimestamp, "Timestamps should be incremental");
-        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided block number is not correct");
+        require(previousBatchNumber + 1 == _expectedNewNumber, "The provided batch number is not correct");
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 

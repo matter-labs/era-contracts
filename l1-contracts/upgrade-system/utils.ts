@@ -9,7 +9,7 @@ export async function insertGasPrice(l1Provider: ethers.providers.Provider, over
     // Sometimes baseFeePerGas is not available, so we use gasPrice instead.
     const baseFee = l1FeeData.lastBaseFeePerGas || l1FeeData.gasPrice;
 
-    // ethers.js by default uses multiplcation by 2, but since the price for the L2 part
+    // ethers.js by default uses multiplication by 2, but since the price for the L2 part
     // will depend on the L1 part, doubling base fee is typically too much.
     const maxFeePerGas = baseFee.mul(3).div(2).add(l1FeeData.maxPriorityFeePerGas);
 
