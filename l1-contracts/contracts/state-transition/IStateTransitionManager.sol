@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {FeeParams} from "./chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
@@ -28,12 +28,12 @@ struct StateTransitionManagerInitializeData {
 }
 
 interface IStateTransitionManager {
-    /// @dev Emitted when a new Chain is added
-    event NewHyperchain(uint256 indexed _chainId, address indexed _stateTransitionContract);
+    /// @dev Emitted when a new Hyperchain is added
+    event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
     /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(
-        address indexed _stateTransitionChain,
+        address indexed _hyperchain,
         L2CanonicalTransaction _l2Transaction,
         uint256 indexed _protocolVersion
     );
@@ -63,7 +63,7 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
-    function stateTransition(uint256 _chainId) external view returns (address);
+    function hyperchain(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
 
@@ -91,7 +91,7 @@ interface IStateTransitionManager {
         bytes calldata _diamondCut
     ) external;
 
-    function registerAlreadyDeployedStateTransition(uint256 _chainId, address _stateTransitionContract) external;
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external;
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

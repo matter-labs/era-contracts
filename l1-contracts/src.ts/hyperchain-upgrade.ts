@@ -165,7 +165,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   // register Era in Bridgehub, STM
   const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
-  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
+  const tx0 = await stateTrasitionManager.registerAlreadyDeployedHyperchain(
     EraLegacyChainId,
     deployer.addresses.StateTransition.DiamondProxy
   );

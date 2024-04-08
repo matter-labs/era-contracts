@@ -10,8 +10,8 @@ import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager, StateTransitionManagerInitializeData} from "./IStateTransitionManager.sol";
 import {ISystemContext} from "./l2-deps/ISystemContext.sol";
-import {IZkSyncStateTransition} from "./chain-interfaces/IZkSyncStateTransition.sol";
-import {FeeParams} from "./chain-deps/ZkSyncStateTransitionStorage.sol";
+import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
+import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -27,8 +27,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// @notice The mapping from chainId => chainContract
-    mapping(uint256 chainId => address chainContract) public stateTransition;
+    /// @notice The mapping from chainId => hyperchain contract
+    mapping(uint256 chainId => address chainContract) public hyperchain;
 
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
@@ -73,7 +73,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
-        return IZkSyncStateTransition(stateTransition[_chainId]).getAdmin();
+        return IZkSyncHyperchain(hyperchain[_chainId]).getAdmin();
     }
 
     /// @dev initialize
@@ -172,17 +172,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev freezes the specified chain
     function freezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).freezeDiamond();
+        IZkSyncHyperchain(hyperchain[_chainId]).freezeDiamond();
     }
 
     /// @dev freezes the specified chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).unfreezeDiamond();
+        IZkSyncHyperchain(hyperchain[_chainId]).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncStateTransition(stateTransition[_chainId]).revertBatches(_newLastBatch);
+        IZkSyncHyperchain(hyperchain[_chainId]).revertBatches(_newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -191,37 +191,37 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        IZkSyncHyperchain(hyperchain[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).executeUpgrade(_diamondCut);
+        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setTokenMultiplier(_nominator, _denominator);
+        IZkSyncHyperchain(hyperchain[_chainId]).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).changeFeeParams(_newFeeParams);
+        IZkSyncHyperchain(hyperchain[_chainId]).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
     function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setValidator(_validator, _active);
+        IZkSyncHyperchain(hyperchain[_chainId]).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZkSyncStateTransition(stateTransition[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
+        IZkSyncHyperchain(hyperchain[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration
@@ -282,15 +282,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
-    /// @param _stateTransitionContract the chain's contract
-    function registerAlreadyDeployedStateTransition(
-        uint256 _chainId,
-        address _stateTransitionContract
-    ) external onlyOwner {
-        require(_stateTransitionContract != address(0), "STM: STC zero");
-
-        stateTransition[_chainId] = _stateTransitionContract;
-        emit NewHyperchain(_chainId, _stateTransitionContract);
+    /// @param _hyperchainContract the chain's contract
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external onlyOwner {
+        require(_hyperchainContract != address(0), "STM: hyperchain zero");
+        hyperchain[_chainId] = _hyperchainContract;
+        emit NewHyperchain(_chainId, _hyperchainContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -306,8 +302,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
-        if (stateTransition[_chainId] != address(0)) {
-            // StateTransition chain already registered
+        if (hyperchain[_chainId] != address(0)) {
+            // Hyperchain already registered
             return;
         }
 
@@ -336,17 +332,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         );
 
         diamondCut.initCalldata = initData;
-        // deploy stateTransitionContract
-        DiamondProxy stateTransitionContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
+        // deploy hyperchainContract
+        DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
 
         // save data
-        address stateTransitionAddress = address(stateTransitionContract);
+        address hyperchainAddress = address(hyperchainContract);
 
-        stateTransition[_chainId] = stateTransitionAddress;
+        hyperchain[_chainId] = hyperchainAddress;
 
         // set chainId in VM
-        _setChainIdUpgrade(_chainId, stateTransitionAddress);
+        _setChainIdUpgrade(_chainId, hyperchainAddress);
 
-        emit NewHyperchain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, hyperchainAddress);
     }
 }

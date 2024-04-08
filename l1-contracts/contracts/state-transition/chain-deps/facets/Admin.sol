@@ -5,18 +5,18 @@ pragma solidity 0.8.20;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
+import {FeeParams, PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
+import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is ZkSyncStateTransitionBase, IAdmin {
-    /// @inheritdoc IZkSyncStateTransitionBase
+contract AdminFacet is ZkSyncHyperchainBase, IAdmin {
+    /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "AdminFacet";
 
     /// @inheritdoc IAdmin

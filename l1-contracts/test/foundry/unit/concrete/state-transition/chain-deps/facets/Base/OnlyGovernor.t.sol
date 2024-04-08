@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.20;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_ADMIN} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest, ERROR_ONLY_ADMIN} from "./_Base_Shared.t.sol";
 
-contract OnlyAdminTest is ZkSyncStateTransitionBaseTest {
+contract OnlyAdminTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonAdmin() public {
         address nonAdmin = makeAddr("nonAdmin");
 

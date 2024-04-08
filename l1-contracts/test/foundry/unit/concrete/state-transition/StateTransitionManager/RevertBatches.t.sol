@@ -30,7 +30,7 @@ contract revertBatchesTest is StateTransitionManagerTest {
     function test_SuccessfulBatchReverting() public {
         createNewChain(getDiamondCutData(diamondInit));
 
-        address newChainAddress = chainContractAddress.stateTransition(chainId);
+        address newChainAddress = chainContractAddress.hyperchain(chainId);
 
         executorFacet = ExecutorFacet(address(newChainAddress));
         gettersFacet = GettersFacet(address(newChainAddress));

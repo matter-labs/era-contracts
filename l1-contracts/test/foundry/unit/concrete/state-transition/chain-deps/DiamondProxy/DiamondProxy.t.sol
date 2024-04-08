@@ -11,12 +11,12 @@ import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
 import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 import {GettersFacet} from "solpp/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier, VerifierParams} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode, ZkSyncStateTransitionStorage} from "solpp/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode, ZkSyncHyperchainStorage} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
 import {MAX_GAS_PER_TRANSACTION} from "solpp/common/Config.sol";
-import {ZkSyncStateTransitionBase} from "solpp/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "solpp/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 
-contract TestFacet is ZkSyncStateTransitionBase {
+contract TestFacet is ZkSyncHyperchainBase {
     function func() public pure returns (bool) {
         return true;
     }
