@@ -79,24 +79,24 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "StateTransition: governor zero");
-        _transferOwnership(_initializeData.governor);
+        require(_initializeData.owner != address(0), "StateTransition: owner zero");
+        _transferOwnership(_initializeData.owner);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
-        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo(
-            0,
-            _initializeData.genesisBatchHash,
-            _initializeData.genesisIndexRepeatedStorageChanges,
-            0,
-            EMPTY_STRING_KECCAK,
-            DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-            0,
-            _initializeData.genesisBatchCommitment
-        );
+        IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
+            batchNumber: 0,
+            batchHash: _initializeData.genesisBatchHash,
+            indexRepeatedStorageChanges: _initializeData.genesisIndexRepeatedStorageChanges,
+            numberOfLayer1Txs: 0,
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
+            l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            timestamp: 0,
+            commitment: _initializeData.genesisBatchCommitment
+        });
         storedBatchZero = keccak256(abi.encode(batchZero));
 
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
@@ -125,10 +125,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         delete pendingAdmin;
 
         emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it an initialization, as validatorTimelock is deployed after STM
+    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after STM
     function setValidatorTimelock(address _validatorTimelock) external onlyOwnerOrAdmin {
         validatorTimelock = _validatorTimelock;
     }
@@ -231,8 +231,10 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _chainId,
         address _stateTransitionContract
     ) external onlyOwner {
+        require(_stateTransitionContract != address(0), "STM: STC zero");
+
         stateTransition[_chainId] = _stateTransitionContract;
-        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+        emit NewHyperchain(_chainId, _stateTransitionContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -284,6 +286,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);
 
-        emit StateTransitionNewChain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, stateTransitionAddress);
     }
 }

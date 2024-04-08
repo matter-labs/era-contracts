@@ -39,13 +39,13 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
         require(s.chainId == ERA_CHAIN_ID, "transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
-        address sharedBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(sharedBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
+        address baseTokenBridgeAddress = s.baseTokenBridge;
+        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub
     function bridgehubRequestL2Transaction(
-        BridgehubL2TransactionRequest memory _request
+        BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
@@ -244,69 +244,59 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
         // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
+        params.request = _request;
+        params.request.sender = l2Sender;
 
-        params.sender = l2Sender;
-        params.l2Value = _request.l2Value;
-        params.contractAddressL2 = _request.contractL2;
-        params.l2GasLimit = _request.l2GasLimit;
-        params.l2GasPricePerPubdata = _request.l2GasPerPubdataByteLimit;
-        params.refundRecipient = _request.refundRecipient;
-
-        canonicalTxHash = _requestL2Transaction(_request.mintValue, params, _request.l2Calldata, _request.factoryDeps);
+        canonicalTxHash = _requestL2Transaction(params);
     }
 
-    function _requestL2Transaction(
-        uint256 _mintValue,
-        WritePriorityOpParams memory _params,
-        bytes memory _calldata,
-        bytes[] memory _factoryDeps
-    ) internal returns (bytes32 canonicalTxHash) {
-        require(_factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
+    function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
+        BridgehubL2TransactionRequest memory request = _params.request;
+
+        require(request.factoryDeps.length <= MAX_NEW_FACTORY_DEPS, "uj");
         _params.txId = s.priorityQueue.getTotalPriorityTxs();
 
         // Checking that the user provided enough ether to pay for the transaction.
         // Using a new scope to prevent "stack too deep" error
 
-        _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, _params.l2GasPricePerPubdata);
-        uint256 baseCost = _params.l2GasPrice * _params.l2GasLimit;
-        require(_mintValue >= baseCost + _params.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
+        _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
+        uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
+        require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 
         // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
-        address refundRecipient = _params.refundRecipient == address(0) ? _params.sender : _params.refundRecipient;
+        address refundRecipient = request.refundRecipient == address(0) ? request.sender : request.refundRecipient;
         // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
         if (refundRecipient.code.length > 0) {
             refundRecipient = AddressAliasHelper.applyL1ToL2Alias(refundRecipient);
         }
-        _params.refundRecipient = refundRecipient;
+        request.refundRecipient = refundRecipient;
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-        _params.valueToMint = _mintValue;
 
-        canonicalTxHash = _writePriorityOp(_params, _calldata, _factoryDeps);
+        canonicalTxHash = _writePriorityOp(_params);
     }
 
     function _serializeL2Transaction(
-        WritePriorityOpParams memory _priorityOpParams,
-        bytes memory _calldata,
-        bytes[] memory _factoryDeps
+        WritePriorityOpParams memory _priorityOpParams
     ) internal pure returns (L2CanonicalTransaction memory transaction) {
+        BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
         transaction = L2CanonicalTransaction({
             txType: PRIORITY_OPERATION_L2_TX_TYPE,
-            from: uint256(uint160(_priorityOpParams.sender)),
-            to: uint256(uint160(_priorityOpParams.contractAddressL2)),
-            gasLimit: _priorityOpParams.l2GasLimit,
-            gasPerPubdataByteLimit: _priorityOpParams.l2GasPricePerPubdata,
+            from: uint256(uint160(request.sender)),
+            to: uint256(uint160(request.contractL2)),
+            gasLimit: request.l2GasLimit,
+            gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
             maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
             // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
             nonce: uint256(_priorityOpParams.txId),
-            value: _priorityOpParams.l2Value,
-            reserved: [_priorityOpParams.valueToMint, uint256(uint160(_priorityOpParams.refundRecipient)), 0, 0],
-            data: _calldata,
+            value: request.l2Value,
+            reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
+            data: request.l2Calldata,
             signature: new bytes(0),
-            factoryDeps: _hashFactoryDeps(_factoryDeps),
+            factoryDeps: _hashFactoryDeps(request.factoryDeps),
             paymasterInput: new bytes(0),
             reservedDynamic: new bytes(0)
         });
@@ -314,11 +304,9 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
 
     /// @notice Stores a transaction record in storage & send event about that
     function _writePriorityOp(
-        WritePriorityOpParams memory _priorityOpParams,
-        bytes memory _calldata,
-        bytes[] memory _factoryDeps
+        WritePriorityOpParams memory _priorityOpParams
     ) internal returns (bytes32 canonicalTxHash) {
-        L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams, _calldata, _factoryDeps);
+        L2CanonicalTransaction memory transaction = _serializeL2Transaction(_priorityOpParams);
 
         bytes memory transactionEncoding = abi.encode(transaction);
 
@@ -345,7 +333,7 @@ contract MailboxFacet is ZkSyncStateTransitionBase, IMailbox {
             canonicalTxHash,
             _priorityOpParams.expirationTimestamp,
             transaction,
-            _factoryDeps
+            _priorityOpParams.request.factoryDeps
         );
     }
 
