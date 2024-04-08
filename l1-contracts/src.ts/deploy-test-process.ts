@@ -212,10 +212,10 @@ export class EraDeployer extends Deployer {
     // notably, the DummyAdminFacet does not depend on the contracts containing the ERA_Diamond_Proxy address
     const diamondAdminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet2", contractAddress);
     // we separate the main diamond cut into an upgrade ( as this was copied from the the old diamond cut )
-    await diamondAdminFacet.executeUpgrade2(await this.upgradeZkSyncStateTransitionDiamondCut());
+    await diamondAdminFacet.executeUpgrade2(await this.upgradeZkSyncHyperchainDiamondCut());
   }
 
-  public async upgradeZkSyncStateTransitionDiamondCut(extraFacets?: FacetCut[]) {
+  public async upgradeZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {
     let facetCuts: FacetCut[] = Object.values(
       await getCurrentFacetCutsForAdd(
         this.addresses.StateTransition.AdminFacet,
