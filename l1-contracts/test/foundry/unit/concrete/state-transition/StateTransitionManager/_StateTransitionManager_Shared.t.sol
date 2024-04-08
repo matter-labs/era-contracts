@@ -89,7 +89,7 @@ contract StateTransitionManagerTest is Test {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes.concat("StateTransition: owner zero"));
+        vm.expectRevert(bytes.concat("STM: governor zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,

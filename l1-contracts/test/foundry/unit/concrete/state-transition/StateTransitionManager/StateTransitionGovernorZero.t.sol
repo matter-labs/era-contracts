@@ -20,7 +20,7 @@ contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes("StateTransition: owner zero"));
+        vm.expectRevert(bytes("STM: governor zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,

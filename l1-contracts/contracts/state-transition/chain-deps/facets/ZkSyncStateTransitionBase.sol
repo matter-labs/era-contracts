@@ -50,7 +50,7 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
     }
 
     modifier onlyBaseTokenBridge() {
-        require(msg.sender == s.baseTokenBridge, "Only base token bridge can call this function");
+        require(msg.sender == s.baseTokenBridge, "StateTransition Chain: Only shared bridge can call this function");
         _;
     }
 }
