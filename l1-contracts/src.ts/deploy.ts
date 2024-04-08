@@ -308,7 +308,7 @@ export class Deployer {
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
-        governor: this.ownerAddress,
+        owner: this.ownerAddress,
         validatorTimelock: this.addresses.ValidatorTimeLock,
         genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
         genesisBatchHash,
@@ -664,7 +664,7 @@ export class Deployer {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
-          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
+          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("NewHyperchain"))
           .topics[2].slice(26);
       this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
       if (this.verbose) {

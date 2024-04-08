@@ -45,22 +45,22 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBridgehub() external view returns (address) {
-        return address(s.bridgehub);
+        return s.bridgehub;
     }
 
     /// @inheritdoc IGetters
     function getStateTransitionManager() external view returns (address) {
-        return address(s.stateTransitionManager);
+        return s.stateTransitionManager;
     }
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return address(s.baseToken);
+        return s.baseToken;
     }
 
     /// @inheritdoc IGetters
     function getBaseTokenBridge() external view returns (address) {
-        return address(s.baseTokenBridge);
+        return s.baseTokenBridge;
     }
 
     /// @inheritdoc IGetters

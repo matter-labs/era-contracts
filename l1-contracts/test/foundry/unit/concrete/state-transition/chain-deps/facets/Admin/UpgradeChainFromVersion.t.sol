@@ -46,7 +46,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(cutHashInput)
         );
 
-        vm.expectRevert("StateTransition: cutHash mismatch");
+        vm.expectRevert("AdminFacet: cutHash mismatch");
 
         vm.startPrank(admin);
         adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
@@ -73,7 +73,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(cutHashInput)
         );
 
-        vm.expectRevert("StateTransition: protocolVersion mismatch in STC when upgrading");
+        vm.expectRevert("AdminFacet: protocolVersion mismatch in STC when upgrading");
 
         vm.startPrank(admin);
         adminFacet.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
@@ -100,7 +100,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(cutHashInput)
         );
 
-        vm.expectRevert("StateTransition: protocolVersion mismatch in STC after upgrading");
+        vm.expectRevert("AdminFacet: protocolVersion mismatch in STC after upgrading");
 
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ExecuteUpgrade(diamondCutData);
