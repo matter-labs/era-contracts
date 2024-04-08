@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
-import {VerifierParams} from "solpp/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract GetVerifierParamsTest is GettersFacetTest {
     function test() public {

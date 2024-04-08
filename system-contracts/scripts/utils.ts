@@ -8,7 +8,7 @@ import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
 import { hashBytecode } from "zksync-web3/build/src/utils";
-import type { YulContractDescrption, ZasmContractDescrption } from "./constants";
+import type { YulContractDescription, ZasmContractDescription } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
 import path from "path";
@@ -28,13 +28,13 @@ export interface DeployedDependency {
   address?: string;
 }
 
-export function readYulBytecode(description: YulContractDescrption) {
+export function readYulBytecode(description: YulContractDescription) {
   const contractName = description.codeName;
   const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul.zbin`;
   return ethers.utils.hexlify(fs.readFileSync(path));
 }
 
-export function readZasmBytecode(description: ZasmContractDescrption) {
+export function readZasmBytecode(description: ZasmContractDescription) {
   const contractName = description.codeName;
   const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.zasm.zbin`;
   return ethers.utils.hexlify(fs.readFileSync(path));

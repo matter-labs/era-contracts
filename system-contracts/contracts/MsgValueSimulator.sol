@@ -78,6 +78,14 @@ contract MsgValueSimulator is ISystemContract {
         // For the next call this `msg.value` will be used.
         SystemContractHelper.setValueForNextFarCall(Utils.safeCastToU128(value));
 
-        return EfficientCall.mimicCall(userGas, to, _data, msg.sender, false, isSystemCall);
+        return
+            EfficientCall.mimicCall({
+                _gas: userGas,
+                _address: to,
+                _data: _data,
+                _whoToMimic: msg.sender,
+                _isConstructor: false,
+                _isSystem: isSystemCall
+            });
     }
 }

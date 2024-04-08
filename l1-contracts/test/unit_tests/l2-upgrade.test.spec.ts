@@ -266,7 +266,7 @@ describe("L2 upgrade test", function () {
     expect(revertReason).to.equal("ui");
   });
 
-  it("Should validate upgrade transaction can't output more pubdata than processable", async () => {
+  it("Should validate upgrade transaction cannot output more pubdata than processable", async () => {
     const wrongTx = buildL2CanonicalTransaction({
       nonce: 0,
       gasLimit: 10000000,
@@ -344,7 +344,9 @@ describe("L2 upgrade test", function () {
   it("Should successfully perform an upgrade", async () => {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const newVerifier = ethers.utils.hexlify(ethers.utils.randomBytes(20));
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierContract = await testnetVerifierFactory.deploy();
+    const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
       recursionNodeLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
       recursionLeafLevelVkHash: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
@@ -824,13 +826,14 @@ async function executeUpgrade(
     await stateTransitionManager.setNewVersionUpgrade(
       diamondCutData,
       oldProtocolVersion,
+      999999999999,
       partialUpgrade.newProtocolVersion
     )
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }
 
-// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that's ok)
+// we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that is ok)
 async function rollBackToVersion(
   protocolVersion: string,
   stateTransition: StateTransitionManager,
@@ -854,6 +857,7 @@ async function rollBackToVersion(
     await stateTransition.setNewVersionUpgrade(
       diamondCutData,
       (parseInt(protocolVersion) - 1).toString(),
+      999999999999,
       protocolVersion
     )
   ).wait();
@@ -887,7 +891,12 @@ async function executeCustomUpgrade(
 
   // This promise will be handled in the tests
   (
-    await stateTransition.setNewVersionUpgrade(diamondCutData, oldProtocolVersion, partialUpgrade.newProtocolVersion)
+    await stateTransition.setNewVersionUpgrade(
+      diamondCutData,
+      oldProtocolVersion,
+      999999999999,
+      partialUpgrade.newProtocolVersion
+    )
   ).wait();
   return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
 }

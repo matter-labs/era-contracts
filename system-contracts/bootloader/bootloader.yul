@@ -399,12 +399,12 @@ object "Bootloader" {
                 ret := add(TX_DESCRIPTION_BEGIN_BYTE(), mul(MAX_TRANSACTIONS_IN_BATCH(), TX_DESCRIPTION_SIZE()))
             }
 
-            /// @dev The memory page consists of 30000000 / 32 VM words.
+            /// @dev The memory page consists of 59000000 / 32 VM words.
             /// Each execution result is a single boolean, but
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 30000000
+                ret := 59000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -627,12 +627,21 @@ object "Bootloader" {
                         <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                         switch isETHCall
                             case 1 {
-                                let gasLimit := getGasLimit(innerTxDataOffset)
-                                let nearCallAbi := getNearCallABI(gasLimit)
-                                checkEnoughGas(gasLimit)
+                                let gasLimitForTx, reservedGas := getGasLimitForTx(
+                                    innerTxDataOffset, 
+                                    transactionIndex, 
+                                    gasPerPubdata,
+                                    L2_TX_INTRINSIC_GAS(), 
+                                    L2_TX_INTRINSIC_PUBDATA()
+                                )
 
-                                if iszero(gasLimit) {
-                                    // If success is 0, we need to revert
+                                let nearCallAbi := getNearCallABI(gasLimitForTx)
+                                checkEnoughGas(gasLimitForTx)
+
+                                if iszero(gasLimitForTx) {
+                                    // We disallow providing 0 gas limit for an eth call transaction.
+                                    // Note, in case it is 0 `ZKSYNC_NEAR_CALL_ethCall` will get the entire
+                                    // gas of the bootloader.
                                     revertWithReason(
                                         ETH_CALL_ERR_CODE(),
                                         0
@@ -642,7 +651,9 @@ object "Bootloader" {
                                 ZKSYNC_NEAR_CALL_ethCall(
                                     nearCallAbi,
                                     txDataOffset,
-                                    resultPtr
+                                    resultPtr,
+                                    reservedGas,
+                                    gasPerPubdata
                                 )
                             }
                             default {
@@ -964,7 +975,6 @@ object "Bootloader" {
 
                 // In previous steps, there might have been already some pubdata published (e.g. to mark factory dependencies as published).
                 // However, these actions are mandatory and it is assumed that the L1 Mailbox contract ensured that the provided gas is enough to cover for pubdata.
-
                 if gt(gasLimitForTx, gasUsedOnPreparation) {
                     let gasSpentOnExecution := 0
                     let gasForExecution := sub(gasLimitForTx, gasUsedOnPreparation)
@@ -1157,7 +1167,7 @@ object "Bootloader" {
 
                 let innerTxDataOffset := add(txDataOffset, 32)
 
-                // Firsly, we publish all the bytecodes needed. This is needed to be done separately, since
+                // Firstly, we publish all the bytecodes needed. This is needed to be done separately, since
                 // bytecodes usually form the bulk of the L2 gas prices.
 
                 let gasLimitForTx, reservedGas := getGasLimitForTx(
@@ -1496,7 +1506,7 @@ object "Bootloader" {
 
                     if eq(bytecodeHash, currentExpectedBytecodeHash) {
                         // Here we are making sure that the bytecode is indeed not yet know and needs to be published,
-                        // preveting users from being overcharged by the operator.
+                        // preventing users from being overcharged by the operator.
                         let marker := getCodeMarker(bytecodeHash)
 
                         if marker {
@@ -1590,8 +1600,8 @@ object "Bootloader" {
                             // it should know about it
                             safeAdd(gasLeft, reservedGas, "jkl"),
                             basePubdataSpent,
-                            reservedGas,
-                            gasPerPubdata
+                            gasPerPubdata,
+                            reservedGas
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
@@ -1880,8 +1890,14 @@ object "Bootloader" {
             function ZKSYNC_NEAR_CALL_ethCall(
                 abi,
                 txDataOffset,
-                resultPtr
+                resultPtr,
+                reservedGas,
+                gasPerPubdata
             ) {
+                let basePubdataSpent := getPubdataCounter()
+
+                setPubdataInfo(gasPerPubdata, basePubdataSpent)
+
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let to := getTo(innerTxDataOffset)
                 let from := getFrom(innerTxDataOffset)
@@ -1914,6 +1930,19 @@ object "Bootloader" {
                     revertWithReason(
                         ETH_CALL_ERR_CODE(),
                         1
+                    )
+                }
+
+                if isNotEnoughGasForPubdata(
+                    basePubdataSpent,
+                    gas(),
+                    reservedGas,
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata, eth call reverts too
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        0
                     )
                 }
 
@@ -2154,9 +2183,9 @@ object "Bootloader" {
                 mstore(add(txDataWithHashesOffset, 64), 96)
 
                 let calldataPtr := prependSelector(txDataWithHashesOffset, selector)
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // Besides the length of the transaction itself,
                 // we also require 3 words for hashes and the offset
@@ -2178,9 +2207,9 @@ object "Bootloader" {
             /// @dev Calculates and saves the explorer hash and the suggested signed hash for the transaction.
             function saveTxHashes(txDataOffset) {
                 let calldataPtr := prependSelector(txDataOffset, {{GET_TX_HASHES_SELECTOR}})
-                let innerTxDataOffst := add(txDataOffset, 32)
+                let innerTxDataOffset := add(txDataOffset, 32)
 
-                let len := getDataLength(innerTxDataOffst)
+                let len := getDataLength(innerTxDataOffset)
 
                 // The first word is formal, but still required by the ABI
                 // We also should take into account the selector.
@@ -2347,12 +2376,12 @@ object "Bootloader" {
             /// this method also enforces that the nonce has been marked as used.
             function accountValidateTx(txDataOffset) {
                 // Skipping the first 0x20 word of the ABI-encoding of the struct
-                let innerTxDataOffst := add(txDataOffset, 32)
-                let from := getFrom(innerTxDataOffst)
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let from := getFrom(innerTxDataOffset)
                 ensureAccount(from)
 
                 // The nonce should be unique for each transaction.
-                let nonce := getNonce(innerTxDataOffst)
+                let nonce := getNonce(innerTxDataOffset)
                 // Here we check that this nonce was not available before the validation step
                 ensureNonceUsage(from, nonce, 0)
 
@@ -3847,7 +3876,7 @@ object "Bootloader" {
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 9
+                ret := 13
             }
 
             ////////////////////////////////////////////////////////////////////////////

@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol";
-import {StateTransitionManager} from "solpp/state-transition/StateTransitionManager.sol";
-import {StateTransitionManagerInitializeData} from "solpp/state-transition/IStateTransitionManager.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
+import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
+import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 
-contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
+contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {
-        StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
+        StateTransitionManagerInitializeData memory stmInitializeDataNoOwner = StateTransitionManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
@@ -20,11 +19,11 @@ contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes("STM: governor zero"));
+        vm.expectRevert(bytes("STM: owner zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)
+            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoOwner)
         );
     }
 }

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IStateTransitionManager} from "./IStateTransitionManager.sol";
-import {ERA_CHAIN_ID} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -52,9 +51,13 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor(address _initialOwner, uint32 _executionDelay) {
+    /// @dev Era's chainID
+    uint256 immutable ERA_CHAIN_ID;
+
+    constructor(address _initialOwner, uint32 _executionDelay, uint256 _eraChainId) {
         _transferOwnership(_initialOwner);
         executionDelay = _executionDelay;
+        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @notice Checks if the caller is the admin of the chain.

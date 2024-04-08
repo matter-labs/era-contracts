@@ -1,31 +1,32 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "../../bridge/L1SharedBridge.sol";
-import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
-import "../../bridge/interfaces/IL1SharedBridge.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {L1SharedBridge} from "../../bridge/L1SharedBridge.sol";
+import {IL1ERC20Bridge, IBridgehub} from "../../bridge/interfaces/IL1SharedBridge.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 
 /// @author Matter Labs
 contract L1SharedBridgeTest is L1SharedBridge {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
-    address private immutable eraDiamondProxy;
-
     constructor(
         address _diamondProxyAddress,
         address payable _l1WethAddress,
         IBridgehub _bridgehub,
-        IL1ERC20Bridge _legacyBridge
-    ) L1SharedBridge(_l1WethAddress, _bridgehub, _legacyBridge) {
-        eraDiamondProxy = _diamondProxyAddress;
+        IL1ERC20Bridge _legacyBridge,
+        uint256 _eraChainId
+    ) L1SharedBridge(_l1WethAddress, _bridgehub, _eraChainId, _diamondProxyAddress) {
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
     }
 
     /// @notice Checks that the message sender is the bridgehub or Era
     modifier onlyBridgehubOrTestEra(uint256 _chainId) {
         require(
-            (msg.sender == address(bridgehub)) || (_chainId == ERA_CHAIN_ID && msg.sender == eraDiamondProxy),
+            (msg.sender == address(bridgehub)) || (_chainId == eraChainId && msg.sender == eraDiamondProxy),
             "L1SharedBridge: not bridgehub or era chain"
         );
         _;

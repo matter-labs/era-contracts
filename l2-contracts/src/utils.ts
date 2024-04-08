@@ -32,13 +32,19 @@ export const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/
 export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 export function applyL1ToL2Alias(address: string): string {
-  return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
+  return ethers.utils.hexZeroPad(
+    ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO)),
+    20
+  );
 }
 
 export function unapplyL1ToL2Alias(address: string): string {
   // We still add ADDRESS_MODULO to avoid negative numbers
-  return ethers.utils.hexlify(
-    ethers.BigNumber.from(address).sub(L1_TO_L2_ALIAS_OFFSET).add(ADDRESS_MODULO).mod(ADDRESS_MODULO)
+  return ethers.utils.hexZeroPad(
+    ethers.utils.hexlify(
+      ethers.BigNumber.from(address).sub(L1_TO_L2_ALIAS_OFFSET).add(ADDRESS_MODULO).mod(ADDRESS_MODULO)
+    ),
+    20
   );
 }
 

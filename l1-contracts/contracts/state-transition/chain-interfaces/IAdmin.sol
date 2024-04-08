@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
 
@@ -43,6 +43,9 @@ interface IAdmin is IZkSyncHyperchainBase {
     /// @param _pricingMode The new pubdata pricing mode
     function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 
+    /// @notice Set the transaction filterer
+    function setTransactionFilterer(address _transactionFilterer) external;
+
     /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
     /// @param _protocolVersion The current protocol version from which upgrade is executed
     /// @param _cutData The diamond cut parameters that is executed in the upgrade
@@ -82,6 +85,9 @@ interface IAdmin is IZkSyncHyperchainBase {
 
     /// @notice Validium mode status changed
     event ValidiumModeStatusUpdate(PubdataPricingMode validiumMode);
+
+    /// @notice The transaction filterer has been updated
+    event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(

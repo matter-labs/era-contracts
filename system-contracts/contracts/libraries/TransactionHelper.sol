@@ -2,14 +2,13 @@
 
 pragma solidity 0.8.20;
 
-import "../openzeppelin/token/ERC20/IERC20.sol";
-import "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../openzeppelin/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-import "../interfaces/IPaymasterFlow.sol";
-import "../interfaces/IContractDeployer.sol";
+import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
 import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
-import "./RLPEncoder.sol";
-import "./EfficientCall.sol";
+import {RLPEncoder} from "./RLPEncoder.sol";
+import {EfficientCall} from "./EfficientCall.sol";
 
 /// @dev The type id of zkSync's EIP-712-signed transaction.
 uint8 constant EIP_712_TX_TYPE = 0x71;
@@ -117,6 +116,7 @@ library TransactionHelper {
     /// @return keccak256 hash of the EIP-712 encoded representation of transaction
     function _encodeHashEIP712Transaction(Transaction calldata _transaction) private view returns (bytes32) {
         bytes32 structHash = keccak256(
+            // solhint-disable-next-line func-named-parameters
             abi.encode(
                 EIP712_TRANSACTION_TYPE_HASH,
                 _transaction.txType,
@@ -201,6 +201,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     encodedListLength,
                     encodedNonce,
@@ -231,6 +232,7 @@ library TransactionHelper {
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -273,6 +275,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x01",
                     encodedListLength,
@@ -302,6 +305,7 @@ library TransactionHelper {
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
+            // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
                 encodedChainId,
                 encodedNonce,
@@ -345,6 +349,7 @@ library TransactionHelper {
 
         return
             keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(
                     "\x02",
                     encodedListLength,

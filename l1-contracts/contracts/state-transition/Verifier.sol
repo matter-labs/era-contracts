@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import "./chain-interfaces/IVerifier.sol";
+import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /* solhint-disable max-line-length */
 /// @author Matter Labs
@@ -344,7 +344,7 @@ contract Verifier is IVerifier {
         uint256[] calldata, // _publicInputs
         uint256[] calldata, // _proof
         uint256[] calldata // _recursiveAggregationInput
-    ) external view returns (bool) {
+    ) public view virtual returns (bool) {
         // No memory was accessed yet, so keys can be loaded into the right place and not corrupt any other memory.
         _loadVerificationKey();
 

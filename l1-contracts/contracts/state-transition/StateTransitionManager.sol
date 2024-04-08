@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
@@ -17,7 +17,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
 /// @title StateTransition contract
@@ -41,6 +41,9 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev The current protocolVersion
     uint256 public protocolVersion;
+
+    /// @dev timestamp when protocolVersion can be last used
+    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address, used to setChainId
     address public validatorTimelock;
@@ -85,6 +88,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
+        protocolVersionDeadline[_initializeData.protocolVersion] = type(uint256).max;
         validatorTimelock = _initializeData.validatorTimelock;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -99,7 +103,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             commitment: _initializeData.genesisBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
-
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
 
         // While this does not provide a protection in the production, it is needed for local testing
@@ -150,14 +153,27 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
+        uint256 _oldprotocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         uint256 previousProtocolVersion = protocolVersion;
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+    }
+
+    /// @dev check that the protocolVersion is active
+    function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
+        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
+    }
+
+    /// @dev set the protocol version timestamp
+    function setprotocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -236,7 +252,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
-            gasLimit: $(PRIORITY_TX_MAX_GAS_LIMIT),
+            gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
             gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             maxFeePerGas: uint256(0),
             maxPriorityFeePerGas: uint256(0),
@@ -317,6 +333,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // construct init data
         bytes memory initData;
         /// all together 4+9*32=292 bytes
+        // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
@@ -333,8 +350,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
         diamondCut.initCalldata = initData;
         // deploy hyperchainContract
+        // slither-disable-next-line reentrancy-no-eth
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
-
         // save data
         address hyperchainAddress = address(hyperchainContract);
 

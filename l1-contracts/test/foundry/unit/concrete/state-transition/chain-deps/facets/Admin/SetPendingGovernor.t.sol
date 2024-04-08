@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_ADMIN} from "../Base/_Base_Shared.t.sol";
@@ -23,6 +23,7 @@ contract SetPendingAdminTest is AdminTest {
         address oldPendingAdmin = utilsFacet.util_getPendingAdmin();
         address newPendingAdmin = makeAddr("newPendingAdmin");
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit NewPendingAdmin(oldPendingAdmin, newPendingAdmin);
 

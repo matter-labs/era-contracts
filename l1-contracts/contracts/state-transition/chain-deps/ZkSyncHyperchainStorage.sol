@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
@@ -149,4 +149,6 @@ struct ZkSyncHyperchainStorage {
     /// we multiply by the nominator, and divide by the denominator
     uint128 baseTokenGasPriceMultiplierNominator;
     uint128 baseTokenGasPriceMultiplierDenominator;
+    /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
+    address transactionFilterer;
 }

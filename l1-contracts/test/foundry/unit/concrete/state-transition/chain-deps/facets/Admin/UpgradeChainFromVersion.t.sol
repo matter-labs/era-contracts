@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {IStateTransitionManager} from "solpp/state-transition/IStateTransitionManager.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IStateTransitionManager} from "contracts/state-transition/IStateTransitionManager.sol";
 
 contract UpgradeChainFromVersionTest is AdminTest {
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
@@ -102,6 +102,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         vm.expectRevert("AdminFacet: protocolVersion mismatch in STC after upgrading");
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ExecuteUpgrade(diamondCutData);
 

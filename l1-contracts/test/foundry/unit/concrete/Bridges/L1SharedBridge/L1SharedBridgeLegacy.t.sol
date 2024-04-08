@@ -1,23 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {L1SharedBridge} from "solpp/bridge/L1SharedBridge.sol";
-import {Bridgehub} from "solpp/bridgehub/Bridgehub.sol";
-import {L1ERC20Bridge} from "solpp/bridge/L1ERC20Bridge.sol";
-import {ETH_TOKEN_ADDRESS} from "solpp/common/Config.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "solpp/bridgehub/IBridgehub.sol";
-import {L2Message, TxStatus} from "solpp/common/Messaging.sol";
-import {IMailbox} from "solpp/state-transition/chain-interfaces/IMailbox.sol";
-import {IL1ERC20Bridge} from "solpp/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1SharedBridge} from "solpp/bridge/interfaces/IL1SharedBridge.sol";
-import {TestnetERC20Token} from "solpp/dev-contracts/TestnetERC20Token.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "solpp/common/L2ContractAddresses.sol";
-import {ERA_CHAIN_ID} from "solpp/common/Config.sol";
+import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract L1SharedBridgeLegacyTest is Test {
     event BridgehubDepositBaseTokenInitiated(
@@ -81,10 +76,17 @@ contract L1SharedBridgeLegacyTest is Test {
     uint256 amount = 100;
     bytes32 txHash;
 
+    uint256 eraChainId;
+    address eraDiamondProxy;
+
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
+
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 4th so 4 -1 + dependency storage slots
+    uint256 depositLocationInStorage = uint256(4 - 1 + 1 + 1);
+    uint256 chainBalanceLocationInStorage = uint256(7 - 1 + 1 + 1);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -104,13 +106,16 @@ contract L1SharedBridgeLegacyTest is Test {
         merkleProof = new bytes32[](1);
 
         chainId = 1;
+        eraChainId = 9;
+        eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
-        sharedBridgeImpl = new L1SharedBridge(
-            l1WethAddress,
-            IBridgehub(bridgehubAddress),
-            IL1ERC20Bridge(l1ERC20BridgeAddress)
-        );
+        sharedBridgeImpl = new L1SharedBridge({
+            _l1WethAddress: l1WethAddress,
+            _bridgehub: IBridgehub(bridgehubAddress),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
+        });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
             admin,
@@ -118,9 +123,11 @@ contract L1SharedBridgeLegacyTest is Test {
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
         vm.prank(owner);
+        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
+        vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
-        sharedBridge.initializeChainGovernance(ERA_CHAIN_ID, l2SharedBridge);
+        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
     }
 
     function test_depositLegacyERC20Bridge() public {
@@ -128,8 +135,16 @@ contract L1SharedBridgeLegacyTest is Test {
         uint256 l2TxGasPerPubdataByte = 100;
         address refundRecipient = address(0);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated(ERA_CHAIN_ID, txHash, alice, bob, address(token), amount);
+        emit LegacyDepositInitiated({
+            chainId: eraChainId,
+            l2DepositTxHash: txHash,
+            from: alice,
+            to: bob,
+            l1Token: address(token),
+            amount: amount
+        });
 
         vm.mockCall(
             bridgehubAddress,
@@ -138,28 +153,28 @@ contract L1SharedBridgeLegacyTest is Test {
         );
 
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.depositLegacyErc20Bridge(
-            alice,
-            bob,
-            address(token),
-            amount,
-            l2TxGasLimit,
-            l2TxGasPerPubdataByte,
-            refundRecipient
-        );
+
+        sharedBridge.depositLegacyErc20Bridge({
+            _prevMsgSender: alice,
+            _l2Receiver: bob,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxGasLimit: l2TxGasLimit,
+            _l2TxGasPerPubdataByte: l2TxGasPerPubdataByte,
+            _refundRecipient: refundRecipient
+        });
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
                 abi.encode(
                     uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -179,9 +194,10 @@ contract L1SharedBridgeLegacyTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
                 l2ToL1Message,
@@ -190,29 +206,29 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, ETH_TOKEN_ADDRESS, amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, ETH_TOKEN_ADDRESS, amount);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
                 abi.encode(
                     uint256(uint160(address(token))),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -223,6 +239,7 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
+        // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,
             alice,
@@ -237,9 +254,10 @@ contract L1SharedBridgeLegacyTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL2MessageInclusion.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
                 l2ToL1Message,
@@ -248,38 +266,36 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit WithdrawalFinalizedSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
+        emit WithdrawalFinalizedSharedBridge(eraChainId, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            message,
-            merkleProof
-        );
+        sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _message: message,
+            _merkleProof: merkleProof
+        });
     }
 
     function test_claimFailedDepositLegacyErc20Bridge_Erc() public {
         token.mint(address(sharedBridge), amount);
 
-        // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-        uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         vm.store(
             address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(ERA_CHAIN_ID, depositLocationInStorage)))),
+            keccak256(abi.encode(txHash, keccak256(abi.encode(eraChainId, depositLocationInStorage)))),
             txDataHash
         );
-        require(sharedBridge.depositHappened(ERA_CHAIN_ID, txHash) == txDataHash, "Deposit not set");
+        require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
-        uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
         vm.store(
             address(sharedBridge),
             keccak256(
                 abi.encode(
                     uint256(uint160(address(token))),
-                    keccak256(abi.encode(ERA_CHAIN_ID, chainBalanceLocationInStorage))
+                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
                 )
             ),
             bytes32(amount)
@@ -291,9 +307,10 @@ contract L1SharedBridgeLegacyTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
                 IBridgehub.proveL1ToL2TransactionStatus.selector,
-                ERA_CHAIN_ID,
+                eraChainId,
                 txHash,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -304,18 +321,20 @@ contract L1SharedBridgeLegacyTest is Test {
             abi.encode(true)
         );
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit ClaimedFailedDepositSharedBridge(ERA_CHAIN_ID, alice, address(token), amount);
+        emit ClaimedFailedDepositSharedBridge(eraChainId, alice, address(token), amount);
         vm.prank(l1ERC20BridgeAddress);
-        sharedBridge.claimFailedDepositLegacyErc20Bridge(
-            alice,
-            address(token),
-            amount,
-            txHash,
-            l2BatchNumber,
-            l2MessageIndex,
-            l2TxNumberInBatch,
-            merkleProof
-        );
+
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: alice,
+            _l1Token: address(token),
+            _amount: amount,
+            _l2TxHash: txHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
     }
 }

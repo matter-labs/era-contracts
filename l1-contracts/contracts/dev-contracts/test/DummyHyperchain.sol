@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 contract DummyHyperchain is MailboxFacet {
-    constructor(address bridgeHubAddress) {
+    constructor(address bridgeHubAddress, uint256 _eraChainId) MailboxFacet(_eraChainId) {
         s.bridgehub = bridgeHubAddress;
     }
 

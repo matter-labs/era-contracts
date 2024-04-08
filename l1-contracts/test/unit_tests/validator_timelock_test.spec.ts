@@ -66,7 +66,7 @@ describe("ValidatorTimelock tests", function () {
     await setSTtx.wait();
 
     const validatorTimelockFactory = await hardhat.ethers.getContractFactory("ValidatorTimelock");
-    const validatorTimelockContract = await validatorTimelockFactory.deploy(await owner.getAddress(), 0);
+    const validatorTimelockContract = await validatorTimelockFactory.deploy(await owner.getAddress(), 0, chainId);
     validatorTimelock = ValidatorTimelockFactory.connect(
       validatorTimelockContract.address,
       validatorTimelockContract.signer

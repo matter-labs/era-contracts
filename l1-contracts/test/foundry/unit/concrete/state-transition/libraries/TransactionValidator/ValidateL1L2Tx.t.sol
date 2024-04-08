@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {TransactionValidatorSharedTest} from "./_TransactionValidator_Shared.t.sol";
-
-import {L2CanonicalTransaction} from "solpp/common/Messaging.sol";
-import {TransactionValidator} from "solpp/state-transition/libraries/TransactionValidator.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_BasicRequestL1L2() public pure {

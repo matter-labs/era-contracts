@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -24,6 +24,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 l2BatchNumber => mapping(uint256 l2ToL1MessageNumber => bool isFinalized))
         public isWithdrawalFinalized;
 
@@ -33,12 +34,15 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         public depositAmount;
 
     /// @dev The address that is used as a L2 bridge counterpart in zkSync Era.
+    // slither-disable-next-line uninitialized-state
     address public l2Bridge;
 
     /// @dev The address that is used as a beacon for L2 tokens in zkSync Era.
+    // slither-disable-next-line uninitialized-state
     address public l2TokenBeacon;
 
     /// @dev Stores the hash of the L2 token proxy contract's bytecode on zkSync Era.
+    // slither-disable-next-line uninitialized-state
     bytes32 public l2TokenProxyBytecodeHash;
 
     /// @dev Deprecated storage variable related to withdrawal limitations.
@@ -102,7 +106,14 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasLimit,
         uint256 _l2TxGasPerPubdataByte
     ) external payable returns (bytes32 l2TxHash) {
-        l2TxHash = deposit(_l2Receiver, _l1Token, _amount, _l2TxGasLimit, _l2TxGasPerPubdataByte, address(0));
+        l2TxHash = deposit({
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+            _refundRecipient: address(0)
+        });
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
@@ -142,16 +153,17 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}(
-            msg.sender,
-            _l2Receiver,
-            _l1Token,
-            _amount,
-            _l2TxGasLimit,
-            _l2TxGasPerPubdataByte,
-            _refundRecipient
-        );
+        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}({
+            _msgSender: msg.sender,
+            _l2Receiver: _l2Receiver,
+            _l1Token: _l1Token,
+            _amount: _amount,
+            _l2TxGasLimit: _l2TxGasLimit,
+            _l2TxGasPerPubdataByte: _l2TxGasPerPubdataByte,
+            _refundRecipient: _refundRecipient
+        });
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
+        // solhint-disable-next-line func-named-parameters
         emit DepositInitiated(l2TxHash, msg.sender, _l2Receiver, _l1Token, _amount);
     }
 
@@ -186,16 +198,16 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(amount != 0, "2T"); // empty deposit
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
-        sharedBridge.claimFailedDepositLegacyErc20Bridge(
-            _depositSender,
-            _l1Token,
-            amount,
-            _l2TxHash,
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _merkleProof
-        );
+        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+            _depositSender: _depositSender,
+            _l1Token: _l1Token,
+            _amount: amount,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof
+        });
         emit ClaimedFailedDeposit(_depositSender, _l1Token, amount);
     }
 
@@ -215,13 +227,13 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
-        (address l1Receiver, address l1Token, uint256 amount) = sharedBridge.finalizeWithdrawalLegacyErc20Bridge(
-            _l2BatchNumber,
-            _l2MessageIndex,
-            _l2TxNumberInBatch,
-            _message,
-            _merkleProof
-        );
+        (address l1Receiver, address l1Token, uint256 amount) = sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _message: _message,
+            _merkleProof: _merkleProof
+        });
         emit WithdrawalFinalized(l1Receiver, l1Token, amount);
     }
 }

@@ -1,24 +1,23 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 
-import {AdminFacet} from "solpp/state-transition/chain-deps/facets/Admin.sol";
-import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
-import {DiamondInit} from "solpp/state-transition/chain-deps/DiamondInit.sol";
-import {DiamondProxy} from "solpp/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams} from "solpp/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {IAdmin} from "solpp/state-transition/chain-interfaces/IAdmin.sol";
+import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
+    address internal testnetVerifier = address(new TestnetVerifier());
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](11);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = IAdmin.setPendingAdmin.selector;
         selectors[1] = IAdmin.acceptAdmin.selector;
         selectors[2] = IAdmin.setValidator.selector;
@@ -30,6 +29,7 @@ contract AdminTest is Test {
         selectors[8] = IAdmin.executeUpgrade.selector;
         selectors[9] = IAdmin.freezeDiamond.selector;
         selectors[10] = IAdmin.unfreezeDiamond.selector;
+        selectors[11] = IAdmin.setTransactionFilterer.selector;
         return selectors;
     }
 
@@ -48,7 +48,7 @@ contract AdminTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

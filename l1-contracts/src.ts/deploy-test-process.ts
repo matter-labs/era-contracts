@@ -60,6 +60,9 @@ export async function initialTestnetDeploymentProcess(
   await loadDefaultEnvVarsForTests(deployWallet);
   const deployer = await defaultDeployerForTests(deployWallet, ownerAddress);
 
+  // For tests, the chainId is 9
+  deployer.chainId = 9;
+
   const testnetTokens = getTokens();
   const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
@@ -89,7 +92,6 @@ export async function initialEraTestnetDeploymentProcess(
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true, 1);
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false, 1);
-  deployer.addresses.Create2Factory = "0x1bba393e38a2CD88638F972D67D73599c094f814"; // this should already be deployed, we need to fix it to fix ERA diamond address
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   await deployer.deployDiamondProxy(extraFacets, {});
   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);

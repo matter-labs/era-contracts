@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
@@ -26,6 +26,7 @@ contract SetValidatorTest is AdminTest {
 
         utilsFacet.util_setValidator(validator, true);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ValidatorStatusUpdate(validator, isActive);
 
@@ -42,6 +43,7 @@ contract SetValidatorTest is AdminTest {
 
         utilsFacet.util_setValidator(validator, false);
 
+        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(adminFacet));
         emit ValidatorStatusUpdate(validator, isActive);
 
