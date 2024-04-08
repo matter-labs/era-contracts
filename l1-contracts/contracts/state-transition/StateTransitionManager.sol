@@ -79,8 +79,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function initialize(
         StateTransitionManagerInitializeData calldata _initializeData
     ) external reentrancyGuardInitializer {
-        require(_initializeData.governor != address(0), "StateTransition: governor zero");
-        _transferOwnership(_initializeData.governor);
+        require(_initializeData.owner != address(0), "StateTransition: owner zero");
+        _transferOwnership(_initializeData.owner);
 
         genesisUpgrade = _initializeData.genesisUpgrade;
         protocolVersion = _initializeData.protocolVersion;
@@ -232,7 +232,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _stateTransitionContract
     ) external onlyOwner {
         stateTransition[_chainId] = _stateTransitionContract;
-        emit StateTransitionNewChain(_chainId, _stateTransitionContract);
+        emit NewHyperchain(_chainId, _stateTransitionContract);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -284,6 +284,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // set chainId in VM
         _setChainIdUpgrade(_chainId, stateTransitionAddress);
 
-        emit StateTransitionNewChain(_chainId, stateTransitionAddress);
+        emit NewHyperchain(_chainId, stateTransitionAddress);
     }
 }
