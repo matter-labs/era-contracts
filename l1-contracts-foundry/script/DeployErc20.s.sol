@@ -22,6 +22,8 @@ contract RegisterHyperchainScript is Script {
     struct Config {
         TokenDescription[] tokens;
         address deployerAddress;
+        address create2FactoryAddr;
+        bytes32 create2FactorySalt;
     }
 
     struct TokenDescription {
@@ -53,6 +55,8 @@ contract RegisterHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
+        config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.create2_factory_addr");
+        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
         string[] memory tokens = vm.parseTomlKeys(toml, "$.tokens");
 
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -94,12 +98,7 @@ contract RegisterHyperchainScript is Script {
         bytes memory args = abi.encode(name, symbol, decimals);
         bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
 
-        address tokenAddress;
-        vm.broadcast();
-        assembly {
-            tokenAddress := create(0, add(bytecode, 0x20), mload(bytecode))
-        }
-        require(tokenAddress != address(0), "Token deployment failed");
+        address tokenAddress = deployViaCreate2(bytecode);
 
         if (mint > 0) {
             vm.broadcast();
@@ -107,5 +106,9 @@ contract RegisterHyperchainScript is Script {
         }
 
         return tokenAddress;
+    }
+
+    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
+        return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
     }
 }
