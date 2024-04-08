@@ -97,7 +97,7 @@ interface IMailbox is IZkSyncStateTransitionBase {
 
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
+    ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1
     /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution

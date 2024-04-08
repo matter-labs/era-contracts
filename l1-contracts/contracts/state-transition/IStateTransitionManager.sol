@@ -4,10 +4,11 @@ pragma solidity 0.8.20;
 
 import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {FeeParams} from "./chain-deps/ZkSyncStateTransitionStorage.sol";
 
 /// @notice Struct that holds all data needed for initializing STM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
-/// @param governor The address who can manage non-critical updates in the contract
+/// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
 /// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
 /// @param genesisBatchHash Batch hash of the genesis (initial) batch
@@ -16,7 +17,7 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 /// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
 /// @param protocolVersion The initial protocol version on the newly deployed chain
 struct StateTransitionManagerInitializeData {
-    address governor;
+    address owner;
     address validatorTimelock;
     address genesisUpgrade;
     bytes32 genesisBatchHash;
@@ -27,9 +28,10 @@ struct StateTransitionManagerInitializeData {
 }
 
 interface IStateTransitionManager {
-    // when a new Chain is added
-    event StateTransitionNewChain(uint256 indexed _chainId, address indexed _stateTransitionContract);
+    /// @dev Emitted when a new Chain is added
+    event NewHyperchain(uint256 indexed _chainId, address indexed _stateTransitionContract);
 
+    /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
     event SetChainIdUpgrade(
         address indexed _stateTransitionChain,
         L2CanonicalTransaction _l2Transaction,
@@ -43,14 +45,22 @@ interface IStateTransitionManager {
     /// @notice Admin changed
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
 
+    /// @notice ValidatorTimelock changed
+    event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
+
+    /// @notice InitialCutHash changed
+    event NewInitialCutHash(bytes32 indexed oldInitialCutHash, bytes32 indexed newInitialCutHash);
+
+    /// @notice new UpgradeCutHash
+    event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
+
+    /// @notice new ProtocolVersion
+    event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
+
     function bridgehub() external view returns (address);
 
-    /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
-    /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
-    /// @param _newPendingAdmin Address of the new admin
     function setPendingAdmin(address _newPendingAdmin) external;
 
-    /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external;
 
     function stateTransition(uint256 _chainId) external view returns (address);
@@ -73,7 +83,6 @@ interface IStateTransitionManager {
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
-    /// @notice
     function createNewChain(
         uint256 _chainId,
         address _baseToken,
@@ -95,4 +104,22 @@ interface IStateTransitionManager {
     function freezeChain(uint256 _chainId) external;
 
     function unfreezeChain(uint256 _chainId) external;
+
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external;
+
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
+
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
+
+    function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external;
+
+    function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;
+
+    function setValidator(uint256 _chainId, address _validator, bool _active) external;
+
+    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
 }

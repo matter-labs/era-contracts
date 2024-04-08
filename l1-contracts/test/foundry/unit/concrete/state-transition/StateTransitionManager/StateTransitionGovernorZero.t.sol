@@ -10,7 +10,7 @@ import {Diamond} from "solpp/state-transition/libraries/Diamond.sol";
 contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {
         StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            governor: address(0),
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),

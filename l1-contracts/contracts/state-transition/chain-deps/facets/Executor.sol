@@ -37,7 +37,13 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
-        require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
+        PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
+        require(
+            pricingMode == PubdataPricingMode.Validium ||
+                pubdataSource == uint8(PubdataSource.Calldata) ||
+                pubdataSource == uint8(PubdataSource.Blob),
+            "us"
+        );
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
@@ -45,10 +51,10 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+        if (pricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 1);
+            require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
@@ -187,7 +193,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
-        // With the protocol upgrade we expect 8 logs: 2^10 - 1 = 1023
+        // With the protocol upgrade we expect 10 logs: 2^10 - 1 = 1023
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             require(processedLogs == 511, "b7");
         } else {
@@ -577,7 +583,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
 
-        for (uint i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
+        for (uint256 i = 0; i < MAX_NUMBER_OF_BLOBS; i++) {
             blobAuxOutputWords[i * 2] = _blobHashes[i];
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
