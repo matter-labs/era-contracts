@@ -37,7 +37,13 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
-        require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
+        PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
+        require(
+            pricingMode == PubdataPricingMode.Validium ||
+                pubdataSource == uint8(PubdataSource.Calldata) ||
+                pubdataSource == uint8(PubdataSource.Blob),
+            "us"
+        );
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
@@ -45,10 +51,10 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         bytes32[] memory blobHashes = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+        if (pricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 1);
+            require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // We want only want to include the actual blob linear hashes when we send pubdata via blobs.
             // Otherwise we should be using bytes32(0)
