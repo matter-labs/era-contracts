@@ -111,4 +111,27 @@ library Utils {
         require(child.code.length > 0, "Failed to deploy Create2Factory");
         return child;
     }
+
+    /**
+     * @dev Deploys contract using CREATE2.
+     */
+    function deployViaCreate2(bytes memory _bytecode, bytes32 _salt, address _factory) internal returns (address) {
+        if (_bytecode.length == 0) {
+            revert("Bytecode is not set");
+        }
+        address contractAddress = vm.computeCreate2Address(_salt, keccak256(_bytecode), _factory);
+        if (contractAddress.code.length != 0) {
+            return contractAddress;
+        }
+
+        vm.broadcast();
+        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        contractAddress = Utils.bytesToAddress(data);
+
+        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
+            revert("Failed to deploy contract via create2");
+        }
+
+        return contractAddress;
+    }
 }

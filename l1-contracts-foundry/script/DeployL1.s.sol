@@ -678,28 +678,6 @@ contract DeployL1Script is Script {
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
-        if (_bytecode.length == 0) {
-            revert("Bytecode is not set");
-        }
-        address contractAddress = vm.computeCreate2Address(
-            config.contracts.create2FactorySalt,
-            keccak256(_bytecode),
-            addresses.create2Factory
-        );
-        if (contractAddress.code.length != 0) {
-            return contractAddress;
-        }
-
-        vm.broadcast();
-        (bool success, bytes memory data) = addresses.create2Factory.call(
-            abi.encodePacked(config.contracts.create2FactorySalt, _bytecode)
-        );
-        contractAddress = Utils.bytesToAddress(data);
-
-        if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
-            revert("Failed to deploy contract via create2");
-        }
-
-        return contractAddress;
+        return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
     }
 }
