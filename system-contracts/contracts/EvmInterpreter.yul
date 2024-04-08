@@ -265,6 +265,29 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x5F { // OP_PUSH0
+                    let value := 0
+
+                    sp := pushStackItem(sp, value)
+                }
+                case 0x60 { // OP_PUSH1
+                    let value := readBytes(ip,1)
+
+                    sp := pushStackItem(sp, value)
+                    ip := add(ip, 1)
+                }
+                case 0x63 { // OP_PUSH4
+                    let value := readBytes(ip,4)
+
+                    sp := pushStackItem(sp, value)
+                    ip := add(ip, 4)
+                }
+                case 0x7E { // OP_PUSH31
+                    let value := readBytes(ip,31)
+
+                    sp := pushStackItem(sp, value)
+                    ip := add(ip, 31)
+                }
                 case 0x7F { // OP_PUSH32
                     let value := readBytes(ip,32)
 
