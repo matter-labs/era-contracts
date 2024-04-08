@@ -67,6 +67,14 @@ object "EVMInterpreter" {
                 opcode := and(mload(sub(ip, 31)), 0xff)
             }
 
+            function readBytes(start, length) -> value {
+                for { let i := 0 } lt(i, length) { i := add(i, 1) } {
+                    let next_byte := readIP(add(start, i))
+
+                    value := or(shl(8, value), next_byte)
+                }
+            }
+
             function popStackItem(sp) -> a, newSp {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
@@ -258,12 +266,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
                 case 0x7F { // OP_PUSH32
-                    let value
-                    for { let i := 0 } lt(i, 32) { i := add(i, 1) } {
-                        let next_byte := readIP(add(ip, i))
-
-                        value := or(shl(8, value), next_byte)
-                    }
+                    let value := readBytes(ip,32)
 
                     sp := pushStackItem(sp, value)
                     ip := add(ip, 32)
