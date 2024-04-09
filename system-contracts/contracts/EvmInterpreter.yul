@@ -14,8 +14,12 @@ object "EVMInterpreter" {
                 addr := 0x000000000000000000000000000000000000FFFE
             }
 
-            function CODE_ORACLE_SYSTEM_CONTRACT() -> offset {
-                offset := 0x0000000000000000000000000000000000008012
+            function CODE_ORACLE_SYSTEM_CONTRACT() -> addr {
+                addr := 0x0000000000000000000000000000000000008012
+            }
+
+            function EVM_GAS_MANAGER_CONTRACT() -> addr {   
+                addr :=  0x0000000000000000000000000000000000008013
             }
 
             function DEBUG_SLOT_OFFSET() -> offset {
@@ -32,6 +36,10 @@ object "EVMInterpreter" {
 
             function BYTECODE_OFFSET() -> offset {
                 offset := add(STACK_OFFSET(), mul(1024, 32))
+            }
+
+            function INF_PASS_GAS() -> inf {
+                inf := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
             }
 
             function MAX_POSSIBLE_BYTECODE() -> max {
@@ -134,6 +142,37 @@ object "EVMInterpreter" {
                 mstore(BYTECODE_OFFSET(), codeLen)
             }
 
+            function consumeEvmFrame() -> passGas, isStatic, callerEVM {
+                // function consumeEvmFrame() external returns (uint256 passGas, bool isStatic)
+                // TODO: Unhardcode selector
+                mstore8(0, 0x04)
+                mstore8(1, 0xc1)
+                mstore8(2, 0x4e)
+                mstore8(3, 0x9e)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 64)
+
+                if iszero(success) {
+                    // Should never happen
+                    revert(0, 0)
+                }
+
+                passGas := mload(0)
+                isStatic := mload(32)
+
+                if iszero(eq(passGas, INF_PASS_GAS())) {
+                    callerEVM := true
+                }
+            }
+
+            function chargeGas(prevGas, toCharge) -> gasRemaining {
+                if lt(prevGas, toCharge) {
+                    revert(0, 0)
+                }
+
+                gasRemaining := sub(prevGas, toCharge)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -144,6 +183,11 @@ object "EVMInterpreter" {
             // OF THE ONES IN THE SYSTEM CONTRACT LIST WHATEVER.
             // IN YUL NO SUCH REPLACEMENTE TAKES PLACE, YOU NEED TO DO THE VERBATIM CALL
             // MANUALLY.
+
+            let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
+
+            // TODO: Check if caller is not EVM and override evmGasLeft and isStatic with their
+            // appropriate values if so.
 
             // First, copy the contract's bytecode to be executed into the `BYTECODE_OFFSET`
             // segment of memory.
@@ -156,6 +200,9 @@ object "EVMInterpreter" {
             let ip := add(BYTECODE_OFFSET(), 32)
             let opcode
 
+            let returnOffset := MEM_OFFSET_INNER()
+            let returnLen := 0
+
             for { } true { } {
                 opcode := readIP(ip)
 
@@ -163,7 +210,7 @@ object "EVMInterpreter" {
 
                 switch opcode
                 case 0x00 { // OP_STOP
-                    // TODO: This is not actually what stop does
+                    break
                 }
                 case 0x01 { // OP_ADD
                     let a, b
@@ -172,7 +219,7 @@ object "EVMInterpreter" {
                     b, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, add(a, b))
-                    // TODO: Charge for gas
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
                 case 0x02 { // OP_MUL
                     let a, b
@@ -181,6 +228,7 @@ object "EVMInterpreter" {
                     b, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, mul(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
                 }
                 case 0x03 { // OP_SUB
                     let a, b
@@ -189,6 +237,7 @@ object "EVMInterpreter" {
                     b, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, sub(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
                 case 0x55 { // OP_SSTORE
                     let key, value
@@ -197,7 +246,8 @@ object "EVMInterpreter" {
                     value, sp := popStackItem(sp)
 
                     sstore(key, value)
-                    return(0, 64)
+                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
                 case 0x7F { // OP_PUSH32
                     let value
@@ -209,6 +259,8 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, value)
                     ip := add(ip, 32)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
                 // TODO: REST OF OPCODES
                 default {
@@ -218,7 +270,13 @@ object "EVMInterpreter" {
                 }
             }
 
-            return(0, 64)
+            if eq(isCallerEVM, 1) {
+                // Includes gas
+                returnOffset := sub(returnOffset, 32)
+                returnLen := add(returnLen, 32)
+            }
+
+            return(returnOffset, returnLen)
         }
     }
 }
