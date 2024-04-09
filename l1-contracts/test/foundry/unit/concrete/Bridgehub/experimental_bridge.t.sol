@@ -42,9 +42,6 @@ contract ExperimentalBridgeTest is Test {
         // test if the ownership of the bridgeHub is set correctly or not
         address defaultOwner = bridgeHub.owner();
 
-        // The defaultOwner should be the same as this contract address, since this is the one deploying the bridgehub contract
-        // assertEq(defaultOwner, address(this));
-
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(bytes("1B"));
         bridgeHub.initialize(bridgeOwner);
