@@ -95,7 +95,10 @@ contract RegisterHyperchainScript is Script {
 
         if (mint > 0) {
             vm.broadcast();
-            tokenAddress.call(abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint));
+            (bool success, ) = tokenAddress.call(
+                abi.encodeWithSignature("mint(address,uint256)", config.deployerAddress, mint)
+            );
+            require(success, "Mint failed");
         }
 
         return tokenAddress;
