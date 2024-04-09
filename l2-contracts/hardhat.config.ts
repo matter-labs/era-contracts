@@ -64,7 +64,7 @@ export default {
     localhost: {
       // era-test-node default url
       url: "http://127.0.0.1:8011",
-      ethNetwork: null,
+      ethNetwork: "localhost",
       zksync: true,
     },
     zkSyncTestnet: {
