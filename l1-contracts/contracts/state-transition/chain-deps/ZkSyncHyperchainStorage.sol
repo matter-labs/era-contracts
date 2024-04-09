@@ -63,7 +63,7 @@ struct FeeParams {
 /// but NOT to modify already existing variables or change their order.
 /// NOTE: variables prefixed with '__DEPRECATED_' are deprecated and shouldn't be used.
 /// Their presence is maintained for compatibility and to prevent storage collision.
-struct ZkSyncStateTransitionStorage {
+struct ZkSyncHyperchainStorage {
     /// @dev Storage of variables needed for deprecated diamond cut facet
     uint256[7] __DEPRECATED_diamondCutStorage;
     /// @notice Address which will exercise critical changes to the Diamond Proxy (upgrades, freezing & unfreezing). Replaced by STM
@@ -135,7 +135,6 @@ struct ZkSyncStateTransitionStorage {
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
     address blobVersionedHashRetriever;
-    /// new fields
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub

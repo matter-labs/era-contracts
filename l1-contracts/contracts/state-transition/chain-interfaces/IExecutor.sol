@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -78,7 +78,7 @@ uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 /// @title The interface of the zkSync Executor contract capable of processing events emitted in the zkSync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IExecutor is IZkSyncStateTransitionBase {
+interface IExecutor is IZkSyncHyperchainBase {
     /// @notice Rollup batch stored data
     /// @param batchNumber Rollup batch number
     /// @param batchHash Hash of L2 batch

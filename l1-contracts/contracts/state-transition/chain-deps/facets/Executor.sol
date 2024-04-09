@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncStateTransitionBase} from "./ZkSyncStateTransitionBase.sol";
+import {ZkSyncHyperchainBase} from "./ZkSyncHyperchainBase.sol";
 import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, POINT_EVALUATION_PRECOMPILE_ADDR} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, PubdataSource, BLS_MODULUS, PUBDATA_COMMITMENT_SIZE, PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET, PUBDATA_COMMITMENT_COMMITMENT_OFFSET, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT, BLOB_SIZE_BYTES} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
@@ -10,20 +10,20 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {PubdataPricingMode} from "../ZkSyncStateTransitionStorage.sol";
+import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
-import {IZkSyncStateTransitionBase} from "../../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 /// @title zkSync hyperchain Executor contract capable of processing events emitted in the zkSync hyperchain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
+contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
 
-    /// @inheritdoc IZkSyncStateTransitionBase
+    /// @inheritdoc IZkSyncHyperchainBase
     string public constant override getName = "ExecutorFacet";
 
     /// @dev Process one batch commit using the previous batch StoredBatchInfo
@@ -37,17 +37,23 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         require(_newBatch.batchNumber == _previousBatch.batchNumber + 1, "f"); // only commit next batch
 
         uint8 pubdataSource = uint8(bytes1(_newBatch.pubdataCommitments[0]));
-        require(pubdataSource == uint8(PubdataSource.Calldata) || pubdataSource == uint8(PubdataSource.Blob), "us");
+        PubdataPricingMode pricingMode = s.feeParams.pubdataPricingMode;
+        require(
+            pricingMode == PubdataPricingMode.Validium ||
+                pubdataSource == uint8(PubdataSource.Calldata) ||
+                pubdataSource == uint8(PubdataSource.Blob),
+            "us"
+        );
 
         // Check that batch contain all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
-        if (s.feeParams.pubdataPricingMode == PubdataPricingMode.Validium) {
+        if (pricingMode == PubdataPricingMode.Validium) {
             // skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 1);
+            require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
@@ -196,7 +202,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             }
         }
 
-        // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
+        // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
         // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
@@ -514,8 +520,8 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
 
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
-            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
+                // solhint-disable-next-line func-named-parameters
                 _batch.indexRepeatedStorageChanges,
                 _batch.newStateRoot,
                 uint64(0), // index repeated storage changes in zkPorter

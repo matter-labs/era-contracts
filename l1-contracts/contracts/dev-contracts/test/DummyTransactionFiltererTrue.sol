@@ -15,7 +15,7 @@ contract TransactionFiltererTrue is ITransactionFilterer {
         uint256,
         bytes memory,
         address
-    ) external view returns (bool) {
+    ) external pure returns (bool) {
         return true;
     }
 }
