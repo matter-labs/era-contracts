@@ -2,15 +2,15 @@
 
 pragma solidity 0.8.24;
 
-import {IZkSyncStateTransitionBase} from "../chain-interfaces/IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "../chain-interfaces/IZkSyncHyperchainBase.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
-import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "../chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZkSyncStateTransitionBase {
+interface IAdmin is IZkSyncHyperchainBase {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -39,12 +39,16 @@ interface IAdmin is IZkSyncStateTransitionBase {
     /// @notice Change the token multiplier for L1->L2 transactions
     function setTokenMultiplier(uint128 _nominator, uint128 _denominator) external;
 
-    /// @notice Used to set to validium directly after genesis
-    function setValidiumMode(PubdataPricingMode _validiumMode) external;
+    /// @notice Change the pubdata pricing mode before the first batch is processed
+    /// @param _pricingMode The new pubdata pricing mode
+    function setPubdataPricingMode(PubdataPricingMode _pricingMode) external;
 
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
+    /// @param _protocolVersion The current protocol version from which upgrade is executed
+    /// @param _cutData The diamond cut parameters that is executed in the upgrade
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 
     /// @notice Executes a proposed governor upgrade

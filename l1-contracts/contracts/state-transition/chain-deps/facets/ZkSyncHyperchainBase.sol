@@ -2,42 +2,42 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncStateTransitionStorage} from "../ZkSyncStateTransitionStorage.sol";
+import {ZkSyncHyperchainStorage} from "../ZkSyncHyperchainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ZkSyncStateTransitionBase is ReentrancyGuard {
+contract ZkSyncHyperchainBase is ReentrancyGuard {
     // slither-disable-next-line uninitialized-state
-    ZkSyncStateTransitionStorage internal s;
+    ZkSyncHyperchainStorage internal s;
 
     /// @notice Checks that the message sender is an active admin
     modifier onlyAdmin() {
-        require(msg.sender == s.admin, "StateTransition Chain: not admin");
+        require(msg.sender == s.admin, "Hyperchain: not admin");
         _;
     }
 
     /// @notice Checks if validator is active
     modifier onlyValidator() {
-        require(s.validators[msg.sender], "StateTransition Chain: not validator");
+        require(s.validators[msg.sender], "Hyperchain: not validator");
         _;
     }
 
     modifier onlyStateTransitionManager() {
-        require(msg.sender == s.stateTransitionManager, "StateTransition Chain: not state transition manager");
+        require(msg.sender == s.stateTransitionManager, "Hyperchain: not state transition manager");
         _;
     }
 
     modifier onlyBridgehub() {
-        require(msg.sender == s.bridgehub, "StateTransition Chain: not bridgehub");
+        require(msg.sender == s.bridgehub, "Hyperchain: not bridgehub");
         _;
     }
 
     modifier onlyAdminOrStateTransitionManager() {
         require(
             msg.sender == s.admin || msg.sender == s.stateTransitionManager,
-            "StateTransition Chain: Only by admin or state transition manager"
+            "Hyperchain: Only by admin or state transition manager"
         );
         _;
     }
@@ -45,13 +45,13 @@ contract ZkSyncStateTransitionBase is ReentrancyGuard {
     modifier onlyValidatorOrStateTransitionManager() {
         require(
             s.validators[msg.sender] || msg.sender == s.stateTransitionManager,
-            "StateTransition Chain: Only by validator or state transition manager"
+            "Hyperchain: Only by validator or state transition manager"
         );
         _;
     }
 
     modifier onlyBaseTokenBridge() {
-        require(msg.sender == s.baseTokenBridge, "Only shared bridge can call this function");
+        require(msg.sender == s.baseTokenBridge, "Hyperchain: Only shared bridge can call this function");
         _;
     }
 }

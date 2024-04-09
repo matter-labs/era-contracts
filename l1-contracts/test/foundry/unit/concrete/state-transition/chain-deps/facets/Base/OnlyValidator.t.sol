@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.24;
 
-import {ZkSyncStateTransitionBaseTest, ERROR_ONLY_VALIDATOR} from "./_Base_Shared.t.sol";
+import {ZkSyncHyperchainBaseTest, ERROR_ONLY_VALIDATOR} from "./_Base_Shared.t.sol";
 
-contract OnlyValidatorTest is ZkSyncStateTransitionBaseTest {
+contract OnlyValidatorTest is ZkSyncHyperchainBaseTest {
     function test_revertWhen_calledByNonValidator() public {
         address nonValidator = makeAddr("nonValidator");
 

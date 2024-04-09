@@ -10,7 +10,7 @@ import {IMailbox} from "./IMailbox.sol";
 // kl to do remove this, needed for the server for now
 import {Diamond} from "../libraries/Diamond.sol";
 
-interface IZkSyncStateTransition is IAdmin, IExecutor, IGetters, IMailbox {
+interface IZkSyncHyperchain is IAdmin, IExecutor, IGetters, IMailbox {
     // KL todo: need this in the server for now
     event ProposeTransparentUpgrade(
         Diamond.DiamondCutData diamondCut,

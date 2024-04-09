@@ -6,7 +6,7 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -100,7 +100,7 @@ contract UpgradeLogicTest is DiamondCutTest {
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
             }),
-            blobVersionedHashRetriever: address(0)
+            blobVersionedHashRetriever: makeAddr("blobVersionedHashRetriver")
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
@@ -119,7 +119,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     function test_RevertWhen_EmergencyFreezeWhenUnauthorizedGovernor() public {
         vm.startPrank(randomSigner);
 
-        vm.expectRevert(abi.encodePacked("StateTransition Chain: Only by admin or state transition manager"));
+        vm.expectRevert(abi.encodePacked("Hyperchain: Only by admin or state transition manager"));
         proxyAsAdmin.freezeDiamond();
     }
 
