@@ -181,7 +181,7 @@ contract ExecutorFacet is Base, IExecutor {
 
         // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
-        // With the protocol upgrade we expect 8 logs: 2^10 - 1 = 1023
+        // With the protocol upgrade we expect 10 logs: 2^10 - 1 = 1023
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             require(processedLogs == 511, "b7");
         } else {
