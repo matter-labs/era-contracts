@@ -36,9 +36,9 @@ const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-g
 const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
 // const systemContractsArtifactsPath = path.join("../.." as string, "contracts/system-contracts/??/");// kl todo
 
-const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
+// const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
 // const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
-const BEACON_PROXY_BYTECODE = readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
+const BEACON_PROXY_BYTECODE = ethers.constants.HashZero; //readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
 // const SYSTEM_CONTEXT_BYTECODE = readBytecode(systemContractsArtifactsPath, "SystemContext");
 
 export async function upgradeToHyperchains1(
@@ -240,7 +240,9 @@ async function upgradeL2Bridge(deployer: Deployer) {
   const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
 
   // upgrade from L1 governance. This has to come from governacne on L1.
-  const l2Bridge = L2_SHARED_BRIDGE_INTERFACE;
+  const l2BridgeAbi = ['function initialize(address, address, bytes32, address)'];
+  const l2BridgeContract = new ethers.Contract(ADDRESS_ONE, l2BridgeAbi, deployer.deployWallet);
+  const l2Bridge =l2BridgeContract.interface; //L2_SHARED_BRIDGE_INTERFACE;
   const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [
     deployer.addresses.Bridges.SharedBridgeProxy,
     deployer.addresses.Bridges.ERC20BridgeProxy,
