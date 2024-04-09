@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Wallet } from "zksync-ethers";
-import * as zksync from "zksync-web3";
-import { serialize } from "zksync-web3/build/src/utils";
+import * as zksync from "zksync-ethers";
+import { serialize } from "zksync-ethers/build/src/utils";
 import type { BootloaderUtilities } from "../typechain";
 import { BootloaderUtilitiesFactory } from "../typechain";
 import { TEST_BOOTLOADER_UTILITIES_ADDRESS } from "./shared/constants";
@@ -21,6 +21,7 @@ describe("BootloaderUtilities tests", function () {
 
   describe("EIP-712 transaction", function () {
     it("check hashes", async () => {
+      console.log("kl todo 1");
       const eip712Tx = await wallet.populateTransaction({
         type: 113,
         to: wallet.address,
@@ -33,9 +34,11 @@ describe("BootloaderUtilities tests", function () {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
       });
+      console.log("kl todo 2");
       const signedEip712Tx = await wallet.signTransaction(eip712Tx);
+      console.log("kl todo 3");
       const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-
+      console.log("kl todo 4");
       const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
       const expectedEIP712TxHash = parsedEIP712tx.hash;
       const expectedEIP712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
