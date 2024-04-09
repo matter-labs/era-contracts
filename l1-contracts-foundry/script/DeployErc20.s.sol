@@ -88,7 +88,12 @@ contract RegisterHyperchainScript is Script {
         string memory implementation,
         uint256 mint
     ) internal returns (address) {
-        bytes memory args = abi.encode(name, symbol, decimals);
+        bytes memory args;
+        // WETH9 constructor has no arguments
+        if (keccak256(bytes(implementation)) != keccak256(bytes("WETH9.sol"))) {
+            args = abi.encode(name, symbol, decimals);
+        }
+
         bytes memory bytecode = abi.encodePacked(vm.getCode(implementation), args);
 
         address tokenAddress = deployViaCreate2(bytecode);
