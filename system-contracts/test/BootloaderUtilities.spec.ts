@@ -21,24 +21,20 @@ describe("BootloaderUtilities tests", function () {
 
   describe("EIP-712 transaction", function () {
     it("check hashes", async () => {
-      console.log("kl todo 1");
       const eip712Tx = await wallet.populateTransaction({
         type: 113,
         to: wallet.address,
         from: wallet.address,
         data: "0x",
         value: 0,
-        maxFeePerGas: 12000,
-        maxPriorityFeePerGas: 100,
+        // maxFeePerGas: 12000,
+        // maxPriorityFeePerGas: 100,
         customData: {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
       });
-      console.log("kl todo 2", eip712Tx);
       const signedEip712Tx = await wallet.signTransaction(eip712Tx);
-      console.log("kl todo 3");
       const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
-      console.log("kl todo 4");
       const eip712TxData = signedTxToTransactionData(parsedEIP712tx)!;
       const expectedEIP712TxHash = parsedEIP712tx.hash;
       const expectedEIP712SignedHash = zksync.EIP712Signer.getSignedDigest(eip712Tx);
