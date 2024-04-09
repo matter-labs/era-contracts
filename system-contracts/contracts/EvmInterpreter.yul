@@ -346,6 +346,16 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x12 { // OP_SLT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, slt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
