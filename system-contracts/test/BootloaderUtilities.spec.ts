@@ -34,7 +34,7 @@ describe("BootloaderUtilities tests", function () {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
       });
-      console.log("kl todo 2");
+      console.log("kl todo 2", eip712Tx);
       const signedEip712Tx = await wallet.signTransaction(eip712Tx);
       console.log("kl todo 3");
       const parsedEIP712tx = zksync.utils.parseTransaction(signedEip712Tx);
