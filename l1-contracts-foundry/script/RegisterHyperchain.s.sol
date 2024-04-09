@@ -12,7 +12,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IZkSyncStateTransition} from "contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
+import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 

@@ -23,7 +23,7 @@ import { IStateTransitionManagerFactory } from "../typechain/IStateTransitionMan
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 import { ProxyAdminFactory } from "../typechain/ProxyAdminFactory";
 
-import { IZkSyncStateTransitionFactory } from "../typechain/IZkSyncStateTransitionFactory";
+import { IZkSyncHyperchainFactory } from "../typechain/IZkSyncHyperchainFactory";
 import { L1SharedBridgeFactory } from "../typechain/L1SharedBridgeFactory";
 
 import { SingletonFactoryFactory } from "../typechain/SingletonFactoryFactory";
@@ -308,7 +308,7 @@ export class Deployer {
 
     const initCalldata = stateTransitionManager.encodeFunctionData("initialize", [
       {
-        governor: this.ownerAddress,
+        owner: this.ownerAddress,
         validatorTimelock: this.addresses.ValidatorTimeLock,
         genesisUpgrade: this.addresses.StateTransition.GenesisUpgrade,
         genesisBatchHash,
@@ -665,7 +665,7 @@ export class Deployer {
       const diamondProxyAddress =
         "0x" +
         receipt.logs
-          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("StateTransitionNewChain"))
+          .find((log) => log.topics[0] == stateTransitionManager.interface.getEventTopic("NewHyperchain"))
           .topics[2].slice(26);
       this.addresses.StateTransition.DiamondProxy = diamondProxyAddress;
       if (this.verbose) {
@@ -814,7 +814,7 @@ export class Deployer {
   }
 
   public stateTransitionContract(signerOrProvider: Signer | providers.Provider) {
-    return IZkSyncStateTransitionFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
+    return IZkSyncHyperchainFactory.connect(this.addresses.StateTransition.DiamondProxy, signerOrProvider);
   }
 
   public governanceContract(signerOrProvider: Signer | providers.Provider) {

@@ -143,7 +143,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     function receiveEth(uint256 _chainId) external payable {
-        require(bridgehub.getStateTransition(_chainId) == msg.sender, "receiveEth not state transition");
+        require(bridgehub.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.

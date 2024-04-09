@@ -13,7 +13,7 @@ contract DummyStateTransitionManager is StateTransitionManager {
     /// @notice Constructor
     constructor() StateTransitionManager(address(0)) {}
 
-    function setStateTransition(uint256 _chainId, address _stateTransition) external {
-        stateTransition[_chainId] = _stateTransition;
+    function setHyperchain(uint256 _chainId, address _hyperchain) external {
+        hyperchain[_chainId] = _hyperchain;
     }
 }
