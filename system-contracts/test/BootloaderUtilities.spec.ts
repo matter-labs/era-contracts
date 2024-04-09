@@ -27,8 +27,6 @@ describe("BootloaderUtilities tests", function () {
         from: wallet.address,
         data: "0x",
         value: 0,
-        // maxFeePerGas: 12000,
-        // maxPriorityFeePerGas: 100,
         customData: {
           gasPerPubdata: zksync.utils.DEFAULT_GAS_PER_PUBDATA_LIMIT,
         },
