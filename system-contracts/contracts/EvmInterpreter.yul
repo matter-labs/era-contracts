@@ -485,6 +485,24 @@ object "EVMInterpreter" {
                         revert(0, 0)
                     }
                 }
+                case 0x57 { // OP_JUMPI
+                    let counter, b
+
+                    counter, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    if iszero(b) {
+                        continue
+                    }
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
