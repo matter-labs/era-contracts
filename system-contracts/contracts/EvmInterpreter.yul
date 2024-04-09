@@ -82,7 +82,7 @@ object "EVMInterpreter" {
                     revert(0, 0)
                 }
 
-                for { let i := 0 } lt(i, position + 1) { i := add(i, 1) } {
+                for { let i := 0 } lt(i, add(position, 1)) { i := add(i, 1) } {
                     dup := mload(tempSp)                    
                 }
                 newSp := add(sp, 0x20)
