@@ -3,7 +3,7 @@
 import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
-import * as path from "path";
+// import * as path from "path";
 
 import type { BigNumberish } from "ethers";
 import { BigNumber, ethers } from "ethers";
@@ -18,7 +18,7 @@ import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgr
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, readBytecode, readInterface } from "./utils";
+import { ADDRESS_ONE } from "./utils";
 import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
@@ -31,9 +31,9 @@ import {
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 
-const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
-const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge");
-const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
+// const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
+// const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge");
+// const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
 // const systemContractsArtifactsPath = path.join("../.." as string, "contracts/system-contracts/??/");// kl todo
 
 // const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
@@ -240,9 +240,9 @@ async function upgradeL2Bridge(deployer: Deployer) {
   const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
 
   // upgrade from L1 governance. This has to come from governacne on L1.
-  const l2BridgeAbi = ['function initialize(address, address, bytes32, address)'];
+  const l2BridgeAbi = ["function initialize(address, address, bytes32, address)"];
   const l2BridgeContract = new ethers.Contract(ADDRESS_ONE, l2BridgeAbi, deployer.deployWallet);
-  const l2Bridge =l2BridgeContract.interface; //L2_SHARED_BRIDGE_INTERFACE;
+  const l2Bridge = l2BridgeContract.interface; //L2_SHARED_BRIDGE_INTERFACE;
   const l2BridgeCalldata = l2Bridge.encodeFunctionData("initialize", [
     deployer.addresses.Bridges.SharedBridgeProxy,
     deployer.addresses.Bridges.ERC20BridgeProxy,
