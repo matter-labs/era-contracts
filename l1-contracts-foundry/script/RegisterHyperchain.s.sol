@@ -280,6 +280,7 @@ contract RegisterHyperchainScript is Script {
             config.contracts.baseTokenGasPriceMultiplierDenominator
         );
 
+        // TODO: support validium mode when available
         // if (config.contractsMode) {
         //     zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
         // }
