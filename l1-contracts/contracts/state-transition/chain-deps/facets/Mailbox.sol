@@ -266,7 +266,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
 
-        // Here we manually assign fields for the struct to prevent "stack too deep" error
         WritePriorityOpParams memory params;
         params.request = _request;
         params.request.sender = l2Sender;
@@ -281,8 +280,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         _params.txId = s.priorityQueue.getTotalPriorityTxs();
 
         // Checking that the user provided enough ether to pay for the transaction.
-        // Using a new scope to prevent "stack too deep" error
-
         _params.l2GasPrice = _deriveL2GasPrice(tx.gasprice, request.l2GasPerPubdataByteLimit);
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
         require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost

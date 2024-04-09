@@ -27,7 +27,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
-    /// @notice The mapping from chainId => chainContract
+    /// @notice The mapping from chainId => hyperchain contract
     mapping(uint256 chainId => address chainContract) public hyperchain;
 
     /// @dev The batch zero hash, calculated at initialization
@@ -103,7 +103,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
             commitment: _initializeData.genesisBatchCommitment
         });
         storedBatchZero = keccak256(abi.encode(batchZero));
-
         initialCutHash = keccak256(abi.encode(_initializeData.diamondCut));
 
         // While this does not provide a protection in the production, it is needed for local testing
@@ -158,8 +157,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _newProtocolVersion
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
         uint256 previousProtocolVersion = protocolVersion;
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
         protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
         protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
@@ -211,6 +210,16 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         IZkSyncHyperchain(hyperchain[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
+    /// @dev executes upgrade on chain
+    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
+        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
+    }
+
+    /// @dev setPriorityTxMaxGasLimit for the specified chain
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+    }
+
     /// @dev setTokenMultiplier for the specified chain
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
         IZkSyncHyperchain(hyperchain[_chainId]).setTokenMultiplier(_nominator, _denominator);
@@ -229,16 +238,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
         IZkSyncHyperchain(hyperchain[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
-    }
-
-    /// @dev executes upgrade on chain
-    function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
-    }
-
-    /// @dev setPriorityTxMaxGasLimit for the specified chain
-    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// registration
@@ -302,7 +301,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @param _hyperchainContract the chain's contract
     function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external onlyOwner {
         require(_hyperchainContract != address(0), "STM: hyperchain zero");
-
         hyperchain[_chainId] = _hyperchainContract;
         emit NewHyperchain(_chainId, _hyperchainContract);
     }
@@ -322,8 +320,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     ) external onlyBridgehub {
         if (hyperchain[_chainId] != address(0)) {
             // Hyperchain already registered
-            // note this can only happen if we added the chain manually, as chains are normally registered through the bridgehub
-            // this is for legacy chains
             return;
         }
 
@@ -356,7 +352,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // deploy hyperchainContract
         // slither-disable-next-line reentrancy-no-eth
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
-
         // save data
         address hyperchainAddress = address(hyperchainContract);
 

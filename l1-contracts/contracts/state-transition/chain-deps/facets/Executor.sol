@@ -520,8 +520,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
 
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
-            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
+                // solhint-disable-next-line func-named-parameters
                 _batch.indexRepeatedStorageChanges,
                 _batch.newStateRoot,
                 uint64(0), // index repeated storage changes in zkPorter

@@ -517,7 +517,8 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount); /// should have more data here
+        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount);
+        // should have more data here
 
         vm.expectRevert("ShB wrong msg len 2");
 

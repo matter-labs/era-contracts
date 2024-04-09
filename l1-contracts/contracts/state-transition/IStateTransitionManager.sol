@@ -28,7 +28,7 @@ struct StateTransitionManagerInitializeData {
 }
 
 interface IStateTransitionManager {
-    /// @dev emitted when a new Chain is added
+    /// @dev Emitted when a new Hyperchain is added
     event NewHyperchain(uint256 indexed _chainId, address indexed _hyperchainContract);
 
     /// @dev emitted when an chain registers and a SetChainIdUpgrade happens
@@ -108,17 +108,11 @@ interface IStateTransitionManager {
 
     function freezeChain(uint256 _chainId) external;
 
-    function unfreezeChain(uint256 _chainId) external;
-
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
-    ) external;
-
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
 
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
+
+    function unfreezeChain(uint256 _chainId) external;
 
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external;
 
@@ -127,4 +121,10 @@ interface IStateTransitionManager {
     function setValidator(uint256 _chainId, address _validator, bool _active) external;
 
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external;
+
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external;
 }
