@@ -42,7 +42,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
     /// @inheritdoc IMailbox
     function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == eraChainId, "transferEthToSharedBridge only available for Era on mailbox");
+        require(s.chainId == eraChainId, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
         address baseTokenBridgeAddress = s.baseTokenBridge;
@@ -191,7 +191,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == eraChainId, "finalizeEthWithdrawal only available for Era on mailbox");
+        require(s.chainId == eraChainId, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
             _chainId: eraChainId,
             _l2BatchNumber: _l2BatchNumber,
@@ -212,7 +212,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == eraChainId, "legacy interface only available for era token");
+        require(s.chainId == eraChainId, "Mailbox: legacy interface only available for Era");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

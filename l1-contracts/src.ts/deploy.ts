@@ -354,6 +354,7 @@ export class Deployer {
     const contractAddress = await this.deployViaCreate2("MailboxFacet", [eraChainId], create2Salt, ethTxOptions);
 
     if (this.verbose) {
+      console.log(`Mailbox deployed with era chain id: ${eraChainId}`);
       console.log(`CONTRACTS_MAILBOX_FACET_ADDR=${contractAddress}`);
     }
 
@@ -488,6 +489,7 @@ export class Deployer {
     );
 
     if (this.verbose) {
+      console.log(`With era chain id ${eraChainId} and era diamond proxy ${eraDiamondProxy}`);
       console.log(`CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR=${contractAddress}`);
     }
 

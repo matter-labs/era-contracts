@@ -76,7 +76,8 @@
     "display-governance": "ts-node scripts/display-governance.ts",
     "upgrade-system": "ts-node upgrade-system/index.ts",
     "hyperchain-upgrade-1": "ts-node scripts/hyperchain-upgrade-1.ts",
-    "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts"
+    "hyperchain-upgrade-2": "ts-node scripts/hyperchain-upgrade-2.ts",
+    "upgrade-shared-bridge-era": "ts-node scripts/upgrade-shared-bridge-era.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

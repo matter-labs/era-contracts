@@ -167,21 +167,21 @@ describe("Mailbox tests", function () {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, invalidProof)
       );
-      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Successful withdrawal", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
     });
 
     it("Reverts when withdrawal is already finalized", async () => {
       const revertReason = await getCallRevertReason(
         mailbox.finalizeEthWithdrawal(BLOCK_NUMBER, MESSAGE_INDEX, TX_NUMBER_IN_BLOCK, MESSAGE, MERKLE_PROOF)
       );
-      expect(revertReason).equal("finalizeEthWithdrawal only available for Era on mailbox");
+      expect(revertReason).equal("Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
     });
   });
 
