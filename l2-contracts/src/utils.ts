@@ -15,9 +15,6 @@ import { IERC20Factory } from "zksync-web3/build/typechain";
 
 import { ERC20Factory } from "../../l1-contracts/typechain";
 
-import * as fs from "fs";
-import * as path from "path";
-
 export const provider = web3Provider();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -30,8 +27,7 @@ const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
 
-export const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
+
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexZeroPad(

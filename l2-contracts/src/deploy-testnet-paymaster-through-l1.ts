@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, ethTestConfig, provider } from "./utils";
+import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, provider } from "./utils";
+import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
+
 import * as hre from "hardhat";
 
 // Script to deploy the testnet paymaster and output its address.

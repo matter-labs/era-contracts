@@ -4,7 +4,6 @@ import { formatUnits, Interface, parseUnits } from "ethers/lib/utils";
 import {
   computeL2Create2Address,
   create2DeployFromL1,
-  ethTestConfig,
   provider,
   priorityTxMaxGasLimit,
   hashL2Bytecode,
@@ -15,6 +14,11 @@ import {
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import * as hre from "hardhat";
+
+import * as fs from "fs";
+import * as path from "path";
+export const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
+export const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
