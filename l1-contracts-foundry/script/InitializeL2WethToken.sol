@@ -102,6 +102,8 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function getL2Calldata() internal returns (bytes memory) {
+        // Low-level call is performed due to different solidity
+        // compiler versions between L1 and L2
         // solhint-disable-next-line func-named-parameters
         bytes memory upgradeData = abi.encodeWithSignature(
             "initializeV2(string,string,address,address)",
