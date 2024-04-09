@@ -479,6 +479,8 @@ object "EVMInterpreter" {
 
                     ip := add(add(BYTECODE_OFFSET(), 32), counter)
 
+                    evmGasLeft = chargeGas(evmGasLeft, 8)
+
                     // Check next opcode is JUMPDEST
                     let nextOpcode := readIP(ip)
                     if iszero(eq(nextOpcode, 0x5B)) {
@@ -490,6 +492,8 @@ object "EVMInterpreter" {
 
                     counter, sp := popStackItem(sp)
                     b, sp := popStackItem(sp)
+
+                    evmGasLeft = chargeGas(evmGasLeft, 10)
 
                     if iszero(b) {
                         continue
