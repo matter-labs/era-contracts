@@ -2,12 +2,6 @@
 
 pragma solidity 0.8.24;
 
-// import "../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
-// import "../state-transition/chain-interfaces/IMailbox.sol";
-// import "../state-transition/chain-interfaces/IVerifier.sol";
-// import "../common/libraries/L2ContractHelper.sol";
-// import "../common/Messaging.sol";
-// import "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_ALLOWED_PROTOCOL_VERSION_DELTA} from "../common/Config.sol";
 import {ProposedUpgrade, BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
 
