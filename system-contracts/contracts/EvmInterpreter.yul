@@ -265,6 +265,15 @@ object "EVMInterpreter" {
                     sp := pushStackItem(sp, sdiv(a, b))
                     evmGasLeft := chargeGas(evmGasLeft, 5)
                 }
+                case 0x06 { // OP_MOD
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, mod(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
                 case 0x17 { // OP_OR
                     let a, b
 
