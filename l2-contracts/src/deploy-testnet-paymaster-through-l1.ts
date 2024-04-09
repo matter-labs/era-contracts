@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
 import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, provider } from "./utils";
-import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
+import { ethTestConfig } from "./deploy-utils";
 
 import * as hre from "hardhat";
 

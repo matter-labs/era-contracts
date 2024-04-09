@@ -4,7 +4,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { GAS_MULTIPLIER } from "../../l1-contracts/scripts/utils";
 import { provider } from "./utils";
-import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
+import { ethTestConfig } from "./deploy-utils";
 
 async function main() {
   const program = new Command();
