@@ -68,8 +68,9 @@ object "EVMInterpreter" {
             }
 
             function readBytes(start, length) -> value {
-                for { let i := 0 } lt(i, length) { i := add(i, 1) } {
-                    let next_byte := readIP(add(start, i))
+                let max := add(start, length)
+                for {} lt(start, max) { start := add(start, 1) } {
+                    let next_byte := readIP(start)
 
                     value := or(shl(8, value), next_byte)
                 }
