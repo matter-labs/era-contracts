@@ -101,3 +101,11 @@ jobs:
       - name: Run RegisterHyperchain script
         working-directory: ./l1-contracts-foundry
         run: forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+
+      - name: Run DeployErc20 script
+        working-directory: ./l1-contracts-foundry
+        run: forge script ./script/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+
+      - name: Run InitializeL2WethToken script
+        working-directory: ./l1-contracts-foundry
+        run: forge script ./script/InitializeL2WethToken.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
