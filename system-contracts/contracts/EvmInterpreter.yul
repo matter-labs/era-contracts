@@ -255,6 +255,22 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, or(a,b))
                 }
+                case 0x0A { // OP_EXP
+                    let a, exponent
+
+                    a, sp := popStackItem(sp)
+                    exponent, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, exp(a, exponent))
+                }
+                case 0x0B { // OP_SIGNEXTEND
+                    let b, x
+
+                    b, sp := popStackItem(sp)
+                    x, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, signextend(b, x))
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
