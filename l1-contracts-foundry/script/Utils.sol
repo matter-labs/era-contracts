@@ -72,6 +72,24 @@ library Utils {
     }
 
     /**
+     * @dev Extract a uint256 from bytes.
+     */
+    function bytesToUint256(bytes memory bys) internal pure returns (uint256 value) {
+        // Add left padding to 32 bytes if needed
+        if (bys.length < 32) {
+            bytes memory padded = new bytes(32);
+            for (uint256 i = 0; i < bys.length; i++) {
+                padded[i + 32 - bys.length] = bys[i];
+            }
+            bys = padded;
+        }
+
+        assembly {
+            value := mload(add(bys, 0x20))
+        }
+    }
+
+    /**
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {

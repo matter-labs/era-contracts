@@ -4,17 +4,9 @@ pragma solidity 0.8.24;
 // solhint-disable no-console
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IZkSyncStateTransition} from "contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -42,6 +34,7 @@ contract RegisterHyperchainScript is Script {
 
         initializeConfig();
         deployTokens();
+        saveOutput();
     }
 
     function initializeConfig() internal {
@@ -76,13 +69,13 @@ contract RegisterHyperchainScript is Script {
         for (uint256 i = 0; i < config.tokens.length; i++) {
             TokenDescription memory token = config.tokens[i];
             console.log("Deploying token:", token.name);
-            address tokenAddress = deployErc20(
-                token.name,
-                token.symbol,
-                token.decimals,
-                token.implementation,
-                token.mint
-            );
+            address tokenAddress = deployErc20({
+                name: token.name,
+                symbol: token.symbol,
+                decimals: token.decimals,
+                implementation: token.implementation,
+                mint: token.mint
+            });
             console.log("Token deployed at:", tokenAddress);
             token.addr = tokenAddress;
         }
@@ -106,6 +99,29 @@ contract RegisterHyperchainScript is Script {
         }
 
         return tokenAddress;
+    }
+
+    function saveOutput() internal {
+        vm.serializeAddress("root", "create2_factory_addr", config.create2FactoryAddr);
+        vm.serializeBytes32("root", "create2_factory_salt", config.create2FactorySalt);
+
+        string memory tokens = "";
+        for (uint256 i = 0; i < config.tokens.length; i++) {
+            TokenDescription memory token = config.tokens[i];
+            vm.serializeString(token.symbol, "name", token.name);
+            vm.serializeString(token.symbol, "symbol", token.symbol);
+            vm.serializeUint(token.symbol, "decimals", token.decimals);
+            vm.serializeString(token.symbol, "implementation", token.implementation);
+            vm.serializeUint(token.symbol, "mint", token.mint);
+            string memory tokenInfo = vm.serializeAddress(token.symbol, "address", token.addr);
+
+            tokens = vm.serializeString("tokens", token.symbol, tokenInfo);
+        }
+
+        string memory toml = vm.serializeString("root", "tokens", tokens);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
+        vm.writeToml(toml, path);
     }
 
     function deployViaCreate2(bytes memory _bytecode) internal returns (address) {

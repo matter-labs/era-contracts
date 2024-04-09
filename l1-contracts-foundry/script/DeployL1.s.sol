@@ -661,6 +661,7 @@ contract DeployL1Script is Script {
         vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
         vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
         vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
+        vm.serializeBytes32("l1", "create2_factory_salt", config.contracts.create2FactorySalt);
         vm.serializeAddress("l1", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeUint("l1", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("l1", "era_chain_id", config.eraChainId);
