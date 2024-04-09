@@ -191,23 +191,6 @@ describe("Legacy Era tests", function () {
     expect(revertReason).equal("xx");
   });
 
-  // we would want to check the scenario where ERA_DIAMOND_PROXY is called,
-  // this is a bit complex
-
-  // it("Should revert on finalizing a withdrawal with legacy batch number", async () => {
-  //   const l1Receiver = await randomSigner.getAddress();
-  //   const l2ToL1message = ethers.utils.hexConcat([
-  //     functionSignature,
-  //     l1Receiver,
-  //     erc20TestToken.address,
-  //     ethers.constants.HashZero,
-  //   ]);
-  //   const revertReason = await getCallRevertReason(
-  //     l1ERC20Bridge.connect(randomSigner).finalizeWithdrawal(0, 0, 0, l2ToL1message, [])
-  //   );
-  //   expect(revertReason).equal("xc"); // note we check that we
-  // });
-
   it("Should revert on finalizing a withdrawal with wrong length of proof", async () => {
     const l1Receiver = await randomSigner.getAddress();
     const l2ToL1message = ethers.utils.hexConcat([
