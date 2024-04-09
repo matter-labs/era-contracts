@@ -102,6 +102,7 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function getL2Calldata() internal returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
         bytes memory upgradeData = abi.encodeWithSignature(
             "initializeV2(string,string,address,address)",
             config.l1WethTokenName,
