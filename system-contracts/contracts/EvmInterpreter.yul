@@ -75,6 +75,20 @@ object "EVMInterpreter" {
                 }
             }
 
+            function dupStackItem(sp, position) -> newSp {
+                let tempSp := sub(sp, mul(0x20, position))
+
+                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                    revert(0, 0)
+                }
+
+                for { let i := 0 } lt(i, position + 1) { i := add(i, 1) } {
+                    dup := mload(tempSp)                    
+                }
+                newSp := add(sp, 0x20)
+                mstore(newSp, item)
+            }
+
             function popStackItem(sp) -> a, newSp {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
@@ -495,6 +509,86 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, value)
                     ip := add(ip, 32)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x80 { // OP_DUP1                    
+                    dupStackItem(sp, 1)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x81 { // OP_DUP2
+                    dupStackItem(sp, 2)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x82 { // OP_DUP3
+                    dupStackItem(sp, 3)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x83 { // OP_DUP4                    
+                    dupStackItem(sp, 4)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x84 { // OP_DUP5
+                    dupStackItem(sp, 5)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x85 { // OP_DUP6
+                    dupStackItem(sp, 6)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x86 { // OP_DUP7                    
+                    dupStackItem(sp, 7)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x87 { // OP_DUP8
+                    dupStackItem(sp, 8)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x88 { // OP_DUP9
+                    dupStackItem(sp, 9)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x89 { // OP_DUP10                    
+                    dupStackItem(sp, 10)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8A { // OP_DUP11
+                    dupStackItem(sp, 11)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8B { // OP_DUP12
+                    dupStackItem(sp, 12)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8C { // OP_DUP13
+                    dupStackItem(sp, 13)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8D { // OP_DUP14
+                    dupStackItem(sp, 14)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8E { // OP_DUP15
+                    dupStackItem(sp, 15)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x8F { // OP_DUP16
+                    dupStackItem(sp, 16)
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
