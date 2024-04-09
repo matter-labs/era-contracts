@@ -28,13 +28,13 @@ contract InitializeL2WethTokenScript is Script {
         address l2WethTokenImplAddr;
         uint256 deployL2BridgeCounterpartGasLimit;
         uint256 requiredL2GasPricePerPubdata;
+        uint256 gasMultiplier;
     }
 
     Config config;
 
     function run() public {
         initializeConfig();
-
         initializeL2WethToken();
     }
 
@@ -69,12 +69,13 @@ contract InitializeL2WethTokenScript is Script {
         config.l2WethTokenImplAddr = toml.readAddress("$.l2_weth_token_impl_addr");
         config.deployL2BridgeCounterpartGasLimit = toml.readUint("$.deploy_l2_bridge_counterpart_gas_limit");
         config.requiredL2GasPricePerPubdata = toml.readUint("$.required_l2_gas_price_per_pubdata");
+        config.gasMultiplier = toml.readUint("$.gas_multiplier");
     }
 
     function initializeL2WethToken() internal {
         Bridgehub bridgehub = Bridgehub(config.bridgehubProxyAddr);
 
-        uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]"));
+        uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
         uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(
             config.eraChainId,
             gasPrice,
