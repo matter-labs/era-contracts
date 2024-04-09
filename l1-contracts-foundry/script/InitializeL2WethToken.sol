@@ -10,7 +10,6 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transp
 import {Utils} from "./Utils.sol";
 import {L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2WrappedBaseToken} from "l2-contracts/bridge/L2WrappedBaseToken.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -103,9 +102,12 @@ contract InitializeL2WethTokenScript is Script {
     }
 
     function getL2Calldata() internal returns (bytes memory) {
-        bytes memory upgradeData = abi.encodeCall(
-            L2WrappedBaseToken.initializeV2,
-            (config.l1WethTokenName, config.l1WethTokenSymbol, config.l2SharedBridgeAddr, config.l1WethTokenAddr)
+        bytes memory upgradeData = abi.encodeWithSignature(
+            "initializeV2(string,string,address,address)",
+            config.l1WethTokenName,
+            config.l1WethTokenSymbol,
+            config.l2SharedBridgeAddr,
+            config.l1WethTokenAddr
         );
         bytes memory l2Calldata = abi.encodeCall(
             ITransparentUpgradeableProxy.upgradeToAndCall,
