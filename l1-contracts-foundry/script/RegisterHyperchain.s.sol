@@ -10,7 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./Utils.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IZkSyncStateTransition} from "contracts/state-transition/chain-interfaces/IZkSyncStateTransition.sol";
+import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -272,7 +272,7 @@ contract RegisterHyperchainScript is Script {
     }
 
     function configureZkSyncStateTransition() internal {
-        IZkSyncStateTransition zkSyncStateTransition = IZkSyncStateTransition(config.addresses.newDiamondProxy);
+        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.addresses.newDiamondProxy);
 
         vm.startBroadcast();
         zkSyncStateTransition.setTokenMultiplier(
@@ -280,9 +280,9 @@ contract RegisterHyperchainScript is Script {
             config.contracts.baseTokenGasPriceMultiplierDenominator
         );
 
-        if (config.contracts.validiumMode) {
-            zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
-        }
+        // if (config.contractsMode) {
+        //     zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
+        // }
 
         vm.stopBroadcast();
         console.log("ZkSync State Transition configured");

@@ -414,7 +414,7 @@ contract DeployL1Script is Script {
         });
 
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
-            governor: config.ownerAddress,
+            owner: config.ownerAddress,
             validatorTimelock: addresses.validatorTimelock,
             genesisUpgrade: addresses.stateTransition.genesisUpgrade,
             genesisBatchHash: config.contracts.genesisRoot,
