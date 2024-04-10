@@ -76,6 +76,24 @@ object "EVMInterpreter" {
                 }
             }
 
+            function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
+                evmGasLeft := chargeGas(evmGas, 3)
+                let tempSp := sub(sp, mul(0x20, sub(position, 1)))
+
+                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                    revert(0, 0)
+                }
+                
+                if lt(tempSp, STACK_OFFSET()) {
+                    revert(0, 0)
+                }
+
+                let dup := mload(tempSp)                    
+
+                newSp := add(sp, 0x20)
+                mstore(newSp, dup)
+            }
+
             function popStackItem(sp) -> a, newSp {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
@@ -678,6 +696,54 @@ object "EVMInterpreter" {
                     ip := add(ip, 32)
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x80 { // OP_DUP1 
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 1)
+                }
+                case 0x81 { // OP_DUP2
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 2)
+                }
+                case 0x82 { // OP_DUP3
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 3)
+                }
+                case 0x83 { // OP_DUP4    
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 4)
+                }
+                case 0x84 { // OP_DUP5
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 5)
+                }
+                case 0x85 { // OP_DUP6
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 6)
+                }
+                case 0x86 { // OP_DUP7    
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 7)
+                }
+                case 0x87 { // OP_DUP8
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 8)
+                }
+                case 0x88 { // OP_DUP9
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 9)
+                }
+                case 0x89 { // OP_DUP10   
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 10)
+                }
+                case 0x8A { // OP_DUP11
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 11)
+                }
+                case 0x8B { // OP_DUP12
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 12)
+                }
+                case 0x8C { // OP_DUP13
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 13)
+                }
+                case 0x8D { // OP_DUP14
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 14)
+                }
+                case 0x8E { // OP_DUP15
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 15)
+                }
+                case 0x8F { // OP_DUP16
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 16)
                 }
                 // TODO: REST OF OPCODES
                 default {
