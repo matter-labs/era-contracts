@@ -68,8 +68,9 @@ object "EVMInterpreter" {
             }
 
             function readBytes(start, length) -> value {
-                for { let i := 0 } lt(i, length) { i := add(i, 1) } {
-                    let next_byte := readIP(add(start, i))
+                let max := add(start, length)
+                for {} lt(start, max) { start := add(start, 1) } {
+                    let next_byte := readIP(start)
 
                     value := or(shl(8, value), next_byte)
                 }
@@ -219,10 +220,28 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            // Essentially a NOP that will not get optimized away by the compiler
+            function $llvm_NoInline_llvm$_unoptimized() {
+                pop(1)
+            }
+
+            function printHex(value) {
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+                mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
+            }
+
+            function printString(value) {
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+                mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
-
 
             // TALK ABOUT THE DIFFERENCE BETWEEN VERBATIM AND DOING A STATIC CALL.
             // IN SOLIDITY A STATIC CALL IS REPLACED BY A VERBATIM IF THE ADDRES IS ONE
@@ -285,6 +304,42 @@ object "EVMInterpreter" {
                     sp := pushStackItem(sp, sub(a, b))
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x04 { // OP_DIV
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, div(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x05 { // OP_SDIV
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sdiv(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x06 { // OP_MOD
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, mod(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x07 { // OP_SMOD
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, smod(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
                 case 0x17 { // OP_OR
                     let a, b
 
@@ -327,6 +382,131 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, mulmod(a, b, N))
                 }
+                case 0x10 { // OP_LT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, lt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x11 { // OP_GT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, gt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x12 { // OP_SLT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, slt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x13 { // OP_SGT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sgt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x14 { // OP_EQ
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, eq(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x15 { // OP_ISZERO
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, iszero(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x18 { // OP_XOR
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, xor(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x19 { // OP_NOT
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, not(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x1A { // OP_BYTE
+                    let i, x
+
+                    i, sp := popStackItem(sp)
+                    x, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, byte(i, x))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                // NOTE: We don't currently do full jumpdest validation
+                // (i.e. validating a jumpdest isn't in PUSH data)
+                case 0x56 { // OP_JUMP
+                    let counter
+
+                    counter, sp := popStackItem(sp)
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
+                case 0x57 { // OP_JUMPI
+                    let counter, b
+
+                    counter, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 10)
+
+                    if iszero(b) {
+                        continue
+                    }
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
@@ -337,6 +517,7 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x5B {} // OP_JUMPDEST
                 case 0x5F { // OP_PUSH0
                     let value := 0
 
