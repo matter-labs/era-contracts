@@ -476,7 +476,6 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                 }
                 case 0x31 { // OP_BALANCE
-                    printHex(balance(address()))
                     let addr
 
                     addr, sp := popStackItem(sp)
