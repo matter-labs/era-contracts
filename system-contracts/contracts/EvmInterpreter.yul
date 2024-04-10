@@ -485,6 +485,11 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x32 { // OP_ORIGIN
+                    sp := pushStackItem(sp, origin())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
