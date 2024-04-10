@@ -369,9 +369,12 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
 
                     let end := add(offset, 32)
-                    if gt(end, mload(MEM_OFFSET())) {
+                    let currentEnd := mload(MEM_OFFSET())
+                    if gt(end, currentEnd) {
                         let newSize := roundUp(end, 32)
-                        mstore(sub(add(MEM_OFFSET_INNER(), newSize), 32), 0)
+                        for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
+                            mstore(currentEnd, 0)
+                        }
                         mstore(MEM_OFFSET(), newSize)
                     }
 
@@ -384,9 +387,12 @@ object "EVMInterpreter" {
                     value, sp := popStackItem(sp)
 
                     let end := add(offset, 32)
+                    let currentEnd := mload(MEM_OFFSET())
                     if gt(end, mload(MEM_OFFSET())) {
                         let newSize := roundUp(end, 32)
-                        mstore(sub(add(MEM_OFFSET_INNER(), newSize), 32), 0)
+                        for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
+                            mstore(currentEnd, 0)
+                        }
                         mstore(MEM_OFFSET(), newSize)
                     }
 
