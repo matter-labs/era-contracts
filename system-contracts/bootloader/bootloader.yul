@@ -82,8 +82,9 @@ object "Bootloader" {
 
             /// @dev The maximal allowed gasPerPubdata, we want it multiplied by the u32::MAX
             /// (i.e. the maximal possible value of the pubdata counter) to be a safe JS integer with a good enough margin.
+            /// @dev For now, the 50000 value is used for backward compatibility with SDK, but in the future we will migrate to 2^20.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
-                ret := 1048576
+                ret := 50000
             }
 
             /// @dev The overhead for the interaction with L1.
@@ -537,12 +538,6 @@ object "Bootloader" {
             /// when checking for X gas, the context should have at least X+CHECK_ENOUGH_GAS_OVERHEAD() gas.
             function CHECK_ENOUGH_GAS_OVERHEAD() -> ret {
                 ret := 1000000
-            }
-
-            /// @dev The maximal amount of pubdata that can be safely used by a transaction.
-            /// If a transaction uses more pubdata than this, it will be reverted.
-            function MAX_PUBDATA_FOR_TX() -> ret {
-                ret := 120000
             }
 
             /// @dev Ceil division of integers
@@ -1635,8 +1630,8 @@ object "Bootloader" {
                     assertionError("refundInGas > gasLimit")
                 }
 
-                if iszero(validateUint32(refundInGas)) {
-                    assertionError("refundInGas is not uint32")
+                if iszero(validateUint64(refundInGas)) {
+                    assertionError("refundInGas is not uint64")
                 }
 
                 let ethToRefund := safeMul(
@@ -2768,11 +2763,8 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
-
-                let notEnoughGas := lt(allowedGasLimit, spentErgs)
-                let tooMuchPubdata := gt(getCurrentPubdataSpent(basePubdataSpent), MAX_PUBDATA_FOR_TX())
-
-                ret := or(notEnoughGas, tooMuchPubdata)
+                
+                ret := lt(allowedGasLimit, spentErgs)
             }
 
             /// @dev Set the new value for the tx origin context value
@@ -3322,7 +3314,7 @@ object "Bootloader" {
                 }
 
                 let gasLimitValue := getGasLimit(innerTxDataOffset)
-                if iszero(validateUint32(gasLimitValue)) {
+                if iszero(validateUint64(gasLimitValue)) {
                     assertionError("Encoding gasLimit")
                 }
 
