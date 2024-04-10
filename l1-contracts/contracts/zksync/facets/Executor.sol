@@ -400,14 +400,7 @@ contract ExecutorFacet is Base, IExecutor {
         VerifierParams memory _verifierParams
     ) internal pure returns (uint256) {
         return
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        _prevBatchCommitment,
-                        _currentBatchCommitment
-                    )
-                )
-            ) >> PUBLIC_INPUT_SHIFT;
+            uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @inheritdoc IExecutor
