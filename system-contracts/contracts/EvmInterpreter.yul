@@ -470,6 +470,11 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x30 { // OP_ADDRESS
+                    sp := pushStackItem(sp, address())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
