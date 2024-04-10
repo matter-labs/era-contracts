@@ -220,16 +220,23 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            // Essentially a NOP that will not get optimized away by the compiler
+            function $llvm_NoInline_llvm$_unoptimized() {
+                pop(1)
+            }
+
             function printHex(value) {
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
                 mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             function printString(value) {
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
                 mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             ////////////////////////////////////////////////////////////////
