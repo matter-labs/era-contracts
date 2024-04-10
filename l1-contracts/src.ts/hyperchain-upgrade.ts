@@ -31,16 +31,9 @@ import {
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 
-// const contractArtifactsPath = path.join("../../" as string, "contracts/l2-contracts/artifacts-zk/");
-// const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge");
-// const openzeppelinBeaconProxyArtifactsPath = path.join(contractArtifactsPath, "@openzeppelin/contracts/proxy/beacon");
-// const systemContractsArtifactsPath = path.join("../.." as string, "contracts/system-contracts/??/");// kl todo
+const BEACON_PROXY_BYTECODE = ethers.constants.HashZero;
 
-// const L2_SHARED_BRIDGE_INTERFACE = readInterface(l2BridgeArtifactsPath, "L2SharedBridge");
-// const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = readBytecode(l2BridgeArtifactsPath, "L2SharedBridge");
-const BEACON_PROXY_BYTECODE = ethers.constants.HashZero; //readBytecode(openzeppelinBeaconProxyArtifactsPath, "BeaconProxy");
-// const SYSTEM_CONTEXT_BYTECODE = readBytecode(systemContractsArtifactsPath, "SystemContext");
-
+/// this deploys the contracts
 export async function upgradeToHyperchains1(
   deployer: Deployer,
   gasPrice: BigNumberish,
@@ -56,6 +49,9 @@ export async function upgradeToHyperchains1(
   await deployNewContracts(deployer, gasPrice, create2Salt, nonce); //done
 }
 
+// this simulates the main part of the upgrade, the diamond cut, registration into the Bridgehub and STM, and the bridge upgrade
+// this has to be done atomically.
+// before we call this we need to generate the facet cuts using the protocol upgrade tool, on hardhat we test the dummy diamondCut
 export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNumberish) {
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
@@ -132,7 +128,6 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {
   // publish L2 system contracts
-  // await publishBytecodeFromL1(deployer.chainId, deployer.deployWallet, SYSTEM_CONTEXT_BYTECODE, gasPrice);
   if (process.env.CHAIN_ETH_NETWORK === "hardhat") {
     // era facet cut
     const newProtocolVersion = 24;
@@ -162,6 +157,15 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
       recursionLeafLevelVkHash: ethers.constants.HashZero,
       recursionCircuitsSetVksHash: ethers.constants.HashZero,
     };
+    const postUpgradeCalldata = new ethers.utils.AbiCoder().encode(
+      ["uint256", "address", "address", "address"],
+      [
+        deployer.chainId,
+        deployer.addresses.Bridgehub.BridgehubProxy,
+        deployer.addresses.StateTransition.StateTransitionProxy,
+        deployer.addresses.Bridges.SharedBridgeProxy,
+      ]
+    );
     const proposedUpgrade: ProposedUpgrade = {
       l2ProtocolUpgradeTx,
       factoryDeps: [],
@@ -170,23 +174,12 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
       verifier: ethers.constants.AddressZero,
       verifierParams: verifierParams,
       l1ContractsUpgradeCalldata: ethers.constants.HashZero,
-      postUpgradeCalldata: ethers.constants.HashZero,
+      postUpgradeCalldata: postUpgradeCalldata,
       upgradeTimestamp: upgradeTimestamp,
       newProtocolVersion: 24,
     };
     const upgradeHyperchains = new Interface(hardhat.artifacts.readArtifactSync("UpgradeHyperchains").abi);
-    const defaultUpgradeData = upgradeHyperchains.encodeFunctionData("upgradeWithAdditionalData", [
-      proposedUpgrade,
-      new ethers.utils.AbiCoder().encode(
-        ["uint256", "address", "address", "address"],
-        [
-          deployer.chainId,
-          deployer.addresses.Bridgehub.BridgehubProxy,
-          deployer.addresses.StateTransition.StateTransitionProxy,
-          deployer.addresses.Bridges.SharedBridgeProxy,
-        ]
-      ),
-    ]);
+    const defaultUpgradeData = upgradeHyperchains.encodeFunctionData("upgrade", [proposedUpgrade]);
 
     const facetCuts = await getFacetCutsForUpgrade(
       deployer.deployWallet,

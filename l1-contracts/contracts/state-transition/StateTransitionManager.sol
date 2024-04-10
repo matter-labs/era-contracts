@@ -153,13 +153,13 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldprotocolVersionDeadline,
+        uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
+        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
         protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
