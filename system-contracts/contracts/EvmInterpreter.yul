@@ -246,6 +246,20 @@ object "EVMInterpreter" {
                 }
             }
 
+            function expandMemory(end) -> gasCost {
+                gasCost := 3
+
+                let currentEnd := mload(MEM_OFFSET())
+                if gt(end, currentEnd) {
+                    let newSize := roundUp(end, 32)
+                    for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
+                        gasCost := add(gasCost, 3)
+                        mstore(currentEnd, 0)
+                    }
+                    mstore(MEM_OFFSET(), newSize)
+                }
+            }
+
             // Essentially a NOP that will not get optimized away by the compiler
             function $llvm_NoInline_llvm$_unoptimized() {
                 pop(1)
@@ -678,21 +692,10 @@ object "EVMInterpreter" {
 
                     offset, sp := popStackItem(sp)
 
-                    let gasCounter := 3
-
-                    let end := add(offset, 32)
-                    let currentEnd := mload(MEM_OFFSET())
-                    if gt(end, currentEnd) {
-                        let newSize := roundUp(end, 32)
-                        for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
-                            gasCounter := add(gasCounter, 3)
-                            mstore(currentEnd, 0)
-                        }
-                        mstore(MEM_OFFSET(), newSize)
-                    }
+                    let expansionGas := expandMemory(add(offset, 32))
 
                     sp := pushStackItem(sp, mload(add(MEM_OFFSET_INNER(), offset)))
-                    evmGasLeft := chargeGas(evmGasLeft, gasCounter)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
                 }
                 case 0x52 { // OP_MSTORE
                     let offset, value
@@ -700,21 +703,10 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     value, sp := popStackItem(sp)
 
-                    let gasCounter := 3
-
-                    let end := add(offset, 32)
-                    let currentEnd := mload(MEM_OFFSET())
-                    if gt(end, currentEnd) {
-                        let newSize := roundUp(end, 32)
-                        for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
-                            gasCounter := add(gasCounter, 3)
-                            mstore(currentEnd, 0)
-                        }
-                        mstore(MEM_OFFSET(), newSize)
-                    }
+                    let expansionGas := expandMemory(add(offset, 32))
 
                     mstore(add(MEM_OFFSET_INNER(), offset), value)
-                    evmGasLeft := chargeGas(evmGasLeft, gasCounter)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
                 }
                 case 0x53 { // OP_MSTORE8
                     let offset, value
@@ -722,21 +714,10 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     value, sp := popStackItem(sp)
 
-                    let gasCounter := 3
-
-                    let end := add(offset, 1)
-                    let currentEnd := mload(MEM_OFFSET())
-                    if gt(end, currentEnd) {
-                        let newSize := roundUp(end, 32)
-                        for {} lt(currentEnd, newSize) {currentEnd := add(currentEnd, 32)} {
-                            gasCounter := add(gasCounter, 3)
-                            mstore(currentEnd, 0)
-                        }
-                        mstore(MEM_OFFSET(), newSize)
-                    }
+                    let expansionGas := expandMemory(add(offset, 1))
 
                     mstore8(add(MEM_OFFSET_INNER(), offset), value)
-                    evmGasLeft := chargeGas(evmGasLeft, gasCounter)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
                 }
                 case 0x55 { // OP_SSTORE
                     let key, value,gasSpent
