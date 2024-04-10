@@ -68,8 +68,9 @@ object "EVMInterpreter" {
             }
 
             function readBytes(start, length) -> value {
-                for { let i := 0 } lt(i, length) { i := add(i, 1) } {
-                    let next_byte := readIP(add(start, i))
+                let max := add(start, length)
+                for {} lt(start, max) { start := add(start, 1) } {
+                    let next_byte := readIP(start)
 
                     value := or(shl(8, value), next_byte)
                 }
@@ -181,6 +182,16 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            function printHex(value) {
+                mstore(0, value)
+                log1(0, 32, 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+            }
+
+            function printString(value) {
+                mstore(0, value)
+                log1(0, 32, 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -246,6 +257,42 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, sub(a, b))
                     evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x04 { // OP_DIV
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, div(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x05 { // OP_SDIV
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sdiv(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x06 { // OP_MOD
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, mod(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                }
+                case 0x07 { // OP_SMOD
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, smod(a, b))
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
                 }
                 case 0x17 { // OP_OR
                     let a, b
