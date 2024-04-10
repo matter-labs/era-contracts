@@ -475,6 +475,17 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                 }
+                case 0x31 { // OP_BALANCE
+                    printHex(balance(address()))
+                    let addr
+
+                    addr, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, balance(addr))
+
+                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
