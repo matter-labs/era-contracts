@@ -406,6 +406,24 @@ object "EVMInterpreter" {
                     mstore(add(MEM_OFFSET_INNER(), offset), value)
                     evmGasLeft := chargeGas(evmGasLeft, gasCounter)
                 }
+                case 0x53 { // OP_MSTORE8
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let end := add(offset, 1)
+                    let currentEnd := mload(MEM_OFFSET())
+                    if gt(end, currentEnd) {
+                        let newSize := roundUp(end, 32)
+                        for {} lt(currentEnd, newSize) {currentEnd := add(currentEnd, 32)} {
+                            mstore(currentEnd, 0)
+                        }
+                        mstore(MEM_OFFSET(), newSize)
+                    }
+
+                    mstore8(add(MEM_OFFSET_INNER(), offset), value)
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
