@@ -344,6 +344,43 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, mulmod(a, b, N))
                 }
+                // NOTE: We don't currently do full jumpdest validation
+                // (i.e. validating a jumpdest isn't in PUSH data)
+                case 0x56 { // OP_JUMP
+                    let counter
+
+                    counter, sp := popStackItem(sp)
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
+                case 0x57 { // OP_JUMPI
+                    let counter, b
+
+                    counter, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 10)
+
+                    if iszero(b) {
+                        continue
+                    }
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
@@ -354,6 +391,7 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x5B {} // OP_JUMPDEST
                 case 0x5F { // OP_PUSH0
                     let value := 0
 
