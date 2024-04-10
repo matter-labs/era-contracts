@@ -51,6 +51,7 @@ library AddressAliasHelper {
     ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_prevMsgSender` as the recipient.
+            // slither-disable-next-line tx-origin
             _recipient = _prevMsgSender == tx.origin
                 ? _prevMsgSender
                 : AddressAliasHelper.applyL1ToL2Alias(_prevMsgSender);
