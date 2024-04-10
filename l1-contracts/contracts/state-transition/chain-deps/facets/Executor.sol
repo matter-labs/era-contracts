@@ -193,7 +193,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
             }
         }
 
-        // We only require 9 logs to be checked, the 10th is if we are expecting a protocol upgrade
+        // We only require 13 logs to be checked, the 14th is if we are expecting a protocol upgrade
         // Without the protocol upgrade we expect 13 logs: 2^13 - 1 = 8191
         // With the protocol upgrade we expect 14 logs: 2^14 - 1 = 16383
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {

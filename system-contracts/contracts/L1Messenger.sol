@@ -133,7 +133,6 @@ contract L1Messenger is IL1Messenger, ISystemContract {
         });
         _processL2ToL1Log(l2ToL1Log);
 
-        // Get cost of one byte pubdata in gas from context.
         uint256 pubdataLen;
         unchecked {
             // 4 bytes used to encode the length of the message (see `publishPubdataAndClearState`)

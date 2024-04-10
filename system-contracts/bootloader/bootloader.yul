@@ -2750,7 +2750,7 @@ object "Bootloader" {
 
             /// @dev Compares the amount of spent ergs on the pubdatawith the allowed amount.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param computeGas The amount of gas spent on the computation.
+            /// @param computeGas The amount of execution gas remaining that can still be spent on future computation.
             /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return ret Whether the amount of pubdata spent so far is valid and
@@ -3555,7 +3555,8 @@ object "Bootloader" {
             }
 
             /// @dev Asks operator for the refund for the transaction. The function provides
-            /// the operator with the leftover gas found by the bootloader.
+            /// the operator with the proposed refund gas by the bootloader, 
+            /// total spent gas on the pubdata and gas per 1 byte of pubdata.
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
             /// bring us to closing the batch as well as how much the transaction
