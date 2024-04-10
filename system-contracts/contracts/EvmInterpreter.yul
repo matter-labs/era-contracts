@@ -597,6 +597,12 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x58 { // OP_PC
+                    // PC = ip - 32 (bytecode size) - 1 (current instruction)
+                    sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 case 0x5B { // OP_JUMPDEST
                     evmGasLeft := chargeGas(evmGasLeft, 1)
                 }
