@@ -221,6 +221,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
                 require(msg.value == 0, "Bridgehub: non-eth bridge with msg.value");
             }
 
+            // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 msg.sender,
@@ -271,6 +272,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
                 require(msg.value == _request.secondBridgeValue, "Bridgehub: msg.value mismatch 3");
                 baseTokenMsgValue = 0;
             }
+            // slither-disable-next-line arbitrary-send-eth
             sharedBridge.bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 msg.sender,
@@ -281,6 +283,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
 
         address hyperchain = getHyperchain(_request.chainId);
 
+        // slither-disable-next-line arbitrary-send-eth
         L2TransactionRequestTwoBridgesInner memory outputRequest = IL1SharedBridge(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
