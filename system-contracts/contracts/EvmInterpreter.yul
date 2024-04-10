@@ -344,6 +344,94 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, mulmod(a, b, N))
                 }
+                case 0x10 { // OP_LT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, lt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x11 { // OP_GT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, gt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x12 { // OP_SLT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, slt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x13 { // OP_SGT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sgt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x14 { // OP_EQ
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, eq(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x15 { // OP_ISZERO
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, iszero(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x18 { // OP_XOR
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, xor(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x19 { // OP_NOT
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, not(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x1A { // OP_BYTE
+                    let i, x
+
+                    i, sp := popStackItem(sp)
+                    x, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, byte(i, x))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
