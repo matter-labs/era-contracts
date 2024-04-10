@@ -602,6 +602,17 @@ object "EVMInterpreter" {
                         revert(0, 0)
                     }
                 }
+                case 0x54 { // OP_SLOAD
+                    let key,value
+
+                    key, sp := popStackItem(sp)
+
+                    value := sload(key)
+
+                    sp := pushStackItem(sp,value)
+                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
+                    evmGasLeft := chargeGas(evmGasLeft,100)
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
