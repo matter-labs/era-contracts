@@ -1,0 +1,19 @@
+[profile.default]
+src = "../l1-contracts/contracts"
+out = "out"
+libs = ["lib"]
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "contracts/=../l1-contracts/contracts/",
+    "l2-contracts/=../l2-contracts/contracts/"
+]
+allow_paths = ["../l1-contracts/contracts", "../l2-contracts/contracts"]
+fs_permissions = [
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts"},
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed"},
+    { access = "read", path = "./script-config" },
+    { access = "read-write", path = "./script-out" },
+    { access = "read", path = "./out" }
+]
+evm_version="cancun"

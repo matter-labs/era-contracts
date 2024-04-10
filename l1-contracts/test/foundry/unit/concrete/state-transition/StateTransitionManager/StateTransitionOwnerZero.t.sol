@@ -6,10 +6,10 @@ import {StateTransitionManagerTest} from "./_StateTransitionManager_Shared.t.sol
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 
-contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
+contract initializingSTMOwnerZeroTest is StateTransitionManagerTest {
     function test_InitializingSTMWithGovernorZeroShouldRevert() public {
-        StateTransitionManagerInitializeData memory stmInitializeDataNoGovernor = StateTransitionManagerInitializeData({
-            governor: address(0),
+        StateTransitionManagerInitializeData memory stmInitializeDataNoOwner = StateTransitionManagerInitializeData({
+            owner: address(0),
             validatorTimelock: validator,
             genesisUpgrade: address(genesisUpgradeContract),
             genesisBatchHash: bytes32(""),
@@ -19,11 +19,11 @@ contract initializingSTMGovernorZeroTest is StateTransitionManagerTest {
             protocolVersion: 0
         });
 
-        vm.expectRevert(bytes("StateTransition: governor zero"));
+        vm.expectRevert(bytes("STM: owner zero"));
         new TransparentUpgradeableProxy(
             address(stateTransitionManager),
             admin,
-            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoGovernor)
+            abi.encodeCall(StateTransitionManager.initialize, stmInitializeDataNoOwner)
         );
     }
 }

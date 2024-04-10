@@ -36,14 +36,8 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override bridgehub;
 
-    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
-    IL1ERC20Bridge public immutable override legacyBridge;
-
     /// @dev Era's chainID
     uint256 immutable eraChainId;
-
-    /// @dev The address of legacy L1 ERC20 bridge.
-    address immutable eraErc20BridgeAddress;
 
     /// @dev The address of zkSync Era diamond proxy contract.
     address immutable eraDiamondProxy;
@@ -52,6 +46,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     uint256 internal eraFirstPostUpgradeBatch;
+
+    /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
+    IL1ERC20Bridge public override legacyBridge;
 
     /// @dev A mapping chainId => bridgeProxy. Used to store the bridge proxy's address, and to see if it has been deployed yet.
     mapping(uint256 chainId => address l2Bridge) public override l2BridgeAddress;
@@ -100,17 +97,13 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     constructor(
         address _l1WethAddress,
         IBridgehub _bridgehub,
-        IL1ERC20Bridge _legacyBridge,
         uint256 _eraChainId,
-        address _eraErc20BridgeAddress,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         l1WethAddress = _l1WethAddress;
         bridgehub = _bridgehub;
-        legacyBridge = _legacyBridge;
         eraChainId = _eraChainId;
-        eraErc20BridgeAddress = _eraErc20BridgeAddress;
         eraDiamondProxy = _eraDiamondProxy;
     }
 
@@ -125,7 +118,6 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         _transferOwnership(_owner);
 
         eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
-        l2BridgeAddress[eraChainId] = eraErc20BridgeAddress;
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
@@ -151,7 +143,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
     }
 
     function receiveEth(uint256 _chainId) external payable {
-        require(bridgehub.getStateTransition(_chainId) == msg.sender, "receiveEth not state transition");
+        require(bridgehub.getHyperchain(_chainId) == msg.sender, "receiveEth not state transition");
     }
 
     /// @dev Initializes the l2Bridge address by governance for a specific chain.
@@ -262,6 +254,14 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Initializable, Owna
         require(depositHappened[_chainId][_txHash] == 0x00, "ShB tx hap");
         depositHappened[_chainId][_txHash] = _txDataHash;
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
+    }
+
+    /// @dev Sets the L1ERC20Bridge contract address. Should be called only once.
+    function setL1Erc20Bridge(address _legacyBridge) external onlyOwner {
+        require(address(legacyBridge) == address(0), "ShB: legacy bridge already set");
+        require(_legacyBridge != address(0), "ShB: legacy bridge 0");
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
+        l2BridgeAddress[eraChainId] = address(legacyBridge);
     }
 
     /// @dev Generate a calldata for calling the deposit finalization on the L2 bridge contract
