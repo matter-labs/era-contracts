@@ -182,6 +182,18 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            function roundUp(value, multiple) -> rounded {
+                let reminder := mod(value, multiple)
+
+                switch reminder
+                case 0 {
+                    rounded := value
+                }
+                default {
+                    rounded := sub(add(value, multiple), reminder)
+                }
+            }
+
             // Essentially a NOP that will not get optimized away by the compiler
             function $llvm_NoInline_llvm$_unoptimized() {
                 pop(1)
@@ -350,6 +362,35 @@ object "EVMInterpreter" {
                     _y, sp := popStackItem(sp)
 
                     evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x51 { // OP_MLOAD
+                    let offset
+
+                    offset, sp := popStackItem(sp)
+
+                    let end := add(offset, 32)
+                    if gt(end, mload(MEM_OFFSET())) {
+                        let newSize := roundUp(end, 32)
+                        mstore(sub(add(MEM_OFFSET_INNER(), newSize), 32), 0)
+                        mstore(MEM_OFFSET(), newSize)
+                    }
+
+                    sp := pushStackItem(sp, mload(add(MEM_OFFSET_INNER(), offset)))
+                }
+                case 0x52 { // OP_MSTORE
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let end := add(offset, 32)
+                    if gt(end, mload(MEM_OFFSET())) {
+                        let newSize := roundUp(end, 32)
+                        mstore(sub(add(MEM_OFFSET_INNER(), newSize), 32), 0)
+                        mstore(MEM_OFFSET(), newSize)
+                    }
+
+                    mstore(add(MEM_OFFSET_INNER(), offset), value)
                 }
                 case 0x55 { // OP_SSTORE
                     let key, value
