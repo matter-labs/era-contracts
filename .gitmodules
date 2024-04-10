@@ -10,3 +10,6 @@
 [submodule "l1-contracts-foundry/lib/openzeppelin-contracts"]
 	path = l1-contracts-foundry/lib/openzeppelin-contracts
 	url = https://github.com/Openzeppelin/openzeppelin-contracts
+[submodule "l1-contracts-foundry/lib/openzeppelin-contracts-upgradeable"]
+	path = l1-contracts-foundry/lib/openzeppelin-contracts-upgradeable
+	url = https://github.com/Openzeppelin/openzeppelin-contracts-upgradeable

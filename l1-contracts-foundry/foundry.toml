@@ -4,6 +4,7 @@ out = "out"
 libs = ["lib"]
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "contracts/=../l1-contracts/contracts/"
 ]
 allow_paths = ["../l1-contracts/contracts"]
