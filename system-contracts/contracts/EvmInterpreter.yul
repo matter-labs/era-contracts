@@ -698,7 +698,7 @@ object "EVMInterpreter" {
 
                     let end := add(offset, 32)
                     let currentEnd := mload(MEM_OFFSET())
-                    if gt(end, mload(MEM_OFFSET())) {
+                    if gt(end, currentEnd) {
                         let newSize := roundUp(end, 32)
                         for {} lt(currentEnd, newSize) { currentEnd := add(currentEnd, 32) } {
                             mstore(currentEnd, 0)
