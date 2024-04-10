@@ -182,20 +182,28 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            // Essentially a NOP that will not get optimized away by the compiler
+            function $llvm_NoInline_llvm$_unoptimized() {
+                pop(1)
+            }
+
             function printHex(value) {
-                mstore(0, value)
-                log1(0, 32, 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+                mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             function printString(value) {
-                mstore(0, value)
-                log1(0, 32, 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
+                mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
+                mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
-
 
             // TALK ABOUT THE DIFFERENCE BETWEEN VERBATIM AND DOING A STATIC CALL.
             // IN SOLIDITY A STATIC CALL IS REPLACED BY A VERBATIM IF THE ADDRES IS ONE
@@ -424,6 +432,43 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                // NOTE: We don't currently do full jumpdest validation
+                // (i.e. validating a jumpdest isn't in PUSH data)
+                case 0x56 { // OP_JUMP
+                    let counter
+
+                    counter, sp := popStackItem(sp)
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
+                case 0x57 { // OP_JUMPI
+                    let counter, b
+
+                    counter, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 10)
+
+                    if iszero(b) {
+                        continue
+                    }
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
@@ -434,6 +479,7 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x5B {} // OP_JUMPDEST
                 case 0x5F { // OP_PUSH0
                     let value := 0
 
