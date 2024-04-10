@@ -230,7 +230,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
         }
 
         address hyperchain = getHyperchain(_request.chainId);
-        address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
         canonicalTxHash = IZkSyncHyperchain(hyperchain).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,
@@ -291,7 +291,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
 
         require(outputRequest.magicValue == TWO_BRIDGES_MAGIC_VALUE, "Bridgehub: magic value mismatch");
 
-        address refundRecipient = _actualRefundRecipient(_request.refundRecipient);
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_request.refundRecipient, msg.sender);
 
         require(
             _request.secondBridgeAddress > BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
@@ -316,17 +316,5 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
             outputRequest.txDataHash,
             canonicalTxHash
         );
-    }
-
-    function _actualRefundRecipient(address _refundRecipient) internal view returns (address _recipient) {
-        if (_refundRecipient == address(0)) {
-            // If the `_refundRecipient` is not provided, we use the `msg.sender` as the recipient.
-            _recipient = msg.sender == tx.origin ? msg.sender : AddressAliasHelper.applyL1ToL2Alias(msg.sender);
-        } else if (_refundRecipient.code.length > 0) {
-            // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
-            _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
-        } else {
-            _recipient = _refundRecipient;
-        }
     }
 }

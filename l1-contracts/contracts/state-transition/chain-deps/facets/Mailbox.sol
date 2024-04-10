@@ -251,13 +251,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
                 "tf"
             );
         }
-        // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
-        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
-        address l2Sender = _request.sender;
-        // slither-disable-next-line tx-origin
-        if (l2Sender != tx.origin) {
-            l2Sender = AddressAliasHelper.applyL1ToL2Alias(_request.sender);
-        }
 
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
@@ -268,7 +261,6 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         WritePriorityOpParams memory params;
         params.request = _request;
-        params.request.sender = l2Sender;
 
         canonicalTxHash = _requestL2Transaction(params);
     }
@@ -284,13 +276,13 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         uint256 baseCost = _params.l2GasPrice * request.l2GasLimit;
         require(request.mintValue >= baseCost + request.l2Value, "mv"); // The `msg.value` doesn't cover the transaction cost
 
-        // If the `_refundRecipient` is not provided, we use the `_sender` as the recipient.
-        address refundRecipient = request.refundRecipient == address(0) ? request.sender : request.refundRecipient;
-        // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
-        if (refundRecipient.code.length > 0) {
-            refundRecipient = AddressAliasHelper.applyL1ToL2Alias(refundRecipient);
+        request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
+        // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
+        // Please note, currently zkSync address derivation is different from Ethereum one, but it may be changed in the future.
+        // slither-disable-next-line tx-origin
+        if (request.sender != tx.origin) {
+            request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-        request.refundRecipient = refundRecipient;
 
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
