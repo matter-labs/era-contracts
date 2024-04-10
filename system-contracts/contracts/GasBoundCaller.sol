@@ -70,16 +70,16 @@ contract GasBoundCaller {
             ? pubdataPublishedAfter - pubdataPublishedBefore
             : 0;
 
-        uint256 pubdataPrice = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
+        uint256 pubdataGasRate = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
         // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
-        uint256 pubdataCost = pubdataPrice * pubdataSpent;
+        uint256 pubdataGas = pubdataGasRate * pubdataSpent;
 
-        if (pubdataCost != 0) {
+        if (pubdataGas != 0) {
             // Here we double check that the additional cost is not higher than the maximum allowed.
             // Note, that the `gasleft()` can be spent on pubdata too.
-            require(pubdataAllowance + gasleft() >= pubdataCost + CALL_RETURN_OVERHEAD, "Not enough gas for pubdata");
+            require(pubdataAllowance + gasleft() >= pubdataGas + CALL_RETURN_OVERHEAD, "Not enough gas for pubdata");
         }
 
         assembly {
