@@ -1196,10 +1196,7 @@ object "Bootloader" {
                 debugLog("execution finished", 0)
 
                 let refund := 0
-                let gasToRefund := sub(gasLeft, gasSpentOnExecute)
-                if lt(gasLeft, gasSpentOnExecute){
-                    gasToRefund := 0
-                }
+                let gasToRefund := saturatingSub(gasLeft, gasSpentOnExecute)
 
                 // Note, that we pass reservedGas from the refundGas separately as it should not be used
                 // during the postOp execution.
@@ -1322,10 +1319,7 @@ object "Bootloader" {
                 let gasUsedForValidate := sub(gasBeforeValidate, gas())
                 debugLog("gasUsedForValidate", gasUsedForValidate)
 
-                gasLeft := sub(gasLimitForTx, gasUsedForValidate)
-                if lt(gasLimitForTx, gasUsedForValidate) {
-                    gasLeft := 0
-                }
+                gasLeft := saturatingSub(gasLimitForTx, gasUsedForValidate)
 
                 // isValid can only be zero if the validation has failed with out of gas
                 if or(iszero(gasLeft), iszero(isValid)) {
@@ -2735,10 +2729,7 @@ object "Bootloader" {
                 let currentPubdataCounter := getPubdataCounter()
                 debugLog("basePubdata", basePubdataSpent)
                 debugLog("currentPubdata", currentPubdataCounter)
-                ret := sub(currentPubdataCounter, basePubdataSpent)
-                if gt(basePubdataSpent, currentPubdataCounter) {
-                    ret := 0
-                }
+                ret := saturatingSub(currentPubdataCounter, basePubdataSpent)
             }
 
             function getErgsSpentForPubdata(
