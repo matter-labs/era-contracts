@@ -20,7 +20,7 @@ contract RegisterHyperchainScript is Script {
     using stdToml for string;
 
     address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("StateTransitionNewChain(uint256,address)");
+    bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     struct Config {
         ContractsConfig contracts;
@@ -280,9 +280,10 @@ contract RegisterHyperchainScript is Script {
             config.contracts.baseTokenGasPriceMultiplierDenominator
         );
 
-        if (config.contracts.validiumMode) {
-            zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
-        }
+        // TODO: support validium mode when available
+        // if (config.contractsMode) {
+        //     zkSyncStateTransition.setValidiumMode(PubdataPricingMode.Validium);
+        // }
 
         vm.stopBroadcast();
         console.log("ZkSync State Transition configured");
