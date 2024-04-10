@@ -66,7 +66,7 @@ object "CodeOracle" {
             /// @param versionedHash The versioned hash to decommit.
             /// @param lenInWords The length of the data in bytes to decommit.
             function decommit(versionedHash, lenInWords) {
-                // The operation below are never expected to overflow since the `lenInWords` is a most 2 bytes long.
+                // The operation below are never expected to overflow since the `lenInWords` is at most 2 bytes long.
                 let gasCost := mul(decommmitCostPerWord(), lenInWords)
 
                 // The cost of the decommit operation can not exceed the maximum value of the `uint32` type.
@@ -96,13 +96,13 @@ object "CodeOracle" {
                 // decommit operation into the `active` pointer. 
                 verbatim_0i_0o("decommit_ptr_to_active")
 
-                // This operation is never expected to overflow since the `lenInWords` is a most 2 bytes long.
+                // This operation is never expected to overflow since the `lenInWords` is at most 2 bytes long.
                 let lenInBytes := mul(lenInWords, 32) 
 
                 // To avoid the complexity of calculating the length of the preimage in circuits, the length of the pointer is always fixed to 2^21 bytes.
                 // So the amount of data actually copied is determined here.
                 // Note, that here we overwrite the first `lenInBytes` bytes of the memory, but it is fine since the written values are equivalent
-                // to the bytes previously written there by the `decommit` operation (in case this is the first page where the decomit happened).
+                // to the bytes previously written there by the `decommit` operation (in case this is the first page where the decommit happened).
                 // In the future we won't do this and simply return the pointer returned by the `decommit` operation, shrunk to the `lenInBytes` length.
                 verbatim_3i_0o("active_ptr_data_copy", 0, 0, lenInBytes)
 

@@ -1159,7 +1159,7 @@ object "Bootloader" {
             ) {
                 let basePubdataSpent := getPubdataCounter()
 
-                debugLog("baseSepnt", basePubdataSpent)
+                debugLog("baseSpent", basePubdataSpent)
 
                 let innerTxDataOffset := add(txDataOffset, 32)
 
@@ -2792,7 +2792,7 @@ object "Bootloader" {
             }
 
             /// @dev Sets the gas per pubdata byte value in the `SystemContext` contract.
-            /// @notice Note that it has not actual impact on the execution of the contract.
+            /// @notice Note that it has no actual impact on the execution of the contract.
             function setPubdataInfo(
                 newGasPerPubdata,
                 basePubdataSpent

@@ -72,7 +72,7 @@ contract GasBoundCaller {
 
         uint256 pubdataPrice = REAL_SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 
-        // In case there is an overflow here, the `_maxTotalGas` wouldbn't be able to cover it anyway, so
+        // In case there is an overflow here, the `_maxTotalGas` wouldn't be able to cover it anyway, so
         // we don't mind the contract panicking here in case of it.
         uint256 pubdataCost = pubdataPrice * pubdataSpent;
 
