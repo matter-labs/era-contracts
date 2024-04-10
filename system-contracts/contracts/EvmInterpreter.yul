@@ -2990,6 +2990,21 @@ object "EVMInterpreter" {
                     mstore8(add(MEM_OFFSET_INNER(), offset), value)
                     evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
                 }
+                case 0x20 { // OP_KECCAK256
+                    let offset, size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, keccak256(add(MEM_OFFSET(), offset), size))
+
+                    // TODO: Handle dynamicGas for gas costs.
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    let dynamicGas = 0
+                    let staticGas = 30
+                    let usedGas = add(staticGas, dynamicGas)
+                    evmGasLeft := chargeGas(evmGasLeft, usedGas)
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value,gasSpent
 
