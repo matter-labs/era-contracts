@@ -182,6 +182,35 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            // Note, that this function can overflow. It's up to the caller to ensure that it does not.
+            function memCost(memSizeWords) -> gasCost {
+                // The first term of the sum is the quadratic cost, the second one the linear one.
+                gasCost := add(div(mul(memSizeWords, memSizeWords), 512), mul(3, memSizeWords))
+            }
+
+            // This function can overflow, it is the job of the caller to ensure that it does not.
+            // The argument to this function is the offset into the memory region IN BYTES.
+            function expandMemory(newSize) -> gasCost {
+                let oldSizeInWords := mload(MEM_OFFSET())
+
+                // The add 31 here before dividing is there to account for misaligned
+                // memory expansions, where someone calls this with a newSize that is not
+                // a multiple of 32. For instance, if someone calls it with an offset of 33,
+                // the new size in words should be 2, not 1, but dividing by 32 will give 1.
+                // Adding 31 solves it.
+                let newSizeInWords := div(add(newSize, 31), 32)
+
+                if gt(newSizeInWords, oldSizeInWords) {
+                    // TODO: Check this, it feels like there might be a more optimized way
+                    // of doing this cost calculation.
+                    let oldCost := memCost(oldSizeInWords)
+                    let newCost := memCost(newSizeInWords)
+
+                    gasCost := sub(newCost, oldCost)
+                    mstore(MEM_OFFSET(), newSizeInWords)
+                }
+            }
+
             // Essentially a NOP that will not get optimized away by the compiler
             function $llvm_NoInline_llvm$_unoptimized() {
                 pop(1)
