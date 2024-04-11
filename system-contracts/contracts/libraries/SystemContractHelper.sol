@@ -140,6 +140,7 @@ library SystemContractHelper {
     /// @param _rawParams The packed precompile params. They can be retrieved by
     /// the `packPrecompileParams` method.
     /// @param _gasToBurn The number of gas to burn during this call.
+    /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
     /// @return success Whether the call was successful.
     /// @dev The list of currently available precompiles sha256, keccak256, ecrecover.
     /// NOTE: The precompile type depends on `this` which calls precompile, which means that only
@@ -342,6 +343,7 @@ library SystemContractHelper {
 
     /// @notice Method used for burning a certain amount of gas.
     /// @param _gasToPay The number of gas to burn.
+    /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
     function burnGas(uint32 _gasToPay, uint32 _pubdataToSpend) internal view {
         bool precompileCallSuccess = unsafePrecompileCall(
             0, // The precompile parameters are formal ones. We only need the precompile call to burn gas.
