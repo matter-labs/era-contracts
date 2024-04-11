@@ -2772,7 +2772,7 @@ object "Bootloader" {
                 // At the time of this writing it possible that the counter is negative.
                 // This can happen only in case of a malicious operator. Such cases will 
                 // be forbidden in the future releases, but for now we will treat such cases as 0 to protect the system.
-                if isNegativeI32(rawCounter) {
+                if isNegativeI32(ret) {
                     ret := 0
                 }
             }
