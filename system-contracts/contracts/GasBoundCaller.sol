@@ -24,8 +24,8 @@ contract GasBoundCaller {
     /// @dev On Era, the gas for pubdata is charged at the end of the execution of the entire transaction, meaning
     /// that if a subcall is not trusted, it can consume lots of pubdata in the process. This function ensures that
     /// no more than  `_maxTotalGas` will be allowed to be spent by the call. To be sure, this function uses some margin
-    /// (`BOUND_CALL_OVERHEAD`) to ensure that the call will not exceed the limit, so it may actually spend a bit less than
-    /// `_maxTotalGas` in the end.
+    /// (`CALL_ENTRY_OVERHEAD` + `CALL_RETURN_OVERHEAD`) to ensure that the call will not exceed the limit, so it may
+    /// actually spend a bit less than `_maxTotalGas` in the end.
     /// @dev The entire `gas` passed to this function could be used, regardless
     /// of the `_maxTotalGas` parameter. In other words, `max(gas(), _maxTotalGas)` is the maximum amount of gas that can be spent by this function.
     /// @dev The function relays the `returndata` returned by the callee. In case the `callee` reverts, it reverts with the same error.

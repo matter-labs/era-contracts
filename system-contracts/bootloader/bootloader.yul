@@ -1056,6 +1056,11 @@ object "Bootloader" {
                 }
             }
 
+            /// @dev The function responsible for execution of L1->L2 transactions.
+            /// @param txDataOffset The offset to the transaction's information
+            /// @param gasForExecution The amount of gas available for the execution
+            /// @param basePubdataSpent The amount of pubdata spent at the start of the transaction
+            /// @param gasPerPubdata The price per each pubdata byte in L2 gas
             function getExecuteL1TxAndNotifyResult(
                 txDataOffset,
                 gasForExecution,
@@ -1280,6 +1285,9 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasLimitForTx The L2 gas limit for the transaction validation & execution.
             /// @param gasPrice The L2 gas price that should be used by the transaction.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return gasLeft The gas left after the validation step.
             function l2TxValidation(
                 txDataOffset,
@@ -1344,6 +1352,9 @@ object "Bootloader" {
             /// @dev The function responsible for the execution step of the L2 transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasLeft The gas left after the validation step.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return success Whether or not the execution step was successful.
             /// @return gasSpentOnExecute The gas spent on the transaction execution.
             function l2TxExecution(
@@ -1438,6 +1449,9 @@ object "Bootloader" {
             /// and the call to postOp of the account.
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_executeL2Tx(
                 abi,
                 txDataOffset,
@@ -1476,6 +1490,11 @@ object "Bootloader" {
             }
 
             /// @dev Sets factory dependencies for an L2 transaction with possible usage of packed bytecodes.
+            /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
+            /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param reservedGas The amount of gas reserved for the pubdata.            
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_markFactoryDepsL2(
                 abi,
                 txDataOffset,
@@ -1554,6 +1573,14 @@ object "Bootloader" {
 
 
             /// @dev Used to refund the current transaction.
+            /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param transactionIndex The index of the transaction in the batch.
+            /// @param success The transaction execution status.
+            /// @param gasLeft The gas left after the execution step.
+            /// @param gasPrice The L2 gas price that should be used by the transaction.
+            /// @param reservedGas The amount of gas reserved for the pubdata.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// The gas that this transaction consumes has been already paid in the
             /// process of the validation
             function refundCurrentL2Transaction(
@@ -1795,6 +1822,8 @@ object "Bootloader" {
             /// @dev Function responsible for the execution of the L1->L2 transaction.
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             function ZKSYNC_NEAR_CALL_executeL1Tx(
                 abi,
                 txDataOffset,
@@ -2241,6 +2270,9 @@ object "Bootloader" {
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param txResult The status of the transaction (1 if succeeded, 0 otherwise).
             /// @param maxRefundedGas The maximum number of gas the bootloader can be refunded.
+            /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
+            /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
+            /// @param reservedGas The amount of gas reserved for the pubdata.            
             /// This is the `maximum` number because it does not take into account the number of gas that
             /// can be spent by the paymaster itself.
             function ZKSYNC_NEAR_CALL_callPostOp(
@@ -2750,7 +2782,7 @@ object "Bootloader" {
 
             /// @dev Compares the amount of spent ergs on the pubdatawith the allowed amount.
             /// @param basePubdataSpent The amount of pubdata spent at the beginning of the transaction.
-            /// @param computeGas The amount of gas spent on the computation.
+            /// @param computeGas The amount of execution gas remaining that can still be spent on future computation.
             /// @param reservedGas The amount of gas reserved for the pubdata.
             /// @param gasPerPubdata The price of each byte of pubdata in L2 gas.
             /// @return ret Whether the amount of pubdata spent so far is valid and
@@ -2792,6 +2824,8 @@ object "Bootloader" {
             }
 
             /// @dev Sets the gas per pubdata byte value in the `SystemContext` contract.
+            /// @param newGasPerPubdata The amount L2 gas that the operator charge the user for single byte of pubdata.
+            /// @param basePubdataSpent The number of pubdata spent as of the start of the transaction.
             /// @notice Note that it has no actual impact on the execution of the contract.
             function setPubdataInfo(
                 newGasPerPubdata,
@@ -3555,7 +3589,8 @@ object "Bootloader" {
             }
 
             /// @dev Asks operator for the refund for the transaction. The function provides
-            /// the operator with the leftover gas found by the bootloader.
+            /// the operator with the proposed refund gas by the bootloader, 
+            /// total spent gas on the pubdata and gas per 1 byte of pubdata.
             /// This function is called before the refund stage, because at that point
             /// only the operator knows how close does a transaction
             /// bring us to closing the batch as well as how much the transaction
@@ -3564,6 +3599,9 @@ object "Bootloader" {
             /// into the memory slot (in the out of circuit execution).
             /// Since the slot after the transaction is not touched,
             /// this slot can be used in the in-circuit VM out of box.
+            /// @param proposedRefund The proposed refund gas by the bootloader.
+            /// @param spentOnPubdata The number of gas that transaction spent on the pubdata.
+            /// @param gasPerPubdataByte The price of each byte of pubdata in L2 gas.
             function askOperatorForRefund(
                 proposedRefund,
                 spentOnPubdata,

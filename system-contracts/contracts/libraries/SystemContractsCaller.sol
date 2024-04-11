@@ -38,7 +38,7 @@ address constant MULTIPLICATION_HIGH_ADDRESS = address((1 << 16) - 26);
 address constant GET_EXTRA_ABI_DATA_ADDRESS = address((1 << 16) - 27);
 
 // All the offsets are in bits
-uint256 constant META_GAS_PER_PUBDATA_BYTE_OFFSET = 0 * 8;
+uint256 constant META_PUBDATA_PUBLISHED_OFFSET = 0 * 8;
 uint256 constant META_HEAP_SIZE_OFFSET = 8 * 8;
 uint256 constant META_AUX_HEAP_SIZE_OFFSET = 12 * 8;
 uint256 constant META_SHARD_ID_OFFSET = 28 * 8;
