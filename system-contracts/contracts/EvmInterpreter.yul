@@ -681,9 +681,11 @@ object "EVMInterpreter" {
                     sstore(key, value)
                 }
                 case 0x59 { // OP_MSIZE
+                    let size
                     evmGasLeft := chargeGas(evmGasLeft,2)
 
-                    //sp := pushStackItem(sp,)
+                    size := mload(MEM_OFFSET())
+                    sp := pushStackItem(sp,size)
 
                 }
                 case 0x5A { // OP_GAS (should conflict with yul-environment-1 branch, retain changes in that branch, ditch this one)
