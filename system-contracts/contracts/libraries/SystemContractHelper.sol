@@ -228,6 +228,12 @@ library SystemContractHelper {
     /// @return pubdataPublished The amount of pubdata published in the system so far.
     function getPubdataPublishedFromMeta(uint256 meta) internal pure returns (uint32 pubdataPublished) {
         pubdataPublished = uint32(extractNumberFromMeta(meta, META_PUBDATA_PUBLISHED_OFFSET, 32));
+        if (pubdataPublished > uint32(type(int32).max)) {
+            // At the time of this writing it possible that the counter is negative.
+            // This can happen only in case of a malicious operator. Such cases will 
+            // be forbidden in the future releases, but for now we will treat such cases as 0 to protect the system.
+            pubdataPublished = 0;
+        }
     }
 
     /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of the current size

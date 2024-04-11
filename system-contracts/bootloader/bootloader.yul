@@ -2758,8 +2758,23 @@ object "Bootloader" {
                 ret := verbatim_0i_1o("meta")
             }
 
+            /// @notice Returns whether an i32 value is negative.
+            /// @dev It is the responsibility of the caller to ensure that the value is indeed an i32.
+            function isNegativeI32(x) -> ret {
+                // All negative i32 numbers have 31-th bit set to 1
+                ret := shr(31, x)
+            }
+
+            /// @notice Returns the current pubdata counter, i.e. the number of pubdata bytes published so far.
             function getPubdataCounter() -> ret {
                 ret := and($llvm_NoInline_llvm$_getMeta(), 0xFFFFFFFF)
+
+                // At the time of this writing it possible that the counter is negative.
+                // This can happen only in case of a malicious operator. Such cases will 
+                // be forbidden in the future releases, but for now we will treat such cases as 0 to protect the system.
+                if isNegativeI32(rawCounter) {
+                    ret := 0
+                }
             }
 
             function getCurrentPubdataSpent(basePubdataSpent) -> ret {
