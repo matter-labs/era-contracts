@@ -347,9 +347,9 @@ object "EVMInterpreter" {
 
                     // TODO: Handle dynamicGas for gas costs.
                     // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
-                    let dynamicGas = 0
-                    let staticGas = 30
-                    let usedGas = add(staticGas, dynamicGas)
+                    let dynamicGas := 0
+                    let staticGas := 30
+                    let usedGas := add(staticGas, dynamicGas)
                     evmGasLeft := chargeGas(evmGasLeft, usedGas)
                 }
                 case 0x55 { // OP_SSTORE
