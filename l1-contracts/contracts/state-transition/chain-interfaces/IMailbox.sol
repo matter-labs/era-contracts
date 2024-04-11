@@ -127,9 +127,4 @@ interface IMailbox is IZkSyncHyperchainBase {
         L2CanonicalTransaction transaction,
         bytes[] factoryDeps
     );
-
-    /// @notice Emitted when the withdrawal is finalized on L1 and funds are released.
-    /// @param to The address to which the funds were sent
-    /// @param amount The amount of funds that were sent
-    event EthWithdrawalFinalized(address indexed to, uint256 amount);
 }

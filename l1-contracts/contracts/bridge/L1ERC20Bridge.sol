@@ -64,10 +64,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     function initialize() external reentrancyGuardInitializer {}
 
     /// @dev transfer token to shared bridge as part of upgrade
-    function transferTokenToSharedBridge(address _token, uint256 _amount) external {
+    function transferTokenToSharedBridge(address _token) external {
         require(msg.sender == address(sharedBridge), "Not shared bridge");
         uint256 amount = IERC20(_token).balanceOf(address(this));
-        require(amount == _amount, "Incorrect amount");
         IERC20(_token).safeTransfer(address(sharedBridge), amount);
     }
 

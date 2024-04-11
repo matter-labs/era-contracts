@@ -18,9 +18,6 @@ interface IL2SharedBridge {
         uint256 amount
     );
 
-    /// @dev Event emitted when baseToken is received by the contract.
-    event BaseTokenReceived(uint256 amount);
-
     function finalizeDeposit(
         address _l1Sender,
         address _l2Receiver,

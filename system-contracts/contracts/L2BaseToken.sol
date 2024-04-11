@@ -102,7 +102,7 @@ contract L2BaseToken is IBaseToken, ISystemContract {
         // Silent burning of the ether
         unchecked {
             // This is safe, since this contract holds the ether balances, and if user
-            // send a `msg.value` it will be added to the contract (`this`) balance.
+            // sends a `msg.value` it will be added to the contract (`this`) balance.
             balance[address(this)] -= amount;
             totalSupply -= amount;
         }

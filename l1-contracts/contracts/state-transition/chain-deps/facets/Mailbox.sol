@@ -156,7 +156,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         return l2GasPrice * _l2GasLimit;
     }
 
-    /// @notice Derives the price for L2 gas in ETH to be paid.
+    /// @notice Derives the price for L2 gas in base token to be paid.
     /// @param _l1GasPrice The gas price on L1
     /// @param _gasPerPubdata The price for each pubdata byte in L2 gas
     /// @return The price of L2 gas in the base token
