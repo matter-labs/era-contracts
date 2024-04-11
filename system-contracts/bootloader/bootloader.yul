@@ -1606,6 +1606,12 @@ object "Bootloader" {
                         checkEnoughGas(gasLeft)
                         let nearCallAbi := getNearCallABI(gasLeft)
                         let gasBeforePostOp := gas()
+
+                        let spentOnPubdata := getErgsSpentForPubdata(
+                            basePubdataSpent,
+                            gasPerPubdata
+                        )
+
                         pop(ZKSYNC_NEAR_CALL_callPostOp(
                             // Maximum number of gas that the postOp could spend
                             nearCallAbi,
@@ -1614,7 +1620,7 @@ object "Bootloader" {
                             success,
                             // Since the paymaster will be refunded with reservedGas,
                             // it should know about it
-                            safeAdd(gasLeft, reservedGas, "jkl"),
+                            saturatingSub(safeAdd(gasLeft, reservedGas, "jkl"), spentOnPubdata),
                             basePubdataSpent,
                             gasPerPubdata,
                             reservedGas
