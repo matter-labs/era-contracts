@@ -90,8 +90,7 @@ struct ZkSyncHyperchainStorage {
     PriorityQueue.Queue priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     address __DEPRECATED_allowList;
-    /// @notice Part of the configuration parameters of ZKP circuits. Used as an input for the verifier smart contract
-    VerifierParams verifierParams;
+    VerifierParams __DEPRECATED_verifierParams;
     /// @notice Bytecode hash of bootloader program.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2BootloaderBytecodeHash;

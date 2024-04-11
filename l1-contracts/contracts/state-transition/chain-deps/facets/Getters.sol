@@ -134,11 +134,6 @@ contract GettersFacet is ZkSyncHyperchainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getVerifierParams() external view returns (VerifierParams memory) {
-        return s.verifierParams;
-    }
-
-    /// @inheritdoc IGetters
     function getProtocolVersion() external view returns (uint256) {
         return s.protocolVersion;
     }

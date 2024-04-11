@@ -409,9 +409,6 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = _committedBatches.length;
 
-        // Save the variable from the storage to memory to save gas
-        VerifierParams memory verifierParams = s.verifierParams;
-
         // Initialize the array, that will be used as public input to the ZKP
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
@@ -429,8 +426,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             bytes32 currentBatchCommitment = _committedBatches[i].commitment;
             proofPublicInput[i] = _getBatchProofPublicInput(
                 prevBatchCommitment,
-                currentBatchCommitment,
-                verifierParams
+                currentBatchCommitment
             );
 
             prevBatchCommitment = currentBatchCommitment;
@@ -458,17 +454,14 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     /// @dev Gets zk proof public input
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment,
-        VerifierParams memory _verifierParams
+        bytes32 _currentBatchCommitment
     ) internal pure returns (uint256) {
         return
             uint256(
                 keccak256(
                     abi.encodePacked(
                         _prevBatchCommitment,
-                        _currentBatchCommitment,
-                        _verifierParams.recursionNodeLevelVkHash,
-                        _verifierParams.recursionLeafLevelVkHash
+                        _currentBatchCommitment
                     )
                 )
             ) >> PUBLIC_INPUT_SHIFT;
