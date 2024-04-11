@@ -495,35 +495,13 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                 }
                 case 0x37 { // OP_CALLDATACOPY
-                    let dest, offset, size
+                    let destOffset, offset, size
 
-                    dest, sp := popStackItem(sp)
+                    destOffset, sp := popStackItem(sp)
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    dest := add(MEM_OFFSET_INNER(), dest)
-
-                    let maskedCallData, maskedMemoryData
-
-                    {
-                        let callData := calldataload(offset)
-                        let callDataMask := shl(
-                            mul(8, sub(size, 1)),
-                            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                        )
-                        maskedCallData := and(callData, callDataMask)
-                    }
-
-                    {
-                        let memoryData := mload(dest)
-                        let memoryDataMask := shr(
-                            mul(8, sub(32,  size)),
-                            0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-                        )
-                        maskedMemoryData := and(memoryData, memoryDataMask)
-                    }
-
-                    mstore(dest, or(maskedCallData, maskedMemoryData))
+                    calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
