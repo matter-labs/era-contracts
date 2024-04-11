@@ -76,6 +76,44 @@ object "EVMInterpreter" {
                 }
             }
 
+            function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
+                evmGasLeft := chargeGas(evmGas, 3)
+                let tempSp := sub(sp, mul(0x20, sub(position, 1)))
+
+                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                    revert(0, 0)
+                }
+                
+                if lt(tempSp, STACK_OFFSET()) {
+                    revert(0, 0)
+                }
+
+                let dup := mload(tempSp)                    
+
+                newSp := add(sp, 0x20)
+                mstore(newSp, dup)
+            }
+
+            function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
+                evmGasLeft := chargeGas(evmGas, 3)
+                let tempSp := sub(sp, mul(0x20, position))
+
+                if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
+                    revert(0, 0)
+                }
+                
+                if lt(tempSp, STACK_OFFSET()) {
+                    revert(0, 0)
+                }
+
+                
+                let s2 := mload(sp)
+                let s1 := mload(tempSp)                    
+
+                mstore(sp, s1)
+                mstore(tempSp, s2)
+            }
+
             function popStackItem(sp) -> a, newSp {
                 // We can not return any error here, because it would break compatibility
                 if lt(sp, STACK_OFFSET()) {
@@ -182,16 +220,23 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            // Essentially a NOP that will not get optimized away by the compiler
+            function $llvm_NoInline_llvm$_unoptimized() {
+                pop(1)
+            }
+
             function printHex(value) {
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebde)
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
                 mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             function printString(value) {
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x20), 0x00debdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdebdf)
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
                 mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
+                $llvm_NoInline_llvm$_unoptimized()
             }
 
             ////////////////////////////////////////////////////////////////
@@ -337,6 +382,94 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, mulmod(a, b, N))
                 }
+                case 0x10 { // OP_LT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, lt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x11 { // OP_GT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, gt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x12 { // OP_SLT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, slt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x13 { // OP_SGT
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sgt(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x14 { // OP_EQ
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, eq(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x15 { // OP_ISZERO
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, iszero(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x18 { // OP_XOR
+                    let a, b
+
+                    a, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, xor(a, b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x19 { // OP_NOT
+                    let a
+
+                    a, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, not(a))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x1A { // OP_BYTE
+                    let i, x
+
+                    i, sp := popStackItem(sp)
+                    x, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, byte(i, x))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
                 case 0x20 { // OP_KECCAK256
                     let offset, size
 
@@ -352,6 +485,43 @@ object "EVMInterpreter" {
                     let usedGas := add(staticGas, dynamicGas)
                     evmGasLeft := chargeGas(evmGasLeft, usedGas)
                 }
+                // NOTE: We don't currently do full jumpdest validation
+                // (i.e. validating a jumpdest isn't in PUSH data)
+                case 0x56 { // OP_JUMP
+                    let counter
+
+                    counter, sp := popStackItem(sp)
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
+                case 0x57 { // OP_JUMPI
+                    let counter, b
+
+                    counter, sp := popStackItem(sp)
+                    b, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 10)
+
+                    if iszero(b) {
+                        continue
+                    }
+
+                    ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+                    // Check next opcode is JUMPDEST
+                    let nextOpcode := readIP(ip)
+                    if iszero(eq(nextOpcode, 0x5B)) {
+                        revert(0, 0)
+                    }
+                }
                 case 0x55 { // OP_SSTORE
                     let key, value
 
@@ -362,6 +532,7 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
+                case 0x5B {} // OP_JUMPDEST
                 case 0x5F { // OP_PUSH0
                     let value := 0
 
@@ -560,6 +731,102 @@ object "EVMInterpreter" {
                     ip := add(ip, 32)
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x80 { // OP_DUP1 
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 1)
+                }
+                case 0x81 { // OP_DUP2
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 2)
+                }
+                case 0x82 { // OP_DUP3
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 3)
+                }
+                case 0x83 { // OP_DUP4    
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 4)
+                }
+                case 0x84 { // OP_DUP5
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 5)
+                }
+                case 0x85 { // OP_DUP6
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 6)
+                }
+                case 0x86 { // OP_DUP7    
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 7)
+                }
+                case 0x87 { // OP_DUP8
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 8)
+                }
+                case 0x88 { // OP_DUP9
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 9)
+                }
+                case 0x89 { // OP_DUP10   
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 10)
+                }
+                case 0x8A { // OP_DUP11
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 11)
+                }
+                case 0x8B { // OP_DUP12
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 12)
+                }
+                case 0x8C { // OP_DUP13
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 13)
+                }
+                case 0x8D { // OP_DUP14
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 14)
+                }
+                case 0x8E { // OP_DUP15
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 15)
+                }
+                case 0x8F { // OP_DUP16
+                    sp, evmGasLeft := dupStackItem(sp, evmGasLeft, 16)
+                }
+                case 0x90 { // OP_SWAP1 
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 1)
+                }
+                case 0x91 { // OP_SWAP2
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 2)
+                }
+                case 0x92 { // OP_SWAP3
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 3)
+                }
+                case 0x93 { // OP_SWAP4    
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 4)
+                }
+                case 0x94 { // OP_SWAP5
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 5)
+                }
+                case 0x95 { // OP_SWAP6
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 6)
+                }
+                case 0x96 { // OP_SWAP7    
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 7)
+                }
+                case 0x97 { // OP_SWAP8
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 8)
+                }
+                case 0x98 { // OP_SWAP9
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 9)
+                }
+                case 0x99 { // OP_SWAP10   
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 10)
+                }
+                case 0x9A { // OP_SWAP11
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 11)
+                }
+                case 0x9B { // OP_SWAP12
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 12)
+                }
+                case 0x9C { // OP_SWAP13
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 13)
+                }
+                case 0x9D { // OP_SWAP14
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 14)
+                }
+                case 0x9E { // OP_SWAP15
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 15)
+                }
+                case 0x9F { // OP_SWAP16
+                    evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
                 }
                 // TODO: REST OF OPCODES
                 default {
