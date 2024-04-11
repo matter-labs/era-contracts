@@ -7916,7 +7916,7 @@ yocto-queue@^1.0.0:
 
 "zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#ethers-v5-feat/bridgehub":
   version "5.1.0"
-  resolved "https://github.com/zksync-sdk/zksync-ethers#ebb0c45ff58141d812f6ab65a443059e369a7c18"
+  resolved "https://github.com/zksync-sdk/zksync-ethers#782c6c192262ed34884f8b9643cbf95d5f03eaea"
   dependencies:
     ethers "~5.7.0"
 
