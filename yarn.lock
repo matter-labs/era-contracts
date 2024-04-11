@@ -7916,7 +7916,7 @@ yocto-queue@^1.0.0:
 
 "zksync-ethers@https://github.com/zksync-sdk/zksync-ethers#sb-fix-file-reference":
   version "5.1.0"
-  resolved "https://github.com/zksync-sdk/zksync-ethers#782c6c192262ed34884f8b9643cbf95d5f03eaea"
+  resolved "https://github.com/zksync-sdk/zksync-ethers#b63a4a137e4a2580f8ca4003366e36c2328c031e"
   dependencies:
     ethers "~5.7.0"
 
