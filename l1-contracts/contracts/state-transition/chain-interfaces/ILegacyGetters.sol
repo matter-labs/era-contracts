@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.24;
 
-import {IZkSyncStateTransitionBase} from "./IZkSyncStateTransitionBase.sol";
+import {IZkSyncHyperchainBase} from "./IZkSyncHyperchainBase.sol";
 
 /// @author Matter Labs
 /// @dev This interface contains getters for the zkSync contract that should not be used,
 /// but still are kept for backward compatibility.
 /// @custom:security-contact security@matterlabs.dev
-interface ILegacyGetters is IZkSyncStateTransitionBase {
+interface ILegacyGetters is IZkSyncHyperchainBase {
     /// @return The total number of batches that were committed
     /// @dev It is a *deprecated* method, please use `getTotalBatchesCommitted` instead
     function getTotalBlocksCommitted() external view returns (uint256);

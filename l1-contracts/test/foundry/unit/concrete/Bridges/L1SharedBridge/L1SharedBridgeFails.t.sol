@@ -85,17 +85,16 @@ contract L1SharedBridgeFailTest is Test {
 
     uint256 eraChainId;
     address eraDiamondProxy;
-    address eraErc20BridgeAddress;
 
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 depositLocationInStorage = uint256(3 - 1 + 1 + 1);
-    uint256 chainBalanceLocationInStorage = uint256(6 - 1 + 1 + 1);
-    uint256 isWithdrawalFinalizedStorageLocation = uint256(4 - 1 + 1 + 1);
+    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 4th so 4 - 1 + dependency storage slots
+    uint256 depositLocationInStorage = uint256(4 - 1 + 1 + 1);
+    uint256 chainBalanceLocationInStorage = uint256(7 - 1 + 1 + 1);
+    uint256 isWithdrawalFinalizedStorageLocation = uint256(5 - 1 + 1 + 1);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -118,15 +117,12 @@ contract L1SharedBridgeFailTest is Test {
         chainId = 1;
         eraChainId = 9;
         eraDiamondProxy = makeAddr("eraDiamondProxy");
-        eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         sharedBridgeImpl = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(bridgehubAddress),
-            _legacyBridge: IL1ERC20Bridge(l1ERC20BridgeAddress),
             _eraChainId: eraChainId,
-            _eraErc20BridgeAddress: eraErc20BridgeAddress,
             _eraDiamondProxy: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
@@ -135,6 +131,8 @@ contract L1SharedBridgeFailTest is Test {
             abi.encodeWithSelector(L1SharedBridge.initialize.selector, owner, eraFirstPostUpgradeBatch)
         );
         sharedBridge = L1SharedBridge(payable(sharedBridgeProxy));
+        vm.prank(owner);
+        sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
@@ -639,7 +637,8 @@ contract L1SharedBridgeFailTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount); /// should have more data here
+        bytes memory message = abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, alice, amount);
+        // should have more data here
 
         vm.expectRevert("ShB wrong msg len 2");
 

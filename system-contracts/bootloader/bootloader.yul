@@ -82,8 +82,9 @@ object "Bootloader" {
 
             /// @dev The maximal allowed gasPerPubdata, we want it multiplied by the u32::MAX
             /// (i.e. the maximal possible value of the pubdata counter) to be a safe JS integer with a good enough margin.
+            /// @dev For now, the 50000 value is used for backward compatibility with SDK, but in the future we will migrate to 2^20.
             function MAX_L2_GAS_PER_PUBDATA() -> ret {
-                ret := 1048576
+                ret := 50000
             }
 
             /// @dev The overhead for the interaction with L1.
@@ -539,12 +540,6 @@ object "Bootloader" {
                 ret := 1000000
             }
 
-            /// @dev The maximal amount of pubdata that can be safely used by a transaction.
-            /// If a transaction uses more pubdata than this, it will be reverted.
-            function MAX_PUBDATA_FOR_TX() -> ret {
-                ret := 120000
-            }
-
             /// @dev Ceil division of integers
             function ceilDiv(x, y) -> ret {
                 switch or(eq(x, 0), eq(y, 0))
@@ -619,6 +614,10 @@ object "Bootloader" {
                         if lt(userProvidedPubdataPrice, gasPerPubdata) {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
+                        <!-- @endif -->
 
                         <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
                         switch isETHCall
@@ -1617,8 +1616,8 @@ object "Bootloader" {
                             // it should know about it
                             safeAdd(gasLeft, reservedGas, "jkl"),
                             basePubdataSpent,
-                            reservedGas,
-                            gasPerPubdata
+                            gasPerPubdata,
+                            reservedGas
                         ))
                         let gasSpentByPostOp := sub(gasBeforePostOp, gas())
 
@@ -1652,8 +1651,8 @@ object "Bootloader" {
                     assertionError("refundInGas > gasLimit")
                 }
 
-                if iszero(validateUint32(refundInGas)) {
-                    assertionError("refundInGas is not uint32")
+                if iszero(validateUint64(refundInGas)) {
+                    assertionError("refundInGas is not uint64")
                 }
 
                 let ethToRefund := safeMul(
@@ -2787,11 +2786,8 @@ object "Bootloader" {
                 let spentErgs := getErgsSpentForPubdata(basePubdataSpent, gasPerPubdata)
                 debugLog("spentErgsPubdata", spentErgs)
                 let allowedGasLimit := add(computeGas, reservedGas)
-
-                let notEnoughGas := lt(allowedGasLimit, spentErgs)
-                let tooMuchPubdata := gt(getCurrentPubdataSpent(basePubdataSpent), MAX_PUBDATA_FOR_TX())
-
-                ret := or(notEnoughGas, tooMuchPubdata)
+                
+                ret := lt(allowedGasLimit, spentErgs)
             }
 
             /// @dev Set the new value for the tx origin context value
@@ -3343,7 +3339,7 @@ object "Bootloader" {
                 }
 
                 let gasLimitValue := getGasLimit(innerTxDataOffset)
-                if iszero(validateUint32(gasLimitValue)) {
+                if iszero(validateUint64(gasLimitValue)) {
                     assertionError("Encoding gasLimit")
                 }
 

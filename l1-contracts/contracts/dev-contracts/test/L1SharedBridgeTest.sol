@@ -18,18 +18,10 @@ contract L1SharedBridgeTest is L1SharedBridge {
         address payable _l1WethAddress,
         IBridgehub _bridgehub,
         IL1ERC20Bridge _legacyBridge,
-        uint256 _eraChainId,
-        address _eraErc20BridgeAddress
-    )
-        L1SharedBridge(
-            _l1WethAddress,
-            _bridgehub,
-            _legacyBridge,
-            _eraChainId,
-            _eraErc20BridgeAddress,
-            _diamondProxyAddress
-        )
-    {}
+        uint256 _eraChainId
+    ) L1SharedBridge(_l1WethAddress, _bridgehub, _eraChainId, _diamondProxyAddress) {
+        legacyBridge = IL1ERC20Bridge(_legacyBridge);
+    }
 
     /// @notice Checks that the message sender is the bridgehub or Era
     modifier onlyBridgehubOrTestEra(uint256 _chainId) {

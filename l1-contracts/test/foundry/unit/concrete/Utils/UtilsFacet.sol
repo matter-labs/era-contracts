@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.24;
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncStateTransitionStorage.sol";
-import {ZkSyncStateTransitionBase} from "contracts/state-transition/chain-deps/facets/ZkSyncStateTransitionBase.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {FeeParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {ZkSyncHyperchainBase} from "contracts/state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-contract UtilsFacet is ZkSyncStateTransitionBase {
+contract UtilsFacet is ZkSyncHyperchainBase {
     function util_setChainId(uint256 _chainId) external {
         s.chainId = _chainId;
     }

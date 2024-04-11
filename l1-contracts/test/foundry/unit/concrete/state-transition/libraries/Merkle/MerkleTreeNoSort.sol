@@ -5,9 +5,11 @@ pragma solidity 0.8.24;
 import {MurkyBase} from "murky/common/MurkyBase.sol";
 
 contract MerkleTreeNoSort is MurkyBase {
-    /********************
+    /**
+     *
      * HASHING FUNCTION *
-     ********************/
+     *
+     */
 
     /// The original Merkle tree contains the ascending sort and concat prior to hashing, so we need to override it
     function hashLeafPairs(bytes32 left, bytes32 right) public pure override returns (bytes32 _hash) {

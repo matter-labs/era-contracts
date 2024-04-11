@@ -55,10 +55,6 @@ export async function upgradeToHyperchains(
   await upgradeL2Bridge(deployer);
   // kl todo add both bridge address to L2Bridge, so that it can receive txs from both bridges
   // kl todo: enable L1SharedBridge deposits if disabled.
-  if (deployer.verbose) {
-    console.log("Upgrading L1 ERC20 bridge");
-  }
-  await upgradeL1ERC20Bridge(deployer);
   // // note, withdrawals will not work until this step, but deposits will
   if (deployer.verbose) {
     console.log("Migrating assets from L1 ERC20 bridge and ChainBalance");
@@ -165,7 +161,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   // register Era in Bridgehub, STM
   const stateTrasitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
-  const tx0 = await stateTrasitionManager.registerAlreadyDeployedStateTransition(
+  const tx0 = await stateTrasitionManager.registerAlreadyDeployedHyperchain(
     EraLegacyChainId,
     deployer.addresses.StateTransition.DiamondProxy
   );
@@ -188,11 +184,6 @@ async function upgradeL2Bridge(deployer: Deployer) {
   // upgrade L2 bridge contract, we do this directly via the L2
   // set initializeChainGovernance in L1SharedBridge
   deployer;
-}
-
-async function upgradeL1ERC20Bridge(deployer: Deployer) {
-  // upgrade old contracts
-  await deployer.upgradeL1ERC20Bridge(true);
 }
 
 async function migrateAssets(deployer: Deployer) {
