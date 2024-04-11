@@ -3598,9 +3598,9 @@ object "Bootloader" {
             /// into the memory slot (in the out of circuit execution).
             /// Since the slot after the transaction is not touched,
             /// this slot can be used in the in-circuit VM out of box.
-            /// @param proposedRefund The roposed refund gas by the bootloader.
+            /// @param proposedRefund The proposed refund gas by the bootloader.
             /// @param spentOnPubdata The number of gas that transaction spent on the pubdata.
-            /// @param gasPerPubdataByte The price for pubdata byte in gas.
+            /// @param gasPerPubdataByte The price of each byte of pubdata in L2 gas.
             function askOperatorForRefund(
                 proposedRefund,
                 spentOnPubdata,
