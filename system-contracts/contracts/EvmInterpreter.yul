@@ -618,6 +618,11 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                 }
+                case 0x5A { // OP_GAS
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+
+                    sp := pushStackItem(sp, evmGasLeft)
+                }
                 case 0x5B { // OP_JUMPDEST
                     evmGasLeft := chargeGas(evmGasLeft, 1)
                 }
