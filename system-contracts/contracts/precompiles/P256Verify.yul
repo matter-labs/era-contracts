@@ -54,20 +54,10 @@ object "P256Verify" {
                 return(0, 0)
             }
 
-            let digest := calldataload(0)
-            let r := calldataload(32)
-            let s := calldataload(64)
-            let x := calldataload(96)
-            let y := calldataload(128)
-
+            // Copy first 5 32-bytes words (the signed digest, r, s, x, y) from the calldata
+            // to memory, from where secp256r1 circuit will read it.
             // The validity of the input as it is done in the internal precompile implementation.
-
-            // Store the data in memory, so the secp256r1 circuit will read it 
-            mstore(0, digest)
-            mstore(32, r)
-            mstore(64, s)
-            mstore(96, x)
-            mstore(128, y)
+            calldatacopy(0, 0, 160)
 
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words

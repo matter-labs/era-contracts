@@ -140,6 +140,7 @@ library SystemContractHelper {
     /// @param _rawParams The packed precompile params. They can be retrieved by
     /// the `packPrecompileParams` method.
     /// @param _gasToBurn The number of gas to burn during this call.
+    /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
     /// @return success Whether the call was successful.
     /// @dev The list of currently available precompiles sha256, keccak256, ecrecover.
     /// NOTE: The precompile type depends on `this` which calls precompile, which means that only
@@ -220,8 +221,8 @@ library SystemContractHelper {
         result = (shifted >> (256 - size));
     }
 
-    /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of gas
-    /// that a single byte sent to L1 as pubdata costs.
+    /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of pubdata
+    /// bytes published in the batch so far.
     /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @param meta Packed representation of the ZkSyncMeta.
     /// @return pubdataPublished The amount of pubdata published in the system so far.
@@ -342,6 +343,7 @@ library SystemContractHelper {
 
     /// @notice Method used for burning a certain amount of gas.
     /// @param _gasToPay The number of gas to burn.
+    /// @param _pubdataToSpend The number of pubdata bytes to burn during the call.
     function burnGas(uint32 _gasToPay, uint32 _pubdataToSpend) internal view {
         bool precompileCallSuccess = unsafePrecompileCall(
             0, // The precompile parameters are formal ones. We only need the precompile call to burn gas.

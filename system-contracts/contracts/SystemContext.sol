@@ -111,6 +111,8 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, ISystemContr
     /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
     /// @dev This value does not have any impact on the execution and purely serves as a way for users
     /// to access the current gas price for the pubdata.
+    /// @param _gasPerPubdataByte The amount L2 gas that the operator charge the user for single byte of pubdata.
+    /// @param _basePubdataSpent The number of pubdata spent as of the start of the transaction.
     function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyCallFromBootloader {
         basePubdataSpent = _basePubdataSpent;
         gasPerPubdataByte = _gasPerPubdataByte;
