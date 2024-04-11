@@ -70,10 +70,12 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   }
   await upgradeL2Bridge(deployer); // mostly finished
 
-  // if (deployer.verbose) {
-  //   console.log("Upgrading L1 ERC20 bridge");
-  // }
-  // await deployer.upgradeL1ERC20Bridge(true); // done
+  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+    if (deployer.verbose) {
+      console.log("Upgrading L1 ERC20 bridge");
+    }
+    await upgradeL1ERC20Bridge(deployer); // done
+  }
 
   // note, withdrawals will not work until this step, but deposits will
   if (deployer.verbose) {
@@ -114,7 +116,9 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   nonce++;
 
   // kl todo: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
-  // await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+    await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
   await deployer.deployStateTransitionManagerContract(create2Salt, [], gasPrice);
@@ -273,6 +277,22 @@ async function upgradeL2Bridge(deployer: Deployer) {
     requiredValueForL2Tx.mul(10),
     mailboxCalldata
   );
+}
+
+async function upgradeL1ERC20Bridge(deployer: Deployer) {
+  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+    // we need to wait here for a new block
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+    const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+      deployer.addresses.Bridges.ERC20BridgeProxy,
+      deployer.addresses.Bridges.ERC20BridgeImplementation,
+    ]);
+    await deployer.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
+    if (this.verbose) {
+      console.log("L1ERC20Bridge upgrade sent");
+    }
+  }
 }
 
 async function migrateAssets(deployer: Deployer) {
