@@ -487,7 +487,7 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, calldataload(i))
 
-                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
