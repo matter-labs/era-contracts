@@ -73,7 +73,7 @@ object "P256Verify" {
                 0, // input offset in words
                 5, // input length in words (the signed digest, r, s, x, y)
                 0, // output offset in words
-                1, // output length in words (success)
+                2, // output length in words (internalSuccess, isValid)
                 0  // No special meaning, secp256r1 circuit doesn't check this value
             )
             let gasToPay := P256_VERIFY_GAS_COST()
@@ -89,8 +89,8 @@ object "P256Verify" {
             default {
                 // The circuits might write `0` to the memory, while providing `internalSuccess` as `1`, so
                 // we double check here.
-                let writtenValue := mload(32)
-                if eq(writtenValue, 0) {
+                let isValid := mload(32)
+                if eq(isValid, 0) {
                     return(0, 0)
                 }
 
