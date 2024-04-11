@@ -253,6 +253,44 @@ object "EVMInterpreter" {
                 $llvm_NoInline_llvm$_unoptimized()
             }
 
+            function isSlotWarm(key) -> isWarm {
+                // TODO: Unhardcode this selector 0x482d2e74
+                mstore8(0, 0x48)
+                mstore8(1, 0x2d)
+                mstore8(2, 0x2e)
+                mstore8(3, 0x74)
+                mstore(4, key)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+            }
+
+            function warmSlot(key,currentValue) -> isWarm, originalValue {
+                // TODO: Unhardcode this selector 0xbdf78160
+                mstore8(0, 0xbd)
+                mstore8(1, 0xf7)
+                mstore8(2, 0x81)
+                mstore8(3, 0x60)
+                mstore(4, key)
+                mstore(36,currentValue)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+                originalValue := mload(32)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -603,25 +641,55 @@ object "EVMInterpreter" {
                     }
                 }
                 case 0x54 { // OP_SLOAD
-                    let key,value
+                    let key,value,isWarm
 
                     key, sp := popStackItem(sp)
 
+                    isWarm := isSlotWarm(key)
+                    switch isWarm
+                    case 0 { evmGasLeft := chargeGas(evmGasLeft,2100) }
+                    default { evmGasLeft := chargeGas(evmGasLeft,100) }
+  
                     value := sload(key)
 
                     sp := pushStackItem(sp,value)
-                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft,100)
                 }
                 case 0x55 { // OP_SSTORE
-                    let key, value
+                    let key, value,gasSpent
 
                     key, sp := popStackItem(sp)
                     value, sp := popStackItem(sp)
 
+                    {
+                        // Here it is okay to read before we charge since we known anyway that
+                        // the context has enough funds to compensate at least for the read.
+                        // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND);
+                        let currentValue := sload(key)
+                        let wasWarm,originalValue := warmSlot(key,currentValue)
+                        gasSpent := 100
+                        if and(not(eq(value,currentValue)),eq(originalValue,currentValue)) {
+                            switch originalValue
+                            case 0 { gasSpent := 20000}
+                            default { gasSpent := 2900}
+                        }
+                        if iszero(wasWarm) {
+                            gasSpent := add(gasSpent,2100)
+                        }
+                    }
+
+                    evmGasLeft := chargeGas(evmGasLeft, gasSpent) //gasSpent
                     sstore(key, value)
-                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                }
+                case 0x59 { // OP_MSIZE
+                    evmGasLeft := chargeGas(evmGasLeft,2)
+
+                    //sp := pushStackItem(sp,)
+
+                }
+                case 0x5A { // OP_GAS (should conflict with yul-environment-1 branch, retain changes in that branch, ditch this one)
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+
+                    sp := pushStackItem(sp, evmGasLeft)
                 }
                 case 0x58 { // OP_PC
                     // PC = ip - 32 (bytecode size) - 1 (current instruction)
