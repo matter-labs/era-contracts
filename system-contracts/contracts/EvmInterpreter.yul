@@ -2899,6 +2899,46 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                     sp := pushStackItem(sp, basefee())
                 }
+                case 0x38 { // OP_CODESIZE
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    sp := pushStackItem(sp, bytecodeLen)
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x39 { // OP_CODECOPY
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    let dst, offset, len
+
+                    dst, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+
+                    // TODO: Handle dynamicGas for gas costs.
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    let dynamicGas := 0
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+                    // basically BYTECODE_OFFSET + 32 - 31, since
+                    // we always need to read one byte
+                    let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+
+                    // TODO: optimize?
+                    for { let i := 0 } lt(i, len) { i := add(i, 1) } {
+                        switch lt(add(offset, i), bytecodeLen)
+                            case true {
+                                mstore8(
+                                    add(add(MEM_OFFSET(), offset), i),
+                                    and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
+                                )
+                            }
+                            default {
+                                mstore8(add(add(MEM_OFFSET(), offset), i), 0)
+                            }
+                    }
+                }
+                case 0x3A { // OP_GASPRICE
+                    sp := pushStackItem(sp, gasprice())
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
