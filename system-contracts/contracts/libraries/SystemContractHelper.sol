@@ -220,8 +220,8 @@ library SystemContractHelper {
         result = (shifted >> (256 - size));
     }
 
-    /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of gas
-    /// that a single byte sent to L1 as pubdata costs.
+    /// @notice Given the packed representation of `ZkSyncMeta`, retrieves the number of pubdata
+    /// bytes published in the batch so far.
     /// @notice NOTE: The behavior of this function will experience a breaking change in 2024.
     /// @param meta Packed representation of the ZkSyncMeta.
     /// @return pubdataPublished The amount of pubdata published in the system so far.
