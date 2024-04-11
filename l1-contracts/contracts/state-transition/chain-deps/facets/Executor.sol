@@ -183,8 +183,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
                 require(logSender == L2_BOOTLOADER_ADDRESS, "bk");
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (
-                logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) &&
-                logKey < uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)
+                logKey >= uint256(SystemLogKey.BLOB_ONE_HASH_KEY) && logKey <= uint256(SystemLogKey.BLOB_SIX_HASH_KEY)
             ) {
                 require(logSender == L2_PUBDATA_CHUNK_PUBLISHER_ADDR, "pc");
                 uint8 blobNumber = uint8(logKey) - uint8(SystemLogKey.BLOB_ONE_HASH_KEY);

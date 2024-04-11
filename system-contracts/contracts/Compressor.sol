@@ -44,7 +44,7 @@ contract Compressor is ICompressor, ISystemContract {
     function publishCompressedBytecode(
         bytes calldata _bytecode,
         bytes calldata _rawCompressedData
-    ) external payable onlyCallFromBootloader returns (bytes32 bytecodeHash) {
+    ) external onlyCallFromBootloader returns (bytes32 bytecodeHash) {
         unchecked {
             (bytes calldata dictionary, bytes calldata encodedData) = _decodeRawBytecode(_rawCompressedData);
 
@@ -112,7 +112,7 @@ contract Compressor is ICompressor, ISystemContract {
         uint256 _enumerationIndexSize,
         bytes calldata _stateDiffs,
         bytes calldata _compressedStateDiffs
-    ) external payable onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32 stateDiffHash) {
+    ) external onlyCallFrom(address(L1_MESSENGER_CONTRACT)) returns (bytes32 stateDiffHash) {
         // We do not enforce the operator to use the optimal, i.e. the minimally possible _enumerationIndexSize.
         // We do enforce however, that the _enumerationIndexSize is not larger than 8 bytes long, which is the
         // maximal ever possible size for enumeration index.
