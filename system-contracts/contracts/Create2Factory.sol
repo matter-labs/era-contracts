@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 
 import {REAL_DEPLOYER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {AccountAbstractionVersion} from "./interfaces/IContractDeployer.sol";
+import {IContractDeployer} from "./interfaces/IContractDeployer.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -27,8 +27,8 @@ contract Create2Factory {
     function create2Account(
         bytes32, // _salt
         bytes32, // _bytecodeHash
-        bytes, // _input
-        AccountAbstractionVersion // _aaVersion
+        bytes calldata, // _input
+        IContractDeployer.AccountAbstractionVersion // _aaVersion
     ) external payable returns (address) {
         _relayCall();
     }
