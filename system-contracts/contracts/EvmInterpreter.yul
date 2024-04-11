@@ -470,6 +470,59 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x40 { // OP_BLOCKHASH
+                    let blockNumber
+                    blockNumber, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 20)
+                    sp := pushStackItem(sp, blockhash(blockNumber))
+                }
+                case 0x41 { // OP_COINBASE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, coinbase())
+                }
+                case 0x42 { // OP_TIMESTAMP
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, timestamp())
+                }
+                case 0x43 { // OP_NUMBER
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, number())
+                }
+                case 0x44 { // OP_PREVRANDAO
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, prevrandao())
+                }
+                case 0x45 { // OP_GASLIMIT
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, gaslimit())
+                }
+                case 0x46 { // OP_CHAINID
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, chainid())
+                }
+                case 0x47 { // OP_SELFBALANCE
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
+                    sp := pushStackItem(sp, selfbalance())
+                }
+                case 0x48 { // OP_BASEFEE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    sp := pushStackItem(sp, basefee())
+                }
+                case 0x49 { // OP_BLOBHASH
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                    
+                    let blobIndex
+                    blobIndex, sp := popStackItem(sp)
+
+                    // blobhash() is not found in this version of yul
+                    //sp := pushStackItem(sp, blobhash(blobIndex))
+                }
+                case 0x4A { // OP_BLOBBASEFEE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    // blobbasefee() is not found in this version of yul
+                    //sp := pushStackItem(sp, blobbasefee())
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
