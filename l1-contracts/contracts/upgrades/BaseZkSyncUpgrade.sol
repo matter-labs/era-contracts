@@ -30,7 +30,6 @@ struct ProposedUpgrade {
     bytes32 bootloaderHash;
     bytes32 defaultAccountHash;
     address verifier;
-    // This field is not used, but it is kept for backwards compatibility.
     VerifierParams verifierParams;
     bytes l1ContractsUpgradeCalldata;
     bytes postUpgradeCalldata;
@@ -73,7 +72,7 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
 
         _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier);
+        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
         txHash = _setL2SystemContractUpgrade(
@@ -137,11 +136,32 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
 
+    /// @notice Change the verifier parameters
+    /// @param _newVerifierParams New parameters for the verifier
+    function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
+        // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
+        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
+        // Batches committed expecting the old verifier params will fail. Ensure all committed batches are finalized before the
+        // verifier is upgraded.
+        if (
+            _newVerifierParams.recursionNodeLevelVkHash == bytes32(0) &&
+            _newVerifierParams.recursionLeafLevelVkHash == bytes32(0) &&
+            _newVerifierParams.recursionCircuitsSetVksHash == bytes32(0)
+        ) {
+            return;
+        }
+
+        VerifierParams memory oldVerifierParams = s.__DEPRECATED_verifierParams;
+        s.__DEPRECATED_verifierParams = _newVerifierParams;
+        emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
+    }
+
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier) internal {
+    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
         _setVerifier(IVerifier(_newVerifier));
+        _setVerifierParams(_verifierParams);
     }
 
     /// @notice Updates the bootloader hash and the hash of the default account
