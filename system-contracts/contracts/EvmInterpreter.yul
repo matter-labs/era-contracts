@@ -470,6 +470,72 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x3B { // OP_EXTCODESIZE
+                    let addr
+                    addr, sp := popStackItem(sp)
+
+                    // Check if its warm or cold
+                    // replace true with e.g: isWarm(addr)
+                    switch true
+                        case true {
+                            evmGasLeft := chargeGas(evmGasLeft, 100)
+                        }
+                        default {
+                            evmGasLeft := chargeGas(evmGasLeft, 2600)
+                        }
+
+                    sp := pushStackItem(sp, extcodesize(addr))
+                }
+                case 0x3C { // OP_EXTCODECOPY
+                    let addr, dest, offset, len
+                    addr, sp := popStackItem(sp)
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+
+                    // Check if its warm or cold
+                    // replace true with e.g: isWarm(addr)
+                    switch true
+                        case true {
+                            evmGasLeft := chargeGas(evmGasLeft, 100)
+                        }
+                        default {
+                            evmGasLeft := chargeGas(evmGasLeft, 2600)
+                        }
+                    // TODO: Check if the way of accessing the address is ok
+                    // in EvmInterpreter.sol:
+                    // _extcodecopy(address(uint160(addr)), destOffset, offset, size);
+                    // extcodecopy(addr, add(MEM_OFFSET(), dest), add(MEM_OFFSET(), offset), len)
+                }
+                case 0x3D { // OP_RETURNDATASIZE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+                    
+                    sp := pushStackItem(sp, rdz)
+                }
+                case 0x3E { // OP_RETURNDATACOPY
+                    let dest, offset, len
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+
+                    // The addition offset + size overflows.
+                    // offset + size is larger than RETURNDATASIZE.
+                    if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+                        revert(0, 0)
+                    }
+                    // if (size > 0 && offset > INT_MAX - size) -> offset+size -> Overflow
+                    if and(gt(len, 0), gt(offset, sub(INF_PASS_GAS(), len))) {
+                        revert(0, 0)
+                    }
+
+                    // TODO: Handle dynamicGas for gas costs.
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    let dynamicGas := 0
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+                    returndatacopy(add(MEM_OFFSET(), offset), add(MEM_OFFSET(), dest), len)
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
