@@ -53,6 +53,14 @@ object "EVMInterpreter" {
             function MEM_OFFSET_INNER() -> offset {
                 offset := add(MEM_OFFSET(), 32)
             }
+
+            function MAX_POSSIBLE_MEM() -> max {
+                max := 0x100000 // 1MB
+            }
+
+            function MAX_MEMORY_FRAME() -> max {
+                max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+            }
     
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
             function readIP(ip) -> opcode {
@@ -218,6 +226,12 @@ object "EVMInterpreter" {
                 }
 
                 gasRemaining := sub(prevGas, toCharge)
+            }
+
+            function checkMemOverflow(location) -> {
+                if gt(location, MAX_MEMORY_FRAME()) {
+                    revert(0, 0)
+                }
             }
 
             // Essentially a NOP that will not get optimized away by the compiler
