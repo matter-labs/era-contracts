@@ -100,6 +100,7 @@ export async function initialTestnetDeploymentProcess(
   return deployer;
 }
 
+// this is used to deploy the diamond and bridge such that they can be upgraded
 export async function initialPreUpgradeContractsDeployment(
   deployWallet: Wallet,
   ownerAddress: string,
@@ -143,20 +144,22 @@ export async function initialPreUpgradeContractsDeployment(
   // // for Era we first deploy the DiamondProxy manually, set the vars manually,
   // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   // // note we just deploy the STM to get the storedBatchZero
-  await deployer.deployStateTransitionDiamondFacets(create2Salt);
-  // await deployer.deployStateTransitionManagerImplementation(create2Salt, {  });
-  // await deployer.deployStateTransitionManagerProxy(create2Salt, {  }, extraFacets);
-
+  
   await deployer.deployDiamondProxy(extraFacets, {});
   // we have to know the address of the diamond proxy in the mailbox so we separate the deployment
   const diamondAdminFacet = await hardhat.ethers.getContractAt(
     "DummyAdminFacetNoOverlap",
     deployer.addresses.StateTransition.DiamondProxy
-  );
+    );
+  
+  await deployer.deployStateTransitionDiamondFacets(create2Salt);
   await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
   return deployer;
 }
 
+/// This is used to deploy the ecosystem contracts with a diamond proxy address that is equal to ERA_DIAMOND_PROXY_ADDR.
+/// For this we have to deploy diamond proxy, deploy facets and other contracts, and initializing the diamond proxy using DiamondInit,
+/// and registering it in the ecosystem.  
 export async function initialEraTestnetDeploymentProcess(
   deployWallet: Wallet,
   ownerAddress: string,
@@ -201,7 +204,7 @@ export class EraDeployer extends Deployer {
   public syncWallet: zkethers.Wallet;
   public async deployDiamondProxy(extraFacets: FacetCut[], ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    ethTxOptions.gasPrice ??= 30_000_000; // to fix gasPrice
+    ethTxOptions.gasPrice ??= 40_000_000; // to fix gasPrice
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
     const dummyAdminAddress = await this.deployViaCreate2(
       "DummyAdminFacetNoOverlap",
