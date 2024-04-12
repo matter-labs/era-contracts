@@ -252,17 +252,19 @@ export class EraDeployer extends Deployer {
     };
     const storedBatchZero = ethers.utils.keccak256(
       new ethers.utils.AbiCoder().encode(
-        ["tuple(uint64 a, bytes32 b, uint64 c, uint256 d, bytes32 e, bytes32 f, uint256 g, bytes32 h)"],
+        [
+          "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)",
+        ],
         [
           {
-            a: "0",
-            b: getHashFromEnv("CONTRACTS_GENESIS_ROOT"),
-            c: getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX"),
-            d: ethers.constants.HashZero,
-            e: "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
-            f: ethers.constants.HashZero,
-            g: ethers.constants.HashZero,
-            h: getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT"),
+            batchNumber: "0",
+            batchHash: getHashFromEnv("CONTRACTS_GENESIS_ROOT"),
+            indexRepeatedStorageChanges: getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX"),
+            numberOfLayer1Txs: ethers.constants.HashZero,
+            priorityOperationsHash: "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+            l2LogsTreeRoot: ethers.constants.HashZero,
+            timestamp: ethers.constants.HashZero,
+            commitment: getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT"),
           },
         ]
       )

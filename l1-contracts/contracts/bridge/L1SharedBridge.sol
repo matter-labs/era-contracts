@@ -137,10 +137,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
     /// @param  _eraLastOldBridgeDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// @param _eraLastOldBridgeDepositTxNumber The tx number in the _eraLastOldBridgeDepositBatch of the last deposit tx initiated by the legacy bridge
-    function eraLastOldBridgeDepositDeadline(uint256 _eraLastOldBridgeDepositBatch, uint256 _eraLastOldBridgeDepositTxNumber)
-        external
-        onlyOwner
-    {
+    function eraLastOldBridgeDepositDeadline(
+        uint256 _eraLastOldBridgeDepositBatch,
+        uint256 _eraLastOldBridgeDepositTxNumber
+    ) external onlyOwner {
         require(eraLastOldBridgeDepositBatch == 0, "ShB: eLOBDB already set");
         require(eraLastOldBridgeDepositTxNumber == 0, "ShB: eLOBDTN already set");
         eraLastOldBridgeDepositBatch = _eraLastOldBridgeDepositBatch;
@@ -431,9 +431,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2BatchNumber The L2 batch number for the deposit where it was processed.
     /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the deposit was processed.
     /// @return Whether deposit was initiated on zkSync Era before Shared Bridge upgrade.
-    function _isEraLegacyDeposit(uint256 _chainId, uint256 _l2BatchNumber, uint256 _l2TxNumberInBatch) internal view returns (bool) {
+    function _isEraLegacyDeposit(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2TxNumberInBatch
+    ) internal view returns (bool) {
         // Note: if eraLastOldBridgeDepositBatch or eraLastOldBridgeDepositTxNumber are 0, then this returns false, so normal security measures are applied
-        return (_chainId == eraChainId) && (_l2BatchNumber < eraLastOldBridgeDepositBatch) && (_l2TxNumberInBatch < eraLastOldBridgeDepositTxNumber);
+        return
+            (_chainId == eraChainId) &&
+            (_l2BatchNumber < eraLastOldBridgeDepositBatch) &&
+            (_l2TxNumberInBatch < eraLastOldBridgeDepositTxNumber);
     }
 
     /// @notice Finalize the withdrawal and release funds

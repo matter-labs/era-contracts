@@ -84,9 +84,9 @@ contract L1SharedBridgeTest is Test {
     bytes32[] merkleProof;
 
     // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 depositLocationInStorage = uint256(4 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1); // DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 chainBalanceLocationInStorage = uint256(7 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
-    uint256 isWithdrawalFinalizedStorageLocation = uint256(5 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
+    uint256 depositLocationInStorage = uint256(6 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1); // DepositHappened is 3rd so 3 -1 + dependency storage slots
+    uint256 chainBalanceLocationInStorage = uint256(9 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
+    uint256 isWithdrawalFinalizedStorageLocation = uint256(7 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
 
     function setUp() public {
         owner = makeAddr("owner");

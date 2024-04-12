@@ -310,7 +310,6 @@ async function migrateAssets(deployer: Deployer) {
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.chainId,
   ]);
-  // ethTransferData;
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
 
   if (deployer.verbose) {
