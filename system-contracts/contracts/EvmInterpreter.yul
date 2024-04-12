@@ -505,7 +505,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    sp := pushStackItem(sp, keccak256(add(MEM_OFFSET(), offset), size))
+                    sp := pushStackItem(sp, keccak256(add(MEM_OFFSET_INNER(), offset), size))
 
                     // TODO: Handle dynamicGas for gas costs.
                     // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
