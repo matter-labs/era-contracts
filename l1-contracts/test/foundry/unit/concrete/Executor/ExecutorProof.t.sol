@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
@@ -24,10 +25,9 @@ contract TestExecutorFacet is ExecutorFacet {
 
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment,
-        VerifierParams memory _verifierParams
+        bytes32 _currentBatchCommitment
     ) external pure returns (uint256) {
-        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
+        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
     }
 
     function processL2Logs(
@@ -125,13 +125,7 @@ contract ExecutorProofTest is Test {
         );
 
         bytes32 prevCommitment = 0x6ebf945305689a8c3ac993df7f002d41d311a762cd6bf39bb054ead8d1f54404;
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: 0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080,
-            recursionLeafLevelVkHash: 0x72167c43a46cf38875b267d67716edc4563861364a3c03ab7aee73498421e828,
-            // ignored.
-            recursionCircuitsSetVksHash: 0x05dc05911af0aee6a0950ee36dad423981cf05a58cfdb479109bff3c2262eaac
-        });
-        uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment, verifierParams);
-        assertEq(result, 0x88C3540EF85F4D77A019EDE1FA56265C8B1D6106ACA64AFC2FEB667, "getBatchProofPublicInput");
+        uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
+        assertEq(result, 0xAC7931F2C11013FC24963E41B86E5325A79F1150350CB41E4F0876A7, "getBatchProofPublicInput");
     }
 }

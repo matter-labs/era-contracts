@@ -40,7 +40,7 @@ contract DiamondInit is ZkSyncHyperchainBase, IDiamondInit {
         s.validators[_initializeData.validatorTimelock] = true;
 
         s.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        s.verifierParams = _initializeData.verifierParams;
+        s.__DEPRECATED_verifierParams = _initializeData.verifierParams;
         s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;

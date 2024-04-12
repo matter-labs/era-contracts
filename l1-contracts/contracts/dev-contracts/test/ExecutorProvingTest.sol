@@ -10,10 +10,9 @@ import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExec
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment,
-        VerifierParams memory _verifierParams
+        bytes32 _currentBatchCommitment
     ) external pure returns (uint256) {
-        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
+        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
     }
 
     function createBatchCommitment(
