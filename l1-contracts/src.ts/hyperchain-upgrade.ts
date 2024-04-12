@@ -115,7 +115,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   });
   nonce++;
 
-  // kl todo: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
+  // kl to do: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
   if (process.env.CHAIN_ETH_NETWORK === "localhost") {
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   }
@@ -200,7 +200,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     };
     const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet2").abi);
 
-    const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl todo calldata might not be "0x"
+    const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl to do calldata might not be "0x"
     await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
   }
   // register Era in Bridgehub, STM

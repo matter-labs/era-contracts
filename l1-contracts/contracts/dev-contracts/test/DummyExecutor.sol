@@ -40,7 +40,7 @@ contract DummyExecutor is IExecutor {
 
     /// @notice Removing txs from the priority queue
     function removePriorityQueueFront(uint256 _index) external {
-        // KL todo
+        // kl to do
         // s.priorityQueue.removeFront(_index);
     }
 

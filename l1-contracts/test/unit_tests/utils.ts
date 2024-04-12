@@ -75,7 +75,7 @@ export async function getCallRevertReason(promise) {
     try {
       await promise;
     } catch (e) {
-      // KL todo. The error messages are messed up. So we need all these cases.
+      // kl to do. The error messages are messed up. So we need all these cases.
       try {
         revertReason = e.reason.match(/reverted with reason string '([^']*)'/)?.[1] || e.reason;
         if (

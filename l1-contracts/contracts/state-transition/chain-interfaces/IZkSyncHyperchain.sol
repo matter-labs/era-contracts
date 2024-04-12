@@ -11,7 +11,7 @@ import {IMailbox} from "./IMailbox.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
 interface IZkSyncHyperchain is IAdmin, IExecutor, IGetters, IMailbox {
-    // KL todo: need this in the server for now
+    // kl to do: need this in the server for now
     event ProposeTransparentUpgrade(
         Diamond.DiamondCutData diamondCut,
         uint256 indexed proposalId,

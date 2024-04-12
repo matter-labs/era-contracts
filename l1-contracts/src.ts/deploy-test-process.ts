@@ -226,7 +226,7 @@ export class EraDeployer extends Deployer {
       )
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
-    // console.log("kl todo", facetCuts);
+    // console.log("kl to do", facetCuts);
     const verifierParams =
       process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
         ? {
