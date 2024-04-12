@@ -668,20 +668,6 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 2)
                     sp := pushStackItem(sp, basefee())
                 }
-                case 0x49 { // OP_BLOBHASH
-                    evmGasLeft := chargeGas(evmGasLeft, 3)
-                    
-                    let blobIndex
-                    blobIndex, sp := popStackItem(sp)
-
-                    // blobhash() is not found in this version of yul
-                    //sp := pushStackItem(sp, blobhash(blobIndex))
-                }
-                case 0x4A { // OP_BLOBBASEFEE
-                    evmGasLeft := chargeGas(evmGasLeft, 2)
-                    // blobbasefee() is not found in this version of yul
-                    //sp := pushStackItem(sp, blobbasefee())
-                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
