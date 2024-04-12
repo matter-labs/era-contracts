@@ -151,8 +151,8 @@ abstract contract BaseZkSyncUpgrade is ZkSyncHyperchainBase {
             return;
         }
 
-        VerifierParams memory oldVerifierParams = s.verifierParams;
-        s.verifierParams = _newVerifierParams;
+        VerifierParams memory oldVerifierParams = s.__DEPRECATED_verifierParams;
+        s.__DEPRECATED_verifierParams = _newVerifierParams;
         emit NewVerifierParams(oldVerifierParams, _newVerifierParams);
     }
 

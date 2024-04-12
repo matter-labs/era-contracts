@@ -72,7 +72,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _;
     }
 
-    /// @dev Set new validator address.
+    /// @dev Sets a new state transition manager.
     function setStateTransitionManager(IStateTransitionManager _stateTransitionManager) external onlyOwner {
         stateTransitionManager = _stateTransitionManager;
     }

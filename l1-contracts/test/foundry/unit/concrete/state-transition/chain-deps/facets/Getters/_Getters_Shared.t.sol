@@ -91,7 +91,7 @@ contract GettersFacetWrapper is GettersFacet {
     }
 
     function util_setVerifierParams(VerifierParams memory _verifierParams) external {
-        s.verifierParams = _verifierParams;
+        s.__DEPRECATED_verifierParams = _verifierParams;
     }
 
     function util_setProtocolVersion(uint256 _protocolVersion) external {

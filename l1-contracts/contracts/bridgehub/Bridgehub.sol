@@ -66,7 +66,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
         delete pendingAdmin;
 
         emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, pendingAdmin);
+        emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
     ///// Getters

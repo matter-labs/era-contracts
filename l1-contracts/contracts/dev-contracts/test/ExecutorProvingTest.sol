@@ -3,17 +3,16 @@
 pragma solidity 0.8.24;
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {VerifierParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode} from "../../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     function getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
-        bytes32 _currentBatchCommitment,
-        VerifierParams memory _verifierParams
+        bytes32 _currentBatchCommitment
     ) external pure returns (uint256) {
-        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment, _verifierParams);
+        return _getBatchProofPublicInput(_prevBatchCommitment, _currentBatchCommitment);
     }
 
     function createBatchCommitment(

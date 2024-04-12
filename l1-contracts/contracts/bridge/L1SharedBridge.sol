@@ -160,12 +160,12 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
                 balanceBefore;
         } else {
             uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 amount = IERC20(_token).balanceOf(address(legacyBridge));
-            require(amount > 0, "ShB: 0 amount to transfer");
-            IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token, amount);
+            uint256 legacyBridgeBalance = IERC20(_token).balanceOf(address(legacyBridge));
+            require(legacyBridgeBalance > 0, "ShB: 0 amount to transfer");
+            IL1ERC20Bridge(_target).transferTokenToSharedBridge(_token);
             uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            require(balanceAfter - balanceBefore == amount, "ShB: wrong amount transferred");
-            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + amount;
+            require(balanceAfter - balanceBefore == legacyBridgeBalance, "ShB: wrong amount transferred");
+            chainBalance[_targetChainId][_token] = chainBalance[_targetChainId][_token] + legacyBridgeBalance;
         }
     }
 
