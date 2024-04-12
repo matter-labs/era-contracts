@@ -55,7 +55,7 @@ async function main() {
         verbose: true,
       });
 
-      await upgradeToHyperchains2(deployer, gasPrice, create2Salt, nonce);
+      await upgradeToHyperchains2(deployer, gasPrice);
     });
 
   await program.parseAsync(process.argv);
