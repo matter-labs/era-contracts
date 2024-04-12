@@ -502,10 +502,15 @@ object "EVMInterpreter" {
                         default {
                             evmGasLeft := chargeGas(evmGasLeft, 2600)
                         }
+
                     // TODO: Check if the way of accessing the address is ok
-                    // in EvmInterpreter.sol:
-                    // _extcodecopy(address(uint160(addr)), destOffset, offset, size);
-                    // extcodecopy(addr, add(MEM_OFFSET(), dest), add(MEM_OFFSET(), offset), len)
+                    // Zero out the memory, is it necessary?
+                    let _lastByte := add(dest, len)
+                    for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
+                            mstore8(i, 0)
+                    }
+                    // Gets the code from the addr
+                    pop(_fetchDeployedCode(addr, offset, len))
                 }
                 case 0x3D { // OP_RETURNDATASIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
