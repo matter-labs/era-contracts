@@ -513,7 +513,8 @@ object "EVMInterpreter" {
 
                     let expansionGas := expandMemory(add(offset, 32))
 
-                    sp := pushStackItem(sp, mload(add(MEM_OFFSET_INNER(), offset)))
+                    let memValue := mload(add(MEM_OFFSET_INNER(), offset))
+                    sp := pushStackItem(sp, memValue)
                     evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
                 }
                 case 0x52 { // OP_MSTORE
