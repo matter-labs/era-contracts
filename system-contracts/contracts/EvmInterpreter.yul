@@ -2626,6 +2626,8 @@ object "EVMInterpreter" {
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
 
+            warmAddress(address())
+
             for { } true { } {
                 opcode := readIP(ip)
 
