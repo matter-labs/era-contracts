@@ -347,6 +347,8 @@ object "EVMInterpreter" {
                     b, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, or(a,b))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
                 case 0x0A { // OP_EXP
                     let a, exponent
@@ -355,6 +357,16 @@ object "EVMInterpreter" {
                     exponent, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, exp(a, exponent))
+
+                    let expSizeByte
+                    switch exponent {
+                        case 0 { expSizeByte := 0 }
+                        default {
+                            expSizeBytes := div(add(exponent, 256), 256)
+                        }
+                    }
+
+                    evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeBytes)))
                 }
                 case 0x0B { // OP_SIGNEXTEND
                     let b, x
@@ -363,6 +375,8 @@ object "EVMInterpreter" {
                     x, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, signextend(b, x))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 5)
                 }
                 case 0x08 { // OP_ADDMOD
                     let a, b, N
@@ -372,6 +386,8 @@ object "EVMInterpreter" {
                     N, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, addmod(a, b, N))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
                 }
                 case 0x09 { // OP_MULMOD
                     let a, b, N
@@ -381,6 +397,8 @@ object "EVMInterpreter" {
                     N, sp := popStackItem(sp)
 
                     sp := pushStackItem(sp, mulmod(a, b, N))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 8)
                 }
                 case 0x10 { // OP_LT
                     let a, b
@@ -517,7 +535,9 @@ object "EVMInterpreter" {
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
                     evmGasLeft := chargeGas(evmGasLeft, 100)
                 }
-                case 0x5B {} // OP_JUMPDEST
+                case 0x5B { // OP_JUMPDEST
+                    evmGasLeft := chargeGas(evmGasLeft, 1)
+                }
                 case 0x5F { // OP_PUSH0
                     let value := 0
 
