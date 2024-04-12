@@ -641,12 +641,12 @@ object "EVMInterpreter" {
                         switch lt(add(offset, i), bytecodeLen)
                             case true {
                                 mstore8(
-                                    add(add(MEM_OFFSET(), offset), i),
+                                    add(add(MEM_OFFSET_INNER(), offset), i),
                                     and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
                                 )
                             }
                             default {
-                                mstore8(add(add(MEM_OFFSET(), offset), i), 0)
+                                mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
                             }
                     }
                 }
