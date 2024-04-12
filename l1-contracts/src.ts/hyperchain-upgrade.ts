@@ -114,6 +114,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
     nonce,
   });
   nonce++;
+  await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
 
   // kl to do: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
   if (process.env.CHAIN_ETH_NETWORK === "localhost") {
@@ -283,13 +284,16 @@ async function upgradeL1ERC20Bridge(deployer: Deployer) {
   if (process.env.CHAIN_ETH_NETWORK === "localhost") {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
-    const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
-    const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+    const bridgeProxy: ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(
       deployer.addresses.Bridges.ERC20BridgeProxy,
-      deployer.addresses.Bridges.ERC20BridgeImplementation,
-    ]);
-    await deployer.executeUpgrade(this.addresses.TransparentProxyAdmin, 0, calldata);
-    if (this.verbose) {
+      deployer.deployWallet
+    );
+    const tx = await bridgeProxy.upgradeTo(deployer.addresses.Bridges.ERC20BridgeImplementation);
+    await tx.wait();
+
+    const tx2 = await bridgeProxy.changeAdmin(deployer.addresses.TransparentProxyAdmin);
+    await tx2.wait();
+    if (deployer.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
     }
   }
