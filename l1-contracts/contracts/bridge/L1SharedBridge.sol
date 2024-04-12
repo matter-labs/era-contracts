@@ -48,16 +48,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     uint256 internal eraFirstPostUpgradeBatch;
 
     /// @dev Stores the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    /// This variable (together with eraLastOldBridgeDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
+    /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraLastOldBridgeDepositBatch;
+    uint256 internal eraLegacyBridgeLastDepositBatch;
 
-    /// @dev The tx number in the _eraLastOldBridgeDepositBatch of the last deposit tx initiated by the legacy bridge
-    /// This variable (together with eraLastOldBridgeDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
+    /// @dev The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
+    /// This variable (together with eraLegacyBridgeLastDepositBatch) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older txs
     /// than this value are considered to have been processed prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token deposits, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraLastOldBridgeDepositTxNumber;
+    uint256 internal eraLegacyBridgeLastDepositTxNumber;
 
     /// @dev Legacy bridge smart contract that used to hold ERC20 tokens.
     IL1ERC20Bridge public override legacyBridge;
@@ -135,16 +135,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param  _eraLastOldBridgeDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
-    /// @param _eraLastOldBridgeDepositTxNumber The tx number in the _eraLastOldBridgeDepositBatch of the last deposit tx initiated by the legacy bridge
-    function setEraLastOldBridgeDepositTime(
-        uint256 _eraLastOldBridgeDepositBatch,
-        uint256 _eraLastOldBridgeDepositTxNumber
+    /// @param  _eraLegacyBridgeLastDepositBatch The the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
+    /// @param _eraLegacyBridgeLastDepositTxNumber The tx number in the _eraLegacyBridgeLastDepositBatch of the last deposit tx initiated by the legacy bridge
+    function setEraLegacyBridgeLastDepositTime(
+        uint256 _eraLegacyBridgeLastDepositBatch,
+        uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external onlyOwner {
-        require(eraLastOldBridgeDepositBatch == 0, "ShB: eLOBDB already set");
-        require(eraLastOldBridgeDepositTxNumber == 0, "ShB: eLOBDTN already set");
-        eraLastOldBridgeDepositBatch = _eraLastOldBridgeDepositBatch;
-        eraLastOldBridgeDepositTxNumber = _eraLastOldBridgeDepositTxNumber;
+        require(eraLegacyBridgeLastDepositBatch == 0, "ShB: eLOBDB already set");
+        require(eraLegacyBridgeLastDepositTxNumber == 0, "ShB: eLOBDTN already set");
+        eraLegacyBridgeLastDepositBatch = _eraLegacyBridgeLastDepositBatch;
+        eraLegacyBridgeLastDepositTxNumber = _eraLegacyBridgeLastDepositTxNumber;
     }
 
     /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process
@@ -436,10 +436,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2BatchNumber,
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
-        // Note: if eraLastOldBridgeDepositBatch or eraLastOldBridgeDepositTxNumber are 0, then this returns false, so normal security measures are applied
+        // Note: if eraLegacyBridgeLastDepositBatch or eraLegacyBridgeLastDepositTxNumber are 0, then this returns false, so normal security measures are applied
         return
             (_chainId == eraChainId) &&
-           ( _l2BatchNumber < eraLastOldBridgeDepositBatch || (_l2TxNumberInBatch < eraLastOldBridgeDepositTxNumber && _l2BatchNumber == eraLastOldBridgeDepositBatch));
+           ( _l2BatchNumber < eraLegacyBridgeLastDepositBatch || (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber && _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
     /// @notice Finalize the withdrawal and release funds

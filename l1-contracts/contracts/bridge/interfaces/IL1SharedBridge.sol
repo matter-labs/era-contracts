@@ -113,9 +113,9 @@ interface IL1SharedBridge {
 
     function setEraFirstPostUpgradeBatch(uint256 _eraFirstPostUpgradeBatch) external;
 
-    function setEraLastOldBridgeDepositTime(
-        uint256 _eraLastOldBridgeDepositBatch,
-        uint256 _eraLastOldBridgeDepositTxNumber
+    function setEraLegacyBridgeLastDepositTime(
+        uint256 _eraLegacyBridgeLastDepositBatch,
+        uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external;
 
     function l1WethAddress() external view returns (address);
