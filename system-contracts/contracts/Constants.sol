@@ -55,6 +55,7 @@ IImmutableSimulator constant IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT = IImmutableSim
     address(SYSTEM_CONTRACTS_OFFSET + 0x05)
 );
 IContractDeployer constant DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(SYSTEM_CONTRACTS_OFFSET + 0x06));
+IContractDeployer constant REAL_DEPLOYER_SYSTEM_CONTRACT = IContractDeployer(address(REAL_SYSTEM_CONTRACTS_OFFSET + 0x06));
 
 // A contract that is allowed to deploy any codehash
 // on any address. To be used only during an upgrade.
