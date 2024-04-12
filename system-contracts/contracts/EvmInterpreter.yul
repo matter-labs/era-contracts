@@ -53,6 +53,14 @@ object "EVMInterpreter" {
             function MEM_OFFSET_INNER() -> offset {
                 offset := add(MEM_OFFSET(), 32)
             }
+
+            function MAX_POSSIBLE_MEM() -> max {
+                max := 0x100000 // 1MB
+            }
+
+            function MAX_MEMORY_FRAME() -> max {
+                max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+            }
     
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
             function readIP(ip) -> opcode {
@@ -218,6 +226,12 @@ object "EVMInterpreter" {
                 }
 
                 gasRemaining := sub(prevGas, toCharge)
+            }
+
+            function checkMemOverflow(location) {
+                if gt(location, MAX_MEMORY_FRAME()) {
+                    revert(0, 0)
+                }
             }
 
             // Note, that this function can overflow. It's up to the caller to ensure that it does not.
@@ -556,6 +570,49 @@ object "EVMInterpreter" {
                     sp := pushStackItem(sp, origin())
 
                     evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x33 { // OP_CALLER
+                    sp := pushStackItem(sp, caller())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x34 { // OP_CALLVALUE
+                    sp := pushStackItem(sp, callvalue())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x35 { // OP_CALLDATALOAD
+                    let i
+
+                    i, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, calldataload(i))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x36 { // OP_CALLDATASIZE
+                    sp := pushStackItem(sp, calldatasize())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x37 { // OP_CALLDATACOPY
+                    let destOffset, offset, size
+
+                    destOffset, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    let dest := add(destOffset, MEM_OFFSET_INNER())
+                    let end := sub(add(dest, size), 1)
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+
+                    checkMemOverflow(end)
+
+                    if or(gt(end, mload(MEM_OFFSET())), eq(end, mload(MEM_OFFSET()))) {
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(end))
+                    }
+
+                    calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
                 }
                 case 0x50 { // OP_POP
                     let _y
