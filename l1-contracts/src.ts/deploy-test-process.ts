@@ -144,14 +144,14 @@ export async function initialPreUpgradeContractsDeployment(
   // // for Era we first deploy the DiamondProxy manually, set the vars manually,
   // // and register it in the system via STM.registerAlreadyDeployedStateTransition and bridgehub.createNewChain(ERA_CHAIN_ID, ..)
   // // note we just deploy the STM to get the storedBatchZero
-  
+
   await deployer.deployDiamondProxy(extraFacets, {});
   // we have to know the address of the diamond proxy in the mailbox so we separate the deployment
   const diamondAdminFacet = await hardhat.ethers.getContractAt(
     "DummyAdminFacetNoOverlap",
     deployer.addresses.StateTransition.DiamondProxy
-    );
-  
+  );
+
   await deployer.deployStateTransitionDiamondFacets(create2Salt);
   await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
   return deployer;
@@ -159,7 +159,7 @@ export async function initialPreUpgradeContractsDeployment(
 
 /// This is used to deploy the ecosystem contracts with a diamond proxy address that is equal to ERA_DIAMOND_PROXY_ADDR.
 /// For this we have to deploy diamond proxy, deploy facets and other contracts, and initializing the diamond proxy using DiamondInit,
-/// and registering it in the ecosystem.  
+/// and registering it in the ecosystem.
 export async function initialEraTestnetDeploymentProcess(
   deployWallet: Wallet,
   ownerAddress: string,

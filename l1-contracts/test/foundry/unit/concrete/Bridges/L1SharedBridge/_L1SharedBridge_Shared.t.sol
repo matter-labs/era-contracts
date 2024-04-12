@@ -63,7 +63,7 @@ contract L1SharedBridgeTest is Test {
     address l1WethAddress;
     address l2SharedBridge;
     TestnetERC20Token token;
-    uint256 eraFirstPostUpgradeBatch;
+    uint256 eraPostUpgradeFirstBatch;
 
     address owner;
     address admin;
@@ -105,7 +105,7 @@ contract L1SharedBridgeTest is Test {
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         merkleProof = new bytes32[](1);
-        eraFirstPostUpgradeBatch = 1;
+        eraPostUpgradeFirstBatch = 1;
 
         chainId = 1;
         eraChainId = 9;
@@ -128,7 +128,7 @@ contract L1SharedBridgeTest is Test {
         vm.prank(owner);
         sharedBridge.setL1Erc20Bridge(l1ERC20BridgeAddress);
         vm.prank(owner);
-        sharedBridge.setEraFirstPostUpgradeBatch(eraFirstPostUpgradeBatch);
+        sharedBridge.setEraPostUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);

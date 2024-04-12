@@ -111,7 +111,7 @@ interface IL1SharedBridge {
         bytes32[] calldata _merkleProof
     ) external;
 
-    function setEraFirstPostUpgradeBatch(uint256 _eraFirstPostUpgradeBatch) external;
+    function setEraPostUpgradeFirstBatch(uint256 _eraPostUpgradeFirstBatch) external;
 
     function setEraLegacyBridgeLastDepositTime(
         uint256 _eraLegacyBridgeLastDepositBatch,

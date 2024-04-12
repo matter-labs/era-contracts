@@ -45,7 +45,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
     /// We use this both for Eth and erc20 token withdrawals, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraFirstPostUpgradeBatch;
+    uint256 internal eraPostUpgradeFirstBatch;
 
     /// @dev Stores the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
@@ -128,10 +128,10 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param _eraFirstPostUpgradeBatch The first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
-    function setEraFirstPostUpgradeBatch(uint256 _eraFirstPostUpgradeBatch) external onlyOwner {
-        require(eraFirstPostUpgradeBatch == 0, "ShB: eFPUB already set");
-        eraFirstPostUpgradeBatch = _eraFirstPostUpgradeBatch;
+    /// @param _eraPostUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
+    function setEraPostUpgradeFirstBatch(uint256 _eraPostUpgradeFirstBatch) external onlyOwner {
+        require(eraPostUpgradeFirstBatch == 0, "ShB: eFPUB already set");
+        eraPostUpgradeFirstBatch = _eraPostUpgradeFirstBatch;
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
@@ -423,7 +423,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on zkSync Era before Shared Bridge upgrade.
     function _isEraLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        return (_chainId == eraChainId) && (_l2BatchNumber < eraFirstPostUpgradeBatch);
+        return (_chainId == eraChainId) && (_l2BatchNumber < eraPostUpgradeFirstBatch);
     }
 
     /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -439,7 +439,9 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // Note: if eraLegacyBridgeLastDepositBatch or eraLegacyBridgeLastDepositTxNumber are 0, then this returns false, so normal security measures are applied
         return
             (_chainId == eraChainId) &&
-           ( _l2BatchNumber < eraLegacyBridgeLastDepositBatch || (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber && _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
+            (_l2BatchNumber < eraLegacyBridgeLastDepositBatch ||
+                (_l2TxNumberInBatch < eraLegacyBridgeLastDepositTxNumber &&
+                    _l2BatchNumber == eraLegacyBridgeLastDepositBatch));
     }
 
     /// @notice Finalize the withdrawal and release funds

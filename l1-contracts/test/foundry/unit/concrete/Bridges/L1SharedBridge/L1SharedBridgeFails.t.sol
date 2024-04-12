@@ -25,7 +25,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
             address(sharedBridgeImpl),
             admin,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraFirstPostUpgradeBatch)
+            abi.encodeWithSelector(L1SharedBridge.initialize.selector, address(0), eraPostUpgradeFirstBatch)
         );
     }
 
