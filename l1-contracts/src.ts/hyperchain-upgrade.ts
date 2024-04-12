@@ -199,9 +199,9 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
       initAddress: deployer.addresses.StateTransition.DefaultUpgrade,
       initCalldata: defaultUpgradeData,
     };
-    const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacet2").abi);
+    const adminFacet = new Interface(hardhat.artifacts.readArtifactSync("DummyAdminFacetNoOverlap").abi);
 
-    const data = adminFacet.encodeFunctionData("executeUpgrade2", [diamondCut]); // kl to do calldata might not be "0x"
+    const data = adminFacet.encodeFunctionData("executeUpgradeNoOverlap", [diamondCut]); // kl to do calldata might not be "0x"
     await deployer.executeUpgrade(deployer.addresses.StateTransition.DiamondProxy, 0, data);
   }
   // register Era in Bridgehub, STM

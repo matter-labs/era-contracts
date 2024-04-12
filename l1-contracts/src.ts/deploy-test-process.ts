@@ -5,29 +5,30 @@ import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 import * as ethers from "ethers";
 import type { BigNumberish, Wallet } from "ethers";
-import type { FacetCut } from "./diamondCut";
-
-import { SYSTEM_CONFIG } from "../scripts/utils";
-import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode, ADDRESS_ONE } from "../src.ts/utils";
-import { Deployer } from "./deploy";
 import { Interface } from "ethers/lib/utils";
-import { deployTokens, getTokens } from "./deploy-token";
+import * as zkethers from "zksync-ethers";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import * as fs from "fs";
+
+import type { FacetCut } from "./diamondCut";
+import { Deployer } from "./deploy";
 import {
   L2_BOOTLOADER_BYTECODE_HASH,
   L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
   initialBridgehubDeployment,
   registerHyperchain,
 } from "./deploy-process";
+import { deployTokens, getTokens } from "./deploy-token";
+
+import { SYSTEM_CONFIG } from "../scripts/utils";
+import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode, ADDRESS_ONE } from "../src.ts/utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
-import * as fs from "fs";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
-// import { DummyAdminFacet } from "../typechain";
-import * as zkethers from "zksync-ethers";
+
+import { DummyAdminFacetNoOverlapFactory } from "../typechain";
 
 const addressConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/addresses.json`, { encoding: "utf-8" }));
 const testnetTokenPath = `${testConfigPath}/hardhat.json`;
-export const CONTRACTS_ERA_DIAMOND_PROXY_ADDR = "0x50DC752D0aabD311C385F3899cdE8F66de3d62be";
 
 export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_GENESIS_PROTOCOL_VERSION = (21).toString();
@@ -42,7 +43,8 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "270";
-  process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = CONTRACTS_ERA_DIAMOND_PROXY_ADDR;
+  process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = ADDRESS_ONE;
+  // CONTRACTS_ERA_DIAMOND_PROXY_ADDR;
   process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_BRIDGEHUB_PROXY_ADDR = ADDRESS_ONE;
 }
@@ -146,7 +148,12 @@ export async function initialPreUpgradeContractsDeployment(
   // await deployer.deployStateTransitionManagerProxy(create2Salt, {  }, extraFacets);
 
   await deployer.deployDiamondProxy(extraFacets, {});
-
+  // we have to know the address of the diamond proxy in the mailbox so we separate the deployment
+  const diamondAdminFacet = await hardhat.ethers.getContractAt(
+    "DummyAdminFacetNoOverlap",
+    deployer.addresses.StateTransition.DiamondProxy
+  );
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
   return deployer;
 }
 
@@ -165,11 +172,21 @@ export async function initialEraTestnetDeploymentProcess(
   const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
+  await deployer.deployDiamondProxy(extraFacets, {});
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
+  // deploy normal contracts
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
-  await deployer.deployDiamondProxy(extraFacets, {});
+  if (deployer.verbose) {
+    console.log("Applying DiamondCut");
+  }
+  const diamondAdminFacet = await hardhat.ethers.getContractAt(
+    "DummyAdminFacetNoOverlap",
+    deployer.addresses.StateTransition.DiamondProxy
+  );
+  await diamondAdminFacet.executeUpgradeNoOverlap(await deployer.upgradeZkSyncHyperchainDiamondCut());
+
   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
   const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedHyperchain", [
     deployer.chainId,
@@ -187,13 +204,13 @@ export class EraDeployer extends Deployer {
     ethTxOptions.gasPrice ??= 30_000_000; // to fix gasPrice
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
     const dummyAdminAddress = await this.deployViaCreate2(
-      "DummyAdminFacet",
+      "DummyAdminFacetNoOverlap",
       [],
       ethers.constants.HashZero,
       ethTxOptions
     );
 
-    const adminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet", dummyAdminAddress);
+    const adminFacet = await hardhat.ethers.getContractAt("DummyAdminFacetNoOverlap", dummyAdminAddress);
     let facetCuts: FacetCut[] = [facetCut(adminFacet.address, adminFacet.interface, Action.Add, false)];
     facetCuts = facetCuts.concat(extraFacets ?? []);
     const contractAddress = await this.deployViaCreate2(
@@ -204,16 +221,19 @@ export class EraDeployer extends Deployer {
     );
 
     if (this.verbose) {
-      console.log("Copy this CONTRACTS_DIAMOND_PROXY_ADDR to hardhat config as ERA_DIAMOND_PROXY for hardhat");
       console.log(`CONTRACTS_DIAMOND_PROXY_ADDR=${contractAddress}`);
     }
-
+    process.env.CONTRACTS_ERA_DIAMOND_PROXY_ADDR = contractAddress;
     this.addresses.StateTransition.DiamondProxy = contractAddress;
     this.chainId = parseInt(getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID"));
-    // notably, the DummyAdminFacet does not depend on the contracts containing the ERA_Diamond_Proxy address
-    const diamondAdminFacet = await hardhat.ethers.getContractAt("DummyAdminFacet2", contractAddress);
-    // we separate the main diamond cut into an upgrade ( as this was copied from the the old diamond cut )
-    await diamondAdminFacet.executeUpgrade2(await this.upgradeZkSyncHyperchainDiamondCut());
+
+    /// we fund the diamond proxy so we can test the receive ether function
+    if (this.verbose) {
+      console.log("Depositing ether");
+    }
+    const diamondAdminFacet = DummyAdminFacetNoOverlapFactory.connect(contractAddress, this.deployWallet);
+    const tx = await diamondAdminFacet.receiveEther({ value: 1000 });
+    await tx.wait();
   }
 
   public async upgradeZkSyncHyperchainDiamondCut(extraFacets?: FacetCut[]) {

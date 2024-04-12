@@ -3,10 +3,7 @@ import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
 import type { EraDeployer } from "../../src.ts/deploy-test-process";
-import {
-  initialPreUpgradeContractsDeployment,
-  CONTRACTS_ERA_DIAMOND_PROXY_ADDR,
-} from "../../src.ts/deploy-test-process";
+import { initialPreUpgradeContractsDeployment } from "../../src.ts/deploy-test-process";
 import { ethTestConfig } from "../../src.ts/utils";
 
 import { upgradeToHyperchains } from "../../src.ts/hyperchain-upgrade";
@@ -34,18 +31,6 @@ describe("Hyperchain migration test", function () {
       gasPrice: gasPrice,
     };
     await owner.sendTransaction(tx);
-
-    // send some Eth to the diamond Proxy, we do it before it is deployed ( it is hard afterwards)
-    const tx2 = {
-      from: await owner.getAddress(),
-      to: CONTRACTS_ERA_DIAMOND_PROXY_ADDR, // the address of the diamondproxy
-      value: ethers.utils.parseEther("1000"),
-      nonce: owner.getTransactionCount(),
-      gasLimit: 100000,
-      gasPrice: gasPrice,
-    };
-
-    await owner.sendTransaction(tx2);
 
     deployer = await initialPreUpgradeContractsDeployment(deployWallet, ownerAddress, gasPrice, []);
   });
