@@ -515,9 +515,17 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
-
+                    let dest := add(destOffset, MEM_OFFSET_INNER())
+                    let end := sub(add(dest, size), 1)
                     evmGasLeft := chargeGas(evmGasLeft, 3)
+
+                    checkMemOverflow(end)
+
+                    if or(gt(end, mload(MEM_OFFSET())), eq(end, mload(MEM_OFFSET()))) {
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(end))
+                    }
+
+                    calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
                 }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
