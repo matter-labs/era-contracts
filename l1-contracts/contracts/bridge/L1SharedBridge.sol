@@ -438,8 +438,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2TxNumberInBatch
     ) internal view returns (bool) {
         require(
-            (_chainId != eraChainId) ||
-                ((eraLegacyBridgeLastDepositBatch != 0) && (eraLegacyBridgeLastDepositTxNumber != 0)),
+            (_chainId != eraChainId) || (eraLegacyBridgeLastDepositBatch != 0),
             "ShB: last deposit time not set for Era"
         );
         return

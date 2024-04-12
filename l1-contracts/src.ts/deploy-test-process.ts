@@ -175,9 +175,9 @@ export async function initialEraTestnetDeploymentProcess(
   const result = await deployTokens(testnetTokens, deployer.deployWallet, null, false, deployer.verbose);
   fs.writeFileSync(testnetTokenPath, JSON.stringify(result, null, 2));
 
-  await deployer.deployDiamondProxy(extraFacets, {});
   // deploy the verifier first
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, true);
+  await deployer.deployDiamondProxy(extraFacets, {});
   // deploy normal contracts
   await initialBridgehubDeployment(deployer, extraFacets, gasPrice, false);
   // for Era we first deploy the DiamondProxy manually, set the vars manually, and register it in the system via bridgehub.createNewChain(ERA_CHAIN_ID, ..)
@@ -204,7 +204,7 @@ export class EraDeployer extends Deployer {
   public syncWallet: zkethers.Wallet;
   public async deployDiamondProxy(extraFacets: FacetCut[], ethTxOptions: ethers.providers.TransactionRequest) {
     ethTxOptions.gasLimit ??= 10_000_000;
-    ethTxOptions.gasPrice ??= 40_000_000; // to fix gasPrice
+    ethTxOptions.gasPrice ??= 89_990_000; // to fix gasPrice
     const chainId = getNumberFromEnv("ETH_CLIENT_CHAIN_ID");
     const dummyAdminAddress = await this.deployViaCreate2(
       "DummyAdminFacetNoOverlap",

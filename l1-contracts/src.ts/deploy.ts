@@ -419,10 +419,14 @@ export class Deployer {
 
   public async updateSharedBridge() {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
-    const data = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+    const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data);
+    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostUpgradeFirstBatch", [1]);
+    const data3 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [1, 0]);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }

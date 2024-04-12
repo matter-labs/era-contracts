@@ -130,6 +130,8 @@ contract L1SharedBridgeTest is Test {
         vm.prank(owner);
         sharedBridge.setEraPostUpgradeFirstBatch(eraPostUpgradeFirstBatch);
         vm.prank(owner);
+        sharedBridge.setEraLegacyBridgeLastDepositTime(1, 0);
+        vm.prank(owner);
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
