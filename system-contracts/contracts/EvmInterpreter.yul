@@ -537,6 +537,26 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x30 { // OP_ADDRESS
+                    sp := pushStackItem(sp, address())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x31 { // OP_BALANCE
+                    let addr
+
+                    addr, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, balance(addr))
+
+                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                }
+                case 0x32 { // OP_ORIGIN
+                    sp := pushStackItem(sp, origin())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 case 0x50 { // OP_POP
                     let _y
 
@@ -663,7 +683,13 @@ object "EVMInterpreter" {
                     sp := pushStackItem(sp,size)
 
                 }
-                case 0x5A { // OP_GAS (should conflict with yul-environment-1 branch, retain changes in that branch, ditch this one)
+                case 0x58 { // OP_PC
+                    // PC = ip - 32 (bytecode size) - 1 (current instruction)
+                    sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x5A { // OP_GAS
                     evmGasLeft := chargeGas(evmGasLeft, 2)
 
                     sp := pushStackItem(sp, evmGasLeft)
