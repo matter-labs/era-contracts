@@ -57,11 +57,11 @@ contract UtilsFacet is ZkSyncHyperchainBase {
     }
 
     function util_setVerifierParams(VerifierParams calldata _verifierParams) external {
-        s.verifierParams = _verifierParams;
+        s.__DEPRECATED_verifierParams = _verifierParams;
     }
 
     function util_getVerifierParams() external view returns (VerifierParams memory) {
-        return s.verifierParams;
+        return s.__DEPRECATED_verifierParams;
     }
 
     function util_setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) external {

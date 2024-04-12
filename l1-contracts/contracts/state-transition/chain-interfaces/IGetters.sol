@@ -79,6 +79,7 @@ interface IGetters is IZkSyncHyperchainBase {
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.
+    /// @dev This function is deprecated and will soon be removed.
     function getVerifierParams() external view returns (VerifierParams memory);
 
     /// @return Whether the diamond is frozen or not
