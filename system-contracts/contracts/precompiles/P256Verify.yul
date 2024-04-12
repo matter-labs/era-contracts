@@ -54,26 +54,16 @@ object "P256Verify" {
                 return(0, 0)
             }
 
-            let digest := calldataload(0)
-            let r := calldataload(32)
-            let s := calldataload(64)
-            let x := calldataload(96)
-            let y := calldataload(128)
-
+            // Copy first 5 32-bytes words (the signed digest, r, s, x, y) from the calldata
+            // to memory, from where secp256r1 circuit will read it.
             // The validity of the input as it is done in the internal precompile implementation.
-
-            // Store the data in memory, so the secp256r1 circuit will read it 
-            mstore(0, digest)
-            mstore(32, r)
-            mstore(64, s)
-            mstore(96, x)
-            mstore(128, y)
+            calldatacopy(0, 0, 160)
 
             let precompileParams := unsafePackPrecompileParams(
                 0, // input offset in words
                 5, // input length in words (the signed digest, r, s, x, y)
                 0, // output offset in words
-                1, // output length in words (success)
+                2, // output length in words (internalSuccess, isValid)
                 0  // No special meaning, secp256r1 circuit doesn't check this value
             )
             let gasToPay := P256_VERIFY_GAS_COST()
@@ -89,8 +79,8 @@ object "P256Verify" {
             default {
                 // The circuits might write `0` to the memory, while providing `internalSuccess` as `1`, so
                 // we double check here.
-                let writtenValue := mload(32)
-                if eq(writtenValue, 0) {
+                let isValid := mload(32)
+                if eq(isValid, 0) {
                     return(0, 0)
                 }
 
