@@ -423,6 +423,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
     /// @return Whether withdrawal was initiated on zkSync Era before Shared Bridge upgrade.
     function _isEraLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        require((_chainId != eraChainId) || eraPostUpgradeFirstBatch != 0, "ShB: eFPUB not set for Era");
         return (_chainId == eraChainId) && (_l2BatchNumber < eraPostUpgradeFirstBatch);
     }
 
