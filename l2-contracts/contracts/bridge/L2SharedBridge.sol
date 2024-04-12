@@ -82,14 +82,13 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable override {
+    ) external override {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
             "mq"
         );
-        require(msg.value == 0, "Value should be 0 for ERC20 bridge");
 
         address expectedL2Token = l2TokenAddress(_l1Token);
         address currentL1Token = l1TokenAddress[expectedL2Token];
