@@ -8,7 +8,6 @@ import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {VerifierParams} from "../../chain-interfaces/IVerifier.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "../../../common/L2ContractAddresses.sol";
 import {PubdataPricingMode} from "../ZkSyncHyperchainStorage.sol";
 import {IStateTransitionManager} from "../../IStateTransitionManager.sol";
@@ -423,10 +422,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             );
 
             bytes32 currentBatchCommitment = _committedBatches[i].commitment;
-            proofPublicInput[i] = _getBatchProofPublicInput(
-                prevBatchCommitment,
-                currentBatchCommitment
-            );
+            proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
 
             prevBatchCommitment = currentBatchCommitment;
         }
@@ -456,14 +452,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         bytes32 _currentBatchCommitment
     ) internal pure returns (uint256) {
         return
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        _prevBatchCommitment,
-                        _currentBatchCommitment
-                    )
-                )
-            ) >> PUBLIC_INPUT_SHIFT;
+            uint256(keccak256(abi.encodePacked(_prevBatchCommitment, _currentBatchCommitment))) >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @inheritdoc IExecutor

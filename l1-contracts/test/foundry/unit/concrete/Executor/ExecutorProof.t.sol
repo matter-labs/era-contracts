@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
@@ -10,7 +9,6 @@ import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {VerifierParams} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
