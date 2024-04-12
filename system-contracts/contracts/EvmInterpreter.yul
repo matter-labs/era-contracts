@@ -53,6 +53,14 @@ object "EVMInterpreter" {
             function MEM_OFFSET_INNER() -> offset {
                 offset := add(MEM_OFFSET(), 32)
             }
+
+            function MAX_POSSIBLE_MEM() -> max {
+                max := 0x100000 // 1MB
+            }
+
+            function MAX_MEMORY_FRAME() -> max {
+                max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
+            }
     
             // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
             function readIP(ip) -> opcode {
@@ -220,6 +228,41 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
+            function checkMemOverflow(location) {
+                if gt(location, MAX_MEMORY_FRAME()) {
+                    revert(0, 0)
+                }
+            }
+
+            // Note, that this function can overflow. It's up to the caller to ensure that it does not.
+            function memCost(memSizeWords) -> gasCost {
+                // The first term of the sum is the quadratic cost, the second one the linear one.
+                gasCost := add(div(mul(memSizeWords, memSizeWords), 512), mul(3, memSizeWords))
+            }
+
+            // This function can overflow, it is the job of the caller to ensure that it does not.
+            // The argument to this function is the offset into the memory region IN BYTES.
+            function expandMemory(newSize) -> gasCost {
+                let oldSizeInWords := mload(MEM_OFFSET())
+
+                // The add 31 here before dividing is there to account for misaligned
+                // memory expansions, where someone calls this with a newSize that is not
+                // a multiple of 32. For instance, if someone calls it with an offset of 33,
+                // the new size in words should be 2, not 1, but dividing by 32 will give 1.
+                // Adding 31 solves it.
+                let newSizeInWords := div(add(newSize, 31), 32)
+
+                if gt(newSizeInWords, oldSizeInWords) {
+                    // TODO: Check this, it feels like there might be a more optimized way
+                    // of doing this cost calculation.
+                    let oldCost := memCost(oldSizeInWords)
+                    let newCost := memCost(newSizeInWords)
+
+                    gasCost := sub(newCost, oldCost)
+                    mstore(MEM_OFFSET(), newSizeInWords)
+                }
+            }
+
             // Essentially a NOP that will not get optimized away by the compiler
             function $llvm_NoInline_llvm$_unoptimized() {
                 pop(1)
@@ -237,6 +280,44 @@ object "EVMInterpreter" {
                 mstore(add(DEBUG_SLOT_OFFSET(), 0x40), value)
                 mstore(DEBUG_SLOT_OFFSET(), 0x4A15830341869CAA1E99840C97043A1EA15D2444DA366EFFF5C43B4BEF299681)
                 $llvm_NoInline_llvm$_unoptimized()
+            }
+
+            function isSlotWarm(key) -> isWarm {
+                // TODO: Unhardcode this selector 0x482d2e74
+                mstore8(0, 0x48)
+                mstore8(1, 0x2d)
+                mstore8(2, 0x2e)
+                mstore8(3, 0x74)
+                mstore(4, key)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+            }
+
+            function warmSlot(key,currentValue) -> isWarm, originalValue {
+                // TODO: Unhardcode this selector 0xbdf78160
+                mstore8(0, 0xbd)
+                mstore8(1, 0xf7)
+                mstore8(2, 0x81)
+                mstore8(3, 0x60)
+                mstore(4, key)
+                mstore(36,currentValue)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 64)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+                originalValue := mload(32)
             }
 
             ////////////////////////////////////////////////////////////////
@@ -488,6 +569,109 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x30 { // OP_ADDRESS
+                    sp := pushStackItem(sp, address())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x31 { // OP_BALANCE
+                    let addr
+
+                    addr, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, balance(addr))
+
+                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
+                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                }
+                case 0x32 { // OP_ORIGIN
+                    sp := pushStackItem(sp, origin())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x33 { // OP_CALLER
+                    sp := pushStackItem(sp, caller())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x34 { // OP_CALLVALUE
+                    sp := pushStackItem(sp, callvalue())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x35 { // OP_CALLDATALOAD
+                    let i
+
+                    i, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, calldataload(i))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x36 { // OP_CALLDATASIZE
+                    sp := pushStackItem(sp, calldatasize())
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x37 { // OP_CALLDATACOPY
+                    let destOffset, offset, size
+
+                    destOffset, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    let dest := add(destOffset, MEM_OFFSET_INNER())
+                    let end := sub(add(dest, size), 1)
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+
+                    checkMemOverflow(end)
+
+                    if or(gt(end, mload(MEM_OFFSET())), eq(end, mload(MEM_OFFSET()))) {
+                        evmGasLeft := chargeGas(evmGasLeft, expandMemory(end))
+                    }
+
+                    calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
+                }
+                case 0x50 { // OP_POP
+                    let _y
+
+                    _y, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x51 { // OP_MLOAD
+                    let offset
+
+                    offset, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 32))
+
+                    let memValue := mload(add(MEM_OFFSET_INNER(), offset))
+                    sp := pushStackItem(sp, memValue)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
+                case 0x52 { // OP_MSTORE
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 32))
+
+                    mstore(add(MEM_OFFSET_INNER(), offset), value)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
+                case 0x53 { // OP_MSTORE8
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 1))
+
+                    mstore8(add(MEM_OFFSET_INNER(), offset), value)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
@@ -525,15 +709,65 @@ object "EVMInterpreter" {
                         revert(0, 0)
                     }
                 }
+                case 0x54 { // OP_SLOAD
+                    let key,value,isWarm
+
+                    key, sp := popStackItem(sp)
+
+                    isWarm := isSlotWarm(key)
+                    switch isWarm
+                    case 0 { evmGasLeft := chargeGas(evmGasLeft,2100) }
+                    default { evmGasLeft := chargeGas(evmGasLeft,100) }
+
+                    value := sload(key)
+
+                    sp := pushStackItem(sp,value)
+                }
                 case 0x55 { // OP_SSTORE
-                    let key, value
+                    let key, value,gasSpent
 
                     key, sp := popStackItem(sp)
                     value, sp := popStackItem(sp)
 
+                    {
+                        // Here it is okay to read before we charge since we known anyway that
+                        // the context has enough funds to compensate at least for the read.
+                        // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND);
+                        let currentValue := sload(key)
+                        let wasWarm,originalValue := warmSlot(key,currentValue)
+                        gasSpent := 100
+                        if and(not(eq(value,currentValue)),eq(originalValue,currentValue)) {
+                            switch originalValue
+                            case 0 { gasSpent := 20000}
+                            default { gasSpent := 2900}
+                        }
+                        if iszero(wasWarm) {
+                            gasSpent := add(gasSpent,2100)
+                        }
+                    }
+
+                    evmGasLeft := chargeGas(evmGasLeft, gasSpent) //gasSpent
                     sstore(key, value)
-                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                }
+                case 0x59 { // OP_MSIZE
+                    let size
+                    evmGasLeft := chargeGas(evmGasLeft,2)
+
+                    size := mload(MEM_OFFSET())
+                    size := shl(5,size)
+                    sp := pushStackItem(sp,size)
+
+                }
+                case 0x58 { // OP_PC
+                    // PC = ip - 32 (bytecode size) - 1 (current instruction)
+                    sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x5A { // OP_GAS
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+
+                    sp := pushStackItem(sp, evmGasLeft)
                 }
                 case 0x5B { // OP_JUMPDEST
                     evmGasLeft := chargeGas(evmGasLeft, 1)
