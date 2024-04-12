@@ -439,8 +439,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         // Note: if eraLastOldBridgeDepositBatch or eraLastOldBridgeDepositTxNumber are 0, then this returns false, so normal security measures are applied
         return
             (_chainId == eraChainId) &&
-            (_l2BatchNumber < eraLastOldBridgeDepositBatch) &&
-            (_l2TxNumberInBatch < eraLastOldBridgeDepositTxNumber);
+           ( _l2BatchNumber < eraLastOldBridgeDepositBatch || (_l2TxNumberInBatch < eraLastOldBridgeDepositTxNumber && _l2BatchNumber == eraLastOldBridgeDepositBatch));
     }
 
     /// @notice Finalize the withdrawal and release funds
