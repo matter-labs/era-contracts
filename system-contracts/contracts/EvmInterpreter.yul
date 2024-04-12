@@ -228,7 +228,7 @@ object "EVMInterpreter" {
                 gasRemaining := sub(prevGas, toCharge)
             }
 
-            function checkMemOverflow(location) -> {
+            function checkMemOverflow(location) {
                 if gt(location, MAX_MEMORY_FRAME()) {
                     revert(0, 0)
                 }
