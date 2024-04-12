@@ -499,6 +499,46 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x50 { // OP_POP
+                    let _y
+
+                    _y, sp := popStackItem(sp)
+
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x51 { // OP_MLOAD
+                    let offset
+
+                    offset, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 32))
+
+                    let memValue := mload(add(MEM_OFFSET_INNER(), offset))
+                    sp := pushStackItem(sp, memValue)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
+                case 0x52 { // OP_MSTORE
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 32))
+
+                    mstore(add(MEM_OFFSET_INNER(), offset), value)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
+                case 0x53 { // OP_MSTORE8
+                    let offset, value
+
+                    offset, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    let expansionGas := expandMemory(add(offset, 1))
+
+                    mstore8(add(MEM_OFFSET_INNER(), offset), value)
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
+                }
                 // NOTE: We don't currently do full jumpdest validation
                 // (i.e. validating a jumpdest isn't in PUSH data)
                 case 0x56 { // OP_JUMP
