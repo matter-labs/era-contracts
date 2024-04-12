@@ -93,7 +93,7 @@ contract DefaultAccount is IAccount {
         // is, the bytes32(0) will be supplied.
         bytes32 txHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
 
-        // The fact there is are enough balance for the account
+        // The fact there is enough balance for the account
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
