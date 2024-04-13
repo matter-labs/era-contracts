@@ -8,7 +8,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
+/// @notice This upgrade will be used to migrate Era to be part of the hyperchain ecosystem contracts.
 contract UpgradeHyperchains is BaseZkSyncUpgrade {
     /// @notice The main function that will be called by the upgrade proxy.
     /// @param _proposedUpgrade The upgrade to be executed.

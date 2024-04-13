@@ -27,6 +27,7 @@ import {
   applyL1ToL2Alias,
   hashL2Bytecode,
 } from "../../l2-contracts/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
@@ -45,43 +46,41 @@ export async function upgradeToHyperchains1(
   if (deployer.verbose) {
     console.log("Deploying new contracts");
   }
-  // const deployFacets = process.env.CHAIN_ETH_NETWORK === "hardhat";
-  await deployNewContracts(deployer, gasPrice, create2Salt, nonce); //done
+  await deployNewContracts(deployer, gasPrice, create2Salt, nonce);
 }
 
 // this simulates the main part of the upgrade, the diamond cut, registration into the Bridgehub and STM, and the bridge upgrade
-// this has to be done atomically.
 // before we call this we need to generate the facet cuts using the protocol upgrade tool, on hardhat we test the dummy diamondCut
 export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNumberish) {
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
   // this requires the sharedBridge to be deployed.
   // In theory, the L1SharedBridge deposits should be disabled until the L2Bridge is upgraded.
-  // However, without the Portal, UI being upgraded it does not matter (nobody will call it)
+  // However, without the Portal, UI being upgraded it does not matter (nobody will call it, they will call the legacy bridge)
   if (deployer.verbose) {
     console.log("Integrating Era into Bridgehub and upgrading L2 system contract");
   }
-  await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice); // details for L2 system contract upgrade not finished
+  await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, gasPrice); // details for L2 system contract upgrade are part of the infrastructure/protocol_upgrade tool
 
   // the L2Bridge and L1ERC20Bridge should be updated relatively in sync, as new messages might not be parsed correctly by the old bridge.
   // however new bridges can parse old messages. L1->L2 messages are faster, so L2 side is upgraded first.
   if (deployer.verbose) {
     console.log("Upgrading L2 bridge");
   }
-  await upgradeL2Bridge(deployer); // mostly finished
+  await upgradeL2Bridge(deployer);
 
   if (process.env.CHAIN_ETH_NETWORK === "localhost") {
     if (deployer.verbose) {
       console.log("Upgrading L1 ERC20 bridge");
     }
-    await upgradeL1ERC20Bridge(deployer); // done
+    await upgradeL1ERC20Bridge(deployer);
   }
 
   // note, withdrawals will not work until this step, but deposits will
   if (deployer.verbose) {
     console.log("Migrating assets from L1 ERC20 bridge and ChainBalance");
   }
-  await migrateAssets(deployer); // done
+  await migrateAssets(deployer);
 }
 
 export async function upgradeToHyperchains(
@@ -116,8 +115,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   nonce++;
   await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
 
-  // kl to do: we will need to deploy the proxyAdmin on mainnet, here it is already deployed
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   }
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
@@ -222,7 +220,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   const tx = await bridgehub.createNewChain(
     deployer.chainId,
     deployer.addresses.StateTransition.StateTransitionProxy,
-    ADDRESS_ONE,
+    ETH_ADDRESS_IN_CONTRACTS,
     ethers.constants.HashZero,
     deployer.addresses.Governance,
     ethers.constants.HashZero,

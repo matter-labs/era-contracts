@@ -21,7 +21,14 @@ import {
 import { deployTokens, getTokens } from "./deploy-token";
 
 import { SYSTEM_CONFIG } from "../scripts/utils";
-import { testConfigPath, getNumberFromEnv, getHashFromEnv, PubdataPricingMode, ADDRESS_ONE } from "../src.ts/utils";
+import {
+  testConfigPath,
+  getNumberFromEnv,
+  getHashFromEnv,
+  PubdataPricingMode,
+  ADDRESS_ONE,
+  EMPTY_STRING_KECCAK,
+} from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
 
@@ -100,7 +107,8 @@ export async function initialTestnetDeploymentProcess(
   return deployer;
 }
 
-// this is used to deploy the diamond and bridge such that they can be upgraded
+// This is used to deploy the diamond and bridge such that they can be upgraded using UpgradeHyperchain.sol
+// This should be deleted after the migration
 export async function initialPreUpgradeContractsDeployment(
   deployWallet: Wallet,
   ownerAddress: string,
@@ -160,6 +168,7 @@ export async function initialPreUpgradeContractsDeployment(
 /// This is used to deploy the ecosystem contracts with a diamond proxy address that is equal to ERA_DIAMOND_PROXY_ADDR.
 /// For this we have to deploy diamond proxy, deploy facets and other contracts, and initializing the diamond proxy using DiamondInit,
 /// and registering it in the ecosystem.
+/// This is used to test the legacy L1ERC20Bridge, so this should not be deleted after the migration
 export async function initialEraTestnetDeploymentProcess(
   deployWallet: Wallet,
   ownerAddress: string,
@@ -249,7 +258,7 @@ export class EraDeployer extends Deployer {
       )
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
-    // console.log("kl to do", facetCuts);
+
     const verifierParams =
       process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
         ? {
@@ -284,7 +293,7 @@ export class EraDeployer extends Deployer {
             batchHash: getHashFromEnv("CONTRACTS_GENESIS_ROOT"),
             indexRepeatedStorageChanges: getNumberFromEnv("CONTRACTS_GENESIS_ROLLUP_LEAF_INDEX"),
             numberOfLayer1Txs: ethers.constants.HashZero,
-            priorityOperationsHash: "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+            priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: ethers.constants.HashZero,
             timestamp: ethers.constants.HashZero,
             commitment: getHashFromEnv("CONTRACTS_GENESIS_BATCH_COMMITMENT"),

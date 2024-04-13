@@ -748,7 +748,6 @@ export class Deployer {
 
   public async registerToken(tokenAddress: string) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    // kl to do change 1 to general variable.
     const tx = await bridgehub.addToken(tokenAddress);
 
     const receipt = await tx.wait();
