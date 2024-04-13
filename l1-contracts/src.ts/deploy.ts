@@ -422,11 +422,13 @@ export class Deployer {
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostUpgradeFirstBatch", [1]);
-    const data3 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [1, 0]);
+    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [1]);
+    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [1]);
+    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [1, 0]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
+    await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data4);
     if (this.verbose) {
       console.log("Shared bridge updated with ERC20Bridge address");
     }

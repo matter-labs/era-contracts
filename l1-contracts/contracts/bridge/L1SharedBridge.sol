@@ -41,11 +41,15 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     /// @dev The address of zkSync Era diamond proxy contract.
     address immutable eraDiamondProxy;
 
-    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
-    /// This variable is used to differentiate between pre-upgrade and post-upgrade withdrawals. Withdrawals from batches older
+    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after Diamond proxy upgrade.
+    /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
     /// than this value are considered to have been finalized prior to the upgrade and handled separately.
-    /// We use this both for Eth and erc20 token withdrawals, so we need to update the diamond and bridge simultaneously.
-    uint256 internal eraPostUpgradeFirstBatch;
+    uint256 internal eraPostDiamondUpgradeFirstBatch;
+
+    /// @dev Stores the first batch number on the zkSync Era Diamond Proxy that was settled after L1ERC20 Bridge upgrade.
+    /// This variable is used to differentiate between pre-upgrade and post-upgrade ERC20 withdrawals. Withdrawals from batches older
+    /// than this value are considered to have been finalized prior to the upgrade and handled separately.
+    uint256 internal eraPostLegacyBridgeUpgradeFirstBatch;
 
     /// @dev Stores the zkSync Era batch number that processes the last deposit tx initiated by the legacy bridge
     /// This variable (together with eraLegacyBridgeLastDepositTxNumber) is used to differentiate between pre-upgrade and post-upgrade deposits. Deposits processed in older batches
@@ -127,11 +131,18 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         _transferOwnership(_owner);
     }
 
-    /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
-    /// @param _eraPostUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after Shared Bridge upgrade.
-    function setEraPostUpgradeFirstBatch(uint256 _eraPostUpgradeFirstBatch) external onlyOwner {
-        require(eraPostUpgradeFirstBatch == 0, "ShB: eFPUB already set");
-        eraPostUpgradeFirstBatch = _eraPostUpgradeFirstBatch;
+    /// @dev This sets the first post diamond upgrade batch for era, used to check old eth withdrawals
+    /// @param _eraPostDiamondUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after diamond proxy upgrade.
+    function setEraPostDiamondUpgradeFirstBatch(uint256 _eraPostDiamondUpgradeFirstBatch) external onlyOwner {
+        require(eraPostDiamondUpgradeFirstBatch == 0, "ShB: eFPUB already set");
+        eraPostDiamondUpgradeFirstBatch = _eraPostDiamondUpgradeFirstBatch;
+    }
+
+    /// @dev This sets the first post upgrade batch for era, used to check old token withdrawals
+    /// @param _eraPostLegacyBridgeUpgradeFirstBatch The first batch number on the zkSync Era Diamond Proxy that was settled after legacy bridge upgrade.
+    function setEraPostLegacyBridgeUpgradeFirstBatch(uint256 _eraPostLegacyBridgeUpgradeFirstBatch) external onlyOwner {
+        require(eraPostLegacyBridgeUpgradeFirstBatch == 0, "ShB: eFPUB already set");
+        eraPostLegacyBridgeUpgradeFirstBatch = _eraPostLegacyBridgeUpgradeFirstBatch;
     }
 
     /// @dev This sets the first post upgrade batch for era, used to check old withdrawals
@@ -418,13 +429,25 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         emit ClaimedFailedDepositSharedBridge(_chainId, _depositSender, _l1Token, _amount);
     }
 
-    /// @dev Determines if a withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @dev Determines if an eth withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _l2BatchNumber The L2 batch number for the withdrawal.
-    /// @return Whether withdrawal was initiated on zkSync Era before Shared Bridge upgrade.
-    function _isEraLegacyWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
-        require((_chainId != eraChainId) || eraPostUpgradeFirstBatch != 0, "ShB: eFPUB not set for Era");
-        return (_chainId == eraChainId) && (_l2BatchNumber < eraPostUpgradeFirstBatch);
+    /// @return Whether withdrawal was initiated on zkSync Era before diamond proxy upgrade.
+    function _isEraLegacyEthWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        require((_chainId != eraChainId) || eraPostDiamondUpgradeFirstBatch != 0, "ShB: diamondUFB not set for Era");
+        return (_chainId == eraChainId) && (_l2BatchNumber < eraPostDiamondUpgradeFirstBatch);
+    }
+
+    /// @dev Determines if a token withdrawal was initiated on zkSync Era before the upgrade to the Shared Bridge.
+    /// @param _chainId The chain ID of the transaction to check.
+    /// @param _l2BatchNumber The L2 batch number for the withdrawal.
+    /// @return Whether withdrawal was initiated on zkSync Era before Legacy Bridge upgrade.
+    function _isEraLegacyTokenWithdrawal(uint256 _chainId, uint256 _l2BatchNumber) internal view returns (bool) {
+        require(
+            (_chainId != eraChainId) || eraPostLegacyBridgeUpgradeFirstBatch != 0,
+            "ShB: LegacyUFB not set for Era"
+        );
+        return (_chainId == eraChainId) && (_l2BatchNumber < eraPostLegacyBridgeUpgradeFirstBatch);
     }
 
     /// @dev Determines if a deposit was initiated on zkSync Era before the upgrade to the Shared Bridge.
@@ -465,7 +488,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
     ) external override {
         // To avoid rewithdrawing txs that have already happened on the legacy bridge.
         // Note: new withdraws are all recorded here, so double withdrawing them is not possible.
-        if (_isEraLegacyWithdrawal(_chainId, _l2BatchNumber)) {
+        if (_isEraLegacyTokenWithdrawal(_chainId, _l2BatchNumber)) {
             require(!legacyBridge.isWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex), "ShB: legacy withdrawal");
         }
         _finalizeWithdrawal({
@@ -498,7 +521,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         isWithdrawalFinalized[_chainId][_l2BatchNumber][_l2MessageIndex] = true;
 
         // Handling special case for withdrawal from zkSync Era initiated before Shared Bridge.
-        if (_isEraLegacyWithdrawal(_chainId, _l2BatchNumber)) {
+        if (_isEraLegacyEthWithdrawal(_chainId, _l2BatchNumber)) {
             // Checks that the withdrawal wasn't finalized already.
             bool alreadyFinalized = IGetters(eraDiamondProxy).isEthWithdrawalFinalized(_l2BatchNumber, _l2MessageIndex);
             require(!alreadyFinalized, "Withdrawal is already finalized 2");
