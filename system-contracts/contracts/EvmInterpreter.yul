@@ -10,6 +10,14 @@ object "EVMInterpreter" {
                 addr := 0x0000000000000000000000000000000000008002
             }
 
+            function NONCE_HOLDER_SYSTEM_CONTRACT() -> addr {
+                addr := 0x0000000000000000000000000000000000008003
+            }
+
+            function DEPLOYER_SYSTEM_CONTRACT() -> addr {
+                addr :=  0x0000000000000000000000000000000000008006
+            }
+
             function CODE_ADDRESS_CALL_ADDRESS() -> addr {
                 addr := 0x000000000000000000000000000000000000FFFE
             }
@@ -318,6 +326,18 @@ object "EVMInterpreter" {
     
                 isWarm := mload(0)
                 originalValue := mload(32)
+            }
+
+            function getNonce() -> nonce {
+                mstore8(0, 0xfb)
+                mstore8(1, 0x1a)
+                mstore8(2, 0x9a)
+                mstore8(3, 0x57)
+                mstore(4, address())
+
+                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+
+                nonce := mload(0)
             }
 
             ////////////////////////////////////////////////////////////////
@@ -1166,6 +1186,47 @@ object "EVMInterpreter" {
                 }
                 case 0x9F { // OP_SWAP16
                     evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
+                }
+                case 0xF0 { // OP_CREATE
+                    let value, offset, size
+
+                    value, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    offset := add(MEM_OFFSET_INNER(), 0x40) // 0x40 is just to make sure there's enough space while testing
+
+                    let addr
+                    {
+                        let digest, nonce, addressEncoded, nonceEncoded, listLength, listLengthEconded
+
+                        nonce := getNonce()
+                        printString("getNonce")
+                        printHex(nonce)
+
+                        addressEncoded := add(shl(248, 0x94), and(address(), 0x1ffffffffffffffffffffffffffffffffffffffff))
+                        nonceEncoded := 0x80
+                        listLength := 22
+
+                        // WIP
+
+                        // addr := keccak256(digest)
+                    }
+
+                    // Selector
+                    mstore8(offset, 0x5b)
+                    mstore8(add(offset, 1), 0x16)
+                    mstore8(add(offset, 2), 0xa2)
+                    mstore8(add(offset, 3), 0x3c)
+                    // Deployed address (WIP)
+                    mstore(add(offset, 4), addr)
+                    // Init code (len = 1): 0x00
+                    mstore8(add(offset, 36), 0x01)
+                    mstore8(add(offset, 37), 0x00)
+                    mstore(MEM_OFFSET(), 64)
+
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 0x26, 0, 0)
+                    sp := pushStackItem(sp, result)
                 }
                 // TODO: REST OF OPCODES
                 default {
