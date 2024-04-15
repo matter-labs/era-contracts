@@ -1208,13 +1208,44 @@ object "EVMInterpreter" {
                         printString("getNonce")
                         printHex(nonce)
 
-                        addressEncoded := add(shl(248, 0x94), and(address(), 0x1ffffffffffffffffffffffffffffffffffffffff))
-                        nonceEncoded := 0x80
+                        addressEncoded := and(add(address(), shl(160, 0x94)), 0x3ffffffffffffffffffffffffffffffffffffffffff)
+
+                        // This block works if 0 <= nonce <= 127
+                        // TODO: Make it work on nonce >= 128
+                        nonceEncoded := 128
+                        if gt(nonce, 0) {
+                            nonceEncoded := nonce
+                        }
                         listLength := 22
+                        listLengthEconded := add(listLengthEconded, 0xC0)
 
-                        // WIP
+                        // TODO: Replace 176 with 168 + bytesLength(listLengthEncoded)
+                        digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
 
-                        // addr := keccak256(digest)
+                        printString("address")
+                        printHex(address())
+                        printString("address encoded")
+                        printHex(addressEncoded)
+                        printString("nonceEncoded")
+                        printHex(nonceEncoded)
+                        printString("listLength")
+                        printHex(listLength)
+                        printString("listLengthEncoded")
+                        printHex(listLengthEconded)
+                        printString("digest")
+                        printHex(digest)
+
+                        // TODO: Replace 72 with 256 - bitsLength(digest)
+                        mstore(offset, shl(72, digest))
+
+                        printString("Mem")
+                        printHex(mload(offset))
+
+                        // TODO: Replace 23 with bytesLength(digest)
+                        addr := keccak256(offset, 23)
+
+                        printString("keccak256")
+                        printHex(addr)
                     }
 
                     // Selector
@@ -1227,7 +1258,10 @@ object "EVMInterpreter" {
                     // Init code (len = 1): 0x00
                     mstore8(add(offset, 36), 0x01)
                     mstore8(add(offset, 37), 0x00)
-                    mstore(MEM_OFFSET(), 64)
+
+                    printString("Memory")
+                    printHex(mload(offset))
+                    printHex(mload(add(offset, 32)))
 
                     let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 0x26, 0, 0)
                     sp := pushStackItem(sp, result)
