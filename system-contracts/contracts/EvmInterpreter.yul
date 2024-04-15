@@ -566,6 +566,23 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x20 { // OP_KECCAK256
+                    let offset, size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, keccak256(add(MEM_OFFSET_INNER(), offset), size))
+
+                    // When an offset is first accessed (either read or write), memory may trigger 
+                    // an expansion, which costs gas.
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    // minimum_word_size = (size + 31) / 32
+                    let minWordSize := shr(add(size, 31), 5)
+                    let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
+                    let usedGas := add(30, dynamicGas)
+                    evmGasLeft := chargeGas(evmGasLeft, usedGas)
+                }
                 case 0x30 { // OP_ADDRESS
                     sp := pushStackItem(sp, address())
 
