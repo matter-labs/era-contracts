@@ -320,6 +320,24 @@ object "EVMInterpreter" {
                 originalValue := mload(32)
             }
 
+            function warmAddress(addr) -> isWarm {
+                // TODO: Unhardcode this selector 0x8db2ba78
+                mstore8(0, 0x8d)
+                mstore8(1, 0xb2)
+                mstore8(2, 0xba)
+                mstore8(3, 0x78)
+                mstore(4, addr)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -348,6 +366,8 @@ object "EVMInterpreter" {
 
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
+
+            pop(warmAddress(address()))
 
             for { } true { } {
                 opcode := readIP(ip)
@@ -439,12 +459,15 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, exp(a, exponent))
 
-                    let expSizeByte := 0
-                    if not(iszero(exponent)) {
-                        expSizeByte := div(add(exponent, 256), 256)
+                    let expSizeByte
+                    switch exponent {
+                        case 0 { expSizeByte := 0 }
+                        default {
+                            expSizeBytes := div(add(exponent, 256), 256)
+                        }
                     }
 
-                    evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
+                    evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeBytes)))
                 }
                 case 0x0B { // OP_SIGNEXTEND
                     let b, x
@@ -597,6 +620,23 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
 
+                case 0x20 { // OP_KECCAK256
+                    let offset, size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, keccak256(add(MEM_OFFSET_INNER(), offset), size))
+
+                    // When an offset is first accessed (either read or write), memory may trigger 
+                    // an expansion, which costs gas.
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    // minimum_word_size = (size + 31) / 32
+                    let minWordSize := shr(add(size, 31), 5)
+                    let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
+                    let usedGas := add(30, dynamicGas)
+                    evmGasLeft := chargeGas(evmGasLeft, usedGas)
+                }
                 case 0x30 { // OP_ADDRESS
                     sp := pushStackItem(sp, address())
 
@@ -607,10 +647,14 @@ object "EVMInterpreter" {
 
                     addr, sp := popStackItem(sp)
 
+                    let wasWarm := warmAddress(addr)
+
                     sp := pushStackItem(sp, balance(addr))
 
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                    switch wasWarm
+                    case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
+                    default { evmGasLeft := chargeGas(evmGasLeft, 100) }
                 }
                 case 0x32 { // OP_ORIGIN
                     sp := pushStackItem(sp, origin())
@@ -659,6 +703,46 @@ object "EVMInterpreter" {
                     }
 
                     calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
+                }
+                case 0x38 { // OP_CODESIZE
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    sp := pushStackItem(sp, bytecodeLen)
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x39 { // OP_CODECOPY
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    let dst, offset, len
+
+                    dst, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+
+                    // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+                    // let minWordSize := div(add(len, 31), 32) Used inside the mul
+                    let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+                    // basically BYTECODE_OFFSET + 32 - 31, since
+                    // we always need to read one byte
+                    let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+
+                    // TODO: optimize?
+                    for { let i := 0 } lt(i, len) { i := add(i, 1) } {
+                        switch lt(add(offset, i), bytecodeLen)
+                            case true {
+                                mstore8(
+                                    add(add(MEM_OFFSET_INNER(), offset), i),
+                                    and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
+                                )
+                            }
+                            default {
+                                mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
+                            }
+                    }
+                }
+                case 0x3A { // OP_GASPRICE
+                    sp := pushStackItem(sp, gasprice())
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     let blockNumber
