@@ -642,9 +642,9 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     len, sp := popStackItem(sp)
 
-                    // TODO: Handle dynamicGas for gas costs.
                     // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
-                    let dynamicGas := 0
+                    let minWordSize := div(add(len, 31), 32)
+                    let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, len)))
                     evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
                     // basically BYTECODE_OFFSET + 32 - 31, since
