@@ -417,14 +417,21 @@ export class Deployer {
     this.addresses.Bridges.ERC20BridgeImplementation = contractAddress;
   }
 
-  public async updateSharedBridge() {
+  public async setParametersSharedBridge() {
     const sharedBridge = L1SharedBridgeFactory.connect(this.addresses.Bridges.SharedBridgeProxy, this.deployWallet);
     const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
       this.addresses.Bridges.ERC20BridgeProxy,
     ]);
-    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [1]);
-    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [1]);
-    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [1, 0]);
+    const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+      process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+    ]);
+    const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+      process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+    ]);
+    const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
+      process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+    ]);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data1);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data2);
     await this.executeUpgrade(this.addresses.Bridges.SharedBridgeProxy, 0, data3);
@@ -434,12 +441,13 @@ export class Deployer {
     }
   }
 
+  /// this should be only use for local testing
   public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
-      salt: ethers.constants.HashZero,
+      salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
     const scheduleTx = await governance.scheduleTransparent(operation, 0);
     await scheduleTx.wait();

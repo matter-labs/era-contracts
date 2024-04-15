@@ -21,11 +21,11 @@ const testnetConfig = {
   ERA_WETH_ADDRESS: "address(0)",
 };
 const hardhatConfig = {
-  ERA_CHAIN_ID: 9,
+  ERA_CHAIN_ID: 270,
   ERA_WETH_ADDRESS: "address(0)",
 };
 const localConfig = {
-  ERA_CHAIN_ID: 9,
+  ERA_CHAIN_ID: 270,
   ERA_WETH_ADDRESS: "address(0)",
 };
 

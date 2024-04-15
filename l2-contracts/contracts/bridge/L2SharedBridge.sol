@@ -55,7 +55,6 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(_l1Bridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
-        require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
 
         l1Bridge = _l1Bridge;
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;

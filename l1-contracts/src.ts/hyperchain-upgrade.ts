@@ -17,6 +17,8 @@ import type { Deployer } from "./deploy";
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
+import { L1SharedBridgeFactory } from "../typechain";
+
 import { Interface } from "ethers/lib/utils";
 import { ADDRESS_ONE } from "./utils";
 import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
@@ -33,6 +35,19 @@ const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 
 const BEACON_PROXY_BYTECODE = ethers.constants.HashZero;
+
+/// In the hardhat tests we do the upgrade all at once.
+/// On localhost/stage/.. we will call the components and send the calldata to Governance manually
+export async function upgradeToHyperchains(
+  deployer: Deployer,
+  gasPrice: BigNumberish,
+  create2Salt?: string,
+  nonce?: number
+) {
+  await upgradeToHyperchains1(deployer, gasPrice, create2Salt, nonce);
+  await upgradeToHyperchains2(deployer, gasPrice);
+  await upgradeToHyperchains3(deployer);
+}
 
 /// this deploys the contracts
 export async function upgradeToHyperchains1(
@@ -83,14 +98,25 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   await migrateAssets(deployer);
 }
 
-export async function upgradeToHyperchains(
-  deployer: Deployer,
-  gasPrice: BigNumberish,
-  create2Salt?: string,
-  nonce?: number
-) {
-  await upgradeToHyperchains1(deployer, gasPrice, create2Salt, nonce);
-  await upgradeToHyperchains2(deployer, gasPrice);
+// This sets the Shared Bridge parameters. We need to do this separately, as these params will be known after the upgrade
+export async function upgradeToHyperchains3(deployer: Deployer) {
+  const sharedBridge = L1SharedBridgeFactory.connect(
+    deployer.addresses.Bridges.SharedBridgeProxy,
+    deployer.deployWallet
+  );
+  const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
+    process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+  ]);
+  const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
+    process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+  ]);
+  const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
+    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
+    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data4);
 }
 
 async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, create2Salt?: string, nonce?: number) {
@@ -126,7 +152,6 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
   await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
-  await deployer.updateSharedBridge();
 }
 
 async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Deployer, gasPrice: BigNumberish) {
@@ -228,12 +253,19 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   );
 
   await tx.wait();
+
+  const sharedBridge = L1SharedBridgeFactory.connect(
+    deployer.addresses.Bridges.SharedBridgeProxy,
+    deployer.deployWallet
+  );
+  const data1 = sharedBridge.interface.encodeFunctionData("setL1Erc20Bridge", [
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data1);
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
-  // todo deploy l2 bridge here
-  // L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE
-  const l2BridgeImplementationAddress = ADDRESS_ONE; // todo
+  const l2BridgeImplementationAddress = process.env.CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR!;
 
   // upgrade from L1 governance. This has to come from governacne on L1.
   const l2BridgeAbi = ["function initialize(address, address, bytes32, address)"];
@@ -245,6 +277,7 @@ async function upgradeL2Bridge(deployer: Deployer) {
     hashL2Bytecode(BEACON_PROXY_BYTECODE),
     applyL1ToL2Alias(deployer.addresses.Governance),
   ]);
+
   const bridgeProxy: ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(
     ADDRESS_ONE,
     deployer.deployWallet
@@ -254,43 +287,64 @@ async function upgradeL2Bridge(deployer: Deployer) {
     l2BridgeImplementationAddress,
     l2BridgeCalldata,
   ]);
-
-  const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
   const factoryDeps = [];
-  const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [
-    process.env.CONTRACTS_L2_SHARED_BRIDGE_ADDR,
-    0,
-    l2ProxyCalldata,
-    priorityTxMaxGasLimit,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    factoryDeps,
-    deployer.deployWallet.address,
-  ]);
   const gasPrice = await deployer.deployWallet.getGasPrice();
   const requiredValueForL2Tx = await deployer
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
 
-  await deployer.executeUpgrade(
-    deployer.addresses.StateTransition.DiamondProxy,
-    requiredValueForL2Tx.mul(10),
-    mailboxCalldata
-  );
+  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+    // on the main branch the l2SharedBridge governor is incorrectly set to deploy wallet, so we can just make the call
+    const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
+    const tx = await hyperchain.requestL2Transaction(
+      process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
+      0,
+      l2ProxyCalldata,
+      priorityTxMaxGasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps,
+      deployer.deployWallet.address,
+      { value: requiredValueForL2Tx.mul(10) }
+    );
+    await tx.wait();
+  } else {
+    const mailboxFacet = new Interface(hardhat.artifacts.readArtifactSync("MailboxFacet").abi);
+    const mailboxCalldata = mailboxFacet.encodeFunctionData("requestL2Transaction", [
+      process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
+      0,
+      l2ProxyCalldata,
+      priorityTxMaxGasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+      factoryDeps,
+      deployer.deployWallet.address,
+    ]);
+
+    await deployer.executeUpgrade(
+      deployer.addresses.StateTransition.DiamondProxy,
+      requiredValueForL2Tx.mul(10),
+      mailboxCalldata
+    );
+  }
 }
 
 async function upgradeL1ERC20Bridge(deployer: Deployer) {
   if (process.env.CHAIN_ETH_NETWORK === "localhost") {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
-    const bridgeProxy: ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(
-      deployer.addresses.Bridges.ERC20BridgeProxy,
+    // upgrade ERC20.
+    const proxyAdminAbi = ["function upgrade(address, address)"];
+    const proxyAdmin = new ethers.Contract(
+      deployer.addresses.TransparentProxyAdmin,
+      proxyAdminAbi,
       deployer.deployWallet
     );
-    const tx = await bridgeProxy.upgradeTo(deployer.addresses.Bridges.ERC20BridgeImplementation);
-    await tx.wait();
+    const data1 = await proxyAdmin.interface.encodeFunctionData("upgrade", [
+      deployer.addresses.Bridges.ERC20BridgeProxy,
+      deployer.addresses.Bridges.ERC20BridgeImplementation,
+    ]);
 
-    const tx2 = await bridgeProxy.changeAdmin(deployer.addresses.TransparentProxyAdmin);
-    await tx2.wait();
+    await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, data1);
+
     if (deployer.verbose) {
       console.log("L1ERC20Bridge upgrade sent");
     }
@@ -310,12 +364,11 @@ async function migrateAssets(deployer: Deployer) {
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
 
-  if (deployer.verbose) {
-    console.log("transferring Dai");
-  }
-
   const tokens = getTokens();
   const altTokenAddress = tokens.find((token: { symbol: string }) => token.symbol == "DAI")!.address;
+  if (deployer.verbose) {
+    console.log("transferring Dai, ", altTokenAddress);
+  }
 
   // Mint some tokens
   const l1Erc20ABI = ["function mint(address to, uint256 amount)"];

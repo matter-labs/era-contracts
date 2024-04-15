@@ -105,6 +105,8 @@ export interface DeployedAddresses {
     ERC20BridgeProxy: string;
     SharedBridgeImplementation: string;
     SharedBridgeProxy: string;
+    L2SharedBridgeProxy: string;
+    L2SharedBridgeImplementation: string;
   };
   BaseToken: string;
   TransparentProxyAdmin: string;
@@ -139,6 +141,8 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
       ERC20BridgeProxy: getAddressFromEnv("CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR"),
       SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_IMPL_ADDR"),
       SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR"),
+      L2SharedBridgeImplementation: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR"),
+      L2SharedBridgeProxy: getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR"),
     },
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),

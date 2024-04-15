@@ -22,12 +22,11 @@ import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from ".
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import type { ProposedUpgrade, VerifierParams } from "../../src.ts/utils";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
 import {
-  EMPTY_STRING_KECCAK,
   L2_BOOTLOADER_ADDRESS,
   L2_SYSTEM_CONTEXT_ADDRESS,
   SYSTEM_LOG_KEYS,
