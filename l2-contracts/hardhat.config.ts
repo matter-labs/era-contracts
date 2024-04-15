@@ -26,16 +26,6 @@ const localConfig = {
   ERA_WETH_ADDRESS: "address(0)",
 };
 
-const contractDefs = {
-  sepolia: testnetConfig,
-  rinkeby: testnetConfig,
-  ropsten: testnetConfig,
-  goerli: testnetConfig,
-  mainnet: prodConfig,
-  hardhat: hardhatConfig,
-  localhost: localConfig,
-};
-
 export default {
   zksolc: {
     version: "1.3.18",
