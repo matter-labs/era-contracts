@@ -1217,7 +1217,7 @@ object "EVMInterpreter" {
                             nonceEncoded := nonce
                         }
                         listLength := 22
-                        listLengthEconded := add(listLengthEconded, 0xC0)
+                        listLengthEconded := add(listLength, 0xC0)
 
                         // TODO: Replace 176 with 168 + bytesLength(listLengthEncoded)
                         digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
@@ -1242,9 +1242,10 @@ object "EVMInterpreter" {
                         printHex(mload(offset))
 
                         // TODO: Replace 23 with bytesLength(digest)
-                        addr := keccak256(offset, 23)
-
+                        addr := and(keccak256(offset, 23), 0x1ffffffffffffffffffffffffffffffffffffffff)
                         printString("keccak256")
+                        printHex(keccak256(offset, 23))
+                        printString("addr")
                         printHex(addr)
                     }
 
