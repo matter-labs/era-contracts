@@ -3597,6 +3597,55 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
                 }
+                case 0xF3 { // OP_RETURN
+                    let offset,size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    ensureAcceptableMemLocation(offset)
+                    ensureAcceptableMemLocation(size)
+                    evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+                    return(add(offset,MEM_OFFSET_INNER()),size)
+                }
+                case 0xFD { // OP_REVERT
+                    let offset,size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    ensureAcceptableMemLocation(offset)
+                    ensureAcceptableMemLocation(size)
+                    evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+                    revert(add(offset,MEM_OFFSET_INNER()),size)
+                }
+                case 0xFE { // OP_INVALID
+                    evmGasLeft := 0
+
+                    invalid()
+                }
+                case 0xFF { // OP_SELFDESTRUCT
+                    let addr
+
+                    addr, sp := popStackItem(sp)
+
+                    let wasWarm := warmAddress(addr)
+
+                    let staticGas := 5000
+                    let dynamicGas := 0
+                    // nonce ?
+                    if and( and( gt(selfbalance(),0) , iszero(balance(addr)) ), iszero(extcodesize(addr)) ) {
+                        dynamicGas := 25000
+                    }
+                    if not(wasWarm) {
+                        dynamicGas := add(dynamicGas ,2600)
+                    }
+                    evmGasLeft := chargeGas(evmGasLeft,add(staticGas,dynamicGas))
+
+                    selfdestruct(addr)
+                }
                 // TODO: REST OF OPCODES
                 default {
                     // TODO: Revert properly here and report the unrecognized opcode
