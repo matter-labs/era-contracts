@@ -1124,6 +1124,46 @@ object "EVMInterpreter" {
 
                     calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
                 }
+                case 0x38 { // OP_CODESIZE
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    sp := pushStackItem(sp, bytecodeLen)
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x39 { // OP_CODECOPY
+                    let bytecodeLen := mload(BYTECODE_OFFSET())
+                    let dst, offset, len
+
+                    dst, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    let minWordSize := div(add(len, 31), 32)
+                    let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, len)))
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+                    // basically BYTECODE_OFFSET + 32 - 31, since
+                    // we always need to read one byte
+                    let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+
+                    // TODO: optimize?
+                    for { let i := 0 } lt(i, len) { i := add(i, 1) } {
+                        switch lt(add(offset, i), bytecodeLen)
+                            case true {
+                                mstore8(
+                                    add(add(MEM_OFFSET_INNER(), offset), i),
+                                    and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
+                                )
+                            }
+                            default {
+                                mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
+                            }
+                    }
+                }
+                case 0x3A { // OP_GASPRICE
+                    sp := pushStackItem(sp, gasprice())
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
                 case 0x40 { // OP_BLOCKHASH
                     let blockNumber
                     blockNumber, sp := popStackItem(sp)
