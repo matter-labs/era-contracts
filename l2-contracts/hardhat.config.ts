@@ -2,10 +2,7 @@ import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
-import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain";
-import { task } from "hardhat/config";
-import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 
 // If no network is specified, use the default config
 if (!process.env.CHAIN_ETH_NETWORK) {
@@ -91,6 +88,3 @@ export default {
   },
 };
 
-task("solpp", "Preprocess Solidity source files").setAction(async (_, hre) =>
-  hre.run(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS)
-);
