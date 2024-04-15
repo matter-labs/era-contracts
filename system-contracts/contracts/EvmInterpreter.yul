@@ -2626,7 +2626,7 @@ object "EVMInterpreter" {
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
 
-            warmAddress(address())
+            pop(warmAddress(address()))
 
             for { } true { } {
                 opcode := readIP(ip)
@@ -2900,8 +2900,9 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, balance(addr))
 
-                    // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                    switch wasWarm
+                        case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
+                        default { evmGasLeft := chargeGas(evmGasLeft, 100) }
                 }
                 case 0x32 { // OP_ORIGIN
                     sp := pushStackItem(sp, origin())
