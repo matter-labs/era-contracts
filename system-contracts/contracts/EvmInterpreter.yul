@@ -1257,14 +1257,22 @@ object "EVMInterpreter" {
                     // Deployed address (WIP)
                     mstore(add(offset, 4), addr)
                     // Init code (len = 1): 0x00
-                    mstore8(add(offset, 36), 0x01)
-                    mstore8(add(offset, 37), 0x00)
+                    mstore(add(offset, 36), 64)
+                    mstore(add(offset, 68), 5)
+                    mstore8(add(offset, 100), 0x60)
+                    mstore8(add(offset, 101), 0x80)
+                    mstore8(add(offset, 102), 0x60)
+                    mstore8(add(offset, 103), 0x40)
+                    mstore8(add(offset, 104), 0x52)
 
                     printString("Memory")
                     printHex(mload(offset))
                     printHex(mload(add(offset, 32)))
+                    printHex(mload(add(offset, 64)))
+                    printHex(mload(add(offset, 96)))
 
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 0x26, 0, 0)
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 105, 0, 0)
+
                     sp := pushStackItem(sp, result)
                 }
                 // TODO: REST OF OPCODES
