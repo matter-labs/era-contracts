@@ -666,7 +666,7 @@ object "EVMInterpreter" {
                     // Zero out the memory, is it necessary?
                     let _lastByte := add(dest, len)
                     for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
-                            mstore8(i, 0)
+                        mstore8(i, 0)
                     }
                     // Gets the code from the addr
                     pop(_fetchDeployedCode(addr, offset, len))
@@ -693,9 +693,9 @@ object "EVMInterpreter" {
                         revert(0, 0)
                     }
 
-                    // TODO: Handle dynamicGas for gas costs.
                     // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
-                    let dynamicGas := 0
+                    // let minWordSize := div(add(len, 31), 32) Used inside the mul
+                    let dynamicGas := add(mul(6, div(add(len, 31), 32)), expandMemory(add(offset, len)))
                     evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
                     returndatacopy(add(MEM_OFFSET(), offset), add(MEM_OFFSET(), dest), len)
