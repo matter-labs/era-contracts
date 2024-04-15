@@ -936,10 +936,12 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, exp(a, exponent))
 
-                    let expSizeByte := 0
-                    if not(iszero(exponent)) {
-                        expSizeByte := div(add(exponent, 256), 256)
-                    }
+                    let expSizeByte
+                    switch exponent 
+                        case 0 { expSizeByte := 0 }
+                        default {
+                            expSizeByte := div(add(exponent, 256), 256)
+                        }
 
                     evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
                 }
@@ -2718,10 +2720,12 @@ object "EVMInterpreter" {
 
                     sp := pushStackItem(sp, exp(a, exponent))
 
-                    let expSizeByte := 0
-                    if not(iszero(exponent)) {
-                        expSizeByte := div(add(exponent, 256), 256)
-                    }
+                    let expSizeByte
+                    switch exponent 
+                        case 0 { expSizeByte := 0 }
+                        default {
+                            expSizeByte := div(add(exponent, 256), 256)
+                        }
 
                     evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
                 }
