@@ -642,9 +642,9 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     len, sp := popStackItem(sp)
 
-                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
                     // let minWordSize := div(add(len, 31), 32) Used inside the mul
-                    let dynamicGas := add(mul(6, div(add(len, 31), 32)), expandMemory(add(offset, len)))
+                    let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
                     evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
                     // basically BYTECODE_OFFSET + 32 - 31, since
