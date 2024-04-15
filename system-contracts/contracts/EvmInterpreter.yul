@@ -463,7 +463,7 @@ object "EVMInterpreter" {
                     if not(iszero(exponent)) {
                         expSizeByte := div(add(exponent, 256), 256)
                     }
-                    
+
                     evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
                 }
                 case 0x0B { // OP_SIGNEXTEND
