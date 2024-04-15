@@ -320,6 +320,24 @@ object "EVMInterpreter" {
                 originalValue := mload(32)
             }
 
+            function warmAddress(addr) -> isWarm {
+                // TODO: Unhardcode this selector 0x8db2ba78
+                mstore8(0, 0x8d)
+                mstore8(1, 0xb2)
+                mstore8(2, 0xba)
+                mstore8(3, 0x78)
+                mstore(4, addr)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+    
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+    
+                isWarm := mload(0)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -348,6 +366,8 @@ object "EVMInterpreter" {
 
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
+
+            pop(warmAddress(address()))
 
             for { } true { } {
                 opcode := readIP(ip)
@@ -593,10 +613,14 @@ object "EVMInterpreter" {
 
                     addr, sp := popStackItem(sp)
 
+                    let wasWarm := warmAddress(addr)
+
                     sp := pushStackItem(sp, balance(addr))
 
                     // TODO: Handle cold/warm slots and updates, etc for gas costs.
-                    evmGasLeft := chargeGas(evmGasLeft, 100)
+                    switch wasWarm
+                    case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
+                    default { evmGasLeft := chargeGas(evmGasLeft, 100) }
                 }
                 case 0x32 { // OP_ORIGIN
                     sp := pushStackItem(sp, origin())
