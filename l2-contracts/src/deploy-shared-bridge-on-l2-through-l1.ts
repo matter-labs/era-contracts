@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { formatUnits, Interface, parseUnits } from "ethers/lib/utils";
+import { formatUnits, Interface, parseUnits, defaultAbiCoder } from "ethers/lib/utils";
 import {
   computeL2Create2Address,
   create2DeployFromL1,
@@ -84,7 +84,7 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
   const l2SharedBridgeImplAddress = computeL2Create2Address(
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    "0x",
+    defaultAbiCoder.encode(["uint256"], [chainId]),
     ethers.constants.HashZero
   );
   if (deployer.verbose) {
@@ -101,7 +101,7 @@ export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainI
     chainId,
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    "0x",
+    defaultAbiCoder.encode(["uint256"], [chainId]),
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
     gasPrice,
