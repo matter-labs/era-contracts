@@ -47,15 +47,6 @@ export default {
   solidity: {
     version: "0.8.20",
   },
-  solpp: {
-    defs: (() => {
-      const defs = contractDefs[process.env.CHAIN_ETH_NETWORK];
-
-      return {
-        ...defs,
-      };
-    })(),
-  },
   defaultNetwork: "localhost",
   networks: {
     localhost: {
