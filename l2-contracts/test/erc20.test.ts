@@ -50,7 +50,7 @@ describe("ERC20Bridge", function () {
 
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
 
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"));
+    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [9]);
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
       ethers.constants.AddressZero,
