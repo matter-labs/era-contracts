@@ -158,7 +158,7 @@ export async function initializeChainGovernance(deployer: Deployer, chainId: str
     console.log("Initializing chain governance");
   }
   await deployer.executeUpgrade(
-    l1SharedBridge.addresses,
+    l1SharedBridge.address,
     0,
     l1SharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
       chainId,
