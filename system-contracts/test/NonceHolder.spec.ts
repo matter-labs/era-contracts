@@ -2,9 +2,9 @@ import { expect } from "chai";
 import type { NonceHolder } from "../typechain";
 import { NonceHolderFactory } from "../typechain";
 import {
-  TEST_BOOTLOADER_FORMAL_ADDRESS,
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
 } from "./shared/constants";
 import { prepareEnvironment, setResult } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
@@ -14,17 +14,16 @@ import { BigNumber } from "ethers";
 describe("NonceHolder tests", () => {
   const wallet = getWallets()[0];
   let nonceHolder: NonceHolder;
-  let nonceHolderAccount: ethers.Signer;
   let systemAccount: ethers.Signer;
   let deployerAccount: ethers.Signer;
 
   before(async () => {
     await prepareEnvironment();
-    await deployContractOnAddress(await wallet.getAddress(), "NonceHolder");
     await deployContractOnAddress(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, "NonceHolder");
-    nonceHolder = NonceHolderFactory.connect(await wallet.getAddress(), wallet);
-    nonceHolderAccount = await ethers.getImpersonatedSigner(await wallet.getAddress());
-    systemAccount = await ethers.getImpersonatedSigner("0x000000000000000000000000000000000000900b");
+    nonceHolder = NonceHolderFactory.connect(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, wallet);
+
+    // Using a system account to satisfy the `onlySystemCall` modifier.
+    systemAccount = await ethers.getImpersonatedSigner(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS);
     deployerAccount = await ethers.getImpersonatedSigner(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
   });
 
@@ -33,19 +32,18 @@ describe("NonceHolder tests", () => {
       method: "hardhat_stopImpersonatingAccount",
       params: [TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS],
     });
-
-    await network.provider.request({
-      method: "hardhat_stopImpersonatingAccount",
-      params: [TEST_BOOTLOADER_FORMAL_ADDRESS],
-    });
   });
 
   describe("increaseMinNonce and getters", () => {
     it("should increase account minNonce by 1", async () => {
       const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
+      const rawNonceBefore = await nonceHolder.getRawNonce(systemAccount.address);
       await nonceHolder.connect(systemAccount).increaseMinNonce(1);
       const nonceAfter = await nonceHolder.getMinNonce(systemAccount.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(systemAccount.address);
+
       expect(nonceAfter).to.equal(nonceBefore.add(1));
+      expect(rawNonceAfter).to.equal(rawNonceBefore.add(1));
     });
 
     it("should stay the same", async () => {
@@ -61,20 +59,28 @@ describe("NonceHolder tests", () => {
 
     it("should increase account minNonce by many", async () => {
       const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
+      const rawNonceBefore = await nonceHolder.getRawNonce(systemAccount.address);
       await nonceHolder.connect(systemAccount).increaseMinNonce(2 ** 4);
-      const result = await nonceHolder.getMinNonce(systemAccount.address);
-      expect(result).to.equal(nonceBefore.add(2 ** 4));
+      const nonceAfter = await nonceHolder.getMinNonce(systemAccount.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(systemAccount.address);
+
+      expect(nonceAfter).to.equal(nonceBefore.add(2 ** 4));
+      expect(rawNonceAfter).to.equal(rawNonceBefore.add(2 ** 4));
     });
 
     it("should fail with too high", async () => {
       const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
-      await nonceHolder.connect(systemAccount).increaseMinNonce(2 ** 4 + 1);
-      const result = await nonceHolder.getMinNonce(systemAccount.address);
-      expect(result).to.equal(nonceBefore.add(2 ** 4 + 1));
+      const rawNonceBefore = await nonceHolder.getRawNonce(systemAccount.address);
 
       await expect(
         nonceHolder.connect(systemAccount).increaseMinNonce(BigNumber.from(2).pow(32).add(1))
       ).to.be.rejectedWith("The value for incrementing the nonce is too high");
+
+      const nonceAfter = await nonceHolder.getMinNonce(systemAccount.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(systemAccount.address);
+
+      expect(nonceAfter).to.equal(nonceBefore);
+      expect(rawNonceAfter).to.equal(rawNonceBefore);
     });
 
     it("should revert This method require system call flag", async () => {
@@ -106,17 +112,17 @@ describe("NonceHolder tests", () => {
 
   describe("incrementDeploymentNonce", async () => {
     it("should revert Only the contract deployer can increment the deployment nonce", async () => {
-      await expect(
-        nonceHolder.connect(nonceHolderAccount).incrementDeploymentNonce(deployerAccount.address)
-      ).to.be.rejectedWith("Only the contract deployer can increment the deployment nonce");
+      await expect(nonceHolder.incrementDeploymentNonce(deployerAccount.address)).to.be.rejectedWith(
+        "Only the contract deployer can increment the deployment nonce"
+      );
     });
 
     it("should increment deployment nonce", async () => {
-      const nonceBefore = await nonceHolder.getDeploymentNonce(nonceHolderAccount.address);
-      const rawNonceBefore = await nonceHolder.getRawNonce(nonceHolderAccount.address);
-      await nonceHolder.connect(deployerAccount).incrementDeploymentNonce(nonceHolderAccount.address);
-      const nonceAfter = await nonceHolder.getDeploymentNonce(nonceHolderAccount.address);
-      const rawNonceAfter = await nonceHolder.getRawNonce(nonceHolderAccount.address);
+      const nonceBefore = await nonceHolder.getDeploymentNonce(wallet.address);
+      const rawNonceBefore = await nonceHolder.getRawNonce(wallet.address);
+      await nonceHolder.connect(deployerAccount).incrementDeploymentNonce(wallet.address);
+      const nonceAfter = await nonceHolder.getDeploymentNonce(wallet.address);
+      const rawNonceAfter = await nonceHolder.getRawNonce(wallet.address);
 
       expect(nonceAfter).to.equal(nonceBefore.add(BigNumber.from(1)));
       expect(rawNonceAfter).to.equal(rawNonceBefore.add(BigNumber.from(2).pow(128)));
