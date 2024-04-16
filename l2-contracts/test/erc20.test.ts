@@ -35,6 +35,8 @@ describe("ERC20Bridge", function () {
   // We won't actually deploy an L1 token in these tests, but we need some address for it.
   const L1_TOKEN_ADDRESS = "0x1111000000000000000000000000000000001111";
 
+  const testChainId = 9;
+
   let erc20Bridge: L2SharedBridge;
   let erc20Token: L2StandardERC20;
 
@@ -50,7 +52,7 @@ describe("ERC20Bridge", function () {
 
     const beaconProxyBytecodeHash = hashBytecode((await deployer.loadArtifact("BeaconProxy")).bytecode);
 
-    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [9]);
+    const erc20BridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const bridgeInitializeData = erc20BridgeImpl.interface.encodeFunctionData("initialize", [
       unapplyL1ToL2Alias(l1BridgeWallet.address),
       ethers.constants.AddressZero,
