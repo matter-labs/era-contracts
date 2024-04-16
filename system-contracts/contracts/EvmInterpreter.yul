@@ -2603,7 +2603,7 @@ object "EVMInterpreter" {
 
                         addressEncoded := and(
                             add(address(), shl(160, 0x94)),
-                            0x3ffffffffffffffffffffffffffffffffffffffffff
+                            0xffffffffffffffffffffffffffffffffffffffffffff
                         )
 
                         nonceEncoded := nonce
@@ -2650,7 +2650,7 @@ object "EVMInterpreter" {
 
                         addr := and(
                             keccak256(0, add(div(arrayLength, 8), 1)),
-                            0x1ffffffffffffffffffffffffffffffffffffffff
+                            0xffffffffffffffffffffffffffffffffffffffff
                         )
                     }
 
