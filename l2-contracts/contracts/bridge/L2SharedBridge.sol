@@ -57,11 +57,11 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         require(_aliasedOwner != address(0), "sf");
 
         l1Bridge = _l1Bridge;
-        l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
             l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+            l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
             require(_l1LegacyBridge != address(0), "bf2");
