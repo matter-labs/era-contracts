@@ -3619,7 +3619,19 @@ object "EVMInterpreter" {
                     ensureAcceptableMemLocation(size)
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
-                    revert(add(offset,MEM_OFFSET_INNER()),size)
+                    if eq(isCallerEVM,1) {
+                        // include gas
+                        offset := add(offset, MEM_OFFSET_INNER())
+                        let previousValue := mload(sub(offset,32))
+                        mstore(sub(offset,32),evmGasLeft)
+                        mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+                        // but it appears to rewrite were we want to store the gas
+
+                        offset := sub(offset, 32)
+                        size := add(size, 32)
+                    }
+
+                    revert(offset,size)
                 }
                 case 0xFE { // OP_INVALID
                     evmGasLeft := 0
@@ -3635,8 +3647,15 @@ object "EVMInterpreter" {
 
                     let staticGas := 5000
                     let dynamicGas := 0
-                    // nonce ?
-                    if and( and( gt(selfbalance(),0) , iszero(balance(addr)) ), iszero(extcodesize(addr)) ) {
+                    if and( 
+                        and( 
+                            and( 
+                                gt(selfbalance(),0), 
+                                iszero(balance(addr)) 
+                            ), 
+                            iszero(extcodesize(addr)) ),
+                        iszero(getNonce(addr))
+                    ) {
                         dynamicGas := 25000
                     }
                     if not(wasWarm) {
@@ -3644,7 +3663,7 @@ object "EVMInterpreter" {
                     }
                     evmGasLeft := chargeGas(evmGasLeft,add(staticGas,dynamicGas))
 
-                    selfdestruct(addr)
+                    //selfdestruct(addr)
                 }
                 // TODO: REST OF OPCODES
                 default {
@@ -3656,6 +3675,7 @@ object "EVMInterpreter" {
 
             if eq(isCallerEVM, 1) {
                 // Includes gas
+                // I think this needs to be done the same way as revert opcode
                 returnOffset := sub(returnOffset, 32)
                 returnLen := add(returnLen, 32)
             }
