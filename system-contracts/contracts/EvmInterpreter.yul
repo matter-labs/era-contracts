@@ -98,6 +98,12 @@ object "EVMInterpreter" {
             addr :=  0x0000000000000000000000000000000000008013
         }
 
+        function GAS_CONSTANTS() -> divisor, stipend, overhead {
+            divisor := 5
+            stipend := shl(30, 1)
+            overhead := 2000
+        }
+
         function DEBUG_SLOT_OFFSET() -> offset {
             offset := mul(32, 32)
         }
@@ -406,6 +412,31 @@ object "EVMInterpreter" {
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
 
             nonce := mload(0)
+        }
+
+        function getEVMGas() -> evmGas {
+            let GAS_DIVISOR, EVM_GAS_STIPEND, OVERHEAD := GAS_CONSTANTS()
+
+            let gasLeft := gas()
+            let requiredGas := add(EVM_GAS_STIPEND, OVERHEAD)
+
+            evmGas := div(sub(gasLeft, requiredGas), GAS_DIVISOR)
+
+            if lt(gasLeft, requiredGas) {
+                evmGas := 0
+            }
+        }
+
+        function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
+            if len {
+                let firstByte := shr(mload(offset), 248)
+                if eq(firstByte, 0xEF) {
+                    revert(0, 0)
+                }
+            }
+
+            let gasForCode := mul(len, 200)
+            returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
         function simulate(
@@ -1358,13 +1389,13 @@ object "EVMInterpreter" {
 
         getConstructorBytecode()
 
-        // if iszero(isCallerEVM) {
-        //     evmGasLeft = _getEVMGas()
-        // }
+        if iszero(isCallerEVM) {
+            evmGasLeft := getEVMGas()
+        }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
 
-        // gasToReturn = validateCorrectBytecode(offset, len, gasToReturn);
+        gasToReturn := validateCorrectBytecode(offset, len, gasToReturn)
 
         offset, len := padBytecode(offset, len)
 
