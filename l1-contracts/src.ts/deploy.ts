@@ -279,7 +279,7 @@ export class Deployer {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       "StateTransitionManager",
-      [this.addresses.Bridgehub.BridgehubProxy],
+      [this.addresses.Bridgehub.BridgehubProxy, getNumberFromEnv("CONTRACTS_MAX_NUMBER_OF_HYPERCHAINS")],
       create2Salt,
       ethTxOptions
     );

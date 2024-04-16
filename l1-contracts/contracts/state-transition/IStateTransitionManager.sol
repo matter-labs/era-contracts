@@ -57,7 +57,7 @@ interface IStateTransitionManager {
     /// @notice new ProtocolVersion
     event NewProtocolVersion(uint256 indexed oldProtocolVersion, uint256 indexed newProtocolVersion);
 
-    function bridgehub() external view returns (address);
+    function BRIDGE_HUB() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;
 
@@ -95,7 +95,7 @@ interface IStateTransitionManager {
         bytes calldata _diamondCut
     ) external;
 
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external;
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external;
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,

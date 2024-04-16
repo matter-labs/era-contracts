@@ -20,12 +20,16 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
 import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 
-/// @title StateTransition contract
+/// @title State Transition Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice Address of the bridgehub
-    address public immutable bridgehub;
+    address public immutable BRIDGE_HUB;
+
+    /// @notice The total number of hyperchains can be created/connected to this STM.
+    /// This is the temporary security measure.
+    uint256 public immutable MAX_NUMBER_OF_HYPERCHAINS;
 
     /// @notice The mapping from chainId => hyperchain contract
     mapping(uint256 chainId => address chainContract) public hyperchain;
@@ -57,15 +61,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
+    /// @dev  The total number of already deployed/connected hyperchains.
+    uint256 public totalNumberOfHyperchains;
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(address _bridgehub) reentrancyGuardInitializer {
-        bridgehub = _bridgehub;
+    constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
+        BRIDGE_HUB = _bridgehub;
+        MAX_NUMBER_OF_HYPERCHAINS = _maxNumberOfHyperchains;
     }
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        require(msg.sender == bridgehub, "STM: only bridgehub");
+        require(msg.sender == BRIDGE_HUB, "STM: only bridgehub");
         _;
     }
 
@@ -172,7 +180,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev set the protocol version timestamp
-    function setprotocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
     }
 
@@ -298,11 +306,11 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev used to register already deployed hyperchain contracts
     /// @param _chainId the chain's id
-    /// @param _hyperchainContract the chain's contract
-    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchainContract) external onlyOwner {
-        require(_hyperchainContract != address(0), "STM: hyperchain zero");
-        hyperchain[_chainId] = _hyperchainContract;
-        emit NewHyperchain(_chainId, _hyperchainContract);
+    /// @param _hyperchain the chain's contract address
+    function registerAlreadyDeployedHyperchain(uint256 _chainId, address _hyperchain) external onlyOwner {
+        require(_hyperchain != address(0), "STM: hyperchain zero");
+
+        _registerNewHyperchain(_chainId, _hyperchain);
     }
 
     /// @notice called by Bridgehub when a chain registers
@@ -337,7 +345,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
-            bytes32(uint256(uint160(bridgehub))),
+            bytes32(uint256(uint160(BRIDGE_HUB))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(uint256(protocolVersion)),
             bytes32(uint256(uint160(_admin))),
@@ -355,11 +363,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         // save data
         address hyperchainAddress = address(hyperchainContract);
 
-        hyperchain[_chainId] = hyperchainAddress;
+        _registerNewHyperchain(_chainId, hyperchainAddress);
 
         // set chainId in VM
         _setChainIdUpgrade(_chainId, hyperchainAddress);
+    }
 
-        emit NewHyperchain(_chainId, hyperchainAddress);
+    /// @dev This internal function is used to register a new hyperchain in the system.
+    function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
+        uint256 currentNumberOfHyperchains = totalNumberOfHyperchains;
+        require(currentNumberOfHyperchains <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
+        totalNumberOfHyperchains++;
+
+        hyperchain[_chainId] = _hyperchain;
+        emit NewHyperchain(_chainId, _hyperchain);
     }
 }

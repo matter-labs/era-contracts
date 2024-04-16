@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -19,6 +21,8 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
+    using stdStorage for StdStorage;
+
     function test_initialize_wrongOwner() public {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
@@ -156,11 +160,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         vm.prank(bridgehubAddress);
         vm.expectRevert("ShB tx hap");
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
@@ -259,11 +259,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(

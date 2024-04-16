@@ -120,9 +120,9 @@ interface IL1SharedBridge {
         uint256 _eraLegacyBridgeLastDepositTxNumber
     ) external;
 
-    function l1WethAddress() external view returns (address);
+    function L1_WETH_TOKEN() external view returns (address);
 
-    function bridgehub() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (IBridgehub);
 
     function legacyBridge() external view returns (IL1ERC20Bridge);
 

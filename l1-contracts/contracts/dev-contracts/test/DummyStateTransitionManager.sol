@@ -11,7 +11,7 @@ contract DummyStateTransitionManager is StateTransitionManager {
     function test() internal virtual {}
 
     /// @notice Constructor
-    constructor() StateTransitionManager(address(0)) {}
+    constructor() StateTransitionManager(address(0), type(uint256).max) {}
 
     function setHyperchain(uint256 _chainId, address _hyperchain) external {
         hyperchain[_chainId] = _hyperchain;

@@ -41,7 +41,7 @@ contract StateTransitionManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(bridgehub);
-        stateTransitionManager = new StateTransitionManager(bridgehub);
+        stateTransitionManager = new StateTransitionManager(bridgehub, type(uint256).max);
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new GenesisUpgrade();
 

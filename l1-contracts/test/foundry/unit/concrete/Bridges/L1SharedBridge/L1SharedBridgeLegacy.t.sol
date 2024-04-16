@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -11,6 +13,8 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
 contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
+    using stdStorage for StdStorage;
+
     function test_depositLegacyERC20Bridge() public {
         uint256 l2TxGasLimit = 100000;
         uint256 l2TxGasPerPubdataByte = 100;
@@ -50,16 +54,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -104,16 +99,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -165,23 +151,10 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(eraChainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
