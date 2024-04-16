@@ -411,7 +411,25 @@ object "EVMInterpreter" {
 
             let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
 
+            if iszero(result) {
+                revert(0, 0)
+            }
+
             nonce := mload(0)
+        }
+
+        function incrementNonce(addr) {
+            mstore8(0, 0x30)
+            mstore8(1, 0x63)
+            mstore8(2, 0x95)
+            mstore8(3, 0xc6)
+            mstore(4, addr)
+
+            let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+
+            if iszero(result) {
+                revert(0, 0)
+            }
         }
 
         function getEVMGas() -> evmGas {
@@ -1753,7 +1771,25 @@ object "EVMInterpreter" {
 
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
 
+                if iszero(result) {
+                    revert(0, 0)
+                }
+
                 nonce := mload(0)
+            }
+
+            function incrementNonce(addr) {
+                mstore8(0, 0x30)
+                mstore8(1, 0x63)
+                mstore8(2, 0x95)
+                mstore8(3, 0xc6)
+                mstore(4, addr)
+
+                let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+
+                if iszero(result) {
+                    revert(0, 0)
+                }
             }
 
             ////////////////////////////////////////////////////////////////
@@ -2691,6 +2727,8 @@ object "EVMInterpreter" {
                     if iszero(result) {
                         revert(0, 0)
                     }
+
+                    incrementNonce(address())
 
                     let back
 
