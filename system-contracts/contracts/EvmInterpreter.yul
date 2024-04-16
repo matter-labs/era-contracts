@@ -1280,83 +1280,98 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    offset := add(MEM_OFFSET_INNER(), 0x40) // 0x40 is just to make sure there's enough space while testing
-
                     let addr
                     {
-                        let digest, nonce, addressEncoded, nonceEncoded, listLength, listLengthEconded
+                        let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
 
                         nonce := getNonce()
-                        printString("getNonce")
-                        printHex(nonce)
 
-                        addressEncoded := and(add(address(), shl(160, 0x94)), 0x3ffffffffffffffffffffffffffffffffffffffffff)
+                        addressEncoded := and(
+                            add(address(), shl(160, 0x94)),
+                            0xffffffffffffffffffffffffffffffffffffffffffff
+                        )
 
-                        // This block works if 0 <= nonce <= 127
-                        // TODO: Make it work on nonce >= 128
-                        nonceEncoded := 128
-                        if gt(nonce, 0) {
-                            nonceEncoded := nonce
+                        nonceEncoded := nonce
+                        nonceEncodedLength := 1
+                        if iszero(nonce) {
+                            nonceEncoded := 128
                         }
-                        listLength := 22
+                        // The nonce has 4 bytes
+                        if gt(nonce, 0xFFFFFF) {
+                            nonceEncoded := shl(32, 0x84)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 5
+                        }
+                        // The nonce has 3 bytes
+                        if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                            nonceEncoded := shl(24, 0x83)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 4
+                        }
+                        // The nonce has 2 bytes
+                        if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                            nonceEncoded := shl(16, 0x82)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 3
+                        }
+                        // The nonce has 1 byte and it's in [0x80, 0xFF]
+                        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                            nonceEncoded := shl(8, 0x81)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 2
+                        }
+
+                        listLength := add(21, nonceEncodedLength)
                         listLengthEconded := add(listLength, 0xC0)
 
-                        // TODO: Replace 176 with 168 + bytesLength(listLengthEncoded)
-                        digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
+                        let arrayLength := add(168, mul(8, nonceEncodedLength))
 
-                        printString("address")
-                        printHex(address())
-                        printString("address encoded")
-                        printHex(addressEncoded)
-                        printString("nonceEncoded")
-                        printHex(nonceEncoded)
-                        printString("listLength")
-                        printHex(listLength)
-                        printString("listLengthEncoded")
-                        printHex(listLengthEconded)
-                        printString("digest")
-                        printHex(digest)
+                        digest := add(
+                            shl(arrayLength, listLengthEconded),
+                            add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
+                        )
 
-                        // TODO: Replace 72 with 256 - bitsLength(digest)
-                        mstore(offset, shl(72, digest))
+                        mstore(0, shl(sub(248, arrayLength), digest))
 
-                        printString("Mem")
-                        printHex(mload(offset))
-
-                        // TODO: Replace 23 with bytesLength(digest)
-                        addr := and(keccak256(offset, 23), 0x1ffffffffffffffffffffffffffffffffffffffff)
-                        printString("keccak256")
-                        printHex(keccak256(offset, 23))
-                        printString("addr")
-                        printHex(addr)
+                        addr := and(
+                            keccak256(0, add(div(arrayLength, 8), 1)),
+                            0xffffffffffffffffffffffffffffffffffffffff
+                        )
                     }
 
+                    offset := add(MEM_OFFSET_INNER(), offset)
+
+                    sp := pushStackItem(sp, sub(offset, 0x80))
+                    sp := pushStackItem(sp, sub(offset, 0x60))
+                    sp := pushStackItem(sp, sub(offset, 0x40))
+                    sp := pushStackItem(sp, sub(offset, 0x20))
+
                     // Selector
-                    mstore8(offset, 0x5b)
-                    mstore8(add(offset, 1), 0x16)
-                    mstore8(add(offset, 2), 0xa2)
-                    mstore8(add(offset, 3), 0x3c)
-                    // Address (arg1)
-                    // mstore(add(offset, 4), shl(96, addr))
-                    mstore(add(offset, 4), addr)
-                    // Init code (len = 1): 0x00
-                    // Init code (arg2)
+                    mstore(sub(offset, 0x80), 0x5b16a23c)
+                    // Arg1: address
+                    mstore(sub(offset, 0x60), addr)
+                    // Arg2: init code
                     // Where the arg starts (third word)
-                    mstore(add(offset, 36), 64)
+                    mstore(sub(offset, 0x40), 0x40)
                     // Length of the init code
-                    mstore(add(offset, 68), 88)
-                    // init code itself
-                    mstore(add(offset, 100), 0x6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f)
-                    mstore(add(offset, 132), 0x80fdfea264697066735822122070e77c564e632657f44e4b3cb2d5d4f74255fc)
-                    mstore(add(offset, 164), 0x64ca5fae813eb74275609e61e364736f6c634300081900330000000000000000)
+                    mstore(sub(offset, 0x20), size)
 
-                    printString("Memory")
-                    printHex(mload(offset))
-                    printHex(mload(add(offset, 32)))
-                    printHex(mload(add(offset, 64)))
-                    printHex(mload(add(offset, 96)))
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
 
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 188, 0, 0)
+                    if iszero(result) {
+                        revert(0, 0)
+                    }
+
+                    let back
+
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x20), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x40), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x60), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x80), back)
 
                     sp := pushStackItem(sp, addr)
                 }
