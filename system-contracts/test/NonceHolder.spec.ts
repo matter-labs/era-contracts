@@ -165,10 +165,10 @@ describe("NonceHolder tests", () => {
       expect(storedValue).to.equal(333);
     });
 
-    it("should emit ValueSetUnderNonce event not in order", async () => {
+    it("should emit ValueSetUnderNonce event arbitrary ordering", async () => {
       const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
       await nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(currentNonce);
-      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [[1, 0]]);
+      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [[1, 1]]);
       await setResult("ContractDeployer", "getAccountInfo", [systemAccount.address], {
         failure: false,
         returnData: encodedAccountInfo,
@@ -178,9 +178,9 @@ describe("NonceHolder tests", () => {
         .to.emit(nonceHolder, "ValueSetUnderNonce")
         .withArgs(systemAccount.address, currentNonce.add(1), 111);
 
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(3), 333)).to.rejectedWith(
-        "Previous nonce has not been used"
-      );
+      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(3), 333))
+        .to.emit(nonceHolder, "ValueSetUnderNonce")
+        .withArgs(systemAccount.address, currentNonce.add(3), 333);
 
       await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(2), 222))
         .to.emit(nonceHolder, "ValueSetUnderNonce")
