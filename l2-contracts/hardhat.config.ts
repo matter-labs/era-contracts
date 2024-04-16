@@ -10,30 +10,6 @@ if (!process.env.CHAIN_ETH_NETWORK) {
   require("dotenv").config();
 }
 
-const prodConfig = {
-  ERA_CHAIN_ID: 324,
-};
-const testnetConfig = {
-  ERA_CHAIN_ID: 300,
-  ERA_WETH_ADDRESS: "address(0)",
-};
-const hardhatConfig = {
-  ERA_CHAIN_ID: 9,
-  ERA_WETH_ADDRESS: "address(0)",
-};
-const localConfig = {
-  ERA_CHAIN_ID: 9,
-  ERA_WETH_ADDRESS: "address(0)",
-};
-const contractDefs = {
-  sepolia: testnetConfig,
-  rinkeby: testnetConfig,
-  ropsten: testnetConfig,
-  goerli: testnetConfig,
-  mainnet: prodConfig,
-  hardhat: hardhatConfig,
-  localhost: localConfig,
-};
 export default {
   zksolc: {
     version: "1.3.18",
@@ -44,15 +20,6 @@ export default {
   },
   solidity: {
     version: "0.8.20",
-  },
-  solpp: {
-    defs: (() => {
-      const defs = contractDefs[process.env.CHAIN_ETH_NETWORK];
-
-      return {
-        ...defs,
-      };
-    })(),
   },
   defaultNetwork: "localhost",
   networks: {

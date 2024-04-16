@@ -6898,21 +6898,6 @@ solidity-coverage@^0.8.5:
     shelljs "^0.8.3"
     web3-utils "^1.3.6"
 
-solpp@^0.11.5:
-  version "0.11.5"
-  resolved "https://registry.yarnpkg.com/solpp/-/solpp-0.11.5.tgz#e5f38b5acc952e1cc2e3871d490fdbed910938dd"
-  integrity sha512-LjzCGMrTDXtera2C4mbQGZSpBznP+o3/82L2CneAAMNbm+t4xPsvfrgJkIaY+IZ5YLrB8IXn7cYthwHMKvAWnQ==
-  dependencies:
-    antlr4 "~4.8.0"
-    axios "^0.21.1"
-    bn-str-256 "^1.9.1"
-    commander "^2.19.0"
-    ethereumjs-util "^6.0.0"
-    lodash "^4.17.11"
-    mz "^2.7.0"
-    resolve "^1.10.0"
-    semver "^5.6.0"
-
 source-map-support@^0.5.13:
   version "0.5.21"
   resolved "https://registry.yarnpkg.com/source-map-support/-/source-map-support-0.5.21.tgz#04fe7c7f9e1ed2d662233c28cb2b35b9f63f6e4f"
