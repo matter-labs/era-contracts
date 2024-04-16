@@ -71,8 +71,8 @@ object "EVMInterpreter" {
         }
 
         function SYSTEM_CONTRACTS_OFFSET() -> offset {
-                offset := 0x8000
-            }
+            offset := 0x8000
+        }
 
         function ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT() -> addr {
             addr := 0x0000000000000000000000000000000000008002
@@ -137,8 +137,8 @@ object "EVMInterpreter" {
         function MAX_MEMORY_FRAME() -> max {
             max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
         }
-    
-            // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
+
+        // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
         function readIP(ip) -> opcode {
             // TODO: Why not do this at the beginning once instead of every time?
             let bytecodeLen := mload(BYTECODE_OFFSET())
@@ -375,7 +375,6 @@ object "EVMInterpreter" {
     
             isWarm := mload(0)
         }
-            
 
         function warmSlot(key,currentValue) -> isWarm, originalValue {
             // TODO: Unhardcode this selector 0xbdf78160
