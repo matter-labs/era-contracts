@@ -2597,7 +2597,7 @@ object "EVMInterpreter" {
 
                     let addr
                     {
-                        let digest, nonce, addressEncoded, nonceEncoded, listLength, listLengthEconded
+                        let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
 
                         nonce := getNonce()
 
@@ -2606,24 +2606,50 @@ object "EVMInterpreter" {
                             0x3ffffffffffffffffffffffffffffffffffffffffff
                         )
 
-                        // This block works if 0 <= nonce <= 127
-                        // TODO: Make it work on nonce >= 128
-                        nonceEncoded := 128
-                        if gt(nonce, 0) {
-                            nonceEncoded := nonce
+                        nonceEncoded := nonce
+                        nonceEncodedLength := 1
+                        if iszero(nonce) {
+                            nonceEncoded := 128
                         }
-                        listLength := 22
+                        // The nonce has 4 bytes
+                        if gt(nonce, 0xFFFFFF) {
+                            nonceEncoded := shl(32, 0x84)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 5
+                        }
+                        // The nonce has 3 bytes
+                        if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                            nonceEncoded := shl(24, 0x83)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 4
+                        }
+                        // The nonce has 2 bytes
+                        if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                            nonceEncoded := shl(16, 0x82)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 3
+                        }
+                        // The nonce has 1 byte and it's in [0x80, 0xFF]
+                        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                            nonceEncoded := shl(8, 0x81)
+                            nonceEncoded := add(nonceEncoded, nonce)
+                            nonceEncodedLength := 2
+                        }
+
+                        listLength := add(21, nonceEncodedLength)
                         listLengthEconded := add(listLength, 0xC0)
 
-                        // TODO: Replace 176 with 168 + bytesLength(listLengthEncoded)
-                        digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
+                        let arrayLength := add(168, mul(8, nonceEncodedLength))
 
-                        // TODO: Replace 72 with 256 - bitsLength(digest)
-                        mstore(0, shl(72, digest))
+                        digest := add(
+                            shl(arrayLength, listLengthEconded),
+                            add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
+                        )
 
-                        // TODO: Replace 23 with bytesLength(digest) (and mask)
+                        mstore(0, shl(sub(248, arrayLength), digest))
+
                         addr := and(
-                            keccak256(0, 23),
+                            keccak256(0, add(div(arrayLength, 8), 1)),
                             0x1ffffffffffffffffffffffffffffffffffffffff
                         )
                     }
