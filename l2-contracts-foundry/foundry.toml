@@ -1,6 +1,19 @@
 [profile.default]
-src = "src"
+src = "../l2-contracts/contracts"
 out = "out"
 libs = ["lib"]
-
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "l1-contracts/=../l1-contracts/contracts/",
+    "l2-contracts/=../l2-contracts/contracts/"
+]
+allow_paths = ["../l1-contracts/contracts", "../l2-contracts/contracts"]
+fs_permissions = [
+    { access = "read", path = "../system-contracts/bootloader/build/artifacts"},
+    { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed"},
+    { access = "read", path = "./script-config" },
+    { access = "read-write", path = "./script-out" },
+    { access = "read", path = "./out" }
+]
+evm_version="cancun"
