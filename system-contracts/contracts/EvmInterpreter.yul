@@ -2572,10 +2572,11 @@ object "EVMInterpreter" {
                         let digest, nonce, addressEncoded, nonceEncoded, listLength, listLengthEconded
 
                         nonce := getNonce()
-                        printString("getNonce")
-                        printHex(nonce)
 
-                        addressEncoded := and(add(address(), shl(160, 0x94)), 0x3ffffffffffffffffffffffffffffffffffffffffff)
+                        addressEncoded := and(
+                            add(address(), shl(160, 0x94)),
+                            0x3ffffffffffffffffffffffffffffffffffffffffff
+                        )
 
                         // This block works if 0 <= nonce <= 127
                         // TODO: Make it work on nonce >= 128
@@ -2589,31 +2590,14 @@ object "EVMInterpreter" {
                         // TODO: Replace 176 with 168 + bytesLength(listLengthEncoded)
                         digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
 
-                        printString("address")
-                        printHex(address())
-                        printString("address encoded")
-                        printHex(addressEncoded)
-                        printString("nonceEncoded")
-                        printHex(nonceEncoded)
-                        printString("listLength")
-                        printHex(listLength)
-                        printString("listLengthEncoded")
-                        printHex(listLengthEconded)
-                        printString("digest")
-                        printHex(digest)
-
                         // TODO: Replace 72 with 256 - bitsLength(digest)
                         mstore(offset, shl(72, digest))
 
-                        printString("Mem")
-                        printHex(mload(offset))
-
-                        // TODO: Replace 23 with bytesLength(digest)
-                        addr := and(keccak256(offset, 23), 0x1ffffffffffffffffffffffffffffffffffffffff)
-                        printString("keccak256")
-                        printHex(keccak256(offset, 23))
-                        printString("addr")
-                        printHex(addr)
+                        // TODO: Replace 23 with bytesLength(digest) (and mask)
+                        addr := and(
+                            keccak256(offset, 23),
+                            0x1ffffffffffffffffffffffffffffffffffffffff
+                        )
                     }
 
                     mstore8(offset, 0x5b)
@@ -2621,9 +2605,7 @@ object "EVMInterpreter" {
                     mstore8(add(offset, 2), 0xa2)
                     mstore8(add(offset, 3), 0x3c)
                     // Address (arg1)
-                    // mstore(add(offset, 4), shl(96, addr))
                     mstore(add(offset, 4), addr)
-                    // Init code (len = 1): 0x00
                     // Init code (arg2)
                     // Where the arg starts (third word)
                     mstore(add(offset, 36), 64)
@@ -2633,12 +2615,6 @@ object "EVMInterpreter" {
                     mstore(add(offset, 100), 0x6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f)
                     mstore(add(offset, 132), 0x80fdfea264697066735822122070e77c564e632657f44e4b3cb2d5d4f74255fc)
                     mstore(add(offset, 164), 0x64ca5fae813eb74275609e61e364736f6c634300081900330000000000000000)
-
-                    printString("Memory")
-                    printHex(mload(offset))
-                    printHex(mload(add(offset, 32)))
-                    printHex(mload(add(offset, 64)))
-                    printHex(mload(add(offset, 96)))
 
                     let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 188, 0, 0)
 
