@@ -3598,44 +3598,10 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
                 }
                 case 0xF2 { // OP_CALLCODE
-                    let gasSend,addr,value,argsOffset,argsSize,retOffset,retSize
-                    
-                    gasSend, sp := popStackItem(sp)
-                    addr, sp := popStackItem(sp)
-                    value, sp := popStackItem(sp)
-                    argsOffset, sp := popStackItem(sp)
-                    argsSize, sp := popStackItem(sp)
-                    retOffset, sp := popStackItem(sp)
-                    retSize, sp := popStackItem(sp)
-
-
-                    let dynamicGas := expandMemory(add(retOffset,retSize))
-                    // dynamicGas := add(dynamicGas,codeExecutionCost) how to do this?
-                    let wasWarm := warmAddress(addr)
-                    switch wasWarm
-                        case 0 { dynamicGas := add(dynamicGas,2600) }
-                        default { dynamicGas := add(dynamicGas,100) }
-
-                    if not(iszero(value)) {
-                        dynamicGas := add(dynamicGas,6700)
-                        gasSend := add(gasSend,2300)
-
-                        if isAddrEmpty(addr) {
-                            dynamicGas := add(dynamicGas,25000)
-                        }
-                    }
-
-                    if gt(gasSend,div(mul(evmGasLeft,63),64)) {
-                        gasSend := div(mul(evmGasLeft,63),64)
-                    }
-                    argsOffset := add(argsOffset,MEM_OFFSET_INNER())
-                    retOffset := add(retOffset,MEM_OFFSET_INNER())
-                    let success := callcode(gasSend,addr,value,argsOffset,argsSize,retOffset,retSize)
-
-                    sp := pushStackItem(sp,success)
+                    let dynamicGas
+                    dynamicGas, sp := performCallCode(sp,evmGasLeft)
 
                     evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
-
                 }
                 case 0xF3 { // OP_RETURN
                     let offset,size
