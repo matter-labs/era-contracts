@@ -1301,22 +1301,6 @@ object "EVMInterpreter" {
                         printHex(addr)
                     }
 
-                    // // Selector
-                    // mstore8(offset, 0x5b)
-                    // mstore8(add(offset, 1), 0x16)
-                    // mstore8(add(offset, 2), 0xa2)
-                    // mstore8(add(offset, 3), 0x3c)
-                    // // Deployed address (WIP)
-                    // mstore(add(offset, 4), addr)
-                    // // Init code (len = 1): 0x00
-                    // mstore(add(offset, 36), 64)
-                    // mstore(add(offset, 68), 5)
-                    // mstore8(add(offset, 100), 0x60)
-                    // mstore8(add(offset, 101), 0x80)
-                    // mstore8(add(offset, 102), 0x60)
-                    // mstore8(add(offset, 103), 0x40)
-                    // mstore8(add(offset, 104), 0x52)
-
                     // Selector
                     mstore8(offset, 0x5b)
                     mstore8(add(offset, 1), 0x16)
@@ -1342,9 +1326,9 @@ object "EVMInterpreter" {
                     printHex(mload(add(offset, 64)))
                     printHex(mload(add(offset, 96)))
 
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 105, 0, 0)
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 188, 0, 0)
 
-                    sp := pushStackItem(sp, result)
+                    sp := pushStackItem(sp, addr)
                 }
                 // TODO: REST OF OPCODES
                 default {
@@ -2634,21 +2618,23 @@ object "EVMInterpreter" {
                         printHex(addr)
                     }
 
-                    // Selector
                     mstore8(offset, 0x5b)
                     mstore8(add(offset, 1), 0x16)
                     mstore8(add(offset, 2), 0xa2)
                     mstore8(add(offset, 3), 0x3c)
-                    // Deployed address (WIP)
+                    // Address (arg1)
+                    // mstore(add(offset, 4), shl(96, addr))
                     mstore(add(offset, 4), addr)
                     // Init code (len = 1): 0x00
+                    // Init code (arg2)
+                    // Where the arg starts (third word)
                     mstore(add(offset, 36), 64)
-                    mstore(add(offset, 68), 5)
-                    mstore8(add(offset, 100), 0x60)
-                    mstore8(add(offset, 101), 0x80)
-                    mstore8(add(offset, 102), 0x60)
-                    mstore8(add(offset, 103), 0x40)
-                    mstore8(add(offset, 104), 0x52)
+                    // Length of the init code
+                    mstore(add(offset, 68), 88)
+                    // init code itself
+                    mstore(add(offset, 100), 0x6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f)
+                    mstore(add(offset, 132), 0x80fdfea264697066735822122070e77c564e632657f44e4b3cb2d5d4f74255fc)
+                    mstore(add(offset, 164), 0x64ca5fae813eb74275609e61e364736f6c634300081900330000000000000000)
 
                     printString("Memory")
                     printHex(mload(offset))
@@ -2656,7 +2642,11 @@ object "EVMInterpreter" {
                     printHex(mload(add(offset, 64)))
                     printHex(mload(add(offset, 96)))
 
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 105, 0, 0)
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 188, 0, 0)
+
+                    if iszero(result) {
+                        revert(0, 0)
+                    }
 
                     sp := pushStackItem(sp, addr)
                 }
