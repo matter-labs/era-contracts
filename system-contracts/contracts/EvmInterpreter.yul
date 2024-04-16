@@ -3625,12 +3625,12 @@ object "EVMInterpreter" {
                     ensureAcceptableMemLocation(size)
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
+                    offset := add(offset, MEM_OFFSET_INNER())
                     if eq(isCallerEVM,1) {
                         // include gas
-                        offset := add(offset, MEM_OFFSET_INNER())
                         let previousValue := mload(sub(offset,32))
                         mstore(sub(offset,32),evmGasLeft)
-                        mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+                        //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
                         // but it appears to rewrite were we want to store the gas
 
                         offset := sub(offset, 32)
