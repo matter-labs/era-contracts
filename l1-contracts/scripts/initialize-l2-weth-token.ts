@@ -17,7 +17,7 @@ const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_co
 const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 const contractArtifactsPath = path.join(process.env.ZKSYNC_HOME as string, "contracts/l2-contracts/artifacts-zk/");
-const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "cache-zk/solpp-generated-contracts/bridge/");
+const l2BridgeArtifactsPath = path.join(contractArtifactsPath, "contracts/bridge/");
 const openzeppelinTransparentProxyArtifactsPath = path.join(
   contractArtifactsPath,
   "@openzeppelin/contracts/proxy/transparent/"

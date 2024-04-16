@@ -13,11 +13,7 @@ import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/Upgradeab
 import { Provider } from "zksync-web3";
 
 const l2SharedBridgeABI = JSON.parse(
-  fs
-    .readFileSync(
-      "../zksync/artifacts-zk/cache-zk/solpp-generated-contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json"
-    )
-    .toString()
+  fs.readFileSync("../zksync/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json").toString()
 ).abi;
 
 async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {

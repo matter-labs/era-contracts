@@ -14,6 +14,7 @@ const richAccount = {
 };
 
 const eth18 = ethers.utils.parseEther("18");
+const testChainId = 9;
 
 describe("WETH token & WETH bridge", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
@@ -24,7 +25,7 @@ describe("WETH token & WETH bridge", function () {
   before("Deploy token and bridge", async function () {
     const deployer = new Deployer(hre, wallet);
     const wethTokenImpl = await deployer.deploy(await deployer.loadArtifact("L2WrappedBaseToken"));
-    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"));
+    const wethBridgeImpl = await deployer.deploy(await deployer.loadArtifact("L2SharedBridge"), [testChainId]);
     const randomAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
 
     const wethTokenProxy = await deployer.deploy(await deployer.loadArtifact("TransparentUpgradeableProxy"), [

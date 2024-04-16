@@ -14,7 +14,6 @@ import {L2StandardERC20} from "./L2StandardERC20.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {L2ContractHelper, DEPLOYER_SYSTEM_CONTRACT, IContractDeployer} from "../L2ContractHelper.sol";
 import {SystemContractsCaller} from "../SystemContractsCaller.sol";
-import {ERA_CHAIN_ID} from "../Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -38,7 +37,10 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
-    constructor() {
+    uint256 immutable ERA_CHAIN_ID;
+
+    constructor(uint256 _eraChainId) {
+        ERA_CHAIN_ID = _eraChainId;
         _disableInitializers();
     }
 
