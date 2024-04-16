@@ -1351,13 +1351,11 @@ object "EVMInterpreter" {
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
 
-        printString("CONSTRUCTOR CALLED")
-
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
-        // if iszero(isStatic) {
-        //     revert(0, 0)
-        // }
+        if isStatic {
+            revert(0, 0)
+        }
 
         getConstructorBytecode()
 
