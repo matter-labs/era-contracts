@@ -2599,8 +2599,6 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    offset := add(MEM_OFFSET_INNER(), 0x40) // 0x40 is just to make sure there's enough space while testing
-
                     let addr
                     {
                         let digest, nonce, addressEncoded, nonceEncoded, listLength, listLengthEconded
@@ -2625,36 +2623,48 @@ object "EVMInterpreter" {
                         digest := add(shl(176, listLengthEconded), add(shl(8, addressEncoded), nonceEncoded))
 
                         // TODO: Replace 72 with 256 - bitsLength(digest)
-                        mstore(offset, shl(72, digest))
+                        mstore(0, shl(72, digest))
 
                         // TODO: Replace 23 with bytesLength(digest) (and mask)
                         addr := and(
-                            keccak256(offset, 23),
+                            keccak256(0, 23),
                             0x1ffffffffffffffffffffffffffffffffffffffff
                         )
                     }
 
-                    mstore8(offset, 0x5b)
-                    mstore8(add(offset, 1), 0x16)
-                    mstore8(add(offset, 2), 0xa2)
-                    mstore8(add(offset, 3), 0x3c)
-                    // Address (arg1)
-                    mstore(add(offset, 4), addr)
-                    // Init code (arg2)
-                    // Where the arg starts (third word)
-                    mstore(add(offset, 36), 64)
-                    // Length of the init code
-                    mstore(add(offset, 68), 88)
-                    // init code itself
-                    mstore(add(offset, 100), 0x6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f)
-                    mstore(add(offset, 132), 0x80fdfea264697066735822122070e77c564e632657f44e4b3cb2d5d4f74255fc)
-                    mstore(add(offset, 164), 0x64ca5fae813eb74275609e61e364736f6c634300081900330000000000000000)
+                    offset := add(MEM_OFFSET_INNER(), offset)
 
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, offset, 188, 0, 0)
+                    sp := pushStackItem(sp, sub(offset, 0x80))
+                    sp := pushStackItem(sp, sub(offset, 0x60))
+                    sp := pushStackItem(sp, sub(offset, 0x40))
+                    sp := pushStackItem(sp, sub(offset, 0x20))
+
+                    // Selector
+                    mstore(sub(offset, 0x80), 0x5b16a23c)
+                    // Arg1: address
+                    mstore(sub(offset, 0x60), addr)
+                    // Arg2: init code
+                    // Where the arg starts (third word)
+                    mstore(sub(offset, 0x40), 0x40)
+                    // Length of the init code
+                    mstore(sub(offset, 0x20), size)
+
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
 
                     if iszero(result) {
                         revert(0, 0)
                     }
+
+                    let back
+
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x20), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x40), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x60), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x80), back)
 
                     sp := pushStackItem(sp, addr)
                 }
