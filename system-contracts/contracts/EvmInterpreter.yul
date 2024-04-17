@@ -347,6 +347,21 @@ object "EVMInterpreter" {
                     revert(0,0) // Check if this is whats needed
                 }
             }
+
+            function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
+                newOffset := offset
+                newSize := size
+                if eq(isCallerEVM,1) {
+                    // include gas
+                    let previousValue := mload(sub(offset,32))
+                    mstore(sub(offset,32),evmGasLeft)
+                    //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+                    // but it appears to rewrite were we want to store the gas
+
+                    newOffset := sub(offset, 32)
+                    newSize := add(size, 32)
+                }
+            }
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -1420,16 +1435,7 @@ object "EVMInterpreter" {
                     evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
                     offset := add(offset, MEM_OFFSET_INNER())
-                    if eq(isCallerEVM,1) {
-                        // include gas
-                        let previousValue := mload(sub(offset,32))
-                        mstore(sub(offset,32),evmGasLeft)
-                        //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
-                        // but it appears to rewrite were we want to store the gas
-
-                        offset := sub(offset, 32)
-                        size := add(size, 32)
-                    }
+                    offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
 
                     revert(offset,size)
                 }
@@ -1446,12 +1452,7 @@ object "EVMInterpreter" {
                 }
             }
 
-            if eq(isCallerEVM, 1) {
-                // Includes gas
-                // I think this needs to be done the same way as revert opcode
-                returnOffset := sub(returnOffset, 32)
-                returnLen := add(returnLen, 32)
-            }
+            returnOffset, returnLen := addGasIfEvmRevert(isCallerEVM,returnOffset,returnLen,evmGasLeft)
 
             return(returnOffset, returnLen)
         }
