@@ -595,6 +595,37 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, 3)
                 }
+                case 0x1B { // OP_SHL
+                    let shift, value
+
+                    shift, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, shl(shift, value))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x1C { // OP_SHR
+                    let shift, value
+
+                    shift, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, shr(shift, value))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+                case 0x1D { // OP_SAR
+                    let shift, value
+
+                    shift, sp := popStackItem(sp)
+                    value, sp := popStackItem(sp)
+
+                    sp := pushStackItem(sp, sar(shift, value))
+
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+                }
+
                 case 0x20 { // OP_KECCAK256
                     let offset, size
 
