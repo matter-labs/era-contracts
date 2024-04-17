@@ -49,6 +49,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     /// @inheritdoc IBridgehub
+    /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
+    /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;

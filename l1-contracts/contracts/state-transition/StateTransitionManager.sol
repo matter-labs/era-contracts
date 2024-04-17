@@ -137,6 +137,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
+    /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
+    /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
         // Save previous value into the stack to put it into the event later
         address oldPendingAdmin = pendingAdmin;
@@ -255,7 +257,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @dev setValidator for the specified chain
-    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwnerOrAdmin {
         IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
