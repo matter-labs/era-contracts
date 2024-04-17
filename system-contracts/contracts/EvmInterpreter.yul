@@ -1314,7 +1314,7 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, add(
                         32000, add(
-                        expandMemory(add(offset, size))
+                        expandMemory(add(offset, size)),
                         mul(2, div(add(size, 31), 32))
                         )
                     ))
@@ -1323,7 +1323,7 @@ object "EVMInterpreter" {
                     {
                         let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
 
-                        nonce := getNonce()
+                        nonce := getNonce(address())
 
                         addressEncoded := and(
                             add(address(), shl(160, 0x94)),
@@ -2692,7 +2692,7 @@ object "EVMInterpreter" {
 
                     evmGasLeft := chargeGas(evmGasLeft, add(
                         32000, add(
-                        expandMemory(add(offset, size))
+                        expandMemory(add(offset, size)),
                         mul(2, div(add(size, 31), 32))
                         )
                     ))
@@ -2701,7 +2701,7 @@ object "EVMInterpreter" {
                     {
                         let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
 
-                        nonce := getNonce()
+                        nonce := getNonce(address())
 
                         addressEncoded := and(
                             add(address(), shl(160, 0x94)),
