@@ -347,66 +347,6 @@ object "EVMInterpreter" {
                     revert(0,0) // Check if this is whats needed
                 }
             }
-
-            function getNonce(addr) -> nonce {
-                mstore8(0, 0xfb)
-                mstore8(1, 0x1a)
-                mstore8(2, 0x9a)
-                mstore8(3, 0x57)
-                mstore(4, addr)
-
-                let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-
-                nonce := mload(0)
-            }
-
-            function isAddrEmpty(addr) -> isEmpty {
-                isEmpty := 0
-                if  and( and( 
-                        iszero(balance(addr)), 
-                        iszero(extcodesize(addr)) ),
-                        iszero(getNonce(addr))
-                    ) {
-                    isEmpty := 1
-                }
-            }
-
-            function performCallCode(oldSp,evmGasLeft) -> dynamicGas,sp {
-                let gasSend,addr,value,argsOffset,argsSize,retOffset,retSize
-                    
-                gasSend, sp := popStackItem(oldSp)
-                addr, sp := popStackItem(sp)
-                value, sp := popStackItem(sp)
-                argsOffset, sp := popStackItem(sp)
-                argsSize, sp := popStackItem(sp)
-                retOffset, sp := popStackItem(sp)
-                retSize, sp := popStackItem(sp)
-
-
-                dynamicGas := expandMemory(add(retOffset,retSize))
-                // dynamicGas := add(dynamicGas,codeExecutionCost) how to do this?
-                switch warmAddress(addr)
-                    case 0 { dynamicGas := add(dynamicGas,2600) }
-                    default { dynamicGas := add(dynamicGas,100) }
-
-                if not(iszero(value)) {
-                    dynamicGas := add(dynamicGas,6700)
-                    gasSend := add(gasSend,2300)
-
-                    if isAddrEmpty(addr) {
-                        dynamicGas := add(dynamicGas,25000)
-                    }
-                }
-
-                if gt(gasSend,div(mul(evmGasLeft,63),64)) {
-                    gasSend := div(mul(evmGasLeft,63),64)
-                }
-                argsOffset := add(argsOffset,MEM_OFFSET_INNER())
-                retOffset := add(retOffset,MEM_OFFSET_INNER())
-                //let success := callcode(gasSend,addr,value,argsOffset,argsSize,retOffset,retSize)
-                //sp := pushStackItem(sp,success)
-            }
-
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -1317,12 +1257,6 @@ object "EVMInterpreter" {
                 case 0x9F { // OP_SWAP16
                     evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
                 }
-                case 0xF2 { // OP_CALLCODE
-                    let dynamicGas
-                    dynamicGas, sp := performCallCode(sp,evmGasLeft)
-
-                    evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
-                }
                 case 0xF3 { // OP_RETURN
                     let offset,size
 
@@ -1363,25 +1297,6 @@ object "EVMInterpreter" {
                     evmGasLeft := 0
 
                     invalid()
-                }
-                case 0xFF { // OP_SELFDESTRUCT
-                    let addr
-
-                    addr, sp := popStackItem(sp)
-
-                    let wasWarm := warmAddress(addr)
-
-                    let staticGas := 5000
-                    let dynamicGas := 0
-                    if and( gt(selfbalance(),0), isAddrEmpty(addr)) {
-                        dynamicGas := 25000
-                    }
-                    if not(wasWarm) {
-                        dynamicGas := add(dynamicGas ,2600)
-                    }
-                    evmGasLeft := chargeGas(evmGasLeft,add(staticGas,dynamicGas))
-
-                    //selfdestruct(addr)
                 }
                 // TODO: REST OF OPCODES
                 default {
