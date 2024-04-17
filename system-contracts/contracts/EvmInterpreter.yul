@@ -1762,12 +1762,12 @@ object "EVMInterpreter" {
                 originalValue := mload(32)
             }
 
-            function getNonce() -> nonce {
+            function getNonce(addr) -> nonce {
                 mstore8(0, 0xfb)
                 mstore8(1, 0x1a)
                 mstore8(2, 0x9a)
                 mstore8(3, 0x57)
-                mstore(4, address())
+                mstore(4, addr)
 
                 let result := staticcall(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 36, 0, 32)
 
@@ -2640,11 +2640,27 @@ object "EVMInterpreter" {
                     evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
                 }
                 case 0xF0 { // OP_CREATE
+                    if isStatic {
+                        revert(0, 0)
+                    }
+
                     let value, offset, size
 
                     value, sp := popStackItem(sp)
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
+
+                    if gt(add(offset, size), MAX_MEMORY_FRAME()) {
+                        revert(0, 0)
+                    }
+
+                    if gt(len, mul(2, MAX_POSSIBLE_BYTECODE())) {
+                        revert(0, 0)
+                    }
+
+                    if gt(value, balance(address())) {
+                        revert(0, 0)
+                    }
 
                     let addr
                     {
@@ -2705,6 +2721,13 @@ object "EVMInterpreter" {
                         )
                     }
 
+                    let nonceNewAddr := getNonce(addr)
+                    let bytecodeNewAddr := extcodesize(addr)
+                    if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
+                        incrementNonce(address())
+                        revert(0, 0)
+                    }
+
                     offset := add(MEM_OFFSET_INNER(), offset)
 
                     sp := pushStackItem(sp, sub(offset, 0x80))
@@ -2723,10 +2746,6 @@ object "EVMInterpreter" {
                     mstore(sub(offset, 0x20), size)
 
                     let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
-
-                    if iszero(result) {
-                        revert(0, 0)
-                    }
 
                     incrementNonce(address())
 
