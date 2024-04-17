@@ -89,12 +89,19 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256[] memory keys = hyperchainMap.keys();
         chainAddresses = new address[](keys.length);
         for (uint256 i = 0; i < keys.length; i++) {
+            // slither-disable-next-line unused-return
             (, chainAddresses[i]) = hyperchainMap.at(i);
         }
     }
 
+    /// @notice Returns all the registered hyperchain chainIDs
+    function getAllHyperchainChainIDs() public view override returns (uint256[] memory) {
+        return hyperchainMap.keys();
+    }
+
     /// @notice Returns the address of the hyperchain with the corresponding chainID
     function hyperchain(uint256 _chainId) public view override returns (address chainAddress) {
+        // slither-disable-next-line unused-return
         (, chainAddress) = hyperchainMap.tryGet(_chainId);
     }
 
@@ -389,6 +396,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev This internal function is used to register a new hyperchain in the system.
     function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
+        // slither-disable-next-line unused-return
         hyperchainMap.set(_chainId, _hyperchain);
         require(hyperchainMap.length() <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
         emit NewHyperchain(_chainId, _hyperchain);

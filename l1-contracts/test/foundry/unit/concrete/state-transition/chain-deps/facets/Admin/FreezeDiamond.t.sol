@@ -3,17 +3,17 @@
 pragma solidity 0.8.24;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
+import {ERROR_ONLY_STATE_TRANSITION_MANAGER} from "../Base/_Base_Shared.t.sol";
 
 contract FreezeDiamondTest is AdminTest {
     event Freeze();
 
-    function test_revertWhen_calledByNonAdminOrStateTransitionManager() public {
-        address nonAdminOrStateTransitionManager = makeAddr("nonAdminOrStateTransitionManager");
+    function test_revertWhen_calledByNonStateTransitionManager() public {
+        address nonStateTransitionManager = makeAddr("nonStateTransitionManager");
 
-        vm.expectRevert(ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER);
+        vm.expectRevert(ERROR_ONLY_STATE_TRANSITION_MANAGER);
 
-        vm.startPrank(nonAdminOrStateTransitionManager);
+        vm.startPrank(nonStateTransitionManager);
         adminFacet.freezeDiamond();
     }
 }
