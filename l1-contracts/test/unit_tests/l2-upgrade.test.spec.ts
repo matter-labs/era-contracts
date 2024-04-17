@@ -402,21 +402,21 @@ describe("L2 upgrade test", function () {
     expect(newVerifierParams.recursionLeafLevelVkHash).to.equal(newerVerifierParams.recursionLeafLevelVkHash);
     expect(newVerifierParams.recursionCircuitsSetVksHash).to.equal(newerVerifierParams.recursionCircuitsSetVksHash);
 
-    expect(upgradeEvents[0].name).to.eq("NewProtocolVersion");
-    expect(upgradeEvents[0].args.previousProtocolVersion.toString()).to.eq((2 + initialProtocolVersion).toString());
-    expect(upgradeEvents[0].args.newProtocolVersion.toString()).to.eq((4 + 1 + initialProtocolVersion).toString());
+    expect(upgradeEvents[0].name).to.eq("NewVerifier");
+    expect(upgradeEvents[0].args.oldVerifier.toLowerCase()).to.eq(verifier.toLowerCase());
+    expect(upgradeEvents[0].args.newVerifier.toLowerCase()).to.eq(newVerifier.toLowerCase());
 
-    expect(upgradeEvents[1].name).to.eq("NewVerifier");
-    expect(upgradeEvents[1].args.oldVerifier.toLowerCase()).to.eq(verifier.toLowerCase());
-    expect(upgradeEvents[1].args.newVerifier.toLowerCase()).to.eq(newVerifier.toLowerCase());
+    expect(upgradeEvents[1].name).to.eq("NewVerifierParams");
+    expect(upgradeEvents[1].args.oldVerifierParams[0]).to.eq(ethers.constants.HashZero);
+    expect(upgradeEvents[1].args.oldVerifierParams[1]).to.eq(ethers.constants.HashZero);
+    expect(upgradeEvents[1].args.oldVerifierParams[2]).to.eq(ethers.constants.HashZero);
+    expect(upgradeEvents[1].args.newVerifierParams[0]).to.eq(newerVerifierParams.recursionNodeLevelVkHash);
+    expect(upgradeEvents[1].args.newVerifierParams[1]).to.eq(newerVerifierParams.recursionLeafLevelVkHash);
+    expect(upgradeEvents[1].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
 
-    expect(upgradeEvents[2].name).to.eq("NewVerifierParams");
-    expect(upgradeEvents[2].args.oldVerifierParams[0]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[1]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.oldVerifierParams[2]).to.eq(ethers.constants.HashZero);
-    expect(upgradeEvents[2].args.newVerifierParams[0]).to.eq(newerVerifierParams.recursionNodeLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[1]).to.eq(newerVerifierParams.recursionLeafLevelVkHash);
-    expect(upgradeEvents[2].args.newVerifierParams[2]).to.eq(newerVerifierParams.recursionCircuitsSetVksHash);
+    expect(upgradeEvents[2].name).to.eq("NewProtocolVersion");
+    expect(upgradeEvents[2].args.previousProtocolVersion.toString()).to.eq((2 + initialProtocolVersion).toString());
+    expect(upgradeEvents[2].args.newProtocolVersion.toString()).to.eq((4 + 1 + initialProtocolVersion).toString());
 
     expect(upgradeEvents[3].name).to.eq("NewL2BootloaderBytecodeHash");
     expect(upgradeEvents[3].args.previousBytecodeHash).to.eq(L2_BOOTLOADER_BYTECODE_HASH);
@@ -709,7 +709,7 @@ describe("L2 upgrade test", function () {
 
     storedBatch2Info = newBatchStoredInfo;
 
-    expect(upgradeEvents[1].name).to.equal("Test");
+    expect(upgradeEvents[2].name).to.equal("Test");
   });
 });
 

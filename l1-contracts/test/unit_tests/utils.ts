@@ -460,6 +460,8 @@ export async function makeExecutedEqualCommitted(
     await proxyExecutor.proveBatches(prevBatchInfo, batchesToProve, {
       recursiveAggregationInput: [],
       serializedProof: [],
+    }, {
+      gasLimit: 10000000,
     })
   ).wait();
 

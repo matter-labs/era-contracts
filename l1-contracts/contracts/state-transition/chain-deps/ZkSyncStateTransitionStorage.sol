@@ -73,7 +73,7 @@ struct ZkSyncStateTransitionStorage {
     /// @notice List of permitted validators
     mapping(address validatorAddress => bool isValidator) validators;
     /// @dev Verifier contract. Used to verify aggregated proof for batches
-    IVerifier verifier;
+    IVerifier __DEPRECATED_verifier;
     /// @notice Total number of executed batches i.e. batches[totalBatchesExecuted] points at the latest executed batch
     /// (batch 0 is genesis)
     uint256 totalBatchesExecuted;
@@ -152,4 +152,6 @@ struct ZkSyncStateTransitionStorage {
     uint128 baseTokenGasPriceMultiplierDenominator;
     /// @dev The optional address of the contract that has to be used for transaction filtering/whitelisting
     address transactionFilterer;
+    /// @dev Verifier contract per protocol version. Used to verify aggregated proof for batches
+    mapping(uint256 => IVerifier) verifiers;
 }

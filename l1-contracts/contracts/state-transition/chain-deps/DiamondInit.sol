@@ -30,7 +30,7 @@ contract DiamondInit is ZkSyncStateTransitionBase, IDiamondInit {
         s.baseTokenBridge = _initializeData.baseTokenBridge;
         s.protocolVersion = _initializeData.protocolVersion;
 
-        s.verifier = _initializeData.verifier;
+        s.verifiers[_initializeData.protocolVersion] = _initializeData.verifier;
         s.admin = _initializeData.admin;
         s.validators[_initializeData.validatorTimelock] = true;
 

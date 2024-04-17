@@ -13,7 +13,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 
 contract GettersFacetWrapper is GettersFacet {
     function util_setVerifier(address _verifier) external {
-        s.verifier = IVerifier(_verifier);
+        s.verifiers[s.protocolVersion] = IVerifier(_verifier);
     }
 
     function util_setAdmin(address _admin) external {

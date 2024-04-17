@@ -70,9 +70,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
         // as the permitted delay window is reduced in the future.
         require(block.timestamp >= _proposedUpgrade.upgradeTimestamp, "Upgrade is not ready yet");
 
+        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams, _proposedUpgrade.newProtocolVersion);
         _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
         txHash = _setL2SystemContractUpgrade(
@@ -122,17 +122,16 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
 
     /// @notice Change the address of the verifier smart contract
     /// @param _newVerifier Verifier smart contract address
-    function _setVerifier(IVerifier _newVerifier) private {
-        // An upgrade to the verifier must be done carefully to ensure there aren't batches in the committed state
-        // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
-        // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
-        // verifier is upgraded.
-        if (_newVerifier == IVerifier(address(0))) {
-            return;
-        }
+    function _setVerifier(IVerifier _newVerifier, uint256 _protocolVersionId) private {
+        // This upgrade will set the verifier to be used for the current or next protocol version. We allow for the
+        // setting of the current protocol version to handle the scenario where we have a bug in our current verifier
+        // contract.
 
-        IVerifier oldVerifier = s.verifier;
-        s.verifier = _newVerifier;
+        IVerifier oldVerifier = _protocolVersionId == s.protocolVersion ? s.verifiers[_protocolVersionId] : s.verifiers[s.protocolVersion];
+        if (_newVerifier == IVerifier(address(0))) {
+            _newVerifier = oldVerifier;
+        }
+        s.verifiers[_protocolVersionId] = _newVerifier;
         emit NewVerifier(address(oldVerifier), address(_newVerifier));
     }
 
@@ -159,8 +158,9 @@ abstract contract BaseZkSyncUpgrade is ZkSyncStateTransitionBase {
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
-        _setVerifier(IVerifier(_newVerifier));
+    /// @param _protocolVersion The protocol version to associate the new verifier with.
+    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams, uint256 _protocolVersion) internal {
+        _setVerifier(IVerifier(_newVerifier), _protocolVersion);
         _setVerifierParams(_verifierParams);
     }
 

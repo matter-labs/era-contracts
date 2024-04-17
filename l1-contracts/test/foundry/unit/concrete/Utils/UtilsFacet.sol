@@ -41,11 +41,19 @@ contract UtilsFacet is ZkSyncStateTransitionBase {
     }
 
     function util_setVerifier(IVerifier _verifier) external {
-        s.verifier = _verifier;
+        s.verifiers[s.protocolVersion] = _verifier;
     }
 
     function util_getVerifier() external view returns (IVerifier) {
-        return s.verifier;
+        return s.verifiers[s.protocolVersion];
+    }
+
+    function util_setVerifierForProtocolVersion(IVerifier _verifier, uint256 _protocolVersion) external {
+        s.verifiers[_protocolVersion] = _verifier;
+    }
+
+    function util_getVerifierForProtocolVersion(uint256 _protocolVersion) external view returns (IVerifier) {
+        return s.verifiers[_protocolVersion];
     }
 
     function util_setStoredBatchHashes(uint32 _batchId, bytes32 _storedBatchHash) external {

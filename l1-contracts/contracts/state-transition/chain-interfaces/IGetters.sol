@@ -15,8 +15,12 @@ interface IGetters is IZkSyncStateTransitionBase {
                             CUSTOM GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @return The address of the verifier smart contract
+    /// @return The address of the verifier smart contract for the current protocol version
     function getVerifier() external view returns (address);
+
+    /// @param _protocolVersiondId The protocol version id to query the verifier contract for
+    /// @return The address of the verifier smart contract
+    function getVerifierForProtocolVersion(uint256 _protocolVersiondId) external view returns (address);
 
     /// @return The address of the current admin
     function getAdmin() external view returns (address);

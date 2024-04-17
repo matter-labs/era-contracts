@@ -441,7 +441,7 @@ contract ExecutorFacet is ZkSyncStateTransitionBase, IExecutor {
         // We can only process 1 batch proof at a time.
         require(proofPublicInput.length == 1, "t4");
 
-        bool successVerifyProof = s.verifier.verify(
+        bool successVerifyProof = s.verifiers[s.protocolVersion].verify(
             proofPublicInput,
             _proof.serializedProof,
             _proof.recursiveAggregationInput

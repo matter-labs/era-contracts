@@ -47,7 +47,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
 
         _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
+        _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams, _proposedUpgrade.newProtocolVersion);
         _setBaseSystemContracts(_proposedUpgrade.bootloaderHash, _proposedUpgrade.defaultAccountHash);
 
         bytes32 txHash = _setL2SystemContractUpgrade(

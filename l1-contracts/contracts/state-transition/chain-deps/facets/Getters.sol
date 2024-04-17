@@ -30,7 +30,12 @@ contract GettersFacet is ZkSyncStateTransitionBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getVerifier() external view returns (address) {
-        return address(s.verifier);
+        return address(s.verifiers[s.protocolVersion]);
+    }
+
+    /// @inheritdoc IGetters
+    function getVerifierForProtocolVersion(uint256 _protocolVersionId) external view returns (address) {
+        return address(s.verifiers[_protocolVersionId]);
     }
 
     /// @inheritdoc IGetters
