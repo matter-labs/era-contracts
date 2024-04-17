@@ -76,7 +76,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice return the state transition chain contract for a chainId
     function getHyperchain(uint256 _chainId) public view returns (address) {
-        return IStateTransitionManager(stateTransitionManager[_chainId]).hyperchain(_chainId);
+        return IStateTransitionManager(stateTransitionManager[_chainId]).getHyperchain(_chainId);
     }
 
     //// Registry

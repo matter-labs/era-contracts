@@ -99,7 +99,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     }
 
     /// @notice Returns the address of the hyperchain with the corresponding chainID
-    function hyperchain(uint256 _chainId) public view override returns (address chainAddress) {
+    function getHyperchain(uint256 _chainId) public view override returns (address chainAddress) {
         // slither-disable-next-line unused-return
         (, chainAddress) = hyperchainMap.tryGet(_chainId);
     }
@@ -350,7 +350,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
-        if (hyperchain(_chainId) != address(0)) {
+        if (getHyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
             return;
         }
