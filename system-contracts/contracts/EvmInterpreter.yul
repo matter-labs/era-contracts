@@ -420,6 +420,64 @@ object "EVMInterpreter" {
             isWarm := mload(0)
         }
 
+        function getNewAddress(addr) -> newAddr {
+            let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
+
+            nonce := getNonce(addr)
+
+            addressEncoded := and(
+                add(addr, shl(160, 0x94)),
+                0xffffffffffffffffffffffffffffffffffffffffffff
+            )
+
+            nonceEncoded := nonce
+            nonceEncodedLength := 1
+            if iszero(nonce) {
+                nonceEncoded := 128
+            }
+            // The nonce has 4 bytes
+            if gt(nonce, 0xFFFFFF) {
+                nonceEncoded := shl(32, 0x84)
+                nonceEncoded := add(nonceEncoded, nonce)
+                nonceEncodedLength := 5
+            }
+            // The nonce has 3 bytes
+            if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                nonceEncoded := shl(24, 0x83)
+                nonceEncoded := add(nonceEncoded, nonce)
+                nonceEncodedLength := 4
+            }
+            // The nonce has 2 bytes
+            if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                nonceEncoded := shl(16, 0x82)
+                nonceEncoded := add(nonceEncoded, nonce)
+                nonceEncodedLength := 3
+            }
+            // The nonce has 1 byte and it's in [0x80, 0xFF]
+            if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                nonceEncoded := shl(8, 0x81)
+                nonceEncoded := add(nonceEncoded, nonce)
+                nonceEncodedLength := 2
+            }
+
+            listLength := add(21, nonceEncodedLength)
+            listLengthEconded := add(listLength, 0xC0)
+
+            let arrayLength := add(168, mul(8, nonceEncodedLength))
+
+            digest := add(
+                shl(arrayLength, listLengthEconded),
+                add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
+            )
+
+            mstore(0, shl(sub(248, arrayLength), digest))
+
+            newAddr := and(
+                keccak256(0, add(div(arrayLength, 8), 1)),
+                0xffffffffffffffffffffffffffffffffffffffff
+            )
+        }
+
         function getNonce(addr) -> nonce {
             mstore8(0, 0xfb)
             mstore8(1, 0x1a)
@@ -1337,70 +1395,90 @@ object "EVMInterpreter" {
                         )
                     ))
 
-                    let addr
-                    {
-                        let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
-
-                        nonce := getNonce(address())
-
-                        addressEncoded := and(
-                            add(address(), shl(160, 0x94)),
-                            0xffffffffffffffffffffffffffffffffffffffffffff
-                        )
-
-                        nonceEncoded := nonce
-                        nonceEncodedLength := 1
-                        if iszero(nonce) {
-                            nonceEncoded := 128
-                        }
-                        // The nonce has 4 bytes
-                        if gt(nonce, 0xFFFFFF) {
-                            nonceEncoded := shl(32, 0x84)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 5
-                        }
-                        // The nonce has 3 bytes
-                        if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                            nonceEncoded := shl(24, 0x83)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 4
-                        }
-                        // The nonce has 2 bytes
-                        if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                            nonceEncoded := shl(16, 0x82)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 3
-                        }
-                        // The nonce has 1 byte and it's in [0x80, 0xFF]
-                        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                            nonceEncoded := shl(8, 0x81)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 2
-                        }
-
-                        listLength := add(21, nonceEncodedLength)
-                        listLengthEconded := add(listLength, 0xC0)
-
-                        let arrayLength := add(168, mul(8, nonceEncodedLength))
-
-                        digest := add(
-                            shl(arrayLength, listLengthEconded),
-                            add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
-                        )
-
-                        mstore(0, shl(sub(248, arrayLength), digest))
-
-                        addr := and(
-                            keccak256(0, add(div(arrayLength, 8), 1)),
-                            0xffffffffffffffffffffffffffffffffffffffff
-                        )
-                    }
+                    let addr := getNewAddress(address())
 
                     pop(warmAddress(addr))
 
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
                     if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
+                        incrementNonce(address())
+                        revert(0, 0)
+                    }
+
+                    offset := add(MEM_OFFSET_INNER(), offset)
+
+                    sp := pushStackItem(sp, sub(offset, 0x80))
+                    sp := pushStackItem(sp, sub(offset, 0x60))
+                    sp := pushStackItem(sp, sub(offset, 0x40))
+                    sp := pushStackItem(sp, sub(offset, 0x20))
+
+                    // Selector
+                    mstore(sub(offset, 0x80), 0x5b16a23c)
+                    // Arg1: address
+                    mstore(sub(offset, 0x60), addr)
+                    // Arg2: init code
+                    // Where the arg starts (third word)
+                    mstore(sub(offset, 0x40), 0x40)
+                    // Length of the init code
+                    mstore(sub(offset, 0x20), size)
+
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+                    incrementNonce(address())
+
+                    let back
+
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x20), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x40), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x60), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x80), back)
+
+                    sp := pushStackItem(sp, addr)
+                }
+                case 0xF5 { // OP_CREATE2
+                    let value, offset, size, salt
+
+                    value, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+                    salt, sp := popStackItem(sp)
+
+                    checkMemOverflow(add(offset, size))
+
+                    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
+                        revert(0, 0)
+                    }
+
+                    if gt(value, balance(address())) {
+                        revert(0, 0)
+                    }
+
+                    evmGasLeft := chargeGas(evmGasLeft, add(
+                        32000, add(
+                        expandMemory(add(offset, size)),
+                        mul(2, div(add(size, 31), 32))
+                        )
+                    ))
+
+                    let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+                    mstore8(0, 0xFF)
+                    mstore(0x01, shl(0x06, address()))
+                    mstore(0x15, salt)
+                    mstore(0x35, hashedBytecode)
+
+                    let addr := and(
+                        keccak256(0, 0x55),
+                        0xFFFFFFFFFFFFFFFFFFFFFFFF
+                    )
+
+                    pop(warmAddress(addr))
+
+                    if or(gt(getNonce(addr), 0), gt(extcodesize(addr), 0)) {
                         incrementNonce(address())
                         revert(0, 0)
                     }
@@ -1824,6 +1902,64 @@ object "EVMInterpreter" {
                 }
 
                 isWarm := mload(0)
+            }
+
+            function getNewAddress(addr) -> newAddr {
+                let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
+
+                nonce := getNonce(addr)
+
+                addressEncoded := and(
+                    add(addr, shl(160, 0x94)),
+                    0xffffffffffffffffffffffffffffffffffffffffffff
+                )
+
+                nonceEncoded := nonce
+                nonceEncodedLength := 1
+                if iszero(nonce) {
+                    nonceEncoded := 128
+                }
+                // The nonce has 4 bytes
+                if gt(nonce, 0xFFFFFF) {
+                    nonceEncoded := shl(32, 0x84)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 5
+                }
+                // The nonce has 3 bytes
+                if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
+                    nonceEncoded := shl(24, 0x83)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 4
+                }
+                // The nonce has 2 bytes
+                if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
+                    nonceEncoded := shl(16, 0x82)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 3
+                }
+                // The nonce has 1 byte and it's in [0x80, 0xFF]
+                if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
+                    nonceEncoded := shl(8, 0x81)
+                    nonceEncoded := add(nonceEncoded, nonce)
+                    nonceEncodedLength := 2
+                }
+
+                listLength := add(21, nonceEncodedLength)
+                listLengthEconded := add(listLength, 0xC0)
+
+                let arrayLength := add(168, mul(8, nonceEncodedLength))
+
+                digest := add(
+                    shl(arrayLength, listLengthEconded),
+                    add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
+                )
+
+                mstore(0, shl(sub(248, arrayLength), digest))
+
+                newAddr := and(
+                    keccak256(0, add(div(arrayLength, 8), 1)),
+                    0xffffffffffffffffffffffffffffffffffffffff
+                )
             }
 
             function getNonce(addr) -> nonce {
@@ -2708,6 +2844,7 @@ object "EVMInterpreter" {
                     evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
                 }
                 case 0xF0 { // OP_CREATE
+                    printString("Hola!")
                     if isStatic {
                         revert(0, 0)
                     }
@@ -2735,70 +2872,90 @@ object "EVMInterpreter" {
                         )
                     ))
 
-                    let addr
-                    {
-                        let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
-
-                        nonce := getNonce(address())
-
-                        addressEncoded := and(
-                            add(address(), shl(160, 0x94)),
-                            0xffffffffffffffffffffffffffffffffffffffffffff
-                        )
-
-                        nonceEncoded := nonce
-                        nonceEncodedLength := 1
-                        if iszero(nonce) {
-                            nonceEncoded := 128
-                        }
-                        // The nonce has 4 bytes
-                        if gt(nonce, 0xFFFFFF) {
-                            nonceEncoded := shl(32, 0x84)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 5
-                        }
-                        // The nonce has 3 bytes
-                        if and(gt(nonce, 0xFFFF), lt(nonce, 0x1000000)) {
-                            nonceEncoded := shl(24, 0x83)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 4
-                        }
-                        // The nonce has 2 bytes
-                        if and(gt(nonce, 0xFF), lt(nonce, 0x10000)) {
-                            nonceEncoded := shl(16, 0x82)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 3
-                        }
-                        // The nonce has 1 byte and it's in [0x80, 0xFF]
-                        if and(gt(nonce, 0x7F), lt(nonce, 0x100)) {
-                            nonceEncoded := shl(8, 0x81)
-                            nonceEncoded := add(nonceEncoded, nonce)
-                            nonceEncodedLength := 2
-                        }
-
-                        listLength := add(21, nonceEncodedLength)
-                        listLengthEconded := add(listLength, 0xC0)
-
-                        let arrayLength := add(168, mul(8, nonceEncodedLength))
-
-                        digest := add(
-                            shl(arrayLength, listLengthEconded),
-                            add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
-                        )
-
-                        mstore(0, shl(sub(248, arrayLength), digest))
-
-                        addr := and(
-                            keccak256(0, add(div(arrayLength, 8), 1)),
-                            0xffffffffffffffffffffffffffffffffffffffff
-                        )
-                    }
+                    let addr := getNewAddress(address())
 
                     pop(warmAddress(addr))
 
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
                     if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
+                        incrementNonce(address())
+                        revert(0, 0)
+                    }
+
+                    offset := add(MEM_OFFSET_INNER(), offset)
+
+                    sp := pushStackItem(sp, sub(offset, 0x80))
+                    sp := pushStackItem(sp, sub(offset, 0x60))
+                    sp := pushStackItem(sp, sub(offset, 0x40))
+                    sp := pushStackItem(sp, sub(offset, 0x20))
+
+                    // Selector
+                    mstore(sub(offset, 0x80), 0x5b16a23c)
+                    // Arg1: address
+                    mstore(sub(offset, 0x60), addr)
+                    // Arg2: init code
+                    // Where the arg starts (third word)
+                    mstore(sub(offset, 0x40), 0x40)
+                    // Length of the init code
+                    mstore(sub(offset, 0x20), size)
+
+                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+                    incrementNonce(address())
+
+                    let back
+
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x20), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x40), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x60), back)
+                    back, sp := popStackItem(sp)
+                    mstore(sub(offset, 0x80), back)
+
+                    sp := pushStackItem(sp, addr)
+                }
+                case 0xF5 { // OP_CREATE2
+                    let value, offset, size, salt
+
+                    value, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+                    salt, sp := popStackItem(sp)
+
+                    checkMemOverflow(add(offset, size))
+
+                    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
+                        revert(0, 0)
+                    }
+
+                    if gt(value, balance(address())) {
+                        revert(0, 0)
+                    }
+
+                    evmGasLeft := chargeGas(evmGasLeft, add(
+                        32000, add(
+                        expandMemory(add(offset, size)),
+                        mul(2, div(add(size, 31), 32))
+                        )
+                    ))
+
+                    let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+                    mstore8(0, 0xFF)
+                    mstore(0x01, shl(0x06, address()))
+                    mstore(0x15, salt)
+                    mstore(0x35, hashedBytecode)
+
+                    let addr := and(
+                        keccak256(0, 0x55),
+                        0xFFFFFFFFFFFFFFFFFFFFFFFF
+                    )
+
+                    pop(warmAddress(addr))
+
+                    if or(gt(getNonce(addr), 0), gt(extcodesize(addr), 0)) {
                         incrementNonce(address())
                         revert(0, 0)
                     }
