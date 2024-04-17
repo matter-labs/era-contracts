@@ -89,8 +89,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256[] memory keys = hyperchainMap.keys();
         chainAddresses = new address[](keys.length);
         for (uint256 i = 0; i < keys.length; i++) {
-            // slither-disable-next-line unused-return
-            (, chainAddresses[i]) = hyperchainMap.at(i);
+            chainAddresses[i] = hyperchainMap.get(i);
         }
     }
 

@@ -86,6 +86,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across hyperchains.
     /// This serves as a security measure until hyperbridging is implemented.
+    /// NOTE: this function may be removed in the future, don't rely on it!
     mapping(uint256 chainId => mapping(address l1Token => uint256 balance)) public chainBalance;
 
     /// @notice Checks that the message sender is the bridgehub.
@@ -731,7 +732,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint16 _l2TxNumberInBatch,
         bytes calldata _message,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge whenNotPaused returns (address l1Receiver, address l1Token, uint256 amount) {
+    ) external override onlyLegacyBridge returns (address l1Receiver, address l1Token, uint256 amount) {
         (l1Receiver, l1Token, amount) = _finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -763,7 +764,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
-    ) external override onlyLegacyBridge whenNotPaused {
+    ) external override onlyLegacyBridge {
         _claimFailedDeposit({
             _checkedInLegacyBridge: true,
             _chainId: ERA_CHAIN_ID,
