@@ -508,6 +508,49 @@ object "EVMInterpreter" {
             }
         }
 
+        function genericCreate(addr, offset, size, sp) -> result {
+            pop(warmAddress(addr))
+
+            let nonceNewAddr := getNonce(addr)
+            let bytecodeNewAddr := extcodesize(addr)
+            if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
+                incrementNonce(address())
+                revert(0, 0)
+            }
+
+            offset := add(MEM_OFFSET_INNER(), offset)
+
+            sp := pushStackItem(sp, sub(offset, 0x80))
+            sp := pushStackItem(sp, sub(offset, 0x60))
+            sp := pushStackItem(sp, sub(offset, 0x40))
+            sp := pushStackItem(sp, sub(offset, 0x20))
+
+            // Selector
+            mstore(sub(offset, 0x80), 0x5b16a23c)
+            // Arg1: address
+            mstore(sub(offset, 0x60), addr)
+            // Arg2: init code
+            // Where the arg starts (third word)
+            mstore(sub(offset, 0x40), 0x40)
+            // Length of the init code
+            mstore(sub(offset, 0x20), size)
+
+            result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+            incrementNonce(address())
+
+            let back
+
+            back, sp := popStackItem(sp)
+            mstore(sub(offset, 0x20), back)
+            back, sp := popStackItem(sp)
+            mstore(sub(offset, 0x40), back)
+            back, sp := popStackItem(sp)
+            mstore(sub(offset, 0x60), back)
+            back, sp := popStackItem(sp)
+            mstore(sub(offset, 0x80), back)
+        }
+
         function getEVMGas() -> evmGas {
             let GAS_DIVISOR, EVM_GAS_STIPEND, OVERHEAD := GAS_CONSTANTS()
 
@@ -1397,48 +1440,11 @@ object "EVMInterpreter" {
 
                     let addr := getNewAddress(address())
 
-                    pop(warmAddress(addr))
+                    let result := genericCreate(addr, offset, size, sp)
 
-                    let nonceNewAddr := getNonce(addr)
-                    let bytecodeNewAddr := extcodesize(addr)
-                    if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
-                        incrementNonce(address())
-                        revert(0, 0)
-                    }
-
-                    offset := add(MEM_OFFSET_INNER(), offset)
-
-                    sp := pushStackItem(sp, sub(offset, 0x80))
-                    sp := pushStackItem(sp, sub(offset, 0x60))
-                    sp := pushStackItem(sp, sub(offset, 0x40))
-                    sp := pushStackItem(sp, sub(offset, 0x20))
-
-                    // Selector
-                    mstore(sub(offset, 0x80), 0x5b16a23c)
-                    // Arg1: address
-                    mstore(sub(offset, 0x60), addr)
-                    // Arg2: init code
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
-
-                    incrementNonce(address())
-
-                    let back
-
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x20), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x40), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x60), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x80), back)
-
-                    sp := pushStackItem(sp, addr)
+                    switch result
+                        case 0 { sp := pushStackItem(sp, 0) }
+                        default { sp := pushStackItem(sp, addr) }
                 }
                 case 0xF5 { // OP_CREATE2
                     let value, offset, size, salt
@@ -1467,55 +1473,20 @@ object "EVMInterpreter" {
 
                     let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
                     mstore8(0, 0xFF)
-                    mstore(0x01, shl(0x06, address()))
+                    mstore(0x01, shl(0x60, address()))
                     mstore(0x15, salt)
                     mstore(0x35, hashedBytecode)
 
                     let addr := and(
                         keccak256(0, 0x55),
-                        0xFFFFFFFFFFFFFFFFFFFFFFFF
+                        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                     )
 
-                    pop(warmAddress(addr))
+                    let result := genericCreate(addr, offset, size, sp)
 
-                    if or(gt(getNonce(addr), 0), gt(extcodesize(addr), 0)) {
-                        incrementNonce(address())
-                        revert(0, 0)
-                    }
-
-                    offset := add(MEM_OFFSET_INNER(), offset)
-
-                    sp := pushStackItem(sp, sub(offset, 0x80))
-                    sp := pushStackItem(sp, sub(offset, 0x60))
-                    sp := pushStackItem(sp, sub(offset, 0x40))
-                    sp := pushStackItem(sp, sub(offset, 0x20))
-
-                    // Selector
-                    mstore(sub(offset, 0x80), 0x5b16a23c)
-                    // Arg1: address
-                    mstore(sub(offset, 0x60), addr)
-                    // Arg2: init code
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
-
-                    incrementNonce(address())
-
-                    let back
-
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x20), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x40), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x60), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x80), back)
-
-                    sp := pushStackItem(sp, addr)
+                    switch result
+                        case 0 { sp := pushStackItem(sp, 0) }
+                        default { sp := pushStackItem(sp, addr) }
                 }
                 // TODO: REST OF OPCODES
                 default {
@@ -1990,6 +1961,49 @@ object "EVMInterpreter" {
                 if iszero(result) {
                     revert(0, 0)
                 }
+            }
+
+            function genericCreate(addr, offset, size, sp) -> result {
+                pop(warmAddress(addr))
+
+                let nonceNewAddr := getNonce(addr)
+                let bytecodeNewAddr := extcodesize(addr)
+                if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
+                    incrementNonce(address())
+                    revert(0, 0)
+                }
+
+                offset := add(MEM_OFFSET_INNER(), offset)
+
+                sp := pushStackItem(sp, sub(offset, 0x80))
+                sp := pushStackItem(sp, sub(offset, 0x60))
+                sp := pushStackItem(sp, sub(offset, 0x40))
+                sp := pushStackItem(sp, sub(offset, 0x20))
+
+                // Selector
+                mstore(sub(offset, 0x80), 0x5b16a23c)
+                // Arg1: address
+                mstore(sub(offset, 0x60), addr)
+                // Arg2: init code
+                // Where the arg starts (third word)
+                mstore(sub(offset, 0x40), 0x40)
+                // Length of the init code
+                mstore(sub(offset, 0x20), size)
+
+                result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+                incrementNonce(address())
+
+                let back
+
+                back, sp := popStackItem(sp)
+                mstore(sub(offset, 0x20), back)
+                back, sp := popStackItem(sp)
+                mstore(sub(offset, 0x40), back)
+                back, sp := popStackItem(sp)
+                mstore(sub(offset, 0x60), back)
+                back, sp := popStackItem(sp)
+                mstore(sub(offset, 0x80), back)
             }
 
             ////////////////////////////////////////////////////////////////
@@ -2840,7 +2854,6 @@ object "EVMInterpreter" {
                     evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
                 }
                 case 0xF0 { // OP_CREATE
-                    printString("Hola!")
                     if isStatic {
                         revert(0, 0)
                     }
@@ -2870,48 +2883,11 @@ object "EVMInterpreter" {
 
                     let addr := getNewAddress(address())
 
-                    pop(warmAddress(addr))
+                    let result := genericCreate(addr, offset, size, sp)
 
-                    let nonceNewAddr := getNonce(addr)
-                    let bytecodeNewAddr := extcodesize(addr)
-                    if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
-                        incrementNonce(address())
-                        revert(0, 0)
-                    }
-
-                    offset := add(MEM_OFFSET_INNER(), offset)
-
-                    sp := pushStackItem(sp, sub(offset, 0x80))
-                    sp := pushStackItem(sp, sub(offset, 0x60))
-                    sp := pushStackItem(sp, sub(offset, 0x40))
-                    sp := pushStackItem(sp, sub(offset, 0x20))
-
-                    // Selector
-                    mstore(sub(offset, 0x80), 0x5b16a23c)
-                    // Arg1: address
-                    mstore(sub(offset, 0x60), addr)
-                    // Arg2: init code
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
-
-                    incrementNonce(address())
-
-                    let back
-
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x20), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x40), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x60), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x80), back)
-
-                    sp := pushStackItem(sp, addr)
+                    switch result
+                        case 0 { sp := pushStackItem(sp, 0) }
+                        default { sp := pushStackItem(sp, addr) }
                 }
                 case 0xF5 { // OP_CREATE2
                     let value, offset, size, salt
@@ -2940,55 +2916,20 @@ object "EVMInterpreter" {
 
                     let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
                     mstore8(0, 0xFF)
-                    mstore(0x01, shl(0x06, address()))
+                    mstore(0x01, shl(0x60, address()))
                     mstore(0x15, salt)
                     mstore(0x35, hashedBytecode)
 
                     let addr := and(
                         keccak256(0, 0x55),
-                        0xFFFFFFFFFFFFFFFFFFFFFFFF
+                        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
                     )
 
-                    pop(warmAddress(addr))
+                    let result := genericCreate(addr, offset, size, sp)
 
-                    if or(gt(getNonce(addr), 0), gt(extcodesize(addr), 0)) {
-                        incrementNonce(address())
-                        revert(0, 0)
-                    }
-
-                    offset := add(MEM_OFFSET_INNER(), offset)
-
-                    sp := pushStackItem(sp, sub(offset, 0x80))
-                    sp := pushStackItem(sp, sub(offset, 0x60))
-                    sp := pushStackItem(sp, sub(offset, 0x40))
-                    sp := pushStackItem(sp, sub(offset, 0x20))
-
-                    // Selector
-                    mstore(sub(offset, 0x80), 0x5b16a23c)
-                    // Arg1: address
-                    mstore(sub(offset, 0x60), addr)
-                    // Arg2: init code
-                    // Where the arg starts (third word)
-                    mstore(sub(offset, 0x40), 0x40)
-                    // Length of the init code
-                    mstore(sub(offset, 0x20), size)
-
-                    let result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
-
-                    incrementNonce(address())
-
-                    let back
-
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x20), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x40), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x60), back)
-                    back, sp := popStackItem(sp)
-                    mstore(sub(offset, 0x80), back)
-
-                    sp := pushStackItem(sp, addr)
+                    switch result
+                        case 0 { sp := pushStackItem(sp, 0) }
+                        default { sp := pushStackItem(sp, addr) }
                 }
                 // TODO: REST OF OPCODES
                 default {
