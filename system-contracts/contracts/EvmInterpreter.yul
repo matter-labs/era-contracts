@@ -1396,7 +1396,7 @@ object "EVMInterpreter" {
                         )
                     }
 
-                    warmAddress(addr)
+                    pop(warmAddress(addr))
 
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
@@ -2794,7 +2794,7 @@ object "EVMInterpreter" {
                         )
                     }
 
-                    warmAddress(addr)
+                    pop(warmAddress(addr))
 
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
