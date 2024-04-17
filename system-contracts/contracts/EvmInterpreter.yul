@@ -1838,7 +1838,6 @@ object "EVMInterpreter" {
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
                     
-                    // TODO: check if this is correct
                     {
                         let gasUsed := add(add(375, mul(8, size)), expandMemory(add(offset, size)))
                         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
@@ -1859,7 +1858,6 @@ object "EVMInterpreter" {
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
                     
-                    // TODO: check if this is correct    
                     let gasUsed := add(add(750, mul(8, size)), expandMemory(add(offset, size)))
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
 
@@ -1878,7 +1876,6 @@ object "EVMInterpreter" {
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
                     
-                    // TODO: check if this is correct
                     let gasUsed := add(add(1125, mul(8, size)), expandMemory(add(offset, size)))
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                     
@@ -1901,7 +1898,6 @@ object "EVMInterpreter" {
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
                     
-                    // TODO: check if this is correct
                     let gasUsed := add(add(1500, mul(8, size)), expandMemory(add(offset, size)))
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                     
@@ -1925,8 +1921,7 @@ object "EVMInterpreter" {
 
                     checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
                     checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
-                    
-                    // TODO: check if this is correct
+
                     let gasUsed := add(add(1875, mul(8, size)), expandMemory(add(offset, size)))
                     evmGasLeft := chargeGas(evmGasLeft, gasUsed)
                     
