@@ -3,6 +3,7 @@
 pragma solidity 0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {IBridgehub, IL1SharedBridge} from "../bridge/interfaces/IL1SharedBridge.sol";
@@ -13,7 +14,7 @@ import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice all the ether is held by the weth bridge
     IL1SharedBridge public sharedBridge;
 
@@ -119,7 +120,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
         uint256 _salt,
         address _admin,
         bytes calldata _initData
-    ) external onlyOwnerOrAdmin nonReentrant returns (uint256 chainId) {
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
         require(_chainId != 0, "Bridgehub: chainId cannot be 0");
         require(_chainId <= type(uint48).max, "Bridgehub: chainId too large");
 
@@ -212,7 +213,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             if (token == ETH_TOKEN_ADDRESS) {
@@ -258,7 +259,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant returns (bytes32 canonicalTxHash) {
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
         {
             address token = baseToken[_request.chainId];
             uint256 baseTokenMsgValue;
@@ -319,5 +320,19 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable {
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.24;
 
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
@@ -24,6 +26,8 @@ import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2StepUpgradeable {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
@@ -31,8 +35,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_HYPERCHAINS;
 
-    /// @notice The mapping from chainId => hyperchain contract
-    mapping(uint256 chainId => address chainContract) public hyperchain;
+    /// @notice The map from chainId => hyperchain contract
+    EnumerableMap.UintToAddressMap internal hyperchainMap;
 
     /// @dev The batch zero hash, calculated at initialization
     bytes32 public storedBatchZero;
@@ -61,9 +65,6 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    /// @dev  The total number of already deployed/connected hyperchains.
-    uint256 public totalNumberOfHyperchains;
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub, uint256 _maxNumberOfHyperchains) reentrancyGuardInitializer {
@@ -83,8 +84,23 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         _;
     }
 
+    /// @notice Returns all the registered hyperchain addresses
+    function getAllHyperchains() public view override returns (address[] memory chainAddresses) {
+        uint256[] memory keys = hyperchainMap.keys();
+        chainAddresses = new address[](keys.length);
+        for (uint256 i = 0; i < keys.length; i++) {
+            (, chainAddresses[i]) = hyperchainMap.at(i);
+        }
+    }
+
+    /// @notice Returns the address of the hyperchain with the corresponding chainID
+    function hyperchain(uint256 _chainId) public view override returns (address chainAddress) {
+        (, chainAddress) = hyperchainMap.tryGet(_chainId);
+    }
+
+    /// @notice Returns the address of the hyperchain admin with the corresponding chainID
     function getChainAdmin(uint256 _chainId) external view override returns (address) {
-        return IZkSyncHyperchain(hyperchain[_chainId]).getAdmin();
+        return IZkSyncHyperchain(hyperchainMap.get(_chainId)).getAdmin();
     }
 
     /// @dev initialize
@@ -196,17 +212,17 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev freezes the specified chain
     function freezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).freezeDiamond();
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).freezeDiamond();
     }
 
     /// @dev freezes the specified chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).unfreezeDiamond();
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).unfreezeDiamond();
     }
 
     /// @dev reverts batches on the specified chain
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZkSyncHyperchain(hyperchain[_chainId]).revertBatches(_newLastBatch);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).revertBatches(_newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -215,37 +231,37 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
     ) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).upgradeChainFromVersion(_oldProtocolVersion, _diamondCut);
     }
 
     /// @dev executes upgrade on chain
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).executeUpgrade(_diamondCut);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).executeUpgrade(_diamondCut);
     }
 
     /// @dev setPriorityTxMaxGasLimit for the specified chain
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setPriorityTxMaxGasLimit(_maxGasLimit);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPriorityTxMaxGasLimit(_maxGasLimit);
     }
 
     /// @dev setTokenMultiplier for the specified chain
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setTokenMultiplier(_nominator, _denominator);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setTokenMultiplier(_nominator, _denominator);
     }
 
     /// @dev changeFeeParams for the specified chain
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).changeFeeParams(_newFeeParams);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).changeFeeParams(_newFeeParams);
     }
 
     /// @dev setValidator for the specified chain
     function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setValidator(_validator, _active);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setValidator(_validator, _active);
     }
 
     /// @dev setPorterAvailability for the specified chain
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZkSyncHyperchain(hyperchain[_chainId]).setPorterAvailability(_zkPorterIsAvailable);
+        IZkSyncHyperchain(hyperchainMap.get(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
 
     /// registration
@@ -326,7 +342,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
         address _admin,
         bytes calldata _diamondCut
     ) external onlyBridgehub {
-        if (hyperchain[_chainId] != address(0)) {
+        if (hyperchain(_chainId) != address(0)) {
             // Hyperchain already registered
             return;
         }
@@ -371,11 +387,8 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
 
     /// @dev This internal function is used to register a new hyperchain in the system.
     function _registerNewHyperchain(uint256 _chainId, address _hyperchain) internal {
-        uint256 currentNumberOfHyperchains = totalNumberOfHyperchains;
-        require(currentNumberOfHyperchains <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
-        totalNumberOfHyperchains++;
-
-        hyperchain[_chainId] = _hyperchain;
+        hyperchainMap.set(_chainId, _hyperchain);
+        require(hyperchainMap.length() <= MAX_NUMBER_OF_HYPERCHAINS, "STM: Hyperchain limit reached");
         emit NewHyperchain(_chainId, _hyperchain);
     }
 }

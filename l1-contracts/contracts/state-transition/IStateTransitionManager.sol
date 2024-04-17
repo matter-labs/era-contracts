@@ -63,6 +63,8 @@ interface IStateTransitionManager {
 
     function acceptAdmin() external;
 
+    function getAllHyperchains() external view returns (address[] memory);
+
     function hyperchain(uint256 _chainId) external view returns (address);
 
     function storedBatchZero() external view returns (bytes32);
