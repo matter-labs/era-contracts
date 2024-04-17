@@ -1302,9 +1302,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    if gt(add(offset, size), MAX_MEMORY_FRAME()) {
-                        revert(0, 0)
-                    }
+                    checkMemOverflow(add(offset, size))
 
                     if gt(len, mul(2, MAX_POSSIBLE_BYTECODE())) {
                         revert(0, 0)
@@ -2675,9 +2673,7 @@ object "EVMInterpreter" {
                     offset, sp := popStackItem(sp)
                     size, sp := popStackItem(sp)
 
-                    if gt(add(offset, size), MAX_MEMORY_FRAME()) {
-                        revert(0, 0)
-                    }
+                    checkMemOverflow(add(offset, size))
 
                     if gt(len, mul(2, MAX_POSSIBLE_BYTECODE())) {
                         revert(0, 0)
