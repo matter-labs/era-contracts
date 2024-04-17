@@ -402,6 +402,24 @@ object "EVMInterpreter" {
             originalValue := mload(32)
         }
 
+        function warmAddress(addr) -> isWarm {
+            // TODO: Unhardcode this selector 0x8db2ba78
+            mstore8(0, 0x8d)
+            mstore8(1, 0xb2)
+            mstore8(2, 0xba)
+            mstore8(3, 0x78)
+            mstore(4, addr)
+
+            let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+
+            isWarm := mload(0)
+        }
+
         function getNonce(addr) -> nonce {
             mstore8(0, 0xfb)
             mstore8(1, 0x1a)
@@ -1378,6 +1396,8 @@ object "EVMInterpreter" {
                         )
                     }
 
+                    warmAddress(addr)
+
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
                     if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
@@ -1786,6 +1806,24 @@ object "EVMInterpreter" {
     
                 isWarm := mload(0)
                 originalValue := mload(32)
+            }
+
+            function warmAddress(addr) -> isWarm {
+                // TODO: Unhardcode this selector 0x8db2ba78
+                mstore8(0, 0x8d)
+                mstore8(1, 0xb2)
+                mstore8(2, 0xba)
+                mstore8(3, 0x78)
+                mstore(4, addr)
+
+                let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+
+                isWarm := mload(0)
             }
 
             function getNonce(addr) -> nonce {
@@ -2755,6 +2793,8 @@ object "EVMInterpreter" {
                             0xffffffffffffffffffffffffffffffffffffffff
                         )
                     }
+
+                    warmAddress(addr)
 
                     let nonceNewAddr := getNonce(addr)
                     let bytecodeNewAddr := extcodesize(addr)
