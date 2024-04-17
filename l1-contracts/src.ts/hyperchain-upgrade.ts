@@ -49,7 +49,7 @@ export async function upgradeToHyperchains(
   await upgradeToHyperchains3(deployer);
 }
 
-/// this deploys the contracts
+/// this just deploys the contract ( we do it here instead of using the protocol-upgrade tool, since we are deploying more than just facets, the Bridgehub, STM, etc.)
 export async function upgradeToHyperchains1(
   deployer: Deployer,
   gasPrice: BigNumberish,
