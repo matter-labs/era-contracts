@@ -10,6 +10,10 @@ object "EVMInterpreter" {
                 addr := 0x0000000000000000000000000000000000008002
             }
 
+            function NONCE_HOLDER_SYSTEM_CONTRACT() -> addr {
+                addr := 0x0000000000000000000000000000000000008003
+            }
+
             function CODE_ADDRESS_CALL_ADDRESS() -> addr {
                 addr := 0x000000000000000000000000000000000000FFFE
             }
@@ -338,6 +342,26 @@ object "EVMInterpreter" {
                 isWarm := mload(0)
             }
 
+            function ensureAcceptableMemLocation(location) {
+                if gt(location,MAX_POSSIBLE_MEM()) {
+                    revert(0,0) // Check if this is whats needed
+                }
+            }
+
+            function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
+                newOffset := offset
+                newSize := size
+                if eq(isCallerEVM,1) {
+                    // include gas
+                    let previousValue := mload(sub(offset,32))
+                    mstore(sub(offset,32),evmGasLeft)
+                    //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+                    // but it appears to rewrite were we want to store the gas
+
+                    newOffset := sub(offset, 32)
+                    newSize := add(size, 32)
+                }
+            }
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
@@ -1388,6 +1412,38 @@ object "EVMInterpreter" {
                     }
                     
                 }
+                case 0xF3 { // OP_RETURN
+                    let offset,size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    ensureAcceptableMemLocation(offset)
+                    ensureAcceptableMemLocation(size)
+                    evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+                    return(add(offset,MEM_OFFSET_INNER()),size)
+                }
+                case 0xFD { // OP_REVERT
+                    let offset,size
+
+                    offset, sp := popStackItem(sp)
+                    size, sp := popStackItem(sp)
+
+                    ensureAcceptableMemLocation(offset)
+                    ensureAcceptableMemLocation(size)
+                    evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+                    offset := add(offset, MEM_OFFSET_INNER())
+                    offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
+
+                    revert(offset,size)
+                }
+                case 0xFE { // OP_INVALID
+                    evmGasLeft := 0
+
+                    invalid()
+                }
                 // TODO: REST OF OPCODES
                 default {
                     // TODO: Revert properly here and report the unrecognized opcode
@@ -1396,11 +1452,7 @@ object "EVMInterpreter" {
                 }
             }
 
-            if eq(isCallerEVM, 1) {
-                // Includes gas
-                returnOffset := sub(returnOffset, 32)
-                returnLen := add(returnLen, 32)
-            }
+            returnOffset, returnLen := addGasIfEvmRevert(isCallerEVM,returnOffset,returnLen,evmGasLeft)
 
             return(returnOffset, returnLen)
         }
