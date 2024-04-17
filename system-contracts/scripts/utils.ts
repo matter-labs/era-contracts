@@ -212,6 +212,8 @@ export async function compilerLocation(compilerVersion: string, isCompilerPreRel
   const salt = "";
 
   if (isCompilerPreRelease) {
+    console.log(hre.config.zksolc);
+    console.log(hre.config.zksolc.settings);
     const url = hre.config.zksolc.settings.compilerPath;
     const salt = createHash("sha1").update(url!).digest("hex");
     const compilerPath = `${compilersCache}/zksolc/zksolc-remote-${salt}.0`; // Path of the downloaded compiler
