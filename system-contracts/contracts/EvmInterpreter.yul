@@ -3644,25 +3644,6 @@ object "EVMInterpreter" {
 
                     invalid()
                 }
-                case 0xFF { // OP_SELFDESTRUCT
-                    let addr
-
-                    addr, sp := popStackItem(sp)
-
-                    let wasWarm := warmAddress(addr)
-
-                    let staticGas := 5000
-                    let dynamicGas := 0
-                    if and( gt(selfbalance(),0), isAddrEmpty(addr)) {
-                        dynamicGas := 25000
-                    }
-                    if not(wasWarm) {
-                        dynamicGas := add(dynamicGas ,2600)
-                    }
-                    evmGasLeft := chargeGas(evmGasLeft,add(staticGas,dynamicGas))
-
-                    //selfdestruct(addr)
-                }
                 // TODO: REST OF OPCODES
                 default {
                     // TODO: Revert properly here and report the unrecognized opcode
