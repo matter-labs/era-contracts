@@ -1304,13 +1304,20 @@ object "EVMInterpreter" {
 
                     checkMemOverflow(add(offset, size))
 
-                    if gt(len, mul(2, MAX_POSSIBLE_BYTECODE())) {
+                    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                         revert(0, 0)
                     }
 
                     if gt(value, balance(address())) {
                         revert(0, 0)
                     }
+
+                    evmGasLeft := chargeGas(evmGasLeft, add(
+                        32000, add(
+                        expandMemory(add(offset, size))
+                        mul(2, div(add(size, 31), 32))
+                        )
+                    ))
 
                     let addr
                     {
@@ -2675,13 +2682,20 @@ object "EVMInterpreter" {
 
                     checkMemOverflow(add(offset, size))
 
-                    if gt(len, mul(2, MAX_POSSIBLE_BYTECODE())) {
+                    if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
                         revert(0, 0)
                     }
 
                     if gt(value, balance(address())) {
                         revert(0, 0)
                     }
+
+                    evmGasLeft := chargeGas(evmGasLeft, add(
+                        32000, add(
+                        expandMemory(add(offset, size))
+                        mul(2, div(add(size, 31), 32))
+                        )
+                    ))
 
                     let addr
                     {
