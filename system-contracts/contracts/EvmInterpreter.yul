@@ -174,6 +174,8 @@ object "EVMInterpreter" {
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
 
+            pop(warmAddress(address()))
+
             <!-- @include EvmInterpreterLoop.yul -->
 
             return(returnOffset, returnLen)
