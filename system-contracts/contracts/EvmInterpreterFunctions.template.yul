@@ -95,7 +95,7 @@ function dupStackItem(sp, evmGas, position) -> newSp, evmGasLeft {
     if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
         revert(0, 0)
     }
-    
+
     if lt(tempSp, STACK_OFFSET()) {
         revert(0, 0)
     }
@@ -113,12 +113,12 @@ function swapStackItem(sp, evmGas, position) ->  evmGasLeft {
     if or(gt(tempSp, BYTECODE_OFFSET()), eq(tempSp, BYTECODE_OFFSET())) {
         revert(0, 0)
     }
-    
+
     if lt(tempSp, STACK_OFFSET()) {
         revert(0, 0)
     }
 
-    
+
     let s2 := mload(sp)
     let s1 := mload(tempSp)                    
 
