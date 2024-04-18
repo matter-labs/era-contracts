@@ -97,6 +97,7 @@ contract DeployL1Script is Script {
         bytes32 recursionLeafLevelVkHash;
         bytes32 recursionCircuitsSetVksHash;
         uint256 priorityTxMaxGasLimit;
+        uint256 sharedBridgeEraFirstPostUpgradeBatch;
         PubdataPricingMode diamondInitPubdataPricingMode;
         uint256 diamondInitBatchOverheadL1Gas;
         uint256 diamondInitMaxPubdataPerBatch;
@@ -180,6 +181,9 @@ contract DeployL1Script is Script {
         config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
         config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
+        config.contracts.sharedBridgeEraFirstPostUpgradeBatch = toml.readUint(
+            "$.contracts.shared_bridge_era_first_post_upgrade_batch"
+        );
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
         );
@@ -495,7 +499,10 @@ contract DeployL1Script is Script {
     }
 
     function deploySharedBridgeProxy() internal {
-        bytes memory initCalldata = abi.encodeCall(L1SharedBridge.initialize, (config.deployerAddress));
+        bytes memory initCalldata = abi.encodeCall(
+            L1SharedBridge.initialize,
+            (config.deployerAddress, config.contracts.sharedBridgeEraFirstPostUpgradeBatch)
+        );
         bytes memory bytecode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(addresses.bridges.sharedBridgeImplementation, addresses.transparentProxyAdmin, initCalldata)
