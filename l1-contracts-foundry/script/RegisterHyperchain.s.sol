@@ -89,37 +89,47 @@ contract RegisterHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.ownerAddress = toml.readAddress("$.l1.owner_addr");
+        config.ownerAddress = toml.readAddress("$.owner_addr");
 
-        config.addresses.bridgehub = toml.readAddress("$.l1.bridgehub.bridgehub_proxy_addr");
-        config.addresses.stateTransitionProxy = toml.readAddress("$.l1.state_transition.state_transition_proxy_addr");
-        config.addresses.adminFacet = toml.readAddress("$.l1.state_transition.admin_facet_addr");
-        config.addresses.gettersFacet = toml.readAddress("$.l1.state_transition.getters_facet_addr");
-        config.addresses.mailboxFacet = toml.readAddress("$.l1.state_transition.mailbox_facet_addr");
-        config.addresses.executorFacet = toml.readAddress("$.l1.state_transition.executor_facet_addr");
-        config.addresses.verifier = toml.readAddress("$.l1.state_transition.verifier_addr");
-        config.addresses.blobVersionedHashRetriever = toml.readAddress("$.l1.blob_versioned_hash_retriever_addr");
-        config.addresses.diamondInit = toml.readAddress("$.l1.state_transition.diamond_init_addr");
-        config.addresses.validatorTimelock = toml.readAddress("$.l1.validator_timelock_addr");
+        config.addresses.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.addresses.stateTransitionProxy = toml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        config.addresses.adminFacet = toml.readAddress("$.deployed_addresses.state_transition.admin_facet_addr");
+        config.addresses.gettersFacet = toml.readAddress("$.deployed_addresses.state_transition.getters_facet_addr");
+        config.addresses.mailboxFacet = toml.readAddress("$.deployed_addresses.state_transition.mailbox_facet_addr");
+        config.addresses.executorFacet = toml.readAddress("$.deployed_addresses.state_transition.executor_facet_addr");
+        config.addresses.verifier = toml.readAddress("$.deployed_addresses.state_transition.verifier_addr");
+        config.addresses.blobVersionedHashRetriever = toml.readAddress(
+            "$.deployed_addresses.blob_versioned_hash_retriever_addr"
+        );
+        config.addresses.diamondInit = toml.readAddress("$.deployed_addresses.state_transition.diamond_init_addr");
+        config.addresses.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
 
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
-            toml.readUint("$.l1.config.diamond_init_pubdata_pricing_mode")
+            toml.readUint("$.contracts_config.diamond_init_pubdata_pricing_mode")
         );
         config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
-            "$.l1.config.diamond_init_batch_overhead_l1_gas"
+            "$.contracts_config.diamond_init_batch_overhead_l1_gas"
         );
         config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
-            "$.l1.config.diamond_init_max_pubdata_per_batch"
+            "$.contracts_config.diamond_init_max_pubdata_per_batch"
         );
-        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint("$.l1.config.diamond_init_max_l2_gas_per_batch");
+        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint(
+            "$.contracts_config.diamond_init_max_l2_gas_per_batch"
+        );
         config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
-            "$.l1.config.diamond_init_priority_tx_max_pubdata"
+            "$.contracts_config.diamond_init_priority_tx_max_pubdata"
         );
-        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint("$.l1.config.diamond_init_minimal_l2_gas_price");
-        config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.l1.config.recursion_node_level_vk_hash");
-        config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.l1.config.recursion_leaf_level_vk_hash");
-        config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.l1.config.recursion_circuits_set_vks_hash");
-        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.l1.config.priority_tx_max_gas_limit");
+        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint(
+            "$.contracts_config.diamond_init_minimal_l2_gas_price"
+        );
+        config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts_config.recursion_node_level_vk_hash");
+        config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts_config.recursion_leaf_level_vk_hash");
+        config.contracts.recursionCircuitsSetVksHash = toml.readBytes32(
+            "$.contracts_config.recursion_circuits_set_vks_hash"
+        );
+        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts_config.priority_tx_max_gas_limit");
 
         // Grab config from l1 deployment config
         root = vm.projectRoot();

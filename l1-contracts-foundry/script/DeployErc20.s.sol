@@ -49,8 +49,8 @@ contract RegisterHyperchainScript is Script {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.l1.create2_factory_addr");
-        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.l1.create2_factory_salt");
+        config.create2FactoryAddr = vm.parseTomlAddress(toml, "$.create2_factory_addr");
+        config.create2FactorySalt = vm.parseTomlBytes32(toml, "$.create2_factory_salt");
 
         // Grab config from custom config file
         path = string.concat(root, "/script-config/config-deploy-erc20.toml");
@@ -116,9 +116,6 @@ contract RegisterHyperchainScript is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("root", "create2_factory_addr", config.create2FactoryAddr);
-        vm.serializeBytes32("root", "create2_factory_salt", config.create2FactorySalt);
-
         string memory tokens = "";
         for (uint256 i = 0; i < config.tokens.length; i++) {
             TokenDescription memory token = config.tokens[i];

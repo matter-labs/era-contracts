@@ -567,116 +567,124 @@ contract DeployL1Script is Script {
     }
 
     function saveOutput() internal {
-        vm.serializeAddress("l1.bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-        string memory l1Bridgehub = vm.serializeAddress(
-            "l1.bridgehub",
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+        string memory bridgehub = vm.serializeAddress(
+            "bridgehub",
             "bridgehub_implementation_addr",
             addresses.bridgehub.bridgehubImplementation
         );
 
         vm.serializeAddress(
-            "l1.state_transition",
+            "state_transition",
             "state_transition_proxy_addr",
             addresses.stateTransition.stateTransitionProxy
         );
         vm.serializeAddress(
-            "l1.state_transition",
+            "state_transition",
             "state_transition_implementation_addr",
             addresses.stateTransition.stateTransitionImplementation
         );
-        vm.serializeAddress("l1.state_transition", "verifier_addr", addresses.stateTransition.verifier);
-        vm.serializeAddress("l1.state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
-        vm.serializeAddress("l1.state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
-        vm.serializeAddress("l1.state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
-        vm.serializeAddress("l1.state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
-        vm.serializeAddress("l1.state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
-        vm.serializeAddress("l1.state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("l1.state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
-        string memory l1StateTransition = vm.serializeAddress(
-            "l1.state_transition",
+        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
+        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
+        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
+        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
+        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
+        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
+        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
             "diamond_proxy_addr",
             addresses.stateTransition.diamondProxy
         );
 
+        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
         vm.serializeAddress(
-            "l1.bridges",
-            "erc20_bridge_implementation_addr",
-            addresses.bridges.erc20BridgeImplementation
-        );
-        vm.serializeAddress("l1.bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-        vm.serializeAddress(
-            "l1.bridges",
+            "bridges",
             "shared_bridge_implementation_addr",
             addresses.bridges.sharedBridgeImplementation
         );
-        string memory l1Bridges = vm.serializeAddress(
-            "l1.bridges",
+        string memory bridges = vm.serializeAddress(
+            "bridges",
             "shared_bridge_proxy_addr",
             addresses.bridges.sharedBridgeProxy
         );
 
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_pubdata_pricing_mode",
             uint256(config.contracts.diamondInitPubdataPricingMode)
         );
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_batch_overhead_l1_gas",
             config.contracts.diamondInitBatchOverheadL1Gas
         );
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_max_pubdata_per_batch",
             config.contracts.diamondInitMaxPubdataPerBatch
         );
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_max_l2_gas_per_batch",
             config.contracts.diamondInitMaxL2GasPerBatch
         );
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_priority_tx_max_pubdata",
             config.contracts.diamondInitPriorityTxMaxPubdata
         );
         vm.serializeUint(
-            "l1.config",
+            "contracts_config",
             "diamond_init_minimal_l2_gas_price",
             config.contracts.diamondInitMinimalL2GasPrice
         );
-        vm.serializeBytes32("l1.config", "recursion_node_level_vk_hash", config.contracts.recursionNodeLevelVkHash);
-        vm.serializeBytes32("l1.config", "recursion_leaf_level_vk_hash", config.contracts.recursionLeafLevelVkHash);
         vm.serializeBytes32(
-            "l1.config",
+            "contracts_config",
+            "recursion_node_level_vk_hash",
+            config.contracts.recursionNodeLevelVkHash
+        );
+        vm.serializeBytes32(
+            "contracts_config",
+            "recursion_leaf_level_vk_hash",
+            config.contracts.recursionLeafLevelVkHash
+        );
+        vm.serializeBytes32(
+            "contracts_config",
             "recursion_circuits_set_vks_hash",
             config.contracts.recursionCircuitsSetVksHash
         );
-        string memory l1Config = vm.serializeUint(
-            "l1.config",
+        string memory contractsConfig = vm.serializeUint(
+            "contracts_config",
             "priority_tx_max_gas_limit",
             config.contracts.priorityTxMaxGasLimit
         );
 
-        vm.serializeAddress("l1", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
-        vm.serializeAddress("l1", "governance_addr", addresses.governance);
-        vm.serializeAddress("l1", "blob_versioned_hash_retriever_addr", addresses.blobVersionedHashRetriever);
-        vm.serializeAddress("l1", "validator_timelock_addr", addresses.validatorTimelock);
-        vm.serializeAddress("l1", "create2_factory_addr", addresses.create2Factory);
-        vm.serializeBytes32("l1", "create2_factory_salt", config.contracts.create2FactorySalt);
-        vm.serializeAddress("l1", "multicall3_addr", config.contracts.multicall3Addr);
-        vm.serializeUint("l1", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("l1", "era_chain_id", config.eraChainId);
-        vm.serializeString("l1", "bridgehub", l1Bridgehub);
-        vm.serializeString("l1", "state_transition", l1StateTransition);
-        vm.serializeString("l1", "config", l1Config);
-        vm.serializeAddress("l1", "deployer_addr", config.deployerAddress);
-        vm.serializeAddress("l1", "owner_addr", config.ownerAddress);
-        string memory l1 = vm.serializeString("l1", "bridges", l1Bridges);
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
+        vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "blob_versioned_hash_retriever_addr",
+            addresses.blobVersionedHashRetriever
+        );
+        vm.serializeAddress("deployed_addresses", "validator_timelock_addr", addresses.validatorTimelock);
+        vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
+        vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+        string memory deployedAddresses = vm.serializeString("deployed_addresses", "bridges", bridges);
 
-        string memory toml = vm.serializeString("toml", "l1", l1);
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
+        vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
+        vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
+        vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
+        vm.serializeUint("root", "era_chain_id", config.eraChainId);
+        vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
+        vm.serializeString("root", "deployed_addresses", deployedAddresses);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        string memory toml = vm.serializeAddress("root", "owner_addr", config.ownerAddress);
+
+        string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-l1.toml");
         vm.writeToml(toml, path);
     }
 
