@@ -222,6 +222,54 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft, 3)
     }
+    case 0x1B { // OP_SHL
+        let shift, value
+
+        shift, sp := popStackItem(sp)
+        value, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, shl(shift, value))
+
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+    }
+    case 0x1C { // OP_SHR
+        let shift, value
+
+        shift, sp := popStackItem(sp)
+        value, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, shr(shift, value))
+
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+    }
+    case 0x1D { // OP_SAR
+        let shift, value
+
+        shift, sp := popStackItem(sp)
+        value, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, sar(shift, value))
+
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+    }
+
+    case 0x20 { // OP_KECCAK256
+        let offset, size
+
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, keccak256(add(MEM_OFFSET_INNER(), offset), size))
+
+        // When an offset is first accessed (either read or write), memory may trigger 
+        // an expansion, which costs gas.
+        // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+        // minimum_word_size = (size + 31) / 32
+        let minWordSize := shr(add(size, 31), 5)
+        let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
+        let usedGas := add(30, dynamicGas)
+        evmGasLeft := chargeGas(evmGasLeft, usedGas)
+    }
     case 0x30 { // OP_ADDRESS
         sp := pushStackItem(sp, address())
 
@@ -232,10 +280,14 @@ for { } true { } {
 
         addr, sp := popStackItem(sp)
 
+        let wasWarm := warmAddress(addr)
+
         sp := pushStackItem(sp, balance(addr))
 
         // TODO: Handle cold/warm slots and updates, etc for gas costs.
-        evmGasLeft := chargeGas(evmGasLeft, 100)
+        switch wasWarm
+        case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
+        default { evmGasLeft := chargeGas(evmGasLeft, 100) }
     }
     case 0x32 { // OP_ORIGIN
         sp := pushStackItem(sp, origin())
@@ -284,6 +336,46 @@ for { } true { } {
         }
 
         calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
+    }
+    case 0x38 { // OP_CODESIZE
+        let bytecodeLen := mload(BYTECODE_OFFSET())
+        sp := pushStackItem(sp, bytecodeLen)
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+    }
+    case 0x39 { // OP_CODECOPY
+        let bytecodeLen := mload(BYTECODE_OFFSET())
+        let dst, offset, len
+
+        dst, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp)
+        len, sp := popStackItem(sp)
+
+        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        // let minWordSize := div(add(len, 31), 32) Used inside the mul
+        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
+        evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+        // basically BYTECODE_OFFSET + 32 - 31, since
+        // we always need to read one byte
+        let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+
+        // TODO: optimize?
+        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
+            switch lt(add(offset, i), bytecodeLen)
+                case true {
+                    mstore8(
+                        add(add(MEM_OFFSET_INNER(), offset), i),
+                        and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
+                    )
+                }
+                default {
+                    mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
+                }
+        }
+    }
+    case 0x3A { // OP_GASPRICE
+        sp := pushStackItem(sp, gasprice())
+        evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
@@ -823,6 +915,113 @@ for { } true { } {
     case 0x9F { // OP_SWAP16
         evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
     }
+    case 0xA0 { // OP_LOG0
+        if isStatic {
+            revert(0, 0)
+        }
+
+        let offset, size
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
+
+        {
+            let gasUsed := add(add(375, mul(8, size)), expandMemory(add(offset, size)))
+            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        }
+
+        log0(add(offset, MEM_OFFSET_INNER()), size)
+    }
+    case 0xA1 { // OP_LOG1
+        if isStatic {
+            revert(0, 0)
+        }
+
+        let offset, size, topic1
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+        topic1, sp := popStackItem(sp)
+
+        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
+
+        let gasUsed := add(add(750, mul(8, size)), expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+        log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
+    }
+    case 0xA2 { // OP_LOG2
+        if isStatic {
+            revert(0, 0)
+        }
+
+        let offset, size
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
+
+        let gasUsed := add(add(1125, mul(8, size)), expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+        {
+            let topic1, topic2
+            topic1, sp := popStackItem(sp)
+            topic2, sp := popStackItem(sp)
+            log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
+        }
+    }
+    case 0xA3 { // OP_LOG3
+        if isStatic {
+            revert(0, 0)
+        }
+
+        let offset, size
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
+
+        let gasUsed := add(add(1500, mul(8, size)), expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+        {
+            let topic1, topic2, topic3
+            topic1, sp := popStackItem(sp)
+            topic2, sp := popStackItem(sp)
+            topic3, sp := popStackItem(sp)
+            log3(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3)
+        }
+    }
+    case 0xA4 { // OP_LOG4
+        if isStatic {
+            revert(0, 0)
+        }
+
+        let offset, size
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
+
+        let gasUsed := add(add(1875, mul(8, size)), expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+
+        {
+            let topic1, topic2, topic3, topic4
+            topic1, sp := popStackItem(sp)
+            topic2, sp := popStackItem(sp)
+            topic3, sp := popStackItem(sp)
+            topic4, sp := popStackItem(sp)
+            log4(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2, topic3, topic4)
+        }
+
+    }
     case 0xF0 { // OP_CREATE
         if isStatic {
             revert(0, 0)
@@ -900,6 +1099,38 @@ for { } true { } {
         switch result
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
+    }
+    case 0xF3 { // OP_RETURN
+        let offset,size
+
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        ensureAcceptableMemLocation(offset)
+        ensureAcceptableMemLocation(size)
+        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+        return(add(offset,MEM_OFFSET_INNER()),size)
+    }
+    case 0xFD { // OP_REVERT
+        let offset,size
+
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        ensureAcceptableMemLocation(offset)
+        ensureAcceptableMemLocation(size)
+        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+        offset := add(offset, MEM_OFFSET_INNER())
+        offset,size := addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft)
+
+        revert(offset,size)
+    }
+    case 0xFE { // OP_INVALID
+        evmGasLeft := 0
+
+        invalid()
     }
     // TODO: REST OF OPCODES
     default {

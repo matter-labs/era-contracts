@@ -472,3 +472,24 @@ function genericCreate(addr, offset, size, sp) -> result {
     back, sp := popStackItem(sp)
     mstore(sub(offset, 0x80), back)
 }
+
+function ensureAcceptableMemLocation(location) {
+    if gt(location,MAX_POSSIBLE_MEM()) {
+        revert(0,0) // Check if this is whats needed
+    }
+}
+
+function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
+    newOffset := offset
+    newSize := size
+    if eq(isCallerEVM,1) {
+        // include gas
+        let previousValue := mload(sub(offset,32))
+        mstore(sub(offset,32),evmGasLeft)
+        //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+        // but it appears to rewrite were we want to store the gas
+
+        newOffset := sub(offset, 32)
+        newSize := add(size, 32)
+    }
+}
