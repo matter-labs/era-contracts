@@ -4,10 +4,9 @@ import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits } from "ethers/lib/utils";
+import { formatUnits, parseUnits, Interface } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
@@ -15,7 +14,7 @@ const provider = web3Provider();
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("deploy").description("deploy L1 contracts");
+  program.version("0.1.0").name("upgrade-shared-bridge-era").description("upgrade shared bridge for era diamond proxy");
 
   program
     .option("--private-key <private-key>")
@@ -55,7 +54,15 @@ async function main() {
         verbose: true,
       });
 
-      await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
+      await deployer.deploySharedBridgeImplementation(create2Salt, { nonce });
+
+      const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
+      const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
+        deployer.addresses.Bridges.SharedBridgeProxy,
+        deployer.addresses.Bridges.SharedBridgeImplementation,
+      ]);
+
+      await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
     });
 
   await program.parseAsync(process.argv);

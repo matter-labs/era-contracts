@@ -14,7 +14,7 @@ import {IZkSyncHyperchain} from "./chain-interfaces/IZkSyncHyperchain.sol";
 import {FeeParams} from "./chain-deps/ZkSyncHyperchainStorage.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../common/L2ContractAddresses.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {ProposedUpgrade} from "../upgrades/BaseZkSyncUpgrade.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
@@ -23,7 +23,7 @@ import {VerifierParams} from "./chain-interfaces/IVerifier.sol";
 /// @title StateTransition contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2Step {
+contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice Address of the bridgehub
     address public immutable bridgehub;
 
@@ -42,7 +42,7 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     /// @dev The current protocolVersion
     uint256 public protocolVersion;
 
-    /// @dev timestamp when protocolVersion can be last used
+    /// @dev The timestamp when protocolVersion can be last used
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address, used to setChainId
@@ -153,14 +153,14 @@ contract StateTransitionManager is IStateTransitionManager, ReentrancyGuard, Own
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
-        uint256 _oldprotocolVersionDeadline,
+        uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        protocolVersionDeadline[_oldProtocolVersion] = _oldprotocolVersionDeadline;
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         uint256 previousProtocolVersion = protocolVersion;
+        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        protocolVersionDeadline[_newProtocolVersion] = type(uint256).max;
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);

@@ -2,13 +2,13 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
+import { Wallet } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
+import { upgradeToHyperchains3 } from "../src.ts/hyperchain-upgrade";
 
 const provider = web3Provider();
 
@@ -33,7 +33,7 @@ async function main() {
             process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
             "m/44'/60'/0'/0/1"
           ).connect(provider);
-      console.log(`Using deployer wallet: ${deployWallet.address}`);
+      console.log(`Using deployer wallet: ${deployWallet.address}, ${deployWallet.privateKey}`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
       console.log(`Using owner address: ${ownerAddress}`);
@@ -46,8 +46,6 @@ async function main() {
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
-      const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.utils.hexlify(ethers.utils.randomBytes(32));
-
       const deployer = new Deployer({
         deployWallet,
         addresses: deployedAddressesFromEnv(),
@@ -55,7 +53,7 @@ async function main() {
         verbose: true,
       });
 
-      await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
+      await upgradeToHyperchains3(deployer);
     });
 
   await program.parseAsync(process.argv);
