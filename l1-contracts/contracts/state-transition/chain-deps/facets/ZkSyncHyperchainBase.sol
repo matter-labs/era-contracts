@@ -51,7 +51,7 @@ contract ZkSyncHyperchainBase is ReentrancyGuard {
     }
 
     modifier onlyBaseTokenBridge() {
-        require(msg.sender == s.baseTokenBridge, "Hyperchain: Only shared bridge can call this function");
+        require(msg.sender == s.baseTokenBridge, "Hyperchain: Only base token bridge can call this function");
         _;
     }
 }

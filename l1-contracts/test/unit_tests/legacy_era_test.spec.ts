@@ -29,8 +29,11 @@ import {
   getCallRevertReason,
   requestExecuteDirect,
 } from "./utils";
-import { IGovernanceFactory } from "../../typechain/IGovernanceFactory";
 
+// This test is mimicking the legacy Era functions. Era's Address was known at the upgrade, so we hardcoded them in the contracts,
+// Now we are deploying a diamond proxy, which has to have that address.
+// We do this by having a deterministic testing process (wallet, create2Factory address, Era diamond proxy address, etc.),
+// and setting the ERA_DIAMOND_PROXY address in the hardhat config.
 describe("Legacy Era tests", function () {
   let owner: ethers.Signer;
   let randomSigner: ethers.Signer;
@@ -54,8 +57,7 @@ describe("Legacy Era tests", function () {
     [owner, randomSigner] = await hardhat.ethers.getSigners();
 
     const gasPrice = await owner.provider.getGasPrice();
-    // WARNING!!! WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!WARNING!!!
-    // create2Address and Era diamond proxy address can be the same one as fixed in hardhat config
+
     deployWallet = Wallet.fromMnemonic(ethTestConfig.test_mnemonic3, "m/44'/60'/0'/0/1").connect(owner.provider);
     const ownerAddress = await deployWallet.getAddress();
     // process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
@@ -122,20 +124,6 @@ describe("Legacy Era tests", function () {
       deployer.addresses.StateTransition.DiamondProxy,
       mockExecutorContract.signer
     );
-
-    // accept ownership from governance for L1SharedBridge
-    const governance = IGovernanceFactory.connect(deployer.addresses.Governance, deployWallet);
-    const sharedBridgeInterface = new Interface(hardhat.artifacts.readArtifactSync("L1SharedBridge").abi);
-    const callData = sharedBridgeInterface.encodeFunctionData("acceptOwnership()", []);
-    const operation = {
-      calls: [{ target: deployer.addresses.Bridges.SharedBridgeProxy, value: 0, data: callData }],
-      predecessor: ethers.constants.HashZero,
-      salt: ethers.constants.HashZero,
-    };
-    const scheduleTx = await governance.scheduleTransparent(operation, 0);
-    await scheduleTx.wait();
-    const executeTX = await governance.execute(operation);
-    await executeTX.wait();
   });
 
   it("Check should initialize through governance", async () => {
@@ -256,7 +244,7 @@ describe("Legacy Era tests", function () {
   });
 
   describe("finalizeEthWithdrawal", function () {
-    const BLOCK_NUMBER = 0;
+    const BLOCK_NUMBER = 1;
     const MESSAGE_INDEX = 0;
     const TX_NUMBER_IN_BLOCK = 0;
     const L1_RECEIVER = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";

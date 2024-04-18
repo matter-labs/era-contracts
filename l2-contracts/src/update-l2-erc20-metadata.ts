@@ -6,7 +6,8 @@ import { Provider } from "zksync-web3";
 import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { getL1TxInfo, ethTestConfig } from "./utils";
+import { getL1TxInfo } from "./utils";
+import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
 // From openzeppelin-upgradable v4.9.5 Initializable contract implementation.
 const INITIALIZED_STORAGE_SLOT = 0;

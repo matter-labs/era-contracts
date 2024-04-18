@@ -39,10 +39,7 @@ contract DummyExecutor is IExecutor {
     }
 
     /// @notice Removing txs from the priority queue
-    function removePriorityQueueFront(uint256 _index) external {
-        // KL todo
-        // s.priorityQueue.removeFront(_index);
-    }
+    function removePriorityQueueFront(uint256 _index) external {}
 
     /// @notice Allows the owner to set whether the contract should revert during commit blocks operation
     function setShouldRevertOnCommitBatches(bool _shouldRevert) external onlyOwner {

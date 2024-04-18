@@ -8,7 +8,11 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
 
-contract RegisterHyperchainScript is Script {
+// solhint-disable no-unused-import
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {WETH9} from "contracts/dev-contracts/WETH9.sol";
+
+contract DeployErc20Script is Script {
     using stdToml for string;
 
     struct Config {

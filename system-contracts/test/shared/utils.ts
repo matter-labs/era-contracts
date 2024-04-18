@@ -54,7 +54,7 @@ export async function callFallback(contract: Contract, data: string) {
 }
 
 export function getWallets(): Wallet[] {
-  const wallets = [];
+  const wallets: Wallet[] = [];
   for (let i = 0; i < RICH_WALLETS.length; i++) {
     wallets[i] = new Wallet(RICH_WALLETS[i].privateKey, provider);
   }
