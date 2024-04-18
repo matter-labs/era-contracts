@@ -563,7 +563,8 @@ function getEVMGas() -> evmGas {
     let _gas := gas()
     let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
 
-    if or(gt(_gas, requiredGas), eq(requiredGas, _gas)) {
+    evmGas := 0
+    if or(gt(_gas, requiredGas), eq(_gas, requiredGas)) {
         evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
     }
 }
