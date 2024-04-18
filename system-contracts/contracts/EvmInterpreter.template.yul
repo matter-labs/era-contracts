@@ -60,7 +60,7 @@ object "EVMInterpreter" {
 
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                let firstByte := shr(mload(offset), 248)
+                let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
                 }
@@ -70,7 +70,7 @@ object "EVMInterpreter" {
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
-        <!-- @include EvmInterpreterFunctions.yul -->
+        <!-- @include EvmInterpreterFunctions.template.yul -->
 
         function simulate(
             isCallerEVM,
@@ -81,7 +81,7 @@ object "EVMInterpreter" {
             returnOffset := MEM_OFFSET_INNER()
             returnLen := 0
 
-            <!-- @include EvmInterpreterLoop.yul -->
+            <!-- @include EvmInterpreterLoop.template.yul -->
 
             retGasLeft := evmGasLeft
         }
@@ -112,7 +112,7 @@ object "EVMInterpreter" {
     }
     object "EVMInterpreter_deployed" {
         code {
-            <!-- @include EvmInterpreterFunctions.yul -->
+            <!-- @include EvmInterpreterFunctions.template.yul -->
 
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
@@ -138,7 +138,7 @@ object "EVMInterpreter" {
 
             pop(warmAddress(address()))
 
-            <!-- @include EvmInterpreterLoop.yul -->
+            <!-- @include EvmInterpreterLoop.template.yul -->
 
             return(returnOffset, returnLen)
         }
