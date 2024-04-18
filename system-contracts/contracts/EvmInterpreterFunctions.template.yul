@@ -428,6 +428,252 @@ function incrementNonce(addr) {
     if iszero(result) {
         revert(0, 0)
     }
+
+    isEVM := mload(0)
+}
+
+function _pushEVMFrame(_passGas, _isStatic) {
+    // function pushEVMFrame(uint256 _passGas, bool _isStatic) external
+    let selector := 0xead77156
+
+    mstore8(0, 0xea)
+    mstore8(1, 0xd7)
+    mstore8(2, 0x71)
+    mstore8(3, 0x56)
+    mstore(4, _passGas)
+    mstore(36, _isStatic)
+
+    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 68, 0, 0)
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+}
+
+function _popEVMFrame() {
+    // function popEVMFrame() external
+    // 0xe467d2f0
+    let selector := 0xe467d2f0
+
+    mstore8(0, 0xe4)
+    mstore8(1, 0x67)
+    mstore8(2, 0xd2)
+    mstore8(3, 0xf0)
+
+    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 4, 0, 0)
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+}
+
+// Each evm gas is 5 zkEVM one
+// FIXME: change this variable to reflect real ergs : gas ratio
+function GAS_DIVISOR() -> gas_div { gas_div := 5 }
+function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
+function OVERHEAD() -> overhead { overhead := 2000 }
+
+function GAS_CONSTANTS() -> divisor, stipend, overhead {
+    divisor := GAS_DIVISOR()
+    stipend := EVM_GAS_STIPEND()
+    overhead := OVERHEAD()
+}
+
+function _calcEVMGas(_zkevmGas) -> calczkevmGas {
+    calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
+}
+
+function getEVMGas() -> evmGas {
+    let _gas := gas()
+    let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
+
+    evmGas := 0
+    if or(gt(_gas, requiredGas), eq(_gas, requiredGas)) {
+        evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+    }
+}
+
+function _getZkEVMGas(_evmGas) -> zkevmGas {
+    /*
+        TODO: refine the formula, especially with regard to decommitment costs
+    */
+    zkevmGas := mul(_evmGas, GAS_DIVISOR())
+}
+
+function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
+    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
+    let rtsz := returndatasize()
+
+    loadReturndataIntoActivePtr()
+
+    // if (rtsz > 31)
+    printHex(returndatasize())
+    switch gt(rtsz, 31)
+        case 0 {
+            // Unexpected return data.
+            printString("Unexpected return data")
+            _gasLeft := 0
+            _eraseReturndataPointer()
+        }
+        default {
+            printString("SHOULD ENTER")
+            returndatacopy(0, 0, 32)
+            _gasLeft := mload(0)
+            returndatacopy(_outputOffset, 32, _outputLen)
+            mstore(lastRtSzOffset, sub(rtsz, 32))
+
+            // Skip the returnData
+            ptrAddIntoActive(32)
+        }
+}
+
+function _eraseReturndataPointer() {
+    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
+
+    let activePtrSize := getActivePtrDataSize()
+    ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
+    mstore(lastRtSzOffset, 0)
+}
+
+function _saveReturndataAfterZkEVMCall() {
+    let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
+
+    mstore(lastRtSzOffset, returndatasize())
+}
+
+function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
+    let gasSend,addr,value,argsOffset,argsSize,retOffset,retSize
+
+    gasSend, sp := popStackItem(oldSp)
+    addr, sp := popStackItem(sp)
+    value, sp := popStackItem(sp)
+    argsOffset, sp := popStackItem(sp)
+    argsSize, sp := popStackItem(sp)
+    retOffset, sp := popStackItem(sp)
+    retSize, sp := popStackItem(sp)
+
+
+    // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
+    // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
+    // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
+    // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
+    dynamicGas := expandMemory(add(retOffset,retSize))
+    switch warmAddress(addr)
+        case 0 { dynamicGas := add(dynamicGas,2600) }
+        default { dynamicGas := add(dynamicGas,100) }
+
+    if not(iszero(value)) {
+        dynamicGas := add(dynamicGas,6700)
+        gasSend := add(gasSend,2300)
+
+        if isAddrEmpty(addr) {
+            dynamicGas := add(dynamicGas,25000)
+        }
+    }
+
+    if gt(gasSend,div(mul(evmGasLeft,63),64)) {
+        gasSend := div(mul(evmGasLeft,63),64)
+    }
+    argsOffset := add(argsOffset,MEM_OFFSET_INNER())
+    retOffset := add(retOffset,MEM_OFFSET_INNER())
+    // TODO: More Checks are needed
+    // Check gas
+    let success
+
+    if isStatic {
+        printString("Static")
+        if not(iszero(value)) {
+            revert(0, 0)
+        }
+        success, evmGasLeft := _performStaticCall(
+            _isEVM(addr),
+            gasSend,
+            addr,
+            argsOffset,
+            argsSize,
+            retOffset,
+            retSize
+        )
+    }
+
+    if _isEVM(addr) {
+        printString("isEVM")
+        _pushEVMFrame(gasSend, isStatic)
+        success := call(gasSend, addr, value, argsOffset, argsSize, 0, 0)
+        printHex(success)
+        evmGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+        _popEVMFrame()
+        printString("EVM Done")
+    }
+
+    // zkEVM native
+    if and(iszero(_isEVM(addr)), iszero(isStatic)) {
+        printString("is zkEVM")
+        gasSend := _getZkEVMGas(gasSend)
+        let zkevmGasBefore := gas()
+        success := call(gasSend, addr, value, argsOffset, argsSize, retOffset, retSize)
+        _saveReturndataAfterZkEVMCall()
+        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+        evmGasLeft := 0
+        if gt(gasSend, gasUsed) {
+            evmGasLeft := sub(gasSend, gasUsed)
+        }
+        printString("zkEVM Done")
+    }
+
+    sp := pushStackItem(sp,success)
+
+    // TODO: dynamicGas := add(dynamicGas,codeExecutionCost) how to do this?
+    // Check if the following is ok
+    dynamicGas := add(dynamicGas,gasSend)
+}
+
+function _performStaticCall(
+    _calleeIsEVM,
+    _calleeGas,
+    _callee,
+    _inputOffset,
+    _inputLen,
+    _outputOffset,
+    _outputLen
+) ->  success, _gasLeft {
+    if _calleeIsEVM {
+        _pushEVMFrame(_calleeGas, true)
+        // TODO Check the following comment from zkSync .sol.
+        // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+        success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, 0, 0)
+
+        _gasLeft := _saveReturndataAfterEVMCall(_outputOffset, _outputLen)
+        _popEVMFrame()
+    }
+
+    // zkEVM native
+    if not(_calleeIsEVM) {
+        _calleeGas := _getZkEVMGas(_calleeGas)
+        let zkevmGasBefore := gas()
+        success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
+
+        _saveReturndataAfterZkEVMCall()
+
+        let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+        _gasLeft := 0
+        if gt(_calleeGas, gasUsed) {
+            _gasLeft := sub(_calleeGas, gasUsed)
+        }
+    }
+}
+
+function isAddrEmpty(addr) -> isEmpty {
+    isEmpty := 0
+    if  and( and( 
+            iszero(balance(addr)), 
+            iszero(extcodesize(addr)) ),
+            iszero(getNonce(addr))
+        ) {
+        isEmpty := 1
+    }
 }
 
 function genericCreate(addr, offset, size, sp) -> result {
