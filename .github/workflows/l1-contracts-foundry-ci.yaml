@@ -104,7 +104,7 @@ jobs:
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts-foundry
-        run: forge script ./script/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: cat /home/runner/work/era-contracts/era-contracts/l1-contracts-foundry/script-config/config-deploy-erc20.toml && forge script ./script/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 
       - name: Run InitializeL2WethToken script
         working-directory: ./l1-contracts-foundry

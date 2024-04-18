@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
 
-contract DeployERC20Script is Script {
+contract DeployErc20Script is Script {
     using stdToml for string;
 
     struct Config {
@@ -42,6 +42,15 @@ contract DeployERC20Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-erc20.toml");
         string memory toml = vm.readFile(path);
+
+        string[] memory inputs = new string[](2);
+        inputs[0] = "cat";
+        inputs[1] = path;
+
+        bytes memory res = vm.ffi(inputs);
+        string memory output = abi.decode(res, (string));
+
+        console.log(output);
 
         config.deployerAddress = msg.sender;
 
