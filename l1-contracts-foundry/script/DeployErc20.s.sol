@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
 
-contract RegisterHyperchainScript is Script {
+contract DeployERC20Script is Script {
     using stdToml for string;
 
     struct Config {
