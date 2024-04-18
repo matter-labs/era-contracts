@@ -60,8 +60,6 @@ object "EVMInterpreter" {
 
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                // let firstByte := shr(mload(offset), 248)
-                // FIXME: Check this.
                 let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
