@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-// import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 contract L1SharedBridgeTest is Test {
+    using stdStorage for StdStorage;
+
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
         address indexed from,
@@ -83,10 +85,7 @@ contract L1SharedBridgeTest is Test {
     uint16 l2TxNumberInBatch;
     bytes32[] merkleProof;
 
-    // storing depositHappened[chainId][l2TxHash] = txDataHash. DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 depositLocationInStorage = uint256(7 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1); // DepositHappened is 3rd so 3 -1 + dependency storage slots
-    uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
-    uint256 chainBalanceLocationInStorage = uint256(10 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1);
+    uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -96,7 +95,6 @@ contract L1SharedBridgeTest is Test {
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
         l1WethAddress = makeAddr("weth");
-        address l1WethAddress = makeAddr("weth");
         l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
         l2SharedBridge = makeAddr("l2SharedBridge");
 
@@ -137,5 +135,23 @@ contract L1SharedBridgeTest is Test {
         sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
         vm.prank(owner);
         sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
+    }
+
+    function _setSharedBridgeDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.depositHappened.selector)
+            .with_key(_chainId)
+            .with_key(_txHash)
+            .checked_write(_txDataHash);
+    }
+
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+        stdstore
+            .target(address(sharedBridge))
+            .sig(sharedBridge.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
     }
 }

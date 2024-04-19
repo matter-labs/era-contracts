@@ -50,16 +50,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -104,16 +95,7 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
         token.mint(address(sharedBridge), amount);
 
         /// storing chainBalance
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -165,23 +147,10 @@ contract L1SharedBridgeLegacyTest is L1SharedBridgeTest {
 
         // storing depositHappened[chainId][l2TxHash] = txDataHash.
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(eraChainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(eraChainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, address(token), amount);
 
         // Bridgehub bridgehub = new Bridgehub();
         // vm.store(address(bridgehub),  bytes32(uint256(5 +2)), bytes32(uint256(31337)));
