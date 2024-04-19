@@ -78,14 +78,23 @@ async function main() {
       console.log("Upgraded ERC20Bridge to 'dummy' implementation");
 
       const dummyBridgeAbi = hardhat.artifacts.readArtifactSync("DummyL1ERC20Bridge").abi;
-      const dummyBridge = new ethers.Contract(deployer.addresses.Bridges.ERC20BridgeProxy, dummyBridgeAbi, deployWallet);
+      const dummyBridge = new ethers.Contract(
+        deployer.addresses.Bridges.ERC20BridgeProxy,
+        dummyBridgeAbi,
+        deployWallet
+      );
 
-      const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR")
-      const beaconProxyBytecode = require('../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json').bytecode;
+      const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
+      const beaconProxyBytecode =
+        require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json").bytecode;
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxyBytecode);
       // is there a better way to get the l2TokenBeacon address?
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-      const l2SharedBridge = new ethers.Contract(l2SharedBridgeAddress, ["function l2TokenBeacon() view returns (address)"], l2Provider);
+      const l2SharedBridge = new ethers.Contract(
+        l2SharedBridgeAddress,
+        ["function l2TokenBeacon() view returns (address)"],
+        l2Provider
+      );
       const l2TokenBeacon = await l2SharedBridge.l2TokenBeacon();
 
       console.log("Retrieved storage values for TestERC20Bridge:");

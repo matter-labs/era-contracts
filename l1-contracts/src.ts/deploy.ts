@@ -401,7 +401,11 @@ export class Deployer {
     this.addresses.StateTransition.Verifier = contractAddress;
   }
 
-  public async deployERC20BridgeImplementation(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest, dummy: boolean = false) {
+  public async deployERC20BridgeImplementation(
+    create2Salt: string,
+    ethTxOptions: ethers.providers.TransactionRequest,
+    dummy: boolean = false
+  ) {
     ethTxOptions.gasLimit ??= 10_000_000;
     const contractAddress = await this.deployViaCreate2(
       dummy ? "DummyL1ERC20Bridge" : "L1ERC20Bridge",

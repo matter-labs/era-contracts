@@ -50,7 +50,12 @@ export async function publishL2SharedBridgeDependencyBytecodesOnL2(
   }
 }
 
-export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish, chainIdHack: boolean = false) {
+export async function deploySharedBridgeImplOnL2ThroughL1(
+  deployer: Deployer,
+  chainId: string,
+  gasPrice: BigNumberish,
+  chainIdHack: boolean = false
+) {
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
   }
@@ -174,7 +179,12 @@ export async function initializeChainGovernance(deployer: Deployer, chainId: str
   }
 }
 
-export async function deploySharedBridgeOnL2ThroughL1(deployer: Deployer, chainId: string, gasPrice: BigNumberish, chainIdHack: boolean = false) {
+export async function deploySharedBridgeOnL2ThroughL1(
+  deployer: Deployer,
+  chainId: string,
+  gasPrice: BigNumberish,
+  chainIdHack: boolean = false
+) {
   await publishL2SharedBridgeDependencyBytecodesOnL2(deployer, chainId, gasPrice);
   await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice, chainIdHack);
   await deploySharedBridgeProxyOnL2ThroughL1(deployer, chainId, gasPrice);
