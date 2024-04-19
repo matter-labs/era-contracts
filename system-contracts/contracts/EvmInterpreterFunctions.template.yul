@@ -713,10 +713,10 @@ function genericCreate(addr, offset, size, sp) -> result {
 
     offset := add(MEM_OFFSET_INNER(), offset)
 
-    sp := pushStackItem(sp, sub(offset, 0x80))
-    sp := pushStackItem(sp, sub(offset, 0x60))
-    sp := pushStackItem(sp, sub(offset, 0x40))
-    sp := pushStackItem(sp, sub(offset, 0x20))
+    sp := pushStackItem(sp, mload(sub(offset, 0x80)))
+    sp := pushStackItem(sp, mload(sub(offset, 0x60)))
+    sp := pushStackItem(sp, mload(sub(offset, 0x40)))
+    sp := pushStackItem(sp, mload(sub(offset, 0x20)))
 
     // Selector
     mstore(sub(offset, 0x80), 0x5b16a23c)
