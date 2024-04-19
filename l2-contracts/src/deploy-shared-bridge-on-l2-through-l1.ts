@@ -106,7 +106,6 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   /// prepare proxyInitializationParams
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
   const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
-  // console.log("kl to do l2GovernorAddress", l2GovernorAddress, deployer.addresses.Governance)
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
     ethers.constants.AddressZero,
