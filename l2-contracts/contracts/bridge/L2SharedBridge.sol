@@ -84,7 +84,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external override {
+    ) external override returns (address) {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
@@ -104,6 +104,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
 
         IL2StandardToken(expectedL2Token).bridgeMint(_l2Receiver, _amount);
         emit FinalizeDeposit(_l1Sender, _l2Receiver, expectedL2Token, _amount);
+        return expectedL2Token;
     }
 
     /// @dev Deploy and initialize the L2 token for the L1 counterpart
