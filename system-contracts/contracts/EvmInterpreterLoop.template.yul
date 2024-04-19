@@ -1151,9 +1151,3 @@ for { } true { } {
         return(0, 64)
     }
 }
-
-if eq(isCallerEVM, 1) {
-    // Includes gas
-    returnOffset := sub(returnOffset, 32)
-    returnLen := add(returnLen, 32)
-}

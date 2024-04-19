@@ -180,6 +180,12 @@ object "EVMInterpreter" {
 
             <!-- @include EvmInterpreterLoop.template.yul -->
 
+            if eq(isCallerEVM, 1) {
+                // Includes gas
+                returnOffset := sub(returnOffset, 32)
+                returnLen := add(returnLen, 32)
+            }
+
             return(returnOffset, returnLen)
         }
     }
