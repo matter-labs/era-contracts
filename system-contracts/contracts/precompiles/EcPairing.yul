@@ -66,6 +66,13 @@ object "EcPairing" {
                 ret := 111032442853175714102588374283752698368366046808579839647964533820976443843465
             }
 
+            /// @notice Constant function for the alt_bn128 curve seed (parameter `x`).
+            /// @dev See https://eips.ethereum.org/EIPS/eip-196 for further details.
+            /// @return ret The alt_bn128 curve seed.
+            function X() -> ret {
+                ret := 4965661367192848881
+            }
+
             /// @notice Constant function for decimal representation of the NAF for the Millers Loop.
             /// @dev Millers loop uses to iterate the NAF representation of the value t = 6x^2. Where x = 4965661367192848881 is a parameter of the BN 256 curve.
             /// @dev For details of the x parameter: https://hackmd.io/@jpw/bn254#Barreto-Naehrig-curves.
@@ -443,6 +450,39 @@ object "EcPairing" {
                 ny0, ny1 := fp2Neg(y0, y1)
             }
 
+            /// @notice Constant function for the alt_bn128 returning `(xi)^ ((N - 1) // 2)`. Where `xi` is D-type twist param.
+            /// @dev See https://eprint.iacr.org/2022/352.pdf (2 Preliminaries) for further details.
+            /// @return ret Twisted curve `xi2 = (xi)^ ((N - 1) // 2)` value in Montgomery form.
+            function xi2() -> xi0, xi1 {
+                xi0 := intoMontgomeryForm(2821565182194536844548159561693502659359617185244120367078079554186484126554)
+                xi1 := intoMontgomeryForm(3505843767911556378687030309984248845540243509899259641013678093033130930403)
+            }
+
+            /// @notice Constant function for the alt_bn128 returning `(xi)^ ((N - 1) // 2)`. Where `xi` is D-type twist param.
+            /// @dev See https://eprint.iacr.org/2022/352.pdf (2 Preliminaries) for further details.
+            /// @return ret Twisted curve `xi2 = (xi)^ ((N - 1) // 2)` value in Montgomery form.
+            function xi3() -> xi0, xi1 {
+                xi0 := intoMontgomeryForm(21575463638280843010398324269430826099269044274347216827212613867836435027261)
+                xi1 := intoMontgomeryForm(10307601595873709700152284273816112264069230130616436755625194854815875713954)
+            }
+
+            /// @notice Frobenius endomophism used to G2 sub group check for twisted curve.
+            /// @dev For more datail see https://eprint.iacr.org/2022/348.pdf
+            /// @param xp0, xp1 The x coordinate of the point on twisted curve.
+            /// @param yp0, yp1 The y coordinate of the point on twisted curve.
+            /// @param zp0, zp1 The z coordinate of the point on twisted curve.
+            /// @return Point on twisted curve transformed by the phi endomorphism
+            function endomorphism(xp0, xp1, yp0, yp1, zp0, zp1) -> xr0, xr1, yr0, yr1, zr0, zr1 {
+                let xp0_c, xp1_c := fp2Conjugate(xp0, xp1)
+                let yp0_c, yp1_c := fp2Conjugate(yp0, yp1)
+
+                let xi2_0, xi2_1 := xi2()
+                let xi3_0, xi3_1 := xi3()
+
+                xr0, xr1 := fp2Mul(xp0_c, xp1_c, xi3_0, xi3_1)
+                yr0, yr1 := fp2Mul(yp0_c, yp1_c, xi2_0, xi2_1)
+                zr0, zr1 := fp2Conjugate(zp0, zp1)
+            }
             /// @notice Check if a G2 point in jacobian coordinates is in the subgroup of the twisted curve.
             /// @dev The coordinates are encoded in Montgomery form.
             /// @param xp0, xp1 The x coordinate of the point.
@@ -450,6 +490,51 @@ object "EcPairing" {
             /// @param zp0, zp1 The z coordinate of the point.
             /// @return ret True if the point is in the subgroup, false otherwise.
             function g2IsInSubGroup(xp0, xp1, yp0, yp1, zp0, zp1) -> ret {
+                // P * X
+                let px_xp0, px_xp1, px_yp0, px_yp1, px_zp0, px_zp1 := g2ScalarMul(xp0, xp1, yp0, yp1, zp0, zp1, X())
+                // P * (X + 1)
+                let px1_xp0, px1_xp1, px1_yp0, px1_yp1, px1_zp0, px1_zp1 := g2JacobianAdd(px_xp0, px_xp1, px_yp0, px_yp1, px_zp0, px_zp1, xp0, xp1, yp0, yp1, zp0, zp1)
+                // P * 2X
+                let p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1 := g2JacobianDouble(px_xp0, px_xp1, px_yp0, px_yp1, px_zp0, px_zp1)
+
+                // phi(P * X)
+                let e_px_xp0, e_px_xp1, e_px_yp0, e_px_yp1, e_px_zp0, e_px_zp1 := endomorphism(px_xp0, px_xp1, px_yp0, px_yp1, px_zp0, px_zp1)
+                // phi(phi(P * X))
+                let e2_px_xp0, e2_px_xp1, e2_px_yp0, e2_px_yp1, e2_px_zp0, e2_px_zp1 := endomorphism(e_px_xp0, e_px_xp1, e_px_yp0, e_px_yp1, e_px_zp0, e_px_zp1)
+
+                // phi(phi(phi(P * 2X)))
+                p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1 := endomorphism(p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1)
+                p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1 := endomorphism(p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1)
+                p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1 := endomorphism(p2x_xp0, p2x_xp1, p2x_yp0, p2x_yp1, p2x_zp0, p2x_zp1)
+
+                let l1x0, l1x2, l1y0, l1y2, l1z0, l1z2 := g2JacobianAdd(px1_xp0, px1_xp1, px1_yp0, px1_yp1, px1_zp0, px1_zp1, e_px_xp0, e_px_xp1, e_px_yp0, e_px_yp1, e_px_zp0, e_px_zp1)
+                l1x0, l1x2, l1y0, l1y2, l1z0, l1z2 := g2JacobianAdd(l1x0, l1x2, l1y0, l1y2, l1z0, l1z2, e2_px_xp0, e2_px_xp1, e2_px_yp0, e2_px_yp1, e2_px_zp0, e2_px_zp1)
+
+                let l1z0_square, l1z2_square := fp2Mul(l1z0, l1z2, l1z0, l1z2)
+                let p2x_zp0_square, p2x_zp1_square := fp2Mul(p2x_zp0, p2x_zp1, p2x_zp0, p2x_zp1)
+
+                let r00, r01 := fp2Mul(p2x_xp0, p2x_xp1, l1z0_square, l1z2_square)
+                let r10, r11 := fp2Mul(l1x0, l1x2, p2x_zp0_square, p2x_zp1_square)
+
+                let l1z0_cube, l1z2_cube := fp2Mul(l1z0_square, l1z2_square, l1z0, l1z2)
+                let p2x_zp0_cube, p2x_zp1_cube := fp2Mul(p2x_zp0_square, p2x_zp1_square, p2x_zp0, p2x_zp1)
+
+                let l00, l01 := fp2Mul(p2x_yp0, p2x_yp1, l1z0_cube, l1z2_cube)
+                let l10, l11 := fp2Mul(l1y0, l1y2, p2x_zp0_cube, p2x_zp1_cube)
+
+                let r1 := and(eq(r00, r10), eq(r01, r11))
+                let r2 := and(eq(l00, l10), eq(l01, l11))
+                ret := and(r1, r2)
+            }
+
+
+            /// @notice Check if a G2 point in jacobian coordinates is in the subgroup of the twisted curve.
+            /// @dev The coordinates are encoded in Montgomery form.
+            /// @param xp0, xp1 The x coordinate of the point.
+            /// @param yp0, yp1 The y coordinate of the point.
+            /// @param zp0, zp1 The z coordinate of the point.
+            /// @return ret True if the point is in the subgroup, false otherwise.
+            function g2IsInSubGroupNaive(xp0, xp1, yp0, yp1, zp0, zp1) -> ret {
                 let xr0, xr1, yr0, yr1, zr0, zr1 := g2ScalarMul(xp0, xp1, yp0, yp1, zp0, zp1, TWISTED_SUBGROUP_ORDER())
                 ret := and(iszero(zr0), iszero(zr1))
             }
@@ -498,10 +583,6 @@ object "EcPairing" {
                 // Check for infinity in projective coordinates is the same as jacobian
                 let qIsInfinity := g2ProjectivePointIsInfinity(xq0, xq1, yq0, yq1, zq0, zq1)
                 let rIsInfinity := g2ProjectivePointIsInfinity(xr0, xr1, yr0, yr1, zr0, zr1)
-                if and(rIsInfinity, qIsInfinity) {
-                    // Infinity + Infinity = Infinity
-                    leave
-                }
                 if rIsInfinity {
                     // Infinity + P = P
                     c00 := xq0
