@@ -20,7 +20,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev The shared bridge that is now used for all bridging, replacing the legacy contract.
-    IL1SharedBridge public immutable override sharedBridge;
+    IL1SharedBridge public immutable override SHARED_BRIDGE;
 
     /// @dev A mapping L2 batch number => message number => flag.
     /// @dev Used to indicate that L2 -> L1 message was already processed for zkSync Era withdrawals.
@@ -57,7 +57,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IL1SharedBridge _sharedBridge) reentrancyGuardInitializer {
-        sharedBridge = _sharedBridge;
+        SHARED_BRIDGE = _sharedBridge;
     }
 
     /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
@@ -65,9 +65,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev transfer token to shared bridge as part of upgrade
     function transferTokenToSharedBridge(address _token) external {
-        require(msg.sender == address(sharedBridge), "Not shared bridge");
+        require(msg.sender == address(SHARED_BRIDGE), "Not shared bridge");
         uint256 amount = IERC20(_token).balanceOf(address(this));
-        IERC20(_token).safeTransfer(address(sharedBridge), amount);
+        IERC20(_token).safeTransfer(address(SHARED_BRIDGE), amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -152,7 +152,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 amount = _depositFundsToSharedBridge(msg.sender, IERC20(_l1Token), _amount);
         require(amount == _amount, "3T"); // The token has non-standard transfer logic
 
-        l2TxHash = sharedBridge.depositLegacyErc20Bridge{value: msg.value}({
+        l2TxHash = SHARED_BRIDGE.depositLegacyErc20Bridge{value: msg.value}({
             _msgSender: msg.sender,
             _l2Receiver: _l2Receiver,
             _l1Token: _l1Token,
@@ -169,9 +169,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     /// @dev Transfers tokens from the depositor address to the shared bridge address.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _depositFundsToSharedBridge(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
-        uint256 balanceBefore = _token.balanceOf(address(sharedBridge));
-        _token.safeTransferFrom(_from, address(sharedBridge), _amount);
-        uint256 balanceAfter = _token.balanceOf(address(sharedBridge));
+        uint256 balanceBefore = _token.balanceOf(address(SHARED_BRIDGE));
+        _token.safeTransferFrom(_from, address(SHARED_BRIDGE), _amount);
+        uint256 balanceAfter = _token.balanceOf(address(SHARED_BRIDGE));
 
         return balanceAfter - balanceBefore;
     }
@@ -197,7 +197,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(amount != 0, "2T"); // empty deposit
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
-        sharedBridge.claimFailedDepositLegacyErc20Bridge({
+        SHARED_BRIDGE.claimFailedDepositLegacyErc20Bridge({
             _depositSender: _depositSender,
             _l1Token: _l1Token,
             _amount: amount,
@@ -226,7 +226,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], "pw");
         // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
 
-        (address l1Receiver, address l1Token, uint256 amount) = sharedBridge.finalizeWithdrawalLegacyErc20Bridge({
+        (address l1Receiver, address l1Token, uint256 amount) = SHARED_BRIDGE.finalizeWithdrawalLegacyErc20Bridge({
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,

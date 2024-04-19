@@ -34,19 +34,19 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
     string public constant override getName = "MailboxFacet";
 
     /// @dev Era's chainID
-    uint256 immutable eraChainId;
+    uint256 immutable ERA_CHAIN_ID;
 
     constructor(uint256 _eraChainId) {
-        eraChainId = _eraChainId;
+        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @inheritdoc IMailbox
     function transferEthToSharedBridge() external onlyBaseTokenBridge {
-        require(s.chainId == eraChainId, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
+        require(s.chainId == ERA_CHAIN_ID, "Mailbox: transferEthToSharedBridge only available for Era on mailbox");
 
         uint256 amount = address(this).balance;
         address baseTokenBridgeAddress = s.baseTokenBridge;
-        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(eraChainId);
+        IL1SharedBridge(baseTokenBridgeAddress).receiveEth{value: amount}(ERA_CHAIN_ID);
     }
 
     /// @notice when requesting transactions through the bridgehub
@@ -191,9 +191,9 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        require(s.chainId == eraChainId, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
+        require(s.chainId == ERA_CHAIN_ID, "Mailbox: finalizeEthWithdrawal only available for Era on mailbox");
         IL1SharedBridge(s.baseTokenBridge).finalizeWithdrawal({
-            _chainId: eraChainId,
+            _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
             _l2TxNumberInBatch: _l2TxNumberInBatch,
@@ -212,7 +212,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         bytes[] calldata _factoryDeps,
         address _refundRecipient
     ) external payable returns (bytes32 canonicalTxHash) {
-        require(s.chainId == eraChainId, "Mailbox: legacy interface only available for Era");
+        require(s.chainId == ERA_CHAIN_ID, "Mailbox: legacy interface only available for Era");
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

@@ -94,22 +94,19 @@ describe("Legacy Era tests", function () {
     await erc20TestToken.mint(await randomSigner.getAddress(), ethers.utils.parseUnits("10000", 18));
     await erc20TestToken.connect(randomSigner).approve(l1ERC20BridgeAddress, ethers.utils.parseUnits("10000", 18));
 
-    // The L1SharedBridge is compiled with the ERA_DIAMOND_PROXY address in hardhat config, so we update the shared bridge
-    // because all the variables are already set in the proxy, this is upgrade works.
-    const sharedBridgeTestFactory = await hardhat.ethers.getContractFactory("L1SharedBridgeTest");
+    const sharedBridgeFactory = await hardhat.ethers.getContractFactory("L1SharedBridge");
     const l1WethToken = tokens.find((token: { symbol: string }) => token.symbol == "WETH")!.address;
-    const sharedBridgeTest = await sharedBridgeTestFactory.deploy(
-      deployer.addresses.StateTransition.DiamondProxy,
+    const sharedBridge = await sharedBridgeFactory.deploy(
       l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
-      deployer.addresses.Bridges.ERC20BridgeProxy,
-      deployer.chainId
+      deployer.chainId,
+      deployer.addresses.StateTransition.DiamondProxy
     );
 
     const proxyAdminInterface = new Interface(hardhat.artifacts.readArtifactSync("ProxyAdmin").abi);
     const calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
       deployer.addresses.Bridges.SharedBridgeProxy,
-      sharedBridgeTest.address,
+      sharedBridge.address,
     ]);
 
     await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);

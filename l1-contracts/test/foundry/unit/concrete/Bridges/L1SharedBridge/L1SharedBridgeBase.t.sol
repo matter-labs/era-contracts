@@ -90,23 +90,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_claimFailedDeposit_Erc() public {
         token.mint(address(sharedBridge), amount);
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
-
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
             bridgehubAddress,
@@ -144,23 +130,9 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
-
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
         vm.mockCall(
             bridgehubAddress,
@@ -202,16 +174,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -255,16 +218,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_ErcOnEth() public {
         token.mint(address(sharedBridge), amount);
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -313,16 +267,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_EthOnErc() public {
         vm.deal(address(sharedBridge), amount);
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -371,16 +316,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -429,16 +365,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
     function test_finalizeWithdrawal_NonBaseErcOnErc() public {
         token.mint(address(sharedBridge), amount);
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(address(token))),
-                    keccak256(abi.encode(chainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(chainId, address(token), amount);
 
         bytes memory message = abi.encodePacked(
             IL1ERC20Bridge.finalizeWithdrawal.selector,
@@ -496,16 +423,7 @@ contract L1SharedBridgeTestBase is L1SharedBridgeTest {
             abi.encode(false)
         );
 
-        vm.store(
-            address(sharedBridge),
-            keccak256(
-                abi.encode(
-                    uint256(uint160(ETH_TOKEN_ADDRESS)),
-                    keccak256(abi.encode(eraChainId, chainBalanceLocationInStorage))
-                )
-            ),
-            bytes32(amount)
-        );
+        _setSharedBridgeChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),

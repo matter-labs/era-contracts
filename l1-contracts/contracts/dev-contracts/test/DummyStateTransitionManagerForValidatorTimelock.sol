@@ -20,7 +20,7 @@ contract DummyStateTransitionManagerForValidatorTimelock {
         return chainAdmin;
     }
 
-    function hyperchain(uint256) external view returns (address) {
+    function getHyperchain(uint256) external view returns (address) {
         return hyperchainAddress;
     }
 }
