@@ -149,6 +149,30 @@ function getCodeAddress() -> addr {
     addr := verbatim_0i_1o("code_source")
 }
 
+function loadReturndataIntoActivePtr() {
+    verbatim_0i_0o("return_data_ptr_to_active")
+}
+
+function loadCalldataIntoActivePtr() {
+    verbatim_0i_0o("calldata_ptr_to_active")
+}
+
+function getActivePtrDataSize() -> size {
+    size := verbatim_0i_1o("active_ptr_data_size")
+}
+
+function copyActivePtrData(_dest, _source, _size) {
+    verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
+}
+
+function ptrAddIntoActive(_dest) {
+    verbatim_1i_0o("active_ptr_add_assign", _dest)
+}
+
+function ptrShrinkIntoActive(_dest) {
+    verbatim_1i_0o("active_ptr_shrink_assign", _dest)
+}
+
 function _getRawCodeHash(account) -> hash {
     // TODO: Unhardcode this selector
     mstore8(0, 0x4d)
@@ -487,8 +511,7 @@ function getEVMGas() -> evmGas {
     let _gas := gas()
     let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
 
-    evmGas := 0
-    if or(gt(_gas, requiredGas), eq(_gas, requiredGas)) {
+    if or(gt(_gas, requiredGas), eq(requiredGas, _gas)) {
         evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
     }
 }
@@ -679,6 +702,8 @@ function isAddrEmpty(addr) -> isEmpty {
 function genericCreate(addr, offset, size, sp) -> result {
     pop(warmAddress(addr))
 
+    _eraseReturndataPointer()
+
     let nonceNewAddr := getNonce(addr)
     let bytecodeNewAddr := extcodesize(addr)
     if or(gt(nonceNewAddr, 0), gt(bytecodeNewAddr, 0)) {
@@ -703,7 +728,11 @@ function genericCreate(addr, offset, size, sp) -> result {
     // Length of the init code
     mstore(sub(offset, 0x20), size)
 
+    _pushEVMFrame(gas(), false)
+
     result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+    _popEVMFrame()
 
     incrementNonce(address())
 

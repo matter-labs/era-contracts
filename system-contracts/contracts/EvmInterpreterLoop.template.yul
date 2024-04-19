@@ -10,6 +10,9 @@ for { } true { } {
 
     ip := add(ip, 1)
 
+    printString("OPCODE")
+    printHex(opcode)
+
     switch opcode
     case 0x00 { // OP_STOP
         break
@@ -76,6 +79,16 @@ for { } true { } {
 
         sp := pushStackItem(sp, smod(a, b))
         evmGasLeft := chargeGas(evmGasLeft, 5)
+    }
+    case 0x16 { // OP_AND
+        let a, b
+
+        a, sp := popStackItem(sp)
+        b, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, and(a,b))
+
+        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x17 { // OP_OR
         let a, b
@@ -1110,7 +1123,9 @@ for { } true { } {
         ensureAcceptableMemLocation(size)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
-        return(add(offset,MEM_OFFSET_INNER()),size)
+        returnLen := size
+        returnOffset := add(MEM_OFFSET_INNER(), offset)
+        break
     }
     case 0xFD { // OP_REVERT
         let offset,size
