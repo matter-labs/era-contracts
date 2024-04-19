@@ -29,7 +29,7 @@ import {
   applyL1ToL2Alias,
   hashL2Bytecode,
 } from "../../l2-contracts/src/utils";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 
 const SYSTEM_UPGRADE_TX_TYPE = 254;
 const FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
