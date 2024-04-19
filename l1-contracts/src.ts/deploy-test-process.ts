@@ -20,7 +20,7 @@ import {
 } from "./deploy-process";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import * as fs from "fs";
-import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/src/utils";
+import { ETH_ADDRESS_IN_CONTRACTS } from "zksync-ethers/build/utils";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
 // import { DummyAdminFacet } from "../typechain";
 import * as zkethers from "zksync-ethers";
