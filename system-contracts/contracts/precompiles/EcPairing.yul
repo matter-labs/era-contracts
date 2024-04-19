@@ -50,7 +50,7 @@ object "EcPairing" {
 
             /// @notice Constant function for the pre-computation of R^2 % N for the Montgomery REDC algorithm.
             /// @dev R^2 is the Montgomery residue of the value 2^512.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value R^2 modulus the curve group order.
             function R2_MOD_P() -> ret {
@@ -59,7 +59,7 @@ object "EcPairing" {
 
             /// @notice Constant function for the pre-computation of N' for the Montgomery REDC algorithm.
             /// @dev N' is a value such that NN' = -1 mod R, with N being the curve group order.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value N'.
             function N_PRIME() -> ret {
@@ -94,7 +94,7 @@ object "EcPairing" {
                 z21 := 0
             }
 
-            /// @notice Constant function for the zero element in the twisted cuve on affine representation.
+            /// @notice Constant function for the zero element in the twisted curve on affine representation.
             /// @return z00, z01, z10, z11, z20, z21 The values of infinity point on affine representation.
             function G2_INFINITY() -> z00, z01, z02, z10, z11, z12 {
                 z00 := 0
@@ -122,8 +122,8 @@ object "EcPairing" {
                 z211 := 0
             }
 
-            /// @notice Constant function for the lenght of the input of a single pair of points to compute the pairing.
-            /// @return ret The lenght of a pair of points input.
+            /// @notice Constant function for the length of the input of a single pair of points to compute the pairing.
+            /// @return ret The length of a pair of points input.
             function PAIR_LENGTH() -> ret {
                 ret := 0xc0
             }
@@ -332,7 +332,7 @@ object "EcPairing" {
             }
 
             /// @notice Computes the Montgomery modular inverse skipping the Montgomery reduction step.
-            /// @dev The Montgomery reduction step is skept because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
+            /// @dev The Montgomery reduction step is skipped because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
             /// @dev See the function `binaryExtendedEuclideanAlgorithm` for further details.
             /// @param a The field element in Montgomery form to compute the modular inverse of.
             /// @return invmod The result of the Montgomery modular inverse (in Montgomery form).
@@ -340,7 +340,7 @@ object "EcPairing" {
                 invmod := binaryExtendedEuclideanAlgorithm(a)
             }
 
-			// CURVE ARITHMETICS
+			// CURVE ARITHMETIC
 
             /// @notice Checks if a coordinate is on the curve group order.
             /// @dev A coordinate is on the curve group order if it is on the range [0, curveFieldOrder).
@@ -382,7 +382,7 @@ object "EcPairing" {
 			/// @dev Both input and output coordinates are encoded in Montgomery form.
             /// @dev If x or y differ from 0, just add z = (1,0).
             /// @dev If x and y are equal to 0, then P is the infinity point, and z = (0,0).
-            /// @param xp0, xp1 The x coordinate to trasnform.
+            /// @param xp0, xp1 The x coordinate to transform.
             /// @param yp0, yp1 The y coordinate to transform.
             /// @return xr0, xr1, yr0, yr1, zr0, zr1 The projectives coordinates of the given G2 point.
 			function g2ProjectiveFromAffine(xp0, xp1, yp0, yp1) -> xr0, xr1, yr0, yr1, zr0, zr1 {
@@ -1411,7 +1411,7 @@ object "EcPairing" {
             /// @dev It computes the exponentiation of a Fp12 elemento to e, with e = (p^12 -1)/r
             /// @dev We can split this exponentitation in three parts: e = (p^6 - 1)(p^2 + 1)((p^4 - p^2 + 1)/r)
             /// @dev The first 2 parts are easy to compute using the Frobenius operator.
-            /// @dev To calcualte this we use the first 5 lines of Algorithm 31 in: https://eprint.iacr.org/2010/354.pdf
+            /// @dev To calculate this we use the first 5 lines of Algorithm 31 in: https://eprint.iacr.org/2010/354.pdf
             /// @dev For the hard part we use the Fuentes et al. method. Algorithm 6 in: https://eprint.iacr.org/2015/192.pdf
             /// @params a000, a001, a010, a011, a020, a021, a100, a101, a110, a111, a120, a121 The coefficients of the Fp12 element A.
             /// @return f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 The coefficients of A^(s*((p^12 -1)/r)) where s is not divisible by r.
