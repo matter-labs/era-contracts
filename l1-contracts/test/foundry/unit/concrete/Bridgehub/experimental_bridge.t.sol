@@ -366,7 +366,7 @@ contract ExperimentalBridgeTest is Test {
         // bridgeHub.createNewChain => stateTransitionManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockSTM
         mockSTM.setHyperchain(chainId, address(mockChainContract));
-        assertTrue(mockSTM.hyperchain(chainId) == address(mockChainContract));
+        assertTrue(mockSTM.getHyperchain(chainId) == address(mockChainContract));
 
         vm.startPrank(deployerAddress);
         vm.mockCall(

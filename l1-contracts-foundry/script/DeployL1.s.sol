@@ -105,6 +105,7 @@ contract DeployL1Script is Script {
         uint256 diamondInitMinimalL2GasPrice;
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
+        uint256 maxNumberOfHyperchains;
     }
 
     struct TokensConfig {
@@ -165,6 +166,7 @@ contract DeployL1Script is Script {
             "$.contracts.governance_security_council_address"
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
+        config.contracts.maxNumberOfHyperchains = toml.readUint("$.contracts.max_number_of_hyperchains");
         config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
             config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
@@ -344,7 +346,8 @@ contract DeployL1Script is Script {
     function deployStateTransitionManagerImplementation() internal {
         bytes memory bytecode = abi.encodePacked(
             type(StateTransitionManager).creationCode,
-            abi.encode(addresses.bridgehub.bridgehubProxy)
+            abi.encode(addresses.bridgehub.bridgehubProxy),
+            abi.encode(config.contracts.maxNumberOfHyperchains)
         );
         address contractAddress = deployViaCreate2(bytecode);
         console.log("StateTransitionManagerImplementation deployed at:", contractAddress);

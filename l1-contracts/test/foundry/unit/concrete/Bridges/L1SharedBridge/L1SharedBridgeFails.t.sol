@@ -15,8 +15,6 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
-// import "forge-std/console.sol";
-
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
     function test_initialize_wrongOwner() public {
@@ -156,11 +154,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
 
     function test_bridgehubConfirmL2Transaction_depositAlreadyHappened() public {
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         vm.prank(bridgehubAddress);
         vm.expectRevert("ShB tx hap");
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
@@ -259,11 +253,7 @@ contract L1SharedBridgeFailTest is L1SharedBridgeTest {
         vm.deal(address(sharedBridge), amount);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
-        vm.store(
-            address(sharedBridge),
-            keccak256(abi.encode(txHash, keccak256(abi.encode(chainId, depositLocationInStorage)))),
-            txDataHash
-        );
+        _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(sharedBridge.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
