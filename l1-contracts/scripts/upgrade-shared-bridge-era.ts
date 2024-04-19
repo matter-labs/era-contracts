@@ -66,8 +66,7 @@ async function main() {
       await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
 
       // deploy a dummy erc20 bridge to set the storage values
-      // const actualERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeImplementation;
-      await deployer.deployERC20BridgeImplementation(create2Salt, { nonce }, true);
+      await deployer.deployERC20BridgeImplementation(create2Salt, {}, true);
 
       // upgrade to dummy bridge
       calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
@@ -76,14 +75,15 @@ async function main() {
       ]);
 
       await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
-      console.log("Upgraded ERC20Bridge to initializable implementation");
+      console.log("Upgraded ERC20Bridge to 'dummy' implementation");
 
-      const dummyBridgeAbi = hardhat.artifacts.readArtifactSync("DummyERC20Bridge").abi;
+      const dummyBridgeAbi = hardhat.artifacts.readArtifactSync("DummyL1ERC20Bridge").abi;
       const dummyBridge = new ethers.Contract(deployer.addresses.Bridges.ERC20BridgeProxy, dummyBridgeAbi, deployWallet);
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR")
       const beaconProxyBytecode = require('../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json').bytecode;
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxyBytecode);
+      // is there a better way to get the l2TokenBeacon address?
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       const l2SharedBridge = new ethers.Contract(l2SharedBridgeAddress, ["function l2TokenBeacon() view returns (address)"], l2Provider);
       const l2TokenBeacon = await l2SharedBridge.l2TokenBeacon();
@@ -91,20 +91,13 @@ async function main() {
       console.log("Retrieved storage values for TestERC20Bridge:");
       console.log("l2SharedBridgeAddress:", l2SharedBridgeAddress);
       console.log("l2TokenBeacon:", l2TokenBeacon);
-      console.log("l2TokenBytecodeHash:", l2TokenBytecodeHash);
+      console.log("l2TokenBytecodeHash:", ethers.utils.hexlify(l2TokenBytecodeHash));
 
       // set storage values
-      const tx = await dummyBridge.initialize(l2SharedBridgeAddress, l2TokenBeacon, l2TokenBytecodeHash);
+      const tx = await dummyBridge.setValues(l2SharedBridgeAddress, l2TokenBeacon, l2TokenBytecodeHash);
       await tx.wait();
 
       console.log("Set storage values for TestERC20Bridge");
-
-      // upgrade back
-      // calldata = proxyAdminInterface.encodeFunctionData("upgrade(address,address)", [
-      //   deployer.addresses.Bridges.ERC20BridgeProxy,
-      //   actualERC20BridgeAddress,
-      // ]);
-      // await deployer.executeUpgrade(deployer.addresses.TransparentProxyAdmin, 0, calldata);
     });
 
   await program.parseAsync(process.argv);

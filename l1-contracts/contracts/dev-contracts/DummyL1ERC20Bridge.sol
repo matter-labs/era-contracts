@@ -17,7 +17,7 @@ contract DummyL1ERC20Bridge is L1ERC20Bridge {
 
     constructor (IL1SharedBridge _l1SharedBridge) L1ERC20Bridge(_l1SharedBridge) {}
 
-    function initialize(address _l2Bridge, address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external {
+    function setValues(address _l2Bridge, address _l2TokenBeacon, bytes32 _l2TokenProxyBytecodeHash) external {
         l2Bridge = _l2Bridge;
         l2TokenBeacon = _l2TokenBeacon;
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
