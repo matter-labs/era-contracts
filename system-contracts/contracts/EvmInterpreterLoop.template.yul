@@ -1043,7 +1043,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, size))
+        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
 
         if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
             revert(0, 0)
@@ -1076,7 +1076,7 @@ for { } true { } {
         size, sp := popStackItem(sp)
         salt, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, size))
+        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
 
         if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
             revert(0, 0)
