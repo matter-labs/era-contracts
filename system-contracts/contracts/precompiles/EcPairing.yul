@@ -384,7 +384,7 @@ object "EcPairing" {
             /// @dev If x and y are equal to 0, then P is the infinity point, and z = (0,0).
             /// @param xp0, xp1 The x coordinate to transform.
             /// @param yp0, yp1 The y coordinate to transform.
-            /// @return xr0, xr1, yr0, yr1, zr0, zr1 The projectives coordinates of the given G2 point.
+            /// @return xr0, xr1, yr0, yr1, zr0, zr1 The projective coordinates of the given G2 point.
 			function g2ProjectiveFromAffine(xp0, xp1, yp0, yp1) -> xr0, xr1, yr0, yr1, zr0, zr1 {
 				xr0 := xp0
 				xr1 := xp1
@@ -1309,7 +1309,7 @@ object "EcPairing" {
             }
 
             /// @notice Computes the addition of two G2 points and the line through them.
-            /// @dev It's called mixed addition because Q is in affine coordinates ands T in projective coordinates.
+            /// @dev It's called mixed addition because Q is in affine coordinates and T in projective coordinates.
             /// @dev The two points must be different, in this Q, which is G2 group generator of an order of 21888242871839275222246405745257275088548364400416034343698204186575808495617, is doubled and added. So will never reach Q.
             /// @dev See https://eprint.iacr.org/2013/722.pdf for further details.
             /// @dev Disclaimer: The algorithm described in the paper is has a typo, the (`l00`,`l01`) coefficients should not be negated.
@@ -1371,7 +1371,7 @@ object "EcPairing" {
             }
 
             /// @notice Computes the line through two G2 points.
-            /// @dev Like in the mixedAdditionStep, Q is in affine coordinates ands T in projective coordinates.
+            /// @dev Like in the mixedAdditionStep, Q is in affine coordinates and T in projective coordinates.
             /// @dev The two points must be different, in this Q, which is G2 group generator of an order of 21888242871839275222246405745257275088548364400416034343698204186575808495617, is doubled and added. So will never reach Q.
             /// @params xq0, xq1 The coefficients of the Fp2 X coordinate of the Q point.
             /// @params yq0, yq1 The coefficients of the Fp2 Y coordinate of the Q point.
@@ -1487,7 +1487,7 @@ object "EcPairing" {
 
                 // Computes the second iteration of Millers loop outside
                 // NAF[63] == -1.
-                // Here T = 2Q, so doing a dobule step and a mixed addition step with -Q looks like: (2(2Q)-Q) = 3Q.
+                // Here T = 2Q, so doing a double step and a mixed addition step with -Q looks like: (2(2Q)-Q) = 3Q.
                 // This is equivalent to a mixed addition step with Q: (2Q + Q) = 3Q
                 f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121,f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121)
                 l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51 := computeLine(mq00, mq01, mq10, mq11, t00, t01, t10, t11, t20, t21)
