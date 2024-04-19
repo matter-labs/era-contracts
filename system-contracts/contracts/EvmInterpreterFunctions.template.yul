@@ -373,7 +373,7 @@ function getNewAddress(addr) -> newAddr {
 
     addressEncoded := and(
         add(addr, shl(160, 0x94)),
-        0xffffffffffffffffffffffffffffffffffffffffffff
+        0xffffffffffffffffffffffffffffffffffffffffff
     )
 
     nonceEncoded := nonce
@@ -413,7 +413,13 @@ function getNewAddress(addr) -> newAddr {
 
     digest := add(
         shl(arrayLength, listLengthEconded),
-        add(shl(nonceEncodedLength, addressEncoded), nonceEncoded)
+        add(
+            shl(
+                mul(8, nonceEncodedLength),
+                addressEncoded
+            ),
+            nonceEncoded
+        )
     )
 
     mstore(0, shl(sub(248, arrayLength), digest))
