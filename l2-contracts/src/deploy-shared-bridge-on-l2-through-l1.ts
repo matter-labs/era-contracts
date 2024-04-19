@@ -20,7 +20,7 @@ import * as hre from "hardhat";
 
 export const L2_SHARED_BRIDGE_ABI = hre.artifacts.readArtifactSync("L2SharedBridge").abi;
 export const L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE = hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
-export const BEACON_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
+export const L2_STANDARD_TOKEN_PROXY_BYTECODE = hre.artifacts.readArtifactSync("BeaconProxy").bytecode;
 
 export async function publishL2SharedBridgeDependencyBytecodesOnL2(
   deployer: Deployer,
@@ -37,7 +37,11 @@ export async function publishL2SharedBridgeDependencyBytecodesOnL2(
   await publishBytecodeFromL1(
     chainId,
     deployer.deployWallet,
-    [L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE, L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE],
+    [
+      L2_STANDARD_ERC20_PROXY_FACTORY_BYTECODE,
+      L2_STANDARD_ERC20_IMPLEMENTATION_BYTECODE,
+      L2_STANDARD_TOKEN_PROXY_BYTECODE,
+    ],
     gasPrice
   );
 
@@ -50,7 +54,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, ch
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
   }
-
+  const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
   if (!L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE) {
     throw new Error("L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE not found");
   }
@@ -62,7 +66,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, ch
   const l2SharedBridgeImplAddress = computeL2Create2Address(
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    defaultAbiCoder.encode(["uint256"], [chainId]),
+    defaultAbiCoder.encode(["uint256"], [eraChainId]),
     ethers.constants.HashZero
   );
   deployer.addresses.Bridges.L2SharedBridgeImplementation = l2SharedBridgeImplAddress;
@@ -80,7 +84,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, ch
     chainId,
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    defaultAbiCoder.encode(["uint256"], [chainId]),
+    defaultAbiCoder.encode(["uint256"], [eraChainId]),
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
     gasPrice,
@@ -108,8 +112,8 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
   const proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
     l1SharedBridge.address,
-    ethers.constants.AddressZero,
-    hashL2Bytecode(BEACON_PROXY_BYTECODE),
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    hashL2Bytecode(L2_STANDARD_TOKEN_PROXY_BYTECODE),
     l2GovernorAddress,
   ]);
 
