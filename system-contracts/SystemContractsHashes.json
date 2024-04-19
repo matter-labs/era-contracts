@@ -208,5 +208,12 @@
     "sourceCodePath": "bootloader/build/proved_batch.yul",
     "bytecodeHash": "0x010008c5683b01d785f46d7a4237432c3898b0a2c421d362a0729e2ccaa1c076",
     "sourceCodeHash": "0xdd44e44795688eaa0176fcd3378b5bdef949e4f6cd1ef7c76bc412dfb77eaf77"
+  },
+  {
+    "contractName": "EcPairing",
+    "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcPairing.yul.zbin",
+    "sourceCodePath": "contracts-preprocessed/precompiles/EcPairing.yul",
+    "bytecodeHash": "0x01000ce14516d68f44e4a7fd06c6a3e23ef473c727e7cc52fba3c1b1df6bc485",
+    "sourceCodeHash": "0x4b6b04e50b0f147f060a8415abbb18a8b5c04c555a2593c0a7825c60afd2943e"
   }
 ]
