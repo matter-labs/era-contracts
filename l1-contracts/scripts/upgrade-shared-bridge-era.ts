@@ -10,6 +10,7 @@ import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig, getAddressFromEnv } from "../src.ts/utils";
 import { hashL2Bytecode } from "../../l2-contracts/src/utils";
 import { Provider } from "zksync-web3";
+import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
 
 const provider = web3Provider();
 
@@ -85,9 +86,7 @@ async function main() {
       );
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
-      const beaconProxyBytecode =
-        require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json").bytecode;
-      const l2TokenBytecodeHash = hashL2Bytecode(beaconProxyBytecode);
+      const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
       // is there a better way to get the l2TokenBeacon address?
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       const l2SharedBridge = new ethers.Contract(
