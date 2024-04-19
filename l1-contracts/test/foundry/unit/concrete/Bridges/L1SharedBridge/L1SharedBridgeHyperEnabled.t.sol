@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
-
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -14,8 +12,6 @@ import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAdd
 
 // note, this should be the same as where hyper is disabled
 contract L1SharedBridgeHyperEnabledTest is L1SharedBridgeTest {
-    using stdStorage for StdStorage;
-
     function test_bridgehubDepositBaseToken_Eth() public {
         vm.deal(bridgehubAddress, amount);
         vm.prank(bridgehubAddress);

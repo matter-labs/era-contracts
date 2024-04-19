@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
-
 import {L1SharedBridgeTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -17,12 +15,8 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
-// import "forge-std/console.sol";
-
 /// We are testing all the specified revert and require cases.
 contract L1SharedBridgeFailTest is L1SharedBridgeTest {
-    using stdStorage for StdStorage;
-
     function test_initialize_wrongOwner() public {
         vm.expectRevert("ShB owner 0");
         new TransparentUpgradeableProxy(
