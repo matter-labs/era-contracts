@@ -368,22 +368,19 @@ for { } true { } {
         let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        // basically BYTECODE_OFFSET + 32 - 31, since
-        // we always need to read one byte
-        let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+        let end := len
+        if lt(bytecodeLen, len) {
+            end := bytecodeLen
+        }
 
-        // TODO: optimize?
-        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-            switch lt(add(offset, i), bytecodeLen)
-                case true {
-                    mstore8(
-                        add(add(MEM_OFFSET_INNER(), offset), i),
-                        and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
-                    )
-                }
-                default {
-                    mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
-                }
+        for { let i := 0 } lt(i, end) { i := add(i, 1) } {
+            mstore8(
+                add(MEM_OFFSET_INNER(), add(dst, i)),
+                shr(248, mload(add(BYTECODE_OFFSET(), add(32, add(offset, i)))))
+            )
+        }
+        for { let i := end } lt(i, len) { i := add(i, 1) } {
+            mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
     }
     case 0x3A { // OP_GASPRICE
