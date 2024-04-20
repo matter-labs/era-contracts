@@ -1360,7 +1360,8 @@ object "EcPairing" {
                 t130, t131 := fp2Add(t130, t131, t120, t121)
 
                 // l0
-                l00, l01 := fp2Neg(t80, t81)
+                l00 := t80
+                l01 := t81
                 l10 := zero
                 l11 := zero
                 l20 := zero
@@ -1442,7 +1443,8 @@ object "EcPairing" {
                 l21 := zero
 
                 // l1
-                l30, l31 := fp2Neg(t10, t11)
+                l30 := t10
+                l31 := t11
 
                 // l2
                 l40 := t90
@@ -1558,11 +1560,13 @@ object "EcPairing" {
                 let naf := NAF_REPRESENTATIVE()
                 let n_iter := 63
                 let l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51
+                let myp := montgomerySub(0, yp)
+                let mxp := montgomerySub(0, xp)
 
                 // Computes the first iteration of Millers loop outside to avoid unecesariy square
                 // NAF[64] == 0
                 l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := doubleStep(t00, t01, t10, t11, t20, t21)
-                l00, l01 := fp2ScalarMul(l00, l01, yp)
+                l00, l01 := fp2ScalarMul(l00, l01, myp)
                 l30, l31 := fp2ScalarMul(l30, l31, xp)
                 f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
 
@@ -1577,14 +1581,14 @@ object "EcPairing" {
                 f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
                 l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := mixedAdditionStep(xq0, xq1, yq0, yq1, t00, t01, t10, t11, t20, t21)
                 l00, l01 := fp2ScalarMul(l00, l01, yp)
-                l30, l31 := fp2ScalarMul(l30, l31, xp)
+                l30, l31 := fp2ScalarMul(l30, l31, mxp)
                 f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
 
                 for {let i := 0} lt(i, n_iter) { i := add(i, 1) } {
                     f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Square(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121)
 
                     l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := doubleStep(t00, t01, t10, t11, t20, t21)
-                    l00, l01 := fp2ScalarMul(l00, l01, yp)
+                    l00, l01 := fp2ScalarMul(l00, l01, myp)
                     l30, l31 := fp2ScalarMul(l30, l31, xp)
                     f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
 
@@ -1592,7 +1596,7 @@ object "EcPairing" {
                     if and(naf, 1) {
                         l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := mixedAdditionStep(xq0, xq1, yq0, yq1, t00, t01, t10, t11, t20, t21)
                         l00, l01 := fp2ScalarMul(l00, l01, yp)
-                        l30, l31 := fp2ScalarMul(l30, l31, xp)
+                        l30, l31 := fp2ScalarMul(l30, l31, mxp)
                         f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
                     }
 
@@ -1600,7 +1604,7 @@ object "EcPairing" {
                     if and(naf, 2) {
                         l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := mixedAdditionStep(mq00, mq01, mq10, mq11, t00, t01, t10, t11, t20, t21)
                         l00, l01 := fp2ScalarMul(l00, l01, yp)
-                        l30, l31 := fp2ScalarMul(l30, l31, xp)
+                        l30, l31 := fp2ScalarMul(l30, l31, mxp)
                         f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
                     }
 
@@ -1618,7 +1622,7 @@ object "EcPairing" {
 
                 l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, t00, t01, t10, t11, t20, t21 := mixedAdditionStep(r00, r01, r10, r11, t00, t01, t10, t11, t20, t21)
                 l00, l01 := fp2ScalarMul(l00, l01, yp)
-                l30, l31 := fp2ScalarMul(l30, l31, xp)
+                l30, l31 := fp2ScalarMul(l30, l31, mxp)
                 f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := fp12Mul(f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121, l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51)
 
                 l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51 := computeLine(r20, r21, r30, r31, t00, t01, t10, t11, t20, t21)
