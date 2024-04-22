@@ -87,8 +87,10 @@ async function main() {
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
-      // is there a better way to get the l2TokenBeacon address?
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+      // For the server to start up.
+      await waitForServer(l2Provider);
+
       const l2SharedBridge = new ethers.Contract(
         l2SharedBridgeAddress,
         ["function l2TokenBeacon() view returns (address)"],
@@ -117,3 +119,24 @@ main()
     console.error("Error:", err);
     process.exit(1);
   });
+
+async function waitForServer(provider: Provider) {
+  let iter = 0;
+  while (iter < 30) {
+      try {
+          await provider.getBlockNumber();
+          await sleep(2);
+          iter += 1;
+      } catch (_) {
+          // When exception happens, we assume that server died.
+          return;
+      }
+  }
+  // It's going to panic anyway, since the server is a singleton entity, so better to exit early.
+  throw new Error("Server didn't stop after a kill request");
+
+}
+
+async function sleep(seconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+}
