@@ -87,6 +87,7 @@ async function main() {
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
+      console.log(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
       console.log("Waiting for server to start up");
@@ -132,8 +133,7 @@ async function waitForServer(provider: Provider) {
       iter += 1;
     }
   }
-  // It's going to panic anyway, since the server is a singleton entity, so better to exit early.
-  throw new Error("Server didn't stop after a kill request");
+  throw new Error("Server didn't start up in time. Exiting.");
 }
 
 async function sleep(seconds: number) {
