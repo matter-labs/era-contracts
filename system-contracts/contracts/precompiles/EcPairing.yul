@@ -1,5 +1,7 @@
 object "EcPairing" {
-	code { }
+	code {
+        return(0, 0)
+    }
 	object "EcPairing_deployed" {
 		code {
             // CONSTANTS
