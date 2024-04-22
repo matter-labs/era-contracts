@@ -444,7 +444,7 @@ for { } true { } {
         len, sp := popStackItem(sp)
 
 
-        // TODO: check if this conditions are met
+        // TODO: check if these conditions are met
         // The addition offset + size overflows.
         // offset + size is larger than RETURNDATASIZE.
         if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
@@ -458,7 +458,7 @@ for { } true { } {
         let dynamicGas := add(mul(6, shl(add(len, 31), 5)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        returndatacopy(add(MEM_OFFSET_INNER(), offset), add(MEM_OFFSET_INNER(), dest), len)
+        copyActivePtrData(add(MEM_OFFSET_INNER(), dest), add(MEM_OFFSET_INNER(), offset), len)
     }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
