@@ -10,6 +10,9 @@ for { } true { } {
 
     ip := add(ip, 1)
 
+    printString("OPCODE")
+    printHex(opcode)
+
     switch opcode
     case 0x00 { // OP_STOP
         break
@@ -76,6 +79,16 @@ for { } true { } {
 
         sp := pushStackItem(sp, smod(a, b))
         evmGasLeft := chargeGas(evmGasLeft, 5)
+    }
+    case 0x16 { // OP_AND
+        let a, b
+
+        a, sp := popStackItem(sp)
+        b, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, and(a,b))
+
+        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x17 { // OP_OR
         let a, b
@@ -355,22 +368,19 @@ for { } true { } {
         let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        // basically BYTECODE_OFFSET + 32 - 31, since
-        // we always need to read one byte
-        let bytecodeOffsetInner := add(BYTECODE_OFFSET(), 1)
+        let end := len
+        if lt(bytecodeLen, len) {
+            end := bytecodeLen
+        }
 
-        // TODO: optimize?
-        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-            switch lt(add(offset, i), bytecodeLen)
-                case true {
-                    mstore8(
-                        add(add(MEM_OFFSET_INNER(), offset), i),
-                        and(mload(add(add(bytecodeOffsetInner, offset), i)), 0xFF)
-                    )
-                }
-                default {
-                    mstore8(add(add(MEM_OFFSET_INNER(), offset), i), 0)
-                }
+        for { let i := 0 } lt(i, end) { i := add(i, 1) } {
+            mstore8(
+                add(MEM_OFFSET_INNER(), add(dst, i)),
+                shr(248, mload(add(BYTECODE_OFFSET(), add(32, add(offset, i)))))
+            )
+        }
+        for { let i := end } lt(i, len) { i := add(i, 1) } {
+            mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
     }
     case 0x3A { // OP_GASPRICE
@@ -597,7 +607,7 @@ for { } true { } {
     }
     case 0x64 { // OP_PUSH5
         let value := readBytes(ip,5)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 5)
 
@@ -605,7 +615,7 @@ for { } true { } {
     }
     case 0x65 { // OP_PUSH6
         let value := readBytes(ip,6)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 6)
 
@@ -613,7 +623,7 @@ for { } true { } {
     }
     case 0x66 { // OP_PUSH7
         let value := readBytes(ip,7)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 7)
 
@@ -621,7 +631,7 @@ for { } true { } {
     }
     case 0x67 { // OP_PUSH8
         let value := readBytes(ip,8)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 8)
 
@@ -629,7 +639,7 @@ for { } true { } {
     }
     case 0x68 { // OP_PUSH9
         let value := readBytes(ip,9)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 9)
 
@@ -637,7 +647,7 @@ for { } true { } {
     }
     case 0x69 { // OP_PUSH10
         let value := readBytes(ip,10)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 10)
 
@@ -645,7 +655,7 @@ for { } true { } {
     }
     case 0x6A { // OP_PUSH11
         let value := readBytes(ip,11)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 11)
 
@@ -653,7 +663,7 @@ for { } true { } {
     }
     case 0x6B { // OP_PUSH12
         let value := readBytes(ip,12)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 12)
 
@@ -661,7 +671,7 @@ for { } true { } {
     }
     case 0x6C { // OP_PUSH13
         let value := readBytes(ip,13)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 13)
 
@@ -669,7 +679,7 @@ for { } true { } {
     }
     case 0x6D { // OP_PUSH14
         let value := readBytes(ip,14)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 14)
 
@@ -677,7 +687,7 @@ for { } true { } {
     }
     case 0x6E { // OP_PUSH15
         let value := readBytes(ip,15)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 15)
 
@@ -685,7 +695,7 @@ for { } true { } {
     }
     case 0x6F { // OP_PUSH16
         let value := readBytes(ip,16)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 16)
 
@@ -693,7 +703,7 @@ for { } true { } {
     }
     case 0x70 { // OP_PUSH17
         let value := readBytes(ip,17)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 17)
 
@@ -701,7 +711,7 @@ for { } true { } {
     }
     case 0x71 { // OP_PUSH18
         let value := readBytes(ip,18)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 18)
 
@@ -709,7 +719,7 @@ for { } true { } {
     }
     case 0x72 { // OP_PUSH19
         let value := readBytes(ip,19)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 19)
 
@@ -717,7 +727,7 @@ for { } true { } {
     }
     case 0x73 { // OP_PUSH20
         let value := readBytes(ip,20)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 20)
 
@@ -725,7 +735,7 @@ for { } true { } {
     }
     case 0x74 { // OP_PUSH21
         let value := readBytes(ip,21)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 21)
 
@@ -733,7 +743,7 @@ for { } true { } {
     }
     case 0x75 { // OP_PUSH22
         let value := readBytes(ip,22)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 22)
 
@@ -741,7 +751,7 @@ for { } true { } {
     }
     case 0x76 { // OP_PUSH23
         let value := readBytes(ip,23)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 23)
 
@@ -749,7 +759,7 @@ for { } true { } {
     }
     case 0x77 { // OP_PUSH24
         let value := readBytes(ip,24)
-    
+
         sp := pushStackItem(sp, value)
         ip := add(ip, 24)
 
@@ -1033,7 +1043,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, size))
+        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
 
         if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
             revert(0, 0)
@@ -1066,7 +1076,7 @@ for { } true { } {
         size, sp := popStackItem(sp)
         salt, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, size))
+        checkMemOverflow(add(MEM_OFFSET_INNER(), add(offset, size)))
 
         if gt(size, mul(2, MAX_POSSIBLE_BYTECODE())) {
             revert(0, 0)
@@ -1100,6 +1110,13 @@ for { } true { } {
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
     }
+    case 0xF1 { // OP_CALL
+        let dynamicGas
+        // A function was implemented in order to avoid stack depth errors.
+        dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
+
+        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+    }
     case 0xF3 { // OP_RETURN
         let offset,size
 
@@ -1110,7 +1127,9 @@ for { } true { } {
         ensureAcceptableMemLocation(size)
         evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
 
-        return(add(offset,MEM_OFFSET_INNER()),size)
+        returnLen := size
+        returnOffset := add(MEM_OFFSET_INNER(), offset)
+        break
     }
     case 0xFD { // OP_REVERT
         let offset,size
@@ -1138,10 +1157,4 @@ for { } true { } {
         sstore(0, opcode)
         return(0, 64)
     }
-}
-
-if eq(isCallerEVM, 1) {
-    // Includes gas
-    returnOffset := sub(returnOffset, 32)
-    returnLen := add(returnLen, 32)
 }

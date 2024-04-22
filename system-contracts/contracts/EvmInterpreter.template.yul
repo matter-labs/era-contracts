@@ -58,40 +58,11 @@ object "EVMInterpreter" {
             }
         }
 
-        function loadCalldataIntoActivePtr() {
-            verbatim_1i_0o("active_ptr_data_load", 0xFFFF)
-        }
-
-        function getActivePtrDataSize() -> size {
-            size := verbatim_0i_1o("active_ptr_data_size")
-        }
-
-        function copyActivePtrData(_dest, _source, _size) {
-            verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
-        }
-
-        function GAS_CONSTANTS() -> divisor, stipend, overhead {
-            divisor := 5
-            stipend := shl(30, 1)
-            overhead := 2000
-        }
-
-        function getEVMGas() -> evmGas {
-            let GAS_DIVISOR, EVM_GAS_STIPEND, OVERHEAD := GAS_CONSTANTS()
-
-            let gasLeft := gas()
-            let requiredGas := add(EVM_GAS_STIPEND, OVERHEAD)
-
-            evmGas := div(sub(gasLeft, requiredGas), GAS_DIVISOR)
-
-            if lt(gasLeft, requiredGas) {
-                evmGas := 0
-            }
-        }
-
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
-                let firstByte := shr(mload(offset), 248)
+                // let firstByte := shr(mload(offset), 248)
+                // FIXME: Check this.
+                let firstByte := shr(248, mload(offset))
                 if eq(firstByte, 0xEF) {
                     revert(0, 0)
                 }
@@ -101,7 +72,7 @@ object "EVMInterpreter" {
             returnGas := chargeGas(gasToReturn, gasForCode)
         }
 
-        <!-- @include EvmInterpreterFunctions.yul -->
+        <!-- @include EvmInterpreterFunctions.template.yul -->
 
         function simulate(
             isCallerEVM,
@@ -112,7 +83,7 @@ object "EVMInterpreter" {
             returnOffset := MEM_OFFSET_INNER()
             returnLen := 0
 
-            <!-- @include EvmInterpreterLoop.yul -->
+            <!-- @include EvmInterpreterLoop.template.yul -->
 
             retGasLeft := evmGasLeft
         }
@@ -143,7 +114,7 @@ object "EVMInterpreter" {
     }
     object "EVMInterpreter_deployed" {
         code {
-            <!-- @include EvmInterpreterFunctions.yul -->
+            <!-- @include EvmInterpreterFunctions.template.yul -->
 
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
@@ -167,7 +138,15 @@ object "EVMInterpreter" {
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0
 
-            <!-- @include EvmInterpreterLoop.yul -->
+            pop(warmAddress(address()))
+
+            <!-- @include EvmInterpreterLoop.template.yul -->
+
+            if eq(isCallerEVM, 1) {
+                // Includes gas
+                returnOffset := sub(returnOffset, 32)
+                returnLen := add(returnLen, 32)
+            }
 
             return(returnOffset, returnLen)
         }
