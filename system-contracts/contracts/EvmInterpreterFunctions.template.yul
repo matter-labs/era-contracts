@@ -608,15 +608,16 @@ function _eraseReturndataPointer() {
 }
 
 function _saveReturndataAfterZkEVMCall() {
+    loadReturndataIntoActivePtr()
     let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
 
     mstore(lastRtSzOffset, returndatasize())
 }
 
-function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
-    let gasSend,addr,value,argsOffset,argsSize,retOffset,retSize
+function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp {
+    let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
 
-    gasSend, sp := popStackItem(oldSp)
+    gasToPass, sp := popStackItem(oldSp)
     addr, sp := popStackItem(sp)
     value, sp := popStackItem(sp)
     argsOffset, sp := popStackItem(sp)
@@ -625,31 +626,39 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
     retSize, sp := popStackItem(sp)
 
 
+    // static_gas = 0
+    // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
     // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
     // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
-    dynamicGas := expandMemory(add(retOffset,retSize))
+    
+    let extraCost
+
     switch warmAddress(addr)
-        case 0 { dynamicGas := add(dynamicGas,2600) }
-        default { dynamicGas := add(dynamicGas,100) }
-
-    if not(iszero(value)) {
-        dynamicGas := add(dynamicGas,6700)
-        gasSend := add(gasSend,2300)
-
-        if isAddrEmpty(addr) {
-            dynamicGas := add(dynamicGas,25000)
-        }
+        case 0 { extraCost := 2600 }
+        default { extraCost := 100 }
+    if and(gt(value, 0), iszero(isStatic)) {
+        extraCost := 9000
+    }
+    if and(isAddrEmpty(addr), gt(value, 0)) {
+        extraCost := add(extraCost,25000)
     }
 
-    if gt(gasSend,div(mul(evmGasLeft,63),64)) {
-        gasSend := div(mul(evmGasLeft,63),64)
-    }
     argsOffset := add(argsOffset,MEM_OFFSET_INNER())
     retOffset := add(retOffset,MEM_OFFSET_INNER())
-    // TODO: More Checks are needed
+    checkMemOverflow(argsOffset)
+    checkMemOverflow(retOffset)
+    
     // Check gas
+    gasToPay, gasToPass := _getMessageCallGas(
+                                    value, 
+                                    gasToPass,
+                                    evmGasLeft,
+                                    expandMemory(add(retOffset,retSize)),
+                                    extraCost
+                                )
+
     let success
 
     if isStatic {
@@ -657,9 +666,9 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
         if not(iszero(value)) {
             revert(0, 0)
         }
-        success, evmGasLeft := _performStaticCall(
+        success, frameGasLeft:= _performStaticCall(
             _isEVM(addr),
-            gasSend,
+            gasToPass,
             addr,
             argsOffset,
             argsSize,
@@ -670,10 +679,10 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
 
     if _isEVM(addr) {
         printString("isEVM")
-        _pushEVMFrame(gasSend, isStatic)
-        success := call(gasSend, addr, value, argsOffset, argsSize, 0, 0)
+        _pushEVMFrame(gasToPass, isStatic)
+        success := call(gasToPass, addr, value, argsOffset, argsSize, 0, 0)
         printHex(success)
-        evmGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
+        frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         _popEVMFrame()
         printString("EVM Done")
     }
@@ -681,24 +690,51 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
     // zkEVM native
     if and(iszero(_isEVM(addr)), iszero(isStatic)) {
         printString("is zkEVM")
-        gasSend := _getZkEVMGas(gasSend)
+        gasToPass := _getZkEVMGas(gasToPass)
         let zkevmGasBefore := gas()
-        success := call(gasSend, addr, value, argsOffset, argsSize, retOffset, retSize)
+        success := call(gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
         _saveReturndataAfterZkEVMCall()
         let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
 
-        evmGasLeft := 0
-        if gt(gasSend, gasUsed) {
-            evmGasLeft := sub(gasSend, gasUsed)
+        if gt(gasToPass, gasUsed) {
+            frameGasLeft := sub(gasToPass, gasUsed)
         }
         printString("zkEVM Done")
     }
 
     sp := pushStackItem(sp,success)
+}
 
-    // TODO: dynamicGas := add(dynamicGas,codeExecutionCost) how to do this?
-    // Check if the following is ok
-    dynamicGas := add(dynamicGas,gasSend)
+function _getMessageCallGas (
+    _value,
+    _gas,
+    _gasLeft,
+    _memoryCost,
+    _extraGas
+) -> gasPlusExtra, gasPlusStipend {
+    let callStipend := 2300
+    if iszero(_value) {
+        callStipend := 0
+    }
+
+    switch lt(_gasLeft, add(_extraGas, _memoryCost))
+        case 0
+        {
+            let _gasTemp := sub(sub(_gasLeft, _extraGas), _memoryCost)
+            // From the Tangerine Whistle fork, gas is capped at all but one 64th (remaining_gas / 64)
+            // of the remaining gas of the current context. If a call tries to send more, the gas is 
+            // changed to match the maximum allowed.
+            let maxGasToPass := sub(_gasTemp, shr(6, _gasTemp)) // _gas >> 6 == _gas/64
+            if gt(_gas, maxGasToPass) {
+                _gas := maxGasToPass
+            }
+            gasPlusExtra := add(_gas, _extraGas)
+            gasPlusStipend := add(_gas, callStipend)
+        }
+        default {
+            gasPlusExtra := add(_gas, _extraGas)
+            gasPlusStipend := add(_gas, callStipend)
+        }
 }
 
 function _performStaticCall(
