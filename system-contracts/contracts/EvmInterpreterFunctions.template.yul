@@ -192,6 +192,7 @@ function _getRawCodeHash(account) -> hash {
 }
 
 // Basically performs an extcodecopy, while returning the length of the bytecode.
+// it is not an actual extcodecopy, since the first 32bytes are skipped
 function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
     let codeHash := _getRawCodeHash(addr)
 

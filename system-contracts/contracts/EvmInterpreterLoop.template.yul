@@ -403,8 +403,9 @@ for { } true { } {
         // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
         // if a contract is created it works, but if the address is a zkSync's contract
         // what happens?
-
-        sp := pushStackItem(sp, _fetchDeployedCodeLen(addr))
+        switch _isEVM(addr) 
+            case 0  { sp := pushStackItem(sp, extcodesize(addr)) }
+            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr)) }
     }
     case 0x3C { // OP_EXTCODECOPY
         let addr, dest, offset, len
@@ -425,6 +426,7 @@ for { } true { } {
             default {
                 dynamicGas := 2600
             }
+
         dynamicGas := add(dynamicGas, add(mul(3, shr(5, add(len, 31))), expandMemory(add(offset, len))))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
