@@ -87,7 +87,6 @@ async function main() {
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
-      console.log(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
       console.log("Waiting for server to start up");
@@ -124,7 +123,7 @@ main()
 
 async function waitForServer(provider: Provider) {
   let iter = 0;
-  while (iter < 30) {
+  while (iter < 60) {
     try {
       await provider.getBlockNumber();
       return;
