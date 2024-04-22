@@ -150,8 +150,8 @@
     "contractName": "EcPairing",
     "bytecodePath": "contracts-preprocessed/precompiles/artifacts/EcPairing.yul.zbin",
     "sourceCodePath": "contracts-preprocessed/precompiles/EcPairing.yul",
-    "bytecodeHash": "0x01000f1b5858675c73d8ce3734631eb38256defa2190dec62bc192726096dd99",
-    "sourceCodeHash": "0x53e1cb4517d72e5f28c634f400d3b3ddceb5cc253da7eca39dcd6deb1ce523f1"
+    "bytecodeHash": "0x01000f1b3432a32f9fba2115f5dd3b0ee8127e7bf2c609d57d3e231f19119c43",
+    "sourceCodeHash": "0x149f025b222369ab65b9995a6d61df8b557b23f8b52a05f21dc2164839befb18"
   },
   {
     "contractName": "Ecrecover",
