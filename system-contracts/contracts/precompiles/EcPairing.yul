@@ -135,21 +135,21 @@ object "EcPairing" {
                 ret := 0xc0
             }
 
-			// HELPER FUNCTIONS
+            // HELPER FUNCTIONS
 
-			/// @dev Executes the `precompileCall` opcode.
-			function precompileCall(precompileParams, gasToBurn) -> ret {
-				// Compiler simulation for calling `precompileCall` opcode
-				ret := verbatim_2i_1o("precompile", precompileParams, gasToBurn)
-			}
+            /// @dev Executes the `precompileCall` opcode.
+            function precompileCall(precompileParams, gasToBurn) -> ret {
+                // Compiler simulation for calling `precompileCall` opcode
+                ret := verbatim_2i_1o("precompile", precompileParams, gasToBurn)
+            }
 
             /// @notice Burns remaining gas until revert.
             /// @dev This function is used to burn gas in the case of a failed precompile call.
-			function burnGas() {
-				// Precompiles that do not have a circuit counterpart
-				// will burn the provided gas by calling this function.
-				precompileCall(0, gas())
-		  	}
+            function burnGas() {
+                // Precompiles that do not have a circuit counterpart
+                // will burn the provided gas by calling this function.
+                precompileCall(0, gas())
+            }
 
             /// @notice Calculate the bit length of a number.
             /// @param x The number to calculate the bit length of.
@@ -374,7 +374,7 @@ object "EcPairing" {
             /// @param x The x coordinate of the point in Montgomery form.
             /// @param y The y coordinate of the point in Montgomery form.
             /// @return ret True if the point is on the curve, false otherwise.
-			function g1AffinePointIsOnCurve(x, y) -> ret {
+            function g1AffinePointIsOnCurve(x, y) -> ret {
                 let ySquared := montgomeryMul(y, y)
                 let xSquared := montgomeryMul(x, x)
                 let xQubed := montgomeryMul(xSquared, x)
@@ -385,21 +385,21 @@ object "EcPairing" {
 
             // G2
 
-			/// @notice Converts a G2 point in affine coordinates to projective coordinates.
-			/// @dev Both input and output coordinates are encoded in Montgomery form.
+            /// @notice Converts a G2 point in affine coordinates to projective coordinates.
+            /// @dev Both input and output coordinates are encoded in Montgomery form.
             /// @dev If x or y differ from 0, just add z = (1,0).
             /// @dev If x and y are equal to 0, then P is the infinity point, and z = (0,0).
             /// @param xp0, xp1 The x coordinate to transform.
             /// @param yp0, yp1 The y coordinate to transform.
             /// @return xr0, xr1, yr0, yr1, zr0, zr1 The projective coordinates of the given G2 point.
-			function g2ProjectiveFromAffine(xp0, xp1, yp0, yp1) -> xr0, xr1, yr0, yr1, zr0, zr1 {
-				xr0 := xp0
-				xr1 := xp1
-				yr0 := yp0
-				yr1 := yp1
-				zr0 := MONTGOMERY_ONE()
-				zr1 := 0
-			}
+            function g2ProjectiveFromAffine(xp0, xp1, yp0, yp1) -> xr0, xr1, yr0, yr1, zr0, zr1 {
+                xr0 := xp0
+                xr1 := xp1
+                yr0 := yp0
+                yr1 := yp1
+                zr0 := MONTGOMERY_ONE()
+                zr1 := 0
+            }
 
             /// @notice Checks if a G2 point in affine coordinates is the point at infinity.
             /// @dev The coordinates are encoded in Montgomery form.
@@ -1322,7 +1322,7 @@ object "EcPairing" {
                 c00, c01 := fp2Mul(a00, a01, g00, g01)
             }
 
-			// PAIRING FUNCTIONS
+            // PAIRING FUNCTIONS
 
             /// @notice Computes the double of a G2 point and its tangent line.
             /// @dev The point is in projective coordinates.
@@ -1334,7 +1334,7 @@ object "EcPairing" {
             /// @return yt0, yt1 The coefficients of the Fp2 X coordinate of T = 2Q.
             /// @return zt0, zt1 The coefficients of the Fp2 X coordinate of T = 2Q.
             /// @return l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51 The coefficients of the tangent line to Q.
-			function doubleStep(xq0, xq1, yq0, yq1, zq0, zq1) -> l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, xt0, xt1, yt0, yt1, zt0, zt1 {
+            function doubleStep(xq0, xq1, yq0, yq1, zq0, zq1) -> l00, l01, l10, l11, l20, l21, l30, l31, l40, l41, l50, l51, xt0, xt1, yt0, yt1, zt0, zt1 {
                 let zero := 0
                 let twoInv := MONTGOMERY_TWO_INV()
                 let t00, t01 := fp2Mul(xq0, xq1, yq0, yq1)
@@ -1633,30 +1633,30 @@ object "EcPairing" {
 
             // FALLBACK
 
-		  	let inputSize := calldatasize()
+            let inputSize := calldatasize()
 
-			// Empty input is valid and results in returning one.
-		  	if eq(inputSize, 0) {
-				mstore(0, 1)
-				return(0, 32)
-			}
+            // Empty input is valid and results in returning one.
+            if eq(inputSize, 0) {
+                mstore(0, 1)
+                return(0, 32)
+            }
 
-			// If the input length is not a multiple of 192, the call fails.
+            // If the input length is not a multiple of 192, the call fails.
             if mod(inputSize, PAIR_LENGTH()) {
                 // Bad pairing input
-				burnGas()
+                burnGas()
             }
 
             let r000, r001, r010, r011, r020, r021, r100, r101, r110, r111, r120, r121 := FP12_ONE()
 
-			// Calldata "parsing"
-			for { let i := 0 } lt(i, inputSize) { i := add(i, PAIR_LENGTH()) } {
-				/* G1 */
-				calldatacopy(i, i, 32) // x
-				calldatacopy(add(i, 32), add(i, 32), 32) // y
+            // Calldata "parsing"
+            for { let i := 0 } lt(i, inputSize) { i := add(i, PAIR_LENGTH()) } {
+                /* G1 */
+                calldatacopy(i, i, 32) // x
+                calldatacopy(add(i, 32), add(i, 32), 32) // y
 
-				let g1_x := mload(i)
-				let g1_y := mload(add(i, 32))
+                let g1_x := mload(i)
+                let g1_y := mload(add(i, 32))
 
                 if iszero(and(coordinateIsOnFieldOrder(g1_x), coordinateIsOnFieldOrder(g1_y))) {
                     burnGas()
@@ -1667,25 +1667,25 @@ object "EcPairing" {
 
                 let g1IsInfinity := g1AffinePointIsInfinity(g1_x, g1_y)
 
-				if and(iszero(g1IsInfinity), iszero(g1AffinePointIsOnCurve(g1_x, g1_y))) {
-					burnGas()
-				}
+                if and(iszero(g1IsInfinity), iszero(g1AffinePointIsOnCurve(g1_x, g1_y))) {
+                    burnGas()
+                }
 
-				/* G2 */
-				let g2_x1_offset := add(i, 64)
-				let g2_x0_offset := add(i, 96)
-				let g2_y1_offset := add(i, 128)
-				let g2_y0_offset := add(i, 160)
+                /* G2 */
+                let g2_x1_offset := add(i, 64)
+                let g2_x0_offset := add(i, 96)
+                let g2_y1_offset := add(i, 128)
+                let g2_y0_offset := add(i, 160)
 
-				calldatacopy(g2_x1_offset, g2_x1_offset, 32)
-				calldatacopy(g2_x0_offset, g2_x0_offset, 32)
-				calldatacopy(g2_y1_offset, g2_y1_offset, 32)
-				calldatacopy(g2_y0_offset, g2_y0_offset, 32)
+                calldatacopy(g2_x1_offset, g2_x1_offset, 32)
+                calldatacopy(g2_x0_offset, g2_x0_offset, 32)
+                calldatacopy(g2_y1_offset, g2_y1_offset, 32)
+                calldatacopy(g2_y0_offset, g2_y0_offset, 32)
 
-				let g2_x1 := mload(g2_x1_offset)
-				let g2_x0 := mload(g2_x0_offset)
-				let g2_y1 := mload(g2_y1_offset)
-				let g2_y0 := mload(g2_y0_offset)
+                let g2_x1 := mload(g2_x1_offset)
+                let g2_x0 := mload(g2_x0_offset)
+                let g2_y1 := mload(g2_y1_offset)
+                let g2_y0 := mload(g2_y0_offset)
 
                 if iszero(and(coordinateIsOnFieldOrder(g2_x0), coordinateIsOnFieldOrder(g2_x1))) {
                     burnGas()
@@ -1706,11 +1706,11 @@ object "EcPairing" {
 
                 if iszero(g2IsInSubGroup(g2_x0,g2_x1, g2_y0, g2_y1, MONTGOMERY_ONE(), 0)) {
                     burnGas()
-				}
+                }
 
                 if iszero(g2AffinePointIsOnCurve(g2_x0, g2_x1, g2_y0, g2_y1)) {
-					burnGas()
-				}
+                    burnGas()
+                }
 
                 // We must continue if g1 is the point at infinity after validating both g1 and g2
                 // That's why although knowing this before parsing and validating g2 we check it later.
@@ -1722,7 +1722,7 @@ object "EcPairing" {
                 let f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121 := millerLoop(g2_x0, g2_x1, g2_y0, g2_y1, g1_x, g1_y)
 
                 r000, r001, r010, r011, r020, r021, r100, r101, r110, r111, r120, r121 := fp12Mul(r000, r001, r010, r011, r020, r021, r100, r101, r110, r111, r120, r121, f000, f001, f010, f011, f020, f021, f100, f101, f110, f111, f120, f121)
-			}
+            }
 
             r000, r001, r010, r011, r020, r021, r100, r101, r110, r111, r120, r121 := finalExponentiation(r000, r001, r010, r011, r020, r021, r100, r101, r110, r111, r120, r121)
 
@@ -1737,7 +1737,7 @@ object "EcPairing" {
             }
 
             mstore(0, 0)
-			return(0, 32)
-		}
-	}
+            return(0, 32)
+        }
+    }
 }
