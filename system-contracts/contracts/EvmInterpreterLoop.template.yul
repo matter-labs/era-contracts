@@ -1189,6 +1189,20 @@ for { } true { } {
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
     }
+    case 0xF1 { // OP_CALL
+        let dynamicGas
+        // A function was implemented in order to avoid stack depth errors.
+        dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
+
+        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+    }
+    case 0xFA { // OP_STATICCALL
+        let dynamicGas
+        // A function was implemented in order to avoid stack depth errors.
+        dynamicGas, sp := performCall(sp, evmGasLeft, false)
+
+        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+    }
     case 0xF3 { // OP_RETURN
         let offset,size
 
