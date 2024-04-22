@@ -123,18 +123,17 @@ main()
 async function waitForServer(provider: Provider) {
   let iter = 0;
   while (iter < 30) {
-      try {
-          await provider.getBlockNumber();
-          await sleep(2);
-          iter += 1;
-      } catch (_) {
-          // When exception happens, we assume that server died.
-          return;
-      }
+    try {
+      await provider.getBlockNumber();
+      await sleep(2);
+      iter += 1;
+    } catch (_) {
+      // When exception happens, we assume that server died.
+      return;
+    }
   }
   // It's going to panic anyway, since the server is a singleton entity, so better to exit early.
   throw new Error("Server didn't stop after a kill request");
-
 }
 
 async function sleep(seconds: number) {
