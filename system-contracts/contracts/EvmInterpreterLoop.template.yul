@@ -400,7 +400,11 @@ for { } true { } {
                 evmGasLeft := chargeGas(evmGasLeft, 2600)
             }
 
-        sp := pushStackItem(sp, extcodesize(addr))
+        // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+        // if a contract is created it works, but if the address is a zkSync's contract
+        // what happens?
+
+        sp := pushStackItem(sp, _fetchDeployedCodeLen(addr))
     }
     case 0x3C { // OP_EXTCODECOPY
         let addr, dest, offset, len

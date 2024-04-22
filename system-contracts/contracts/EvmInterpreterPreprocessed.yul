@@ -289,6 +289,24 @@ object "EVMInterpreter" {
             returndatacopy(_offset, 32, _len)
         }
         
+        // Returns the length of the bytecode.
+        function _fetchDeployedCodeLen(addr) -> codeLen {
+            let codeHash := _getRawCodeHash(addr)
+        
+            mstore(0, codeHash)
+        
+            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+        
+            if iszero(success) {
+                // This error should never happen
+                revert(0, 0)
+            }
+        
+            // The first word is the true length of the bytecode
+            returndatacopy(0, 0, 32)
+            codeLen := mload(0)
+        }
+        
         function getDeployedBytecode() {
             let codeLen := _fetchDeployedCode(
                 getCodeAddress(),
@@ -667,6 +685,7 @@ object "EVMInterpreter" {
                     _gasLeft := mload(0)
                     returndatacopy(_outputOffset, 32, _outputLen)
                     mstore(lastRtSzOffset, sub(rtsz, 32))
+        
                     // Skip the returnData
                     ptrAddIntoActive(32)
                 }
@@ -745,6 +764,7 @@ object "EVMInterpreter" {
                 printString("isEVM")
                 _pushEVMFrame(gasSend, isStatic)
                 success := call(gasSend, addr, value, argsOffset, argsSize, 0, 0)
+                printHex(success)
                 evmGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                 _popEVMFrame()
                 printString("EVM Done")
@@ -1267,6 +1287,83 @@ object "EVMInterpreter" {
                 case 0x3A { // OP_GASPRICE
                     sp := pushStackItem(sp, gasprice())
                     evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x3B { // OP_EXTCODESIZE
+                    let addr
+                    addr, sp := popStackItem(sp)
+            
+                    // Check if its warm or cold
+                    switch warmAddress(addr)
+                        case true {
+                            evmGasLeft := chargeGas(evmGasLeft, 100)
+                        }
+                        default {
+                            evmGasLeft := chargeGas(evmGasLeft, 2600)
+                        }
+            
+                    // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+                    // if a contract is created it works, but if the address is a zkSync's contract
+                    // what happens?
+            
+                    sp := pushStackItem(sp, _fetchDeployedCodeLen(addr))
+                }
+                case 0x3C { // OP_EXTCODECOPY
+                    let addr, dest, offset, len
+                    addr, sp := popStackItem(sp)
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+            
+                    // Check if its warm or cold
+                    // minimum_word_size = (size + 31) / 32
+                    // static_gas = 0
+                    // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+                    let dynamicGas
+                    switch warmAddress(addr)
+                        case true {
+                            dynamicGas := 100
+                        }
+                        default {
+                            dynamicGas := 2600
+                        }
+                    dynamicGas := add(dynamicGas, add(mul(3, shl(5, add(len, 31))), expandMemory(add(offset, len))))
+                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+            
+                    // TODO: Check if Zeroing out the memory is necessary
+                    let _lastByte := add(dest, len)
+                    for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
+                        mstore8(i, 0)
+                    }
+                    // Gets the code from the addr
+                    pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+                }
+                case 0x3D { // OP_RETURNDATASIZE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+                    sp := pushStackItem(sp, rdz)
+                }
+                case 0x3E { // OP_RETURNDATACOPY
+                    let dest, offset, len
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+            
+            
+                    // TODO: check if these conditions are met
+                    // The addition offset + size overflows.
+                    // offset + size is larger than RETURNDATASIZE.
+                    if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+                        revert(0, 0)
+                    }
+                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), len))
+            
+                    // minimum_word_size = (size + 31) / 32
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    // static_gas = 0
+                    let dynamicGas := add(mul(6, shl(add(len, 31), 5)), expandMemory(add(offset, len)))
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+            
+                    copyActivePtrData(add(MEM_OFFSET_INNER(), dest), add(MEM_OFFSET_INNER(), offset), len)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     let blockNumber
@@ -2287,6 +2384,24 @@ object "EVMInterpreter" {
                 returndatacopy(_offset, 32, _len)
             }
             
+            // Returns the length of the bytecode.
+            function _fetchDeployedCodeLen(addr) -> codeLen {
+                let codeHash := _getRawCodeHash(addr)
+            
+                mstore(0, codeHash)
+            
+                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            
+                if iszero(success) {
+                    // This error should never happen
+                    revert(0, 0)
+                }
+            
+                // The first word is the true length of the bytecode
+                returndatacopy(0, 0, 32)
+                codeLen := mload(0)
+            }
+            
             function getDeployedBytecode() {
                 let codeLen := _fetchDeployedCode(
                     getCodeAddress(),
@@ -2665,6 +2780,7 @@ object "EVMInterpreter" {
                         _gasLeft := mload(0)
                         returndatacopy(_outputOffset, 32, _outputLen)
                         mstore(lastRtSzOffset, sub(rtsz, 32))
+            
                         // Skip the returnData
                         ptrAddIntoActive(32)
                     }
@@ -2743,6 +2859,7 @@ object "EVMInterpreter" {
                     printString("isEVM")
                     _pushEVMFrame(gasSend, isStatic)
                     success := call(gasSend, addr, value, argsOffset, argsSize, 0, 0)
+                    printHex(success)
                     evmGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
                     _popEVMFrame()
                     printString("EVM Done")
@@ -3280,6 +3397,83 @@ object "EVMInterpreter" {
                 case 0x3A { // OP_GASPRICE
                     sp := pushStackItem(sp, gasprice())
                     evmGasLeft := chargeGas(evmGasLeft, 2)
+                }
+                case 0x3B { // OP_EXTCODESIZE
+                    let addr
+                    addr, sp := popStackItem(sp)
+            
+                    // Check if its warm or cold
+                    switch warmAddress(addr)
+                        case true {
+                            evmGasLeft := chargeGas(evmGasLeft, 100)
+                        }
+                        default {
+                            evmGasLeft := chargeGas(evmGasLeft, 2600)
+                        }
+            
+                    // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+                    // if a contract is created it works, but if the address is a zkSync's contract
+                    // what happens?
+            
+                    sp := pushStackItem(sp, _fetchDeployedCodeLen(addr))
+                }
+                case 0x3C { // OP_EXTCODECOPY
+                    let addr, dest, offset, len
+                    addr, sp := popStackItem(sp)
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+            
+                    // Check if its warm or cold
+                    // minimum_word_size = (size + 31) / 32
+                    // static_gas = 0
+                    // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+                    let dynamicGas
+                    switch warmAddress(addr)
+                        case true {
+                            dynamicGas := 100
+                        }
+                        default {
+                            dynamicGas := 2600
+                        }
+                    dynamicGas := add(dynamicGas, add(mul(3, shl(5, add(len, 31))), expandMemory(add(offset, len))))
+                    evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+            
+                    // TODO: Check if Zeroing out the memory is necessary
+                    let _lastByte := add(dest, len)
+                    for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
+                        mstore8(i, 0)
+                    }
+                    // Gets the code from the addr
+                    pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+                }
+                case 0x3D { // OP_RETURNDATASIZE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+                    let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+                    sp := pushStackItem(sp, rdz)
+                }
+                case 0x3E { // OP_RETURNDATACOPY
+                    let dest, offset, len
+                    dest, sp := popStackItem(sp)
+                    offset, sp := popStackItem(sp)
+                    len, sp := popStackItem(sp)
+            
+            
+                    // TODO: check if these conditions are met
+                    // The addition offset + size overflows.
+                    // offset + size is larger than RETURNDATASIZE.
+                    if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+                        revert(0, 0)
+                    }
+                    checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), len))
+            
+                    // minimum_word_size = (size + 31) / 32
+                    // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+                    // static_gas = 0
+                    let dynamicGas := add(mul(6, shl(add(len, 31), 5)), expandMemory(add(offset, len)))
+                    evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+            
+                    copyActivePtrData(add(MEM_OFFSET_INNER(), dest), add(MEM_OFFSET_INNER(), offset), len)
                 }
                 case 0x40 { // OP_BLOCKHASH
                     let blockNumber

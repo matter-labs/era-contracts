@@ -215,6 +215,24 @@ function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
     returndatacopy(_offset, 32, _len)
 }
 
+// Returns the length of the bytecode.
+function _fetchDeployedCodeLen(addr) -> codeLen {
+    let codeHash := _getRawCodeHash(addr)
+
+    mstore(0, codeHash)
+
+    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    // The first word is the true length of the bytecode
+    returndatacopy(0, 0, 32)
+    codeLen := mload(0)
+}
+
 function getDeployedBytecode() {
     let codeLen := _fetchDeployedCode(
         getCodeAddress(),
