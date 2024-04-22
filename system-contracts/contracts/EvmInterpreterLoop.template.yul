@@ -387,6 +387,79 @@ for { } true { } {
         sp := pushStackItem(sp, gasprice())
         evmGasLeft := chargeGas(evmGasLeft, 2)
     }
+    case 0x3B { // OP_EXTCODESIZE
+        let addr
+        addr, sp := popStackItem(sp)
+
+        // Check if its warm or cold
+        switch warmAddress(addr)
+            case true {
+                evmGasLeft := chargeGas(evmGasLeft, 100)
+            }
+            default {
+                evmGasLeft := chargeGas(evmGasLeft, 2600)
+            }
+
+        sp := pushStackItem(sp, extcodesize(addr))
+    }
+    case 0x3C { // OP_EXTCODECOPY
+        let addr, dest, offset, len
+        addr, sp := popStackItem(sp)
+        dest, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp)
+        len, sp := popStackItem(sp)
+
+        // Check if its warm or cold
+        // minimum_word_size = (size + 31) / 32
+        // static_gas = 0
+        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+        let dynamicGas
+        switch warmAddress(addr)
+            case true {
+                dynamicGas := 100
+            }
+            default {
+                dynamicGas := 2600
+            }
+        dynamicGas := add(dynamicGas, add(mul(3, shl(5, add(len, 31))), expandMemory(add(offset, len))))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+
+        // TODO: Check if Zeroing out the memory is necessary
+        let _lastByte := add(dest, len)
+        for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
+            mstore8(i, 0)
+        }
+        // Gets the code from the addr
+        pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+    }
+    case 0x3D { // OP_RETURNDATASIZE
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+        let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+        sp := pushStackItem(sp, rdz)
+    }
+    case 0x3E { // OP_RETURNDATACOPY
+        let dest, offset, len
+        dest, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp)
+        len, sp := popStackItem(sp)
+
+
+        // TODO: check if this conditions are met
+        // The addition offset + size overflows.
+        // offset + size is larger than RETURNDATASIZE.
+        if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+            revert(0, 0)
+        }
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), len))
+
+        // minimum_word_size = (size + 31) / 32
+        // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+        // static_gas = 0
+        let dynamicGas := add(mul(6, shl(add(len, 31), 5)), expandMemory(add(offset, len)))
+        evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+        returndatacopy(add(MEM_OFFSET_INNER(), offset), add(MEM_OFFSET_INNER(), dest), len)
+    }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
         blockNumber, sp := popStackItem(sp)
