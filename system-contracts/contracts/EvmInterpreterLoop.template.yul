@@ -425,7 +425,7 @@ for { } true { } {
             default {
                 dynamicGas := 2600
             }
-        dynamicGas := add(dynamicGas, add(mul(3, shl(5, add(len, 31))), expandMemory(add(offset, len))))
+        dynamicGas := add(dynamicGas, add(mul(3, shr(5, add(len, 31))), expandMemory(add(offset, len))))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         // TODO: Check if Zeroing out the memory is necessary
@@ -459,7 +459,7 @@ for { } true { } {
         // minimum_word_size = (size + 31) / 32
         // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
         // static_gas = 0
-        let dynamicGas := add(mul(6, shl(add(len, 31), 5)), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(6, shr(add(len, 31), 5)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), add(MEM_OFFSET_INNER(), offset), len)
