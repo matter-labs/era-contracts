@@ -1215,8 +1215,7 @@ for { } true { } {
 
         // A function was implemented in order to avoid stack depth errors.
         frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
-
-        // TODO: dynamicGas := add(dynamicGas,codeExecutionCost) how to do this?
+        
         // Check if the following is ok
         evmGasLeft := chargeGas(evmGasLeft, gasToPay)
         evmGasLeft := add(evmGasLeft, frameGasLeft)
