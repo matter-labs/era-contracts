@@ -739,7 +739,7 @@ function _performStaticCall(
     }
 
     // zkEVM native
-    if not(_calleeIsEVM) {
+    if iszero(_calleeIsEVM) {
         _calleeGas := _getZkEVMGas(_calleeGas)
         let zkevmGasBefore := gas()
         success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
