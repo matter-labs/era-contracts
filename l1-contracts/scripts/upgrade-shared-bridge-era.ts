@@ -89,6 +89,7 @@ async function main() {
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
+      console.log("Waiting for server to start up");
       await waitForServer(l2Provider);
 
       const l2SharedBridge = new ethers.Contract(
@@ -125,11 +126,10 @@ async function waitForServer(provider: Provider) {
   while (iter < 30) {
     try {
       await provider.getBlockNumber();
+      return;
+    } catch (_) {
       await sleep(2);
       iter += 1;
-    } catch (_) {
-      // When exception happens, we assume that server died.
-      return;
     }
   }
   // It's going to panic anyway, since the server is a singleton entity, so better to exit early.
