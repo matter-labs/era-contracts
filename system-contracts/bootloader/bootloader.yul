@@ -705,8 +705,8 @@ object "Bootloader" {
                     // Now, we need to encode the call to the `ContractDeployer.forceDeployOnAddresses()` function.
 
                     // The `mimicCallOnlyResult` requires that the first word of the data
-                    // contains its length. Here it is 324 bytes.
-                    mstore(0, 324)
+                    // contains its length. Here it is 292 bytes.
+                    mstore(0, 292)
                     mstore(32, {{PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR}})
 
                     // The 0x20 offset, for the array of forced deployments
