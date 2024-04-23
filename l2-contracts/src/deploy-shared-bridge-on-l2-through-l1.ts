@@ -54,7 +54,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   deployer: Deployer,
   chainId: string,
   gasPrice: BigNumberish,
-  chainIdHack: boolean = false
+  localLegacyBridgeTesting: boolean = false
 ) {
   if (deployer.verbose) {
     console.log("Deploying L2SharedBridge Implementation");
@@ -71,7 +71,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   const l2SharedBridgeImplAddress = computeL2Create2Address(
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    defaultAbiCoder.encode(["uint256"], [chainIdHack ? 0 : eraChainId]),
+    defaultAbiCoder.encode(["uint256"], [localLegacyBridgeTesting ? 0 : eraChainId]),
     ethers.constants.HashZero
   );
   deployer.addresses.Bridges.L2SharedBridgeImplementation = l2SharedBridgeImplAddress;
@@ -89,7 +89,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
     chainId,
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    defaultAbiCoder.encode(["uint256"], [chainIdHack ? 0 : eraChainId]),
+    defaultAbiCoder.encode(["uint256"], [localLegacyBridgeTesting ? 0 : eraChainId]),
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
     gasPrice,
@@ -183,10 +183,10 @@ export async function deploySharedBridgeOnL2ThroughL1(
   deployer: Deployer,
   chainId: string,
   gasPrice: BigNumberish,
-  chainIdHack: boolean = false
+  localLegacyBridgeTesting: boolean = false
 ) {
   await publishL2SharedBridgeDependencyBytecodesOnL2(deployer, chainId, gasPrice);
-  await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice, chainIdHack);
+  await deploySharedBridgeImplOnL2ThroughL1(deployer, chainId, gasPrice, localLegacyBridgeTesting);
   await deploySharedBridgeProxyOnL2ThroughL1(deployer, chainId, gasPrice);
   await initializeChainGovernance(deployer, chainId);
 }
@@ -227,7 +227,7 @@ async function main() {
         : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
-      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice, cmd.chainIdHack);
+      await deploySharedBridgeOnL2ThroughL1(deployer, chainId, gasPrice, cmd.localLegacyBridgeTesting);
     });
 
   await program.parseAsync(process.argv);
