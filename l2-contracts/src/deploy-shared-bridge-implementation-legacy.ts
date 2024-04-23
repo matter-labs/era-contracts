@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { artifacts } from "hardhat";
 import type { BigNumberish } from "ethers";
 import { ethers, Wallet } from "ethers";
-import { formatUnits, Interface, parseUnits } from "ethers/lib/utils";
+import { formatUnits, Interface, parseUnits, defaultAbiCoder } from "ethers/lib/utils";
 import {
   computeL2Create2Address,
   provider,
@@ -52,7 +52,7 @@ async function create2DeployFromL1(
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     factoryDeps,
     wallet.address,
-    { value: expectedCost, gasPrice }
+    { value: expectedCost.mul(5), gasPrice }
   );
 }
 
@@ -125,7 +125,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, ch
   const l2SharedBridgeImplAddress = computeL2Create2Address(
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    "0x",
+    defaultAbiCoder.encode(["uint256"], [deployer.chainId]),
     ethers.constants.HashZero
   );
   deployer.addresses.Bridges.L2SharedBridgeImplementation = l2SharedBridgeImplAddress;
@@ -143,7 +143,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(deployer: Deployer, ch
     chainId,
     deployer.deployWallet,
     L2_SHARED_BRIDGE_IMPLEMENTATION_BYTECODE,
-    "0x",
+    defaultAbiCoder.encode(["uint256"], [deployer.chainId]),
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
     gasPrice,
