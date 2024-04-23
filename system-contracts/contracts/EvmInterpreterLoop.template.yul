@@ -365,20 +365,22 @@ for { } true { } {
 
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
         // let minWordSize := div(add(len, 31), 32) Used inside the mul
-        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(add(MEM_OFFSET_INNER(), offset), len)))
+        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
-            switch lt(add(offset, i), bytecodeLen)
-                case true {
-                    mstore8(
-                        add(MEM_OFFSET_INNER(), add(dst, i)),
-                        and(mload(add(add(1, BYTECODE_OFFSET()), add(offset, i))), 0xFF)
-                    )
-                }
-                default {
-                    mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
-                }
+        let end := len
+        if lt(bytecodeLen, len) {
+            end := bytecodeLen
+        }
+
+        for { let i := 0 } lt(i, end) { i := add(i, 1) } {
+            mstore8(
+                add(MEM_OFFSET_INNER(), add(dst, i)),
+                shr(248, mload(add(BYTECODE_OFFSET(), add(32, add(offset, i)))))
+            )
+        }
+        for { let i := end } lt(i, len) { i := add(i, 1) } {
+            mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
     }
     case 0x3A { // OP_GASPRICE
@@ -1198,11 +1200,53 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
     }
     case 0xFA { // OP_STATICCALL
-        let dynamicGas
-        // A function was implemented in order to avoid stack depth errors.
-        dynamicGas, sp := performCall(sp, evmGasLeft, false)
+        let addr, argsOffset, argsSize, retOffset, retSize
 
-        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+        addr, sp := popStackItem(sp)
+        addr, sp := popStackItem(sp)
+        argsOffset, sp := popStackItem(sp)
+        argsSize, sp := popStackItem(sp)
+        retOffset, sp := popStackItem(sp)
+        retSize, sp := popStackItem(sp)
+
+        // retOffset, addr := _performStaticCall(
+        //     _isEVM(addr),
+        //     gas(),
+        //     addr,
+        //     add(MEM_OFFSET_INNER(), argsOffset),
+        //     argsSize,
+        //     add(MEM_OFFSET_INNER(), retOffset),
+        //     retSize
+        // )
+
+        let success
+        if _isEVM(addr) {
+            _pushEVMFrame(gas(), true)
+            // TODO Check the following comment from zkSync .sol.
+            // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+            success := staticcall(gas(), addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+
+            pop(_saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize))
+            _popEVMFrame()
+        }
+
+        // zkEVM native
+        if iszero(_isEVM(addr)) {
+            // _calleeGas := _getZkEVMGas(_calleeGas)
+            // let zkevmGasBefore := gas()
+            success := staticcall(gas(), addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
+
+            _saveReturndataAfterZkEVMCall()
+
+            // let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+            // _gasLeft := 0
+            // if gt(_calleeGas, gasUsed) {
+            //     _gasLeft := sub(_calleeGas, gasUsed)
+            // }
+        }
+
+        sp := pushStackItem(sp, success)
     }
     case 0xF3 { // OP_RETURN
         let offset,size
@@ -1216,6 +1260,10 @@ for { } true { } {
 
         returnLen := size
         returnOffset := add(MEM_OFFSET_INNER(), offset)
+        printString("ReturnLen")
+        printHex(returnLen)
+        printString("Return Offset")
+        printHex(returnOffset)
         break
     }
     case 0xFD { // OP_REVERT
