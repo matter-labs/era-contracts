@@ -254,7 +254,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
 
   await tx.wait();
   if (deployer.verbose) {
-    console.log("Setting L1Erc20Bridge data");
+    console.log("Setting L1Erc20Bridge data in shared bridge");
   }
   const sharedBridge = L1SharedBridgeFactory.connect(
     deployer.addresses.Bridges.SharedBridgeProxy,
@@ -266,6 +266,15 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data1);
 
   if (deployer.verbose) {
+    console.log("Initializing l2 bridge in shared bridge");
+  }
+  const data2 = sharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
+    deployer.chainId,
+    deployer.addresses.Bridges.L2SharedBridgeProxy,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2);
+
+  if (deployer.verbose) {
     console.log("Setting validators in hyperchain");
   }
   // we have to set it via the STM
@@ -273,12 +282,12 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.deployWallet
   );
-  const data2 = stm.interface.encodeFunctionData("setValidator", [
+  const data3 = stm.interface.encodeFunctionData("setValidator", [
     deployer.chainId,
     deployer.addresses.ValidatorTimeLock,
     true,
   ]);
-  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data2);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data3);
 
   if (deployer.verbose) {
     console.log("Setting validators in validator timelock");
