@@ -16,3 +16,7 @@ tools/data/Verifier.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*
+l2-contracts/zkout/
+l2-contracts/out/
+l2-contracts/cache_forge/
+l2-contracts/lib/forge-std
