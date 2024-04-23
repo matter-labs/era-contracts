@@ -20,7 +20,7 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { L1SharedBridgeFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE } from "./utils";
+import { ADDRESS_ONE,   getAddressFromEnv} from "./utils";
 import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
@@ -262,6 +262,30 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     deployer.addresses.Bridges.ERC20BridgeProxy,
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data1);
+
+  // adding to validator timelock
+  const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+  const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+  const validatorTimelock = this.validatorTimelock(this.deployWallet);
+  const txRegisterValidator = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
+    gasPrice
+  });
+  const receiptRegisterValidator = await txRegisterValidator.wait();
+  if (this.verbose) {
+    console.log(
+      `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
+        txRegisterValidator.hash
+      }`
+    );
+  }
+
+  const tx3 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
+    gasPrice
+  });
+  const receipt3 = await tx3.wait();
+  if (this.verbose) {
+    console.log(`Validator 2 registered, gas used: ${receipt3.gasUsed.toString()}`);
+  }
 }
 
 async function upgradeL2Bridge(deployer: Deployer) {
