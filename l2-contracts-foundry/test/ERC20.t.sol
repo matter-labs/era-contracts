@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {L2SharedBridge} from "l2-contracts/bridge/L2SharedBridge.sol";
 import {L2StandardERC20} from "l2-contracts/bridge/L2StandardERC20.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -43,7 +43,7 @@ contract ERC20Test is Test {
 
         address l2TokenImplAddress = address(new L2StandardERC20());
         address l2Erc20TokenBeacon = address(new UpgradeableBeacon(l2TokenImplAddress));
-        address beaconProxyAddress = address(new BeaconProxy(l2Erc20TokenBeacon, "0x"));
+        address beaconProxyAddress = address(new BeaconProxy(l2Erc20TokenBeacon, ""));
 
         bytes memory beaconProxyBytecodeHash = beaconProxyAddress.code;
 
