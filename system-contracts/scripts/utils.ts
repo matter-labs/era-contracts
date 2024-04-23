@@ -13,7 +13,7 @@ import type { YulContractDescription, ZasmContractDescription } from "./constant
 import { Language, SYSTEM_CONTRACTS } from "./constants";
 import { getCompilersDir } from "hardhat/internal/util/global-dir";
 import path from "path";
-import { spawn as _spawn, exec } from "child_process";
+import { spawn as _spawn } from "child_process";
 import { createHash } from "crypto";
 import { CompilerDownloader } from "hardhat/internal/solidity/compiler/downloader";
 
@@ -258,7 +258,7 @@ export function prepareCompilerPaths(path: string): CompilerPaths {
 // Get the latest file modification time in the watched folder
 function getLatestModificationTime(folder: string): Date | null {
   const files = fs.readdirSync(folder);
-  let latestTime: Date | null = null;
+  let latestTime: Date | null = null; // Initialize to null to avoid uninitialized variable
 
   files.forEach((file) => {
     const filePath = path.join(folder, file);
@@ -279,7 +279,7 @@ function getLatestModificationTime(folder: string): Date | null {
 }
 
 // Read the last compilation timestamp from the file
-function getLastCompilationTime(timestampFile: string): Date | null {
+export function getLastCompilationTime(timestampFile: string): Date | null {
   try {
     if (fs.existsSync(timestampFile)) {
       const timestamp = fs.readFileSync(timestampFile, "utf-8");
@@ -301,24 +301,20 @@ export function setCompilationTime(timestampFile: string) {
 export function needsRecompilation(folder: string, timestampFile: string): boolean {
   const lastCompilationTime = getLastCompilationTime(timestampFile);
   const latestModificationTime = getLatestModificationTime(folder);
-
-  if (!latestModificationTime || !lastCompilationTime) {
+  if (!lastCompilationTime) {
     return true; // If there's no history, always recompile
   }
 
-  return latestModificationTime > lastCompilationTime;
+  return latestModificationTime! > lastCompilationTime;
 }
 
-export function deleteDir(path: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    exec(`rm -rf ${path}`, (error) => {
-      if (error) {
-        reject(error); // If an error occurs, reject the promise
-      } else {
-        resolve(); // If successful, resolve the promise
-      }
-    });
-  });
+export function deleteDir(path: string): void {
+  try {
+    fs.rmSync(path, { recursive: true, force: true }); // 'recursive: true' deletes all contents, 'force: true' prevents errors if the directory doesn't exist
+    console.log(`Directory '${path}' deleted successfully.`);
+  } catch (error) {
+    console.error(`Error deleting directory '${path}':`, error);
+  }
 }
 
 export async function isFolderEmpty(folderPath: string): Promise<boolean> {
