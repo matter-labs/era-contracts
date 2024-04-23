@@ -264,16 +264,16 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
     deployer.addresses.Bridges.ERC20BridgeProxy,
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data1);
-
-  if (deployer.verbose) {
-    console.log("Initializing l2 bridge in shared bridge");
+  if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
+    if (deployer.verbose) {
+      console.log("Initializing l2 bridge in shared bridge");
+    }
+    const data2 = sharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
+      deployer.chainId,
+      deployer.addresses.Bridges.L2SharedBridgeProxy,
+    ]);
+    await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2);
   }
-  const data2 = sharedBridge.interface.encodeFunctionData("initializeChainGovernance", [
-    deployer.chainId,
-    deployer.addresses.Bridges.L2SharedBridgeProxy,
-  ]);
-  await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2);
-
   if (deployer.verbose) {
     console.log("Setting validators in hyperchain");
   }
