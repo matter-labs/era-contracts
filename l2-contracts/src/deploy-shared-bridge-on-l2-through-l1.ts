@@ -199,7 +199,7 @@ async function main() {
   program
     .option("--private-key <private-key>")
     .option("--chain-id <chain-id>")
-    .option("--chain-id-hack")
+    .option("--local-legacy-bridge-testing")
     .option("--gas-price <gas-price>")
     .option("--nonce <nonce>")
     .option("--erc20-bridge <erc20-bridge>")
