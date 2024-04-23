@@ -356,6 +356,7 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x39 { // OP_CODECOPY
+        printString("CODECOPY")
         let bytecodeLen := mload(BYTECODE_OFFSET())
         let dst, offset, len
 
@@ -382,6 +383,8 @@ for { } true { } {
         for { let i := end } lt(i, len) { i := add(i, 1) } {
             mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
+
+        printHex(mload(add(add(BYTECODE_OFFSET(), offset), 32)))
     }
     case 0x3A { // OP_GASPRICE
         sp := pushStackItem(sp, gasprice())
@@ -1190,10 +1193,15 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
+        printString("CALL")
         let dynamicGas
-        if isStatic {
-            printString("isSTATIC")
-        }
+        switch isStatic
+            case true {
+                printString("isSTATIC")
+            }
+            default {
+                printString("NOT STATIC")
+            }
         // A function was implemented in order to avoid stack depth errors.
         dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
 
@@ -1264,6 +1272,7 @@ for { } true { } {
         printHex(returnLen)
         printString("Return Offset")
         printHex(returnOffset)
+        printHex(mload(returnOffset))
         break
     }
     case 0xFD { // OP_REVERT
@@ -1289,6 +1298,7 @@ for { } true { } {
     // TODO: REST OF OPCODES
     default {
         // TODO: Revert properly here and report the unrecognized opcode
+        printString("INVALID OPCODE")
         sstore(0, opcode)
         return(0, 64)
     }
