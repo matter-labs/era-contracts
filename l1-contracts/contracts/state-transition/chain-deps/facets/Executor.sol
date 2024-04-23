@@ -52,7 +52,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         if (pricingMode == PubdataPricingMode.Validium) {
             // Skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
+            require(_newBatch.pubdataCommitments.length == 1, "v0l");
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
