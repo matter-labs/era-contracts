@@ -380,7 +380,7 @@ export async function depositERC20(
   const neededValue = await bridgehubContract.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, gasPerPubdata);
   const ethIsBaseToken = (await bridgehubContract.baseToken(chainId)) == ADDRESS_ONE;
 
-  await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
+  const deposit = await bridge["deposit(address,address,uint256,uint256,uint256,address)"](
     l2Receiver,
     l1Token,
     amount,
@@ -391,6 +391,7 @@ export async function depositERC20(
       value: ethIsBaseToken ? neededValue : 0,
     }
   );
+  await deposit.wait();
 }
 
 export function buildL2CanonicalTransaction(tx: Partial<L2CanonicalTransaction>): L2CanonicalTransaction {

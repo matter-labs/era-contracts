@@ -65,6 +65,12 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
+  ecPairing: {
+    address: "0x0000000000000000000000000000000000000008",
+    codeName: "EcPairing",
+    lang: Language.Yul,
+    path: "precompiles",
+  },
   bootloader: {
     // Bootloader has EmptyContract code
     address: "0x0000000000000000000000000000000000008001",

@@ -39,8 +39,8 @@ function getPaddedSelector(contractName: string, method: string): string {
   return padZeroRight(result, PADDED_SELECTOR_LENGTH);
 }
 
-function getKeccak256ExpectedHash() {
-  const bytecode = readFileSync("contracts-preprocessed/precompiles/artifacts/Keccak256.yul.zbin");
+function getSystemContextCodeHash() {
+  const bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
   return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
 
@@ -90,7 +90,8 @@ const params = {
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
-  KECCAK256_EXPECTED_CODE_HASH: getKeccak256ExpectedHash(),
+  SYSTEM_CONTEXT_EXPECTED_CODE_HASH: getSystemContextCodeHash(),
+  PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployOnAddresses"),
   // One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent
   // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
   // accoomdate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
