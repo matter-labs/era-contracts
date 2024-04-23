@@ -365,22 +365,20 @@ for { } true { } {
 
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
         // let minWordSize := div(add(len, 31), 32) Used inside the mul
-        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(add(MEM_OFFSET_INNER(), offset), len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        let end := len
-        if lt(bytecodeLen, len) {
-            end := bytecodeLen
-        }
-
-        for { let i := 0 } lt(i, end) { i := add(i, 1) } {
-            mstore8(
-                add(MEM_OFFSET_INNER(), add(dst, i)),
-                shr(248, mload(add(BYTECODE_OFFSET(), add(32, add(offset, i)))))
-            )
-        }
-        for { let i := end } lt(i, len) { i := add(i, 1) } {
-            mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
+        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
+            switch lt(add(offset, i), bytecodeLen)
+                case true {
+                    mstore8(
+                        add(MEM_OFFSET_INNER(), add(dst, i)),
+                        and(mload(add(add(1, BYTECODE_OFFSET()), add(offset, i))), 0xFF)
+                    )
+                }
+                default {
+                    mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
+                }
         }
     }
     case 0x3A { // OP_GASPRICE
@@ -1191,6 +1189,9 @@ for { } true { } {
     }
     case 0xF1 { // OP_CALL
         let dynamicGas
+        if isStatic {
+            printString("isSTATIC")
+        }
         // A function was implemented in order to avoid stack depth errors.
         dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
 
