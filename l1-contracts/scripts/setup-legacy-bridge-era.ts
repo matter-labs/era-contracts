@@ -97,6 +97,10 @@ async function main() {
       // For the server to start up.
       console.log("Waiting for server to start up");
       await waitForServer(l2Provider);
+      console.log("Server started up");
+
+      // Wait a bit more after the server is ready to ensure that all of its components are ready.
+      await sleep(2);
 
       const l2SharedBridge = new ethers.Contract(
         l2SharedBridgeAddress,
