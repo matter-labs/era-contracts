@@ -17,10 +17,10 @@ import type { Deployer } from "./deploy";
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
-import { L1SharedBridgeFactory } from "../typechain";
+import { L1SharedBridgeFactory, StateTransitionManagerFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE,   getAddressFromEnv} from "./utils";
+import { ADDRESS_ONE, getAddressFromEnv } from "./utils";
 import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
@@ -231,7 +231,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   const stateTransitionManager = deployer.stateTransitionManagerContract(deployer.deployWallet);
 
   if (deployer.verbose) {
-    console.log("registering Era in stateTransitionManager");
+    console.log("Registering Era in stateTransitionManager");
   }
   const registerData = stateTransitionManager.interface.encodeFunctionData("registerAlreadyDeployedHyperchain", [
     deployer.chainId,
@@ -240,7 +240,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, registerData);
   const bridgehub = deployer.bridgehubContract(deployer.deployWallet);
   if (deployer.verbose) {
-    console.log("registering Era in Bridgehub");
+    console.log("Registering Era in Bridgehub");
   }
   const tx = await bridgehub.createNewChain(
     deployer.chainId,
@@ -253,7 +253,9 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   );
 
   await tx.wait();
-
+  if (deployer.verbose) {
+    console.log("Setting L1Erc20Bridge data");
+  }
   const sharedBridge = L1SharedBridgeFactory.connect(
     deployer.addresses.Bridges.SharedBridgeProxy,
     deployer.deployWallet
@@ -263,15 +265,34 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data1);
 
+  if (deployer.verbose) {
+    console.log("Setting validators in hyperchain");
+  }
+  // we have to set it via the STM
+  const stm = StateTransitionManagerFactory.connect(
+    deployer.addresses.StateTransition.DiamondProxy,
+    deployer.deployWallet
+  );
+  const data2 = stm.interface.encodeFunctionData("setValidator", [
+    deployer.chainId,
+    deployer.addresses.ValidatorTimeLock,
+    true,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data2);
+
+  if (deployer.verbose) {
+    console.log("Setting validators in validator timelock");
+  }
+
   // adding to validator timelock
   const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
   const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
-  const validatorTimelock = this.validatorTimelock(this.deployWallet);
+  const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
   const txRegisterValidator = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
-    gasPrice
+    gasPrice,
   });
   const receiptRegisterValidator = await txRegisterValidator.wait();
-  if (this.verbose) {
+  if (deployer.verbose) {
     console.log(
       `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
         txRegisterValidator.hash
@@ -280,10 +301,10 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer: Dep
   }
 
   const tx3 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
-    gasPrice
+    gasPrice,
   });
   const receipt3 = await tx3.wait();
-  if (this.verbose) {
+  if (deployer.verbose) {
     console.log(`Validator 2 registered, gas used: ${receipt3.gasUsed.toString()}`);
   }
 }
