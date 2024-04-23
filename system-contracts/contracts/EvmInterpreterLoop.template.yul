@@ -467,7 +467,7 @@ for { } true { } {
         let dynamicGas := add(mul(6, shr(add(len, 31), 5)), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
-        copyActivePtrData(add(MEM_OFFSET_INNER(), dest), add(MEM_OFFSET_INNER(), offset), len)
+        copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
     }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
