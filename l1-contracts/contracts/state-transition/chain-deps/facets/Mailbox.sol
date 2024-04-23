@@ -202,7 +202,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
         });
     }
 
-    ///  @inheritdoc IMailbox
+    /// @inheritdoc IMailbox
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,
@@ -254,7 +254,7 @@ contract MailboxFacet is ZkSyncHyperchainBase, IMailbox {
 
         // Enforcing that `_request.l2GasPerPubdataByteLimit` equals to a certain constant number. This is needed
         // to ensure that users do not get used to using "exotic" numbers for _request.l2GasPerPubdataByteLimit, e.g. 1-2, etc.
-        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the ability to provide the
+        // VERY IMPORTANT: nobody should rely on this constant to be fixed and every contract should give their users the
         // ability to provide `_request.l2GasPerPubdataByteLimit` for each independent transaction.
         // CHANGING THIS CONSTANT SHOULD BE A CLIENT-SIDE CHANGE.
         require(_request.l2GasPerPubdataByteLimit == REQUIRED_L2_GAS_PRICE_PER_PUBDATA, "qp");
