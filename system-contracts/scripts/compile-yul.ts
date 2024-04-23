@@ -1,10 +1,16 @@
 // hardhat import should be the first import in the file
 import type { CompilerPaths } from "./utils";
-import { spawn, compilerLocation, prepareCompilerPaths, getSolcLocation } from "./utils";
+import {
+  spawn,
+  compilerLocation,
+  prepareCompilerPaths,
+  getSolcLocation,
+  needsRecompilation,
+  setCompilationTime,
+} from "./utils";
 import * as fs from "fs";
 import { Command } from "commander";
 import * as _path from "path";
-import { needsRecompilation, setCompilationTime } from "./utils";
 
 const COMPILER_VERSION = "1.3.18";
 const IS_COMPILER_PRE_RELEASE = true;
@@ -40,13 +46,13 @@ async function main() {
     const folderToCheck = _path.join(process.cwd(), BOOTLOADER_DIR);
 
     if (needsRecompilation(folderToCheck, timestampFilePath)) {
-        console.log('Compilation needed.');
-        await compileYulFolder("bootloader/build");
-        await compileYulFolder("bootloader/tests");
-        setCompilationTime(timestampFilePath);
+      console.log("Compilation needed.");
+      await compileYulFolder("bootloader/build");
+      await compileYulFolder("bootloader/tests");
+      setCompilationTime(timestampFilePath);
     } else {
-        console.log('Compilation not needed.');
-        return;
+      console.log("Compilation not needed.");
+      return;
     }
   });
 
@@ -55,14 +61,14 @@ async function main() {
     const folderToCheck = _path.join(process.cwd(), CONTRACTS_DIR);
 
     if (needsRecompilation(folderToCheck, timestampFilePath)) {
-        console.log('Compilation needed.');
-        await compileYulFolder("contracts-preprocessed");
-        await compileYulFolder("contracts-preprocessed/precompiles");
-        await compileYulFolder("contracts-preprocessed/precompiles/test-contracts");
-        setCompilationTime(timestampFilePath);
+      console.log("Compilation needed.");
+      await compileYulFolder("contracts-preprocessed");
+      await compileYulFolder("contracts-preprocessed/precompiles");
+      await compileYulFolder("contracts-preprocessed/precompiles/test-contracts");
+      setCompilationTime(timestampFilePath);
     } else {
-        console.log('Compilation not needed.');
-        return;
+      console.log("Compilation not needed.");
+      return;
     }
   });
 

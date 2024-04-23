@@ -22,13 +22,13 @@ async function preprocess(testMode: boolean) {
   const timestampFilePath = path.join(process.cwd(), TIMESTAMP_FILE);
   const folderToCheck = path.join(process.cwd(), CONTRACTS_DIR);
 
-  if (await isFolderEmpty(OUTPUT_DIR) || needsRecompilation(folderToCheck, timestampFilePath)) {
-      console.log('Preprocessing needed.');
-      await deleteDir('./contracts-preprocessed');
-      setCompilationTime(timestampFilePath);
+  if ((await isFolderEmpty(OUTPUT_DIR)) || needsRecompilation(folderToCheck, timestampFilePath)) {
+    console.log("Preprocessing needed.");
+    await deleteDir("./contracts-preprocessed");
+    setCompilationTime(timestampFilePath);
   } else {
-      console.log('Preprocessing not needed.');
-      return;
+    console.log("Preprocessing not needed.");
+    return;
   }
 
   const contracts = await glob(
