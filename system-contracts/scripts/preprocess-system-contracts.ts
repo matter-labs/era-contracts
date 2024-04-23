@@ -3,7 +3,7 @@ import path from "path";
 import { renderFile } from "template-file";
 import { glob } from "fast-glob";
 import { Command } from "commander";
-import { needsRecompilation, deleteDir, setCompilationTime } from "./utils";
+import { needsRecompilation, deleteDir, setCompilationTime, isFolderEmpty } from "./utils";
 
 const CONTRACTS_DIR = "contracts";
 const OUTPUT_DIR = "contracts-preprocessed";
@@ -22,7 +22,7 @@ async function preprocess(testMode: boolean) {
   const timestampFilePath = path.join(process.cwd(), TIMESTAMP_FILE);
   const folderToCheck = path.join(process.cwd(), CONTRACTS_DIR);
 
-  if (needsRecompilation(folderToCheck, timestampFilePath)) {
+  if (await isFolderEmpty(OUTPUT_DIR) || needsRecompilation(folderToCheck, timestampFilePath)) {
       console.log('Preprocessing needed.');
       await deleteDir('./contracts-preprocessed');
       setCompilationTime(timestampFilePath);

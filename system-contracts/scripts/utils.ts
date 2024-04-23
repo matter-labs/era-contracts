@@ -7,6 +7,7 @@ import type { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { BigNumberish, BytesLike } from "ethers";
 import { BigNumber, ethers } from "ethers";
 import * as fs from "fs";
+import * as fsPr from "fs/promises";
 import { hashBytecode } from "zksync-web3/build/src/utils";
 import type { YulContractDescription, ZasmContractDescription } from "./constants";
 import { Language, SYSTEM_CONTRACTS } from "./constants";
@@ -321,4 +322,14 @@ export function deleteDir (path: string): Promise<void> {
       }
     });
   });
+};
+
+export async function isFolderEmpty (folderPath: string): Promise<boolean> {
+  try {
+    const files = await fsPr.readdir(folderPath); // Get a list of files in the folder
+    return files.length === 0; // If there are no files, the folder is empty
+  } catch (error) {
+    console.error('No target folder with artifacts.');
+    return true; // Return true if an error, as folder doesn't exist.
+  }
 };
