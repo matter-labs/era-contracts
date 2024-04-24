@@ -143,7 +143,7 @@ export async function upgradeToHyperchains1(
   }
 }
 
-// this should be called after the diamond cut has beeen proposed and executed
+// this should be called after the diamond cut has been proposed and executed
 // this simulates the main part of the upgrade, registration into the Bridgehub and STM, and the bridge upgrade
 export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
