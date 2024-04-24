@@ -1,12 +1,14 @@
 // hardhat import should be the first import in the file
 import * as hardhat from "hardhat";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv, ethTestConfig } from "../src.ts/utils";
-import { Interface } from "ethers/lib/utils";
+// import { getNumberFromEnv, getHashFromEnv, getAddressFromEnv } from "../src.ts/utils";
+import { ethTestConfig } from "../src.ts/utils";
+
+// import { Interface } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { Wallet } from "ethers";
 import { web3Provider } from "./utils";
-import { getTokens } from "../src.ts/deploy-token";
+// import { getTokens } from "../src.ts/deploy-token";
 
 const provider = web3Provider();
 
@@ -41,7 +43,7 @@ async function main() {
     ownerAddress: deployWalletAddress,
     verbose: true,
   });
-
+  console.log(deployer);
   // TODO: Restore after switching to hardhat tasks (SMA-1711).
   // promises.push(verifyPromise(addresses.AllowList, [governor]));
 
@@ -59,8 +61,8 @@ async function main() {
   //     promises.push(promise);
   // }
 
-  // const promise1 = verifyPromise(addresses.StateTransition.GenesisUpgrade);
-  // promises.push(promise1);
+  const promise1 = verifyPromise(addresses.StateTransition.GenesisUpgrade);
+  promises.push(promise1);
 
   // const executionDelay = getNumberFromEnv("CONTRACTS_VALIDATOR_TIMELOCK_EXECUTION_DELAY");
   // const eraChainId = getNumberFromEnv("CONTRACTS_ERA_CHAIN_ID");
@@ -131,7 +133,7 @@ async function main() {
   //   },
   // ]);
 
-  // console.log("initCalldata2", 
+  // console.log("initCalldata2",
   //   {
   //     owner: addresses.Governance,
   //     validatorTimelock: addresses.ValidatorTimeLock,
