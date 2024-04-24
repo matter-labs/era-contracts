@@ -10,9 +10,6 @@ for { } true { } {
 
     ip := add(ip, 1)
 
-    printString("OPCODE")
-    printHex(opcode)
-
     switch opcode
     case 0x00 { // OP_STOP
         break
@@ -386,6 +383,85 @@ for { } true { } {
     case 0x3A { // OP_GASPRICE
         sp := pushStackItem(sp, gasprice())
         evmGasLeft := chargeGas(evmGasLeft, 2)
+    }
+    case 0x3B { // OP_EXTCODESIZE
+        let addr
+        addr, sp := popStackItem(sp)
+
+        // Check if its warm or cold
+        switch warmAddress(addr)
+            case true {
+                evmGasLeft := chargeGas(evmGasLeft, 100)
+            }
+            default {
+                evmGasLeft := chargeGas(evmGasLeft, 2600)
+            }
+
+        // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
+        // if a contract is created it works, but if the address is a zkSync's contract
+        // what happens?
+        switch _isEVM(addr) 
+            case 0  { sp := pushStackItem(sp, extcodesize(addr)) }
+            default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr)) }
+    }
+    case 0x3C { // OP_EXTCODECOPY
+        let addr, dest, offset, len
+        addr, sp := popStackItem(sp)
+        dest, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp)
+        len, sp := popStackItem(sp)
+
+        // Check if its warm or cold
+        // minimum_word_size = (size + 31) / 32
+        // static_gas = 0
+        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+        let dynamicGas
+        switch warmAddress(addr)
+            case true {
+                dynamicGas := 100
+            }
+            default {
+                dynamicGas := 2600
+            }
+
+        dynamicGas := add(dynamicGas, add(mul(3, shr(5, add(len, 31))), expandMemory(add(offset, len))))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+
+        // TODO: Check if Zeroing out the memory is necessary
+        let _lastByte := add(dest, len)
+        for {let i := dest} lt(i, _lastByte) { i := add(i, 1) } {
+            mstore8(i, 0)
+        }
+        // Gets the code from the addr
+        pop(_fetchDeployedCode(addr, add(offset, MEM_OFFSET_INNER()), len))
+    }
+    case 0x3D { // OP_RETURNDATASIZE
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+        let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
+        sp := pushStackItem(sp, rdz)
+    }
+    case 0x3E { // OP_RETURNDATACOPY
+        let dest, offset, len
+        dest, sp := popStackItem(sp)
+        offset, sp := popStackItem(sp)
+        len, sp := popStackItem(sp)
+
+
+        // TODO: check if these conditions are met
+        // The addition offset + size overflows.
+        // offset + size is larger than RETURNDATASIZE.
+        if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
+            revert(0, 0)
+        }
+        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), len))
+
+        // minimum_word_size = (size + 31) / 32
+        // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+        // static_gas = 0
+        let dynamicGas := add(mul(6, shr(add(len, 31), 5)), expandMemory(add(offset, len)))
+        evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+
+        copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
     }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
@@ -1117,6 +1193,55 @@ for { } true { } {
 
         evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
     }
+    case 0xFA { // OP_STATICCALL
+        let addr, argsOffset, argsSize, retOffset, retSize
+
+        addr, sp := popStackItem(sp)
+        addr, sp := popStackItem(sp)
+        argsOffset, sp := popStackItem(sp)
+        argsSize, sp := popStackItem(sp)
+        retOffset, sp := popStackItem(sp)
+        retSize, sp := popStackItem(sp)
+
+        // retOffset, addr := _performStaticCall(
+        //     _isEVM(addr),
+        //     gas(),
+        //     addr,
+        //     add(MEM_OFFSET_INNER(), argsOffset),
+        //     argsSize,
+        //     add(MEM_OFFSET_INNER(), retOffset),
+        //     retSize
+        // )
+
+        let success
+        if _isEVM(addr) {
+            _pushEVMFrame(gas(), true)
+            // TODO Check the following comment from zkSync .sol.
+            // We can not just pass all gas here to prevert overflow of zkEVM gas counter
+            success := staticcall(gas(), addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
+
+            pop(_saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize))
+            _popEVMFrame()
+        }
+
+        // zkEVM native
+        if iszero(_isEVM(addr)) {
+            // _calleeGas := _getZkEVMGas(_calleeGas)
+            // let zkevmGasBefore := gas()
+            success := staticcall(gas(), addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
+
+            _saveReturndataAfterZkEVMCall()
+
+            // let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
+
+            // _gasLeft := 0
+            // if gt(_calleeGas, gasUsed) {
+            //     _gasLeft := sub(_calleeGas, gasUsed)
+            // }
+        }
+
+        sp := pushStackItem(sp, success)
+    }
     case 0xF3 { // OP_RETURN
         let offset,size
 
@@ -1154,6 +1279,7 @@ for { } true { } {
     // TODO: REST OF OPCODES
     default {
         // TODO: Revert properly here and report the unrecognized opcode
+        printString("INVALID OPCODE")
         sstore(0, opcode)
         return(0, 64)
     }
