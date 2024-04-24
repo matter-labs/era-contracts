@@ -429,7 +429,6 @@ async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
       deployer.addresses.StateTransition.DiamondProxy,
       requiredValueForL2Tx,
       mailboxCalldata,
-
       printFileName
     );
   }
