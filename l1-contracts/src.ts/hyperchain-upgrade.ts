@@ -264,7 +264,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
       ethers.constants.HashZero,
     ]);
 
-    saveToPrintFile(printFileName, operation);
+    saveToOperationsPrintFile(printFileName, operation);
   } else {
     const tx = await bridgehub.createNewChain(
       deployer.chainId,
@@ -326,7 +326,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
       deployer.chainId,
       validatorOneAddress,
     ]);
-    saveToPrintFile(printFileName, operation);
+    saveToOperationsPrintFile(printFileName, operation);
   } else {
     const txRegisterValidator = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
       gasPrice,
@@ -334,10 +334,11 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
     const receiptRegisterValidator = await txRegisterValidator.wait();
 
     if (deployer.verbose) {
-      const operation = `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
-        txRegisterValidator.hash
-      }`;
-      saveToPrintFile(printFileName, operation);
+      console.log(
+        `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
+          txRegisterValidator.hash
+        }`
+      );
     }
   }
   if (printFileName) {
@@ -345,7 +346,7 @@ async function integrateEraIntoBridgehubAndUpgradeL2SystemContract(
       deployer.chainId,
       validatorTwoAddress,
     ]);
-    saveToPrintFile(printFileName, operation);
+    saveToOperationsPrintFile(printFileName, operation);
   } else {
     const tx3 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
       gasPrice,
@@ -399,7 +400,7 @@ async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
         factoryDeps,
         deployer.deployWallet.address,
       ]);
-      saveToPrintFile(printFileName, operation);
+      saveToOperationsPrintFile(printFileName, operation);
     } else {
       const tx = await hyperchain.requestL2Transaction(
         process.env.CONTRACTS_L2_ERC20_BRIDGE_ADDR,
@@ -495,9 +496,9 @@ async function migrateAssets(deployer: Deployer, printFileName?: string) {
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData, printFileName);
 }
 
-function saveToPrintFile(printFileName: string, operation: OperationOrString) {
+function saveToOperationsPrintFile(printFileName: string, operation: OperationOrString) {
   console.log(operation);
-  const transactions: OperationOrString[] = JSON.parse(fs.readFileSync(printFileName).toString());
+  const transactions: OperationOrString[] = JSON.parse(fs.readFileSync(`${printFileName}/operations.json`).toString());
   transactions.push(operation);
   fs.writeFileSync(printFileName, JSON.stringify(transactions, null, 2));
 }

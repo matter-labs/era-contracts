@@ -464,8 +464,9 @@ export class Deployer {
     };
     if (printFileName) {
       console.log("Operation: ", operation);
-      const transactions: OperationOrString[] = JSON.parse(fs.readFileSync(printFileName).toString());
-      transactions.push(operation);
+      const transactions = JSON.parse(fs.readFileSync(`${printFileName}/transactions.json`).toString());
+      transactions.furtherOperations = transactions.furtherOperations || [];
+      transactions.furtherOperations.push(operation);
       fs.writeFileSync(printFileName, JSON.stringify(transactions, null, 2));
       return;
     }
