@@ -594,6 +594,10 @@ for { } true { } {
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
+        if isStatic {
+            revert(0, 0)
+        }
+
         let key, value,gasSpent
 
         key, sp := popStackItem(sp)
@@ -1145,6 +1149,10 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF5 { // OP_CREATE2
+        if isStatic {
+            revert(0, 0)
+        }
+
         let value, offset, size, salt
 
         value, sp := popStackItem(sp)
