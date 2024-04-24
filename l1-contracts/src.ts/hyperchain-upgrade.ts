@@ -12,7 +12,7 @@ import type { Deployer } from "./deploy";
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
 
-import { L1SharedBridgeFactory, StateTransitionManagerFactory } from "../typechain";
+import { L1SharedBridgeFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
 import { ADDRESS_ONE } from "./utils";
