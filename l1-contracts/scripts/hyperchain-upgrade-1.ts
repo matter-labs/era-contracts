@@ -46,7 +46,7 @@ async function main() {
       const nonce = cmd.nonce ? parseInt(cmd.nonce) : await deployWallet.getTransactionCount();
       console.log(`Using nonce: ${nonce}`);
 
-      const create2Salt = cmd.create2Salt ? cmd.create2Salt : ethers.constants.HashZero;
+      const create2Salt = cmd.create2Salt ? cmd.create2Salt : "0x0000000000000000000000000000000000000000000000000000000000000001";
 
       const deployer = new Deployer({
         deployWallet,

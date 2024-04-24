@@ -97,7 +97,7 @@ export async function upgradeToHyperchains1(
   await tx1.wait();
 
   if (deployer.verbose) {
-    console.log("Initializing l2 bridge in shared bridge");
+    console.log("Initializing l2 bridge in shared bridge",  deployer.addresses.Bridges.L2SharedBridgeProxy);
   }
   const tx2 = await sharedBridge.initializeChainGovernance(
     deployer.chainId,
