@@ -3,12 +3,10 @@
 import * as hardhat from "hardhat";
 
 import "@nomiclabs/hardhat-ethers";
-// import * as path from "path";
 
 import type { BigNumberish } from "ethers";
 import { ethers } from "ethers";
 
-// import { getTokens } from "./deploy-token";
 import type { Deployer } from "./deploy";
 
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
@@ -145,19 +143,14 @@ export async function upgradeToHyperchains1(
   }
 }
 
-// this simulates the main part of the upgrade, the diamond cut, registration into the Bridgehub and STM, and the bridge upgrade
-// before we call this we need to generate the facet cuts using the protocol upgrade tool, on hardhat we test the dummy diamondCut
+// this should be called after the diamond cut has beeen proposed and executed
+// this simulates the main part of the upgrade, registration into the Bridgehub and STM, and the bridge upgrade
 export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
   // upgrading system contracts on Era only adds setChainId in systemContext, does not interfere with anything
   // we first upgrade the DiamondProxy. the Mailbox is backwards compatible, so the L1ERC20 and other bridges should still work.
   // this requires the sharedBridge to be deployed.
   // In theory, the L1SharedBridge deposits should be disabled until the L2Bridge is upgraded.
   // However, without the Portal, UI being upgraded it does not matter (nobody will call it, they will call the legacy bridge)
-  // DELETED: moved to hotWallet
-  // if (deployer.verbose) {
-  //   console.log("Integrating Era into Bridgehub and upgrading L2 system contract");
-  // }
-  // await integrateEraIntoBridgehubAndUpgradeL2SystemContract(deployer, printFileName); // details for L2 system contract upgrade are part of the infrastructure/protocol_upgrade tool
 
   // the L2Bridge and L1ERC20Bridge should be updated relatively in sync, as new messages might not be parsed correctly by the old bridge.
   // however new bridges can parse old messages. L1->L2 messages are faster, so L2 side is upgraded first.
