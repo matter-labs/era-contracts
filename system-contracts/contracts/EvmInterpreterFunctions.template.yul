@@ -215,6 +215,24 @@ function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
     returndatacopy(_offset, 32, _len)
 }
 
+// Returns the length of the bytecode.
+function _fetchDeployedCodeLen(addr) -> codeLen {
+    let codeHash := _getRawCodeHash(addr)
+
+    mstore(0, codeHash)
+
+    let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    // The first word is the true length of the bytecode
+    returndatacopy(0, 0, 32)
+    codeLen := mload(0)
+}
+
 function getDeployedBytecode() {
     let codeLen := _fetchDeployedCode(
         getCodeAddress(),
@@ -579,16 +597,13 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
     loadReturndataIntoActivePtr()
 
     // if (rtsz > 31)
-    printHex(returndatasize())
     switch gt(rtsz, 31)
         case 0 {
             // Unexpected return data.
-            printString("Unexpected return data")
             _gasLeft := 0
             _eraseReturndataPointer()
         }
         default {
-            printString("SHOULD ENTER")
             returndatacopy(0, 0, 32)
             _gasLeft := mload(0)
             returndatacopy(_outputOffset, 32, _outputLen)
@@ -662,7 +677,6 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     let success
 
     if isStatic {
-        printString("Static")
         if not(iszero(value)) {
             revert(0, 0)
         }
@@ -678,18 +692,14 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     }
 
     if _isEVM(addr) {
-        printString("isEVM")
         _pushEVMFrame(gasToPass, isStatic)
         success := call(gasToPass, addr, value, argsOffset, argsSize, 0, 0)
-        printHex(success)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         _popEVMFrame()
-        printString("EVM Done")
     }
 
     // zkEVM native
     if and(iszero(_isEVM(addr)), iszero(isStatic)) {
-        printString("is zkEVM")
         gasToPass := _getZkEVMGas(gasToPass)
         let zkevmGasBefore := gas()
         success := call(gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
@@ -699,7 +709,6 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
         if gt(gasToPass, gasUsed) {
             frameGasLeft := sub(gasToPass, gasUsed)
         }
-        printString("zkEVM Done")
     }
 
     sp := pushStackItem(sp,success)
@@ -757,7 +766,7 @@ function _performStaticCall(
     }
 
     // zkEVM native
-    if not(_calleeIsEVM) {
+    if iszero(_calleeIsEVM) {
         _calleeGas := _getZkEVMGas(_calleeGas)
         let zkevmGasBefore := gas()
         success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
