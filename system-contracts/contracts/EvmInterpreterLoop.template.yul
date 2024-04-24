@@ -294,7 +294,6 @@ for { } true { } {
 
         sp := pushStackItem(sp, balance(addr))
 
-        // TODO: Handle cold/warm slots and updates, etc for gas costs.
         switch wasWarm
         case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
         default { evmGasLeft := chargeGas(evmGasLeft, 100) }
@@ -1296,9 +1295,7 @@ for { } true { } {
 
         invalid()
     }
-    // TODO: REST OF OPCODES
     default {
-        // TODO: Revert properly here and report the unrecognized opcode
         printString("INVALID OPCODE")
         printHex(opcode)
         revert(0, 0)
