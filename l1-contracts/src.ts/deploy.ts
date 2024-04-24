@@ -1,6 +1,7 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 
+import * as fs from "fs";
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
@@ -44,6 +45,14 @@ export interface DeployerConfig {
   bootloaderBytecodeHash?: string;
   defaultAccountBytecodeHash?: string;
 }
+
+export interface Operation {
+  calls: { target: string; value: BigNumberish; data: string }[];
+  predecessor: string;
+  salt: string;
+}
+
+export type OperationOrString = Operation | string;
 
 export class Deployer {
   public addresses: DeployedAddresses;
@@ -446,13 +455,20 @@ export class Deployer {
   }
 
   /// this should be only use for local testing
-  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string) {
+  public async executeUpgrade(targetAddress: string, value: BigNumberish, callData: string, printFileName?: string) {
     const governance = IGovernanceFactory.connect(this.addresses.Governance, this.deployWallet);
     const operation = {
       calls: [{ target: targetAddress, value: value, data: callData }],
       predecessor: ethers.constants.HashZero,
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
+    if (printFileName) {
+      console.log("Operation: ", operation);
+      const transactions: OperationOrString[] = JSON.parse(fs.readFileSync(printFileName).toString());
+      transactions.push(operation);
+      fs.writeFileSync(printFileName, JSON.stringify(transactions, null, 2));
+      return;
+    }
     const scheduleTx = await governance.scheduleTransparent(operation, 0);
     await scheduleTx.wait();
     if (this.verbose) {

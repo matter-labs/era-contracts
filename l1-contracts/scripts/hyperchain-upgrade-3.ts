@@ -24,6 +24,7 @@ async function main() {
     .option("--nonce <nonce>")
     .option("--owner-address <owner-address>")
     .option("--create2-salt <create2-salt>")
+    .option("--print-file-path <file-path>")
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .action(async (cmd) => {
@@ -53,7 +54,7 @@ async function main() {
         verbose: true,
       });
 
-      await upgradeToHyperchains3(deployer);
+      await upgradeToHyperchains3(deployer, cmd.filePath);
     });
 
   await program.parseAsync(process.argv);
