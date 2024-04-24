@@ -188,12 +188,16 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
         }
     }
 
-    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process. 
+    /// @dev transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
     /// @dev Unlike `transferFundsFromLegacy` is provides a concrete limit on the gas used for the transfer and even if it will fail, it will not revert the whole transaction.
-    function safeTransferFundsFromLegacy(address _token, address _target, uint256 _targetChainId, uint256 _gasPerToken) external onlyOwner {
-        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {            
-        } catch {
-            // A reasonable amount of gas will be provided to transfer the token. 
+    function safeTransferFundsFromLegacy(
+        address _token,
+        address _target,
+        uint256 _targetChainId,
+        uint256 _gasPerToken
+    ) external onlyOwner {
+        try this.transferFundsFromLegacy{gas: _gasPerToken}(_token, _target, _targetChainId) {} catch {
+            // A reasonable amount of gas will be provided to transfer the token.
             // If the transfer fails, we don't want to revert the whole transaction.
         }
     }

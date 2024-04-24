@@ -2,18 +2,9 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { Wallet, ethers } from "ethers";
-import { Deployer } from "../src.ts/deploy";
-import { formatUnits, parseUnits, Interface } from "ethers/lib/utils";
-import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
-import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { ethTestConfig, getAddressFromEnv } from "../src.ts/utils";
-import { hashL2Bytecode } from "../../l2-contracts/src/utils";
-import { Provider } from "zksync-web3";
-import beaconProxy = require("../../l2-contracts/artifacts-zk/@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol/BeaconProxy.json");
-import { config } from "chai";
-
-const provider = web3Provider();
+import { web3Url } from "./utils";
+import { ethers } from "ethers";
+import { Provider, utils } from "zksync-ethers";
 
 async function main() {
   const program = new Command();
@@ -21,36 +12,115 @@ async function main() {
   program.version("0.1.0").name("upgrade-shared-bridge-era").description("upgrade shared bridge for era diamond proxy");
 
   program
-    .command('get-confirmed-tokens')
-    .description('Returns the list of tokens that are registered on the bridge and should be migrated')
+    .command("get-confirmed-tokens")
+    .description("Returns the list of tokens that are registered on the bridge and should be migrated")
     .option("--use-l1")
     .option("--start-from-block <startFromBlock>")
     .action(async (cmd) => {
-        const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
-        const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
+      const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+      const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
-        let confirmedFromAPI;
+      let confirmedFromAPI;
 
-        if(cmd.useL1) {
-            const block = cmd.startFromBlock;
-            if(!block) {
-                throw new Error('For L1 the starting block should be provided');
-            }
-
-            console.log('Fetching confirmed tokens from the L1');
-            console.log('This will take a long time');
-
-            const bridge =  (await l2Provider.getDefaultBridgeAddresses()).erc20L1;
-            console.log('Using L1 ERC20 bridge ', bridge);
-
-            const confirmedFromL1 = await loadAllConfirmedTokensFromL1(l1Provider, bridge, +block);
-            console.log(JSON.stringify(confirmedFromL1, null, 2));
-        } else {
-            console.log('Fetching confirmed tokens from the L2 API...');
-            confirmedFromAPI = await loadAllConfirmedTokensFromAPI(l2Provider);
-    
-            console.log(JSON.stringify(confirmedFromAPI, null, 2))    
+      if (cmd.useL1) {
+        const block = cmd.startFromBlock;
+        if (!block) {
+          throw new Error("For L1 the starting block should be provided");
         }
+
+        console.log("Fetching confirmed tokens from the L1");
+        console.log("This will take a long time");
+
+        const bridge = (await l2Provider.getDefaultBridgeAddresses()).erc20L1;
+        console.log("Using L1 ERC20 bridge ", bridge);
+
+        const confirmedFromL1 = await loadAllConfirmedTokensFromL1(l1Provider, bridge, +block);
+        console.log(JSON.stringify(confirmedFromL1, null, 2));
+      } else {
+        console.log("Fetching confirmed tokens from the L2 API...");
+        confirmedFromAPI = await loadAllConfirmedTokensFromAPI(l2Provider);
+
+        console.log(JSON.stringify(confirmedFromAPI, null, 2));
+      }
+    });
+
+  program
+    .command("merge-confirmed-tokens")
+    .description("Merges two lists of confirmed tokens")
+    .option("--from-l1 <tokensFromL1>")
+    .option("--from-l2 <tokensFromL2>")
+    .action(async (cmd) => {
+      const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
+      const bridge = (await l2Provider.getDefaultBridgeAddresses()).erc20L1;
+      console.log("Using L1 ERC20 bridge ", bridge);
+
+      const allTokens = {};
+      const tokensFromL1: string[] = JSON.parse(cmd.fromL1).map((token) => token.toLowerCase());
+      const tokensFromL2: string[] = JSON.parse(cmd.fromL2).map((token) => token.toLowerCase());
+
+      tokensFromL1.forEach((token) => (allTokens[token] = true));
+      tokensFromL2.forEach((token) => (allTokens[token] = true));
+
+      const erc20Abi = ["function balanceOf(address) view returns (uint256)"];
+
+      const result = [];
+
+      const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
+      for (const token of Object.keys(allTokens)) {
+        const contract = new ethers.Contract(token, erc20Abi, l1Provider);
+        const balanceL1 = await contract.balanceOf(bridge);
+        if (balanceL1.gt(0)) {
+          console.log("Token ", token, " has balance in the bridge ", balanceL1.toString());
+          result.push(token);
+        }
+      }
+
+      console.log(JSON.stringify(result, null, 2));
+    });
+
+  program
+    .command("prepare-migration-calldata")
+    .description("Prepare the calldata to be signed by the governance to migrate the funds from the legacy bridge")
+    .option("--tokens-list <tokensList>")
+    .option("--gas-per-token <gasPerToken>")
+    .option("--tokens-per-signature <tokensPerSignature>")
+    .option("--shared-bridge-addr <sharedBridgeAddr>")
+    .option("--legacy-bridge-addr <legacyBridgeAddr>")
+    .option("--era-chain-address <eraChainAddress>")
+    .option("--era-chain-id <eraChainId>")
+    .option("--delay <delay>")
+
+    .action(async (cmd) => {
+      const allTokens: string[] = JSON.parse(cmd.tokensList);
+      // Appending the ETH token to be migrated
+      allTokens.push("0x0000000000000000000000000000000000000001");
+
+      const tokensPerSignature = +cmd.tokensPerSignature;
+
+      const scheduleCalldatas = [];
+      const executeCalldatas = [];
+
+      for (let i = 0; i < allTokens.length; i += tokensPerSignature) {
+        const tokens = allTokens.slice(i, Math.min(i + tokensPerSignature, allTokens.length));
+        const { scheduleCalldata, executeCalldata } = await prepareGovernanceTokenMigrationCall(
+          tokens,
+          cmd.sharedBridgeAddr,
+          cmd.legacyBridgeAddr,
+          cmd.eraChainAddress,
+          cmd.eraChainId,
+          +cmd.gasPerToken,
+          +cmd.delay
+        );
+
+        scheduleCalldatas.push(scheduleCalldata);
+        executeCalldatas.push(executeCalldata);
+      }
+
+      console.log("Schedule operations to sign: ");
+      scheduleCalldatas.forEach((calldata) => console.log(calldata + "\n"));
+
+      console.log("Execute operations to sign: ");
+      executeCalldatas.forEach((calldata) => console.log(calldata + "\n"));
     });
 
   await program.parseAsync(process.argv);
@@ -64,58 +134,87 @@ main()
   });
 
 async function loadAllConfirmedTokensFromAPI(l2Provider: Provider) {
-    const limit = 50;
-    const result = [];
-    let offset = 0;
+  const limit = 50;
+  const result = [];
+  let offset = 0;
 
-    while(true) {
-        const tokens = await l2Provider.getConfirmedTokens(offset, limit);
-        if(tokens.length === 0) {
-            return result;
-        }
-
-        tokens.forEach((token) => result.push(token.l1Address));
-        offset += limit;1
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const tokens = await l2Provider.send("zks_getConfirmedTokens", [offset, limit]);
+    if (!tokens.length) {
+      return result;
     }
+
+    tokens.forEach((token) => result.push(token.l1Address));
+    offset += limit;
+  }
 }
 
 async function loadAllConfirmedTokensFromL1(
-    l1Provider: ethers.providers.JsonRpcProvider,
-    bridgeAddress: string,
-    startBlock: number
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgeAddress: string,
+  startBlock: number
 ) {
-    const blocksRange = 50000;
-    const endBlock = await l1Provider.getBlockNumber();
-    const abi = (await hardhat.artifacts.readArtifact("IL1ERC20Bridge")).abi;
-    const contract = new ethers.Contract(
-        bridgeAddress,
-        abi,
-        l1Provider
-    );
-    const filter = contract.filters.DepositInitiated();
+  const blocksRange = 50000;
+  const endBlock = await l1Provider.getBlockNumber();
+  const abi = (await hardhat.artifacts.readArtifact("IL1ERC20Bridge")).abi;
+  const contract = new ethers.Contract(bridgeAddress, abi, l1Provider);
+  const filter = contract.filters.DepositInitiated();
 
-    const tokens = {};
+  const tokens = {};
 
-    while(true) {
-        console.log('Querying blocks ', startBlock, ' - ', Math.min(startBlock + blocksRange, endBlock));
-        const logs = await l1Provider.getLogs({
-            ...filter,
-            fromBlock: startBlock,
-            toBlock: Math.min(startBlock + blocksRange, endBlock),
-        });
-        const deposits = logs.map(log => contract.interface.parseLog(log));
-        deposits.forEach(dep => {
-            if(!tokens[dep.args.l1Token]) {
-                console.log(dep.args.l1Token, ' found!');
-            }
-            tokens[dep.args.l1Token] = true
-        });
+  while (startBlock <= endBlock) {
+    console.log("Querying blocks ", startBlock, " - ", Math.min(startBlock + blocksRange, endBlock));
+    const logs = await l1Provider.getLogs({
+      ...filter,
+      fromBlock: startBlock,
+      toBlock: Math.min(startBlock + blocksRange, endBlock),
+    });
+    const deposits = logs.map((log) => contract.interface.parseLog(log));
+    deposits.forEach((dep) => {
+      if (!tokens[dep.args.l1Token]) {
+        console.log(dep.args.l1Token, " found!");
+      }
+      tokens[dep.args.l1Token] = true;
+    });
 
-        startBlock += blocksRange;
-        if(startBlock > endBlock) {
-            break;
-        }
-    }
+    startBlock += blocksRange;
+  }
 
-    return Object.keys(tokens);
+  return Object.keys(tokens);
+}
+
+async function prepareGovernanceTokenMigrationCall(
+  tokens: string[],
+  l1SharedBridgeAddr: string,
+  l1LegacyBridgeAddr: string,
+  eraChainAddress: string,
+  eraChainId: number,
+  gasPerToken: number,
+  delay: number
+) {
+  const governanceAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("IGovernance")).abi);
+  const sharedBridgeAbi = new ethers.utils.Interface((await hardhat.artifacts.readArtifact("L1SharedBridge")).abi);
+  const calls = tokens.map((token) => {
+    const target = token == utils.ETH_ADDRESS_IN_CONTRACTS ? eraChainAddress : l1LegacyBridgeAddr;
+
+    return {
+      target: l1SharedBridgeAddr,
+      value: 0,
+      data: sharedBridgeAbi.encodeFunctionData("safeTransferFundsFromLegacy", [token, target, eraChainId, gasPerToken]),
+    };
+  });
+  const governanceOp = {
+    calls,
+    predecessor: ethers.constants.HashZero,
+    salt: ethers.constants.HashZero,
+  };
+
+  const scheduleCalldata = governanceAbi.encodeFunctionData("scheduleTransparent", [governanceOp, delay]);
+  const executeCalldata = governanceAbi.encodeFunctionData("execute", [governanceOp]);
+
+  return {
+    scheduleCalldata,
+    executeCalldata,
+  };
 }
