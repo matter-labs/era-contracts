@@ -649,7 +649,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
         case 0 { dynamicGas := add(dynamicGas,2600) }
         default { dynamicGas := add(dynamicGas,100) }
 
-    if not(iszero(value)) {
+    if value {
         dynamicGas := add(dynamicGas,6700)
         gasSend := add(gasSend,2300)
 
@@ -668,7 +668,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
     let success
 
     if isStatic {
-        if not(iszero(value)) {
+        if value {
             revert(0, 0)
         }
         success, evmGasLeft := _performStaticCall(
@@ -682,7 +682,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> dynamicGas,sp {
         )
     }
 
-    if _isEVM(addr) {
+    if and(_isEVM(addr), iszero(isStatic)) {
         _pushEVMFrame(gasSend, isStatic)
         success := call(gasSend, addr, value, argsOffset, argsSize, 0, 0)
         evmGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
