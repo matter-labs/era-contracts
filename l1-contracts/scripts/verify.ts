@@ -93,7 +93,7 @@ async function main() {
   const initCalldata1 = bridgehub.encodeFunctionData("initialize", [deployWalletAddress]);
   const promise7 = verifyPromise(addresses.Bridgehub.BridgehubProxy, [
     addresses.Bridgehub.BridgehubImplementation,
-    this.addresses.TransparentProxyAdmin,
+    addresses.TransparentProxyAdmin,
     initCalldata1,
   ]);
   promises.push(promise7);
@@ -165,7 +165,7 @@ async function main() {
 
   const promise12 = verifyPromise(addresses.Bridges.SharedBridgeImplementation, [
     l1WethToken,
-    this.addresses.Bridgehub.BridgehubProxy,
+    addresses.Bridgehub.BridgehubProxy,
     eraChainId,
     eraDiamondProxy,
   ]);
