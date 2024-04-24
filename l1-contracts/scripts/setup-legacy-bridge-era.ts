@@ -1,3 +1,9 @@
+/// This script is needed for testing the behavior of the shared bridge on Era chain.
+/// Unlike other chains, Era also contains a legacy ERC20 bridge, which is also supported by the corresponding L2SharedBridge.
+///
+/// This script ensures that the LegacyBridge is set up correctly and that the L2SharedBridge references it correctly too.
+/// IMPORTANT: this script should be only used for local testing.
+
 // hardhat import should be the first import in the file
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
@@ -91,6 +97,10 @@ async function main() {
       // For the server to start up.
       console.log("Waiting for server to start up");
       await waitForServer(l2Provider);
+      console.log("Server started up");
+
+      // Wait a bit more after the server is ready to ensure that all of its components are ready.
+      await sleep(2);
 
       const l2SharedBridge = new ethers.Contract(
         l2SharedBridgeAddress,
