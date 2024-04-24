@@ -10,9 +10,6 @@ for { } true { } {
 
     ip := add(ip, 1)
 
-    printString("OPCODE")
-    printHex(opcode)
-
     switch opcode
     case 0x00 { // OP_STOP
         break
@@ -356,7 +353,6 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x39 { // OP_CODECOPY
-        printString("CODECOPY")
         let bytecodeLen := mload(BYTECODE_OFFSET())
         let dst, offset, len
 
@@ -383,8 +379,6 @@ for { } true { } {
         for { let i := end } lt(i, len) { i := add(i, 1) } {
             mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
-
-        printHex(mload(add(add(BYTECODE_OFFSET(), offset), 32)))
     }
     case 0x3A { // OP_GASPRICE
         sp := pushStackItem(sp, gasprice())
@@ -1193,15 +1187,6 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
-        printString("CALL")
-        let dynamicGas
-        switch isStatic
-            case true {
-                printString("isSTATIC")
-            }
-            default {
-                printString("NOT STATIC")
-            }
         // A function was implemented in order to avoid stack depth errors.
         dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
 
@@ -1268,11 +1253,6 @@ for { } true { } {
 
         returnLen := size
         returnOffset := add(MEM_OFFSET_INNER(), offset)
-        printString("ReturnLen")
-        printHex(returnLen)
-        printString("Return Offset")
-        printHex(returnOffset)
-        printHex(mload(returnOffset))
         break
     }
     case 0xFD { // OP_REVERT
