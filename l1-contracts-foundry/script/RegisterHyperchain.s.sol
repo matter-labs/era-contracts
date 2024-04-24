@@ -76,6 +76,8 @@ contract RegisterHyperchainScript is Script {
         registerHyperchain();
         addValidators();
         configureZkSyncStateTransition();
+
+        saveOutput();
     }
 
     function initializeConfig() internal {
@@ -268,6 +270,7 @@ contract RegisterHyperchainScript is Script {
             revert("Diamond proxy address not found");
         }
         config.addresses.newDiamondProxy = diamondProxyAddress;
+        console.log("Hyperchain diamond proxy deployed at:", diamondProxyAddress);
     }
 
     function addValidators() internal {
@@ -297,5 +300,12 @@ contract RegisterHyperchainScript is Script {
 
         vm.stopBroadcast();
         console.log("ZkSync State Transition configured");
+    }
+
+    function saveOutput() internal {
+        string memory toml = vm.serializeAddress("root", "diamond_proxy_addr", config.addresses.newDiamondProxy);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
+        vm.writeToml(toml, path);
     }
 }
