@@ -191,6 +191,26 @@ function _getRawCodeHash(account) -> hash {
     hash := mload(0)
 }
 
+function _getCodeHash(account) -> hash {
+    // function getCodeHash(uint256 _input) external view override returns (bytes32)
+    // 0xe03fe177
+    // TODO: Unhardcode this selector
+    mstore8(0, 0xe0)
+    mstore8(1, 0x3f)
+    mstore8(2, 0xe1)
+    mstore8(3, 0x77)
+    mstore(4, account)
+
+    let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    hash := mload(0)
+}
+
 // Basically performs an extcodecopy, while returning the length of the bytecode.
 function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
     let codeHash := _getRawCodeHash(addr)
