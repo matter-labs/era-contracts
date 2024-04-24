@@ -38,7 +38,7 @@ object "EcMul" {
 
             /// @notice Constant function for the pre-computation of R^2 % N for the Montgomery REDC algorithm.
             /// @dev R^2 is the Montgomery residue of the value 2^512.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value R^2 modulus the curve field order.
             function R2_MOD_P() -> ret {
@@ -47,7 +47,7 @@ object "EcMul" {
 
             /// @notice Constant function for the pre-computation of N' for the Montgomery REDC algorithm.
             /// @dev N' is a value such that NN' = -1 mod R, with N being the curve field order.
-            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further detals.
+            /// @dev See https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#The_REDC_algorithm for further details.
             /// @dev This value was precomputed using Python.
             /// @return ret The value N'.
             function N_PRIME() -> ret {
@@ -102,7 +102,7 @@ object "EcMul" {
             /// @dev Let `base` be a number in Montgomery Form, then base = a*R mod P() being `a` the base number (not in Montgomery Form)
             /// @dev Let `inv` be the inverse of a number `a` in Montgomery Form, then inv = a^(-1)*R mod P()
             /// @dev The original binary extended euclidean algorithms takes a number a and returns a^(-1) mod N
-            /// @dev In our case N is P(), and we'd like the input and output to be in Montgomery Form (a*R mod P() 
+            /// @dev In our case N is P(), and we'd like the input and output to be in Montgomery Form (a*R mod P()
             /// @dev and a^(-1)*R mod P() respectively).
             /// @dev If we just pass the input as a number in Montgomery Form the result would be a^(-1)*R^(-1) mod P(),
             /// @dev but we want it to be a^(-1)*R mod P().
@@ -242,7 +242,7 @@ object "EcMul" {
             }
 
             /// @notice Computes the Montgomery modular inverse skipping the Montgomery reduction step.
-            /// @dev The Montgomery reduction step is skept because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
+            /// @dev The Montgomery reduction step is skipped because a modification in the binary extended Euclidean algorithm is used to compute the modular inverse.
             /// @dev See the function `binaryExtendedEuclideanAlgorithm` for further details.
             /// @param a The field element in Montgomery form to compute the modular inverse of.
             /// @return invmod The result of the Montgomery modular inverse (in Montgomery form).
@@ -315,7 +315,7 @@ object "EcMul" {
 
             /// @notice Converts a point in affine coordinates to projective coordinates in Montgomery form.
             /// @dev The point at infinity is defined as the point (0, 0, 0).
-            /// @dev For performance reasons, the point is assumed to be previously checked to be on the 
+            /// @dev For performance reasons, the point is assumed to be previously checked to be on the
             /// @dev curve and not the point at infinity.
             /// @param xp The x coordinate of the point P in affine coordinates in Montgomery form.
             /// @param yp The y coordinate of the point P in affine coordinates in Montgomery form.
@@ -415,7 +415,7 @@ object "EcMul" {
 
             if eq(scalar, 2) {
                 let xr, yr, zr := projectiveDouble(xp, yp, zp)
-                
+
                 xr, yr := projectiveIntoAffine(xr, yr, zr)
                 xr := outOfMontgomeryForm(xr)
                 yr := outOfMontgomeryForm(yr)
@@ -455,7 +455,7 @@ object "EcMul" {
                     let u := montgomerySub(u0, u1)
 
                     // t = (yq*zr - yr*zq); u = (xq*zr - xr*zq)
-                    if iszero(or(t, u)) { 
+                    if iszero(or(t, u)) {
                         // P + P = 2P
                         xr, yr, zr := projectiveDouble(xr, yr, zr)
 
@@ -472,7 +472,7 @@ object "EcMul" {
                     let u3 := montgomeryMul(u2, u)
                     let v := montgomeryMul(zq, zr)
                     let w := montgomerySub(montgomeryMul(montgomeryMul(t, t), v), montgomeryMul(u2, montgomeryAdd(u0, u1)))
-    
+
                     xr := montgomeryMul(u, w)
                     yr := montgomerySub(montgomeryMul(t, montgomerySub(montgomeryMul(u0, u2), w)), montgomeryMul(t0, u3))
                     zr := montgomeryMul(u3, v)

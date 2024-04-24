@@ -2,7 +2,6 @@ import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomiclabs/hardhat-ethers";
-import "@nomiclabs/hardhat-solpp";
 import "hardhat-typechain";
 
 // If no network is specified, use the default config
@@ -27,7 +26,7 @@ export default {
     localhost: {
       // era-test-node default url
       url: "http://127.0.0.1:8011",
-      ethNetwork: null,
+      ethNetwork: "localhost",
       zksync: true,
     },
     zkSyncTestnet: {

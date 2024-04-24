@@ -15,7 +15,7 @@ interface ISystemContext {
     }
 
     /// @notice A structure representing the timeline for the upgrade from the batch numbers to the L2 block numbers.
-    /// @dev It will used for the L1 batch -> L2 block migration in Q3 2023 only.
+    /// @dev It will be used for the L1 batch -> L2 block migration in Q3 2023 only.
     struct VirtualBlockUpgradeInfo {
         /// @notice In order to maintain consistent results for `blockhash` requests, we'll
         /// have to remember the number of the batch when the upgrade to the virtual blocks has been done.
@@ -54,4 +54,8 @@ interface ISystemContext {
     function getBatchNumberAndTimestamp() external view returns (uint128 blockNumber, uint128 blockTimestamp);
 
     function getL2BlockNumberAndTimestamp() external view returns (uint128 blockNumber, uint128 blockTimestamp);
+
+    function gasPerPubdataByte() external view returns (uint256 gasPerPubdataByte);
+
+    function getCurrentPubdataSpent() external view returns (uint256 currentPubdataSpent);
 }

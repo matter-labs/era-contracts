@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 /// @author Matter Labs
 interface IL2Bridge {
@@ -10,7 +10,7 @@ interface IL2Bridge {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable;
+    ) external;
 
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external;
 

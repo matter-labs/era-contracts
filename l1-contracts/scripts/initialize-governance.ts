@@ -1,15 +1,15 @@
+// hardhat import should be the first import in the file
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { ethers, Wallet } from "ethers";
-import { Deployer } from "../src.ts/deploy";
+import { Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider } from "./utils";
-
-import * as fs from "fs";
-import * as path from "path";
+import { Deployer } from "../src.ts/deploy";
+import { GAS_MULTIPLIER, web3Provider } from "./utils";
+import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
+import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
-const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
-const ethTestConfig = JSON.parse(fs.readFileSync(`${testConfigPath}/eth.json`, { encoding: "utf-8" }));
 
 async function main() {
   const program = new Command();
@@ -29,48 +29,32 @@ async function main() {
           ).connect(provider);
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
-      const gasPrice = cmd.gasPrice ? parseUnits(cmd.gasPrice, "gwei") : await provider.getGasPrice();
+      const gasPrice = cmd.gasPrice
+        ? parseUnits(cmd.gasPrice, "gwei")
+        : (await provider.getGasPrice()).mul(GAS_MULTIPLIER);
       console.log(`Using gas price: ${formatUnits(gasPrice, "gwei")} gwei`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
 
       const deployer = new Deployer({
         deployWallet,
+        addresses: deployedAddressesFromEnv(),
         ownerAddress,
         verbose: true,
       });
 
-      const governance = deployer.governanceContract(deployWallet);
-      const zkSync = deployer.zkSyncContract(deployWallet);
+      // const governance =
+      deployer.governanceContract(deployWallet);
 
-      const erc20Bridge = deployer.transparentUpgradableProxyContract(
-        deployer.addresses.Bridges.ERC20BridgeProxy,
-        deployWallet
-      );
-      const wethBridge = deployer.transparentUpgradableProxyContract(
-        deployer.addresses.Bridges.WethBridgeProxy,
-        deployWallet
-      );
+      // const erc20Bridge =
+      deployer.transparentUpgradableProxyContract(deployer.addresses.Bridges.ERC20BridgeProxy, deployWallet);
+      // const wethBridge = deployer.transparentUpgradableProxyContract(
+      //   deployer.addresses.Bridges.WethBridgeProxy,
+      //   deployWallet
+      // );
 
-      await (await erc20Bridge.changeAdmin(governance.address)).wait();
-      await (await wethBridge.changeAdmin(governance.address)).wait();
-
-      await (await zkSync.setPendingGovernor(governance.address)).wait();
-
-      const call = {
-        target: zkSync.address,
-        value: 0,
-        data: zkSync.interface.encodeFunctionData("acceptGovernor"),
-      };
-
-      const operation = {
-        calls: [call],
-        predecessor: ethers.constants.HashZero,
-        salt: ethers.constants.HashZero,
-      };
-
-      await (await governance.scheduleTransparent(operation, 0)).wait();
-      await (await governance.execute(operation)).wait();
+      // await (await erc20Bridge.changeAdmin(governance.address)).wait();
+      // await (await wethBridge.changeAdmin(governance.address)).wait();
     });
 
   await program.parseAsync(process.argv);

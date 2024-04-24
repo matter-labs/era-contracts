@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -23,7 +23,7 @@ jobs:
         id: init
         run: |
           yarn
-          echo "release_tag=$(echo ${GITHUB_REF#refs/heads/})-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "release_tag=$(echo ${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}})-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build contracts
         run: |
@@ -42,6 +42,7 @@ jobs:
         with:
           tag_name: ${{ steps.init.outputs.release_tag }}
           fail_on_unmatched_files: true
+          target_commitish: ${{ github.sha }}
           body: ""
           files: |
             l1-contracts.tar.gz
