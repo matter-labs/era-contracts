@@ -623,6 +623,7 @@ function _eraseReturndataPointer() {
 }
 
 function _saveReturndataAfterZkEVMCall() {
+    loadReturndataIntoActivePtr()
     let lastRtSzOffset := LAST_RETURNDATA_SIZE_OFFSET()
 
     mstore(lastRtSzOffset, returndatasize())
