@@ -465,10 +465,11 @@ async function migrateAssets(deployer: Deployer, printFileName?: string) {
     console.log("transferring Eth");
   }
   const sharedBridge = deployer.defaultSharedBridge(deployer.deployWallet);
-  const ethTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
+  const ethTransferData = sharedBridge.interface.encodeFunctionData("safeTransferFundsFromLegacy", [
     ADDRESS_ONE,
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.chainId,
+    300_000,
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData, printFileName);
 
@@ -487,10 +488,11 @@ async function migrateAssets(deployer: Deployer, printFileName?: string) {
   );
   await mintTx.wait();
 
-  const daiTransferData = sharedBridge.interface.encodeFunctionData("transferFundsFromLegacy", [
+  const daiTransferData = sharedBridge.interface.encodeFunctionData("safeTransferFundsFromLegacy", [
     altTokenAddress,
     deployer.addresses.Bridges.ERC20BridgeProxy,
     deployer.chainId,
+    300_000,
   ]);
   // daiTransferData;
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData, printFileName);
