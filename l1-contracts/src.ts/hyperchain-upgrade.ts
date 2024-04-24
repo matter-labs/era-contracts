@@ -415,7 +415,7 @@ async function migrateAssets(deployer: Deployer) {
     ADDRESS_ONE,
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.chainId,
-    300_000
+    300_000,
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, ethTransferData);
 
@@ -438,7 +438,7 @@ async function migrateAssets(deployer: Deployer) {
     altTokenAddress,
     deployer.addresses.Bridges.ERC20BridgeProxy,
     deployer.chainId,
-    300_000
+    300_000,
   ]);
   // daiTransferData;
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);
