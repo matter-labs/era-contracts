@@ -15,7 +15,7 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { L1SharedBridgeFactory, StateTransitionManagerFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, getAddressFromEnv } from "./utils";
+import { ADDRESS_ONE } from "./utils";
 
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -121,26 +121,26 @@ export async function upgradeToHyperchains1(
   }
 
   // adding to validator timelock
-  const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
-  const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
-  const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
+  // const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+  // const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+  // const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
 
-  const tx4 = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
-    gasPrice,
-  });
-  const receiptRegisterValidator = await tx4.wait();
+  // const tx4 = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
+  //   gasPrice,
+  // });
+  // const receiptRegisterValidator = await tx4.wait();
 
-  if (deployer.verbose) {
-    console.log(`Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${tx4.hash}`);
-  }
+  // if (deployer.verbose) {
+  //   console.log(`Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${tx4.hash}`);
+  // }
 
-  const tx5 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
-    gasPrice,
-  });
-  const receipt5 = await tx5.wait();
-  if (deployer.verbose) {
-    console.log(`Validator 2 registered, gas used: ${receipt5.gasUsed.toString()}`);
-  }
+  // const tx5 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
+  //   gasPrice,
+  // });
+  // const receipt5 = await tx5.wait();
+  // if (deployer.verbose) {
+  //   console.log(`Validator 2 registered, gas used: ${receipt5.gasUsed.toString()}`);
+  // }
 }
 
 // this should be called after the diamond cut has been proposed and executed
