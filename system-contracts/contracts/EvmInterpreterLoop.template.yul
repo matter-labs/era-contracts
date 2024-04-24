@@ -106,7 +106,7 @@ for { } true { } {
         sp := pushStackItem(sp, exp(a, exponent))
 
         let expSizeByte := 0
-        if not(iszero(exponent)) {
+        if exponent {
             expSizeByte := div(add(exponent, 256), 256)
         }
 
