@@ -45,9 +45,9 @@ async function main() {
   // TODO: Restore after switching to hardhat tasks (SMA-1711).
   // promises.push(verifyPromise(addresses.AllowList, [governor]));
 
-  // // Proxy
+  // Proxy
   // {
-  //     // Create dummy deployer to get constructor parameters for diamond proxy
+  //     Create dummy deployer to get constructor parameters for diamond proxy
   //     const deployer = new Deployer({
   //         deployWallet: ethers.Wallet.createRandom(),
   //         governorAddress: governor
@@ -59,8 +59,6 @@ async function main() {
   //     promises.push(promise);
   // }
 
-  // Bridges
-
   const promise1 = verifyPromise(addresses.StateTransition.GenesisUpgrade);
   promises.push(promise1);
 
@@ -70,16 +68,8 @@ async function main() {
   promises.push(promise2);
 
   console.log("CONTRACTS_HYPERCHAIN_UPGRADE_ADDR", process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
-  const promise3 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR, [
-    deployWalletAddress,
-    executionDelay,
-    eraChainId,
-  ]);
+  const promise3 = verifyPromise(process.env.CONTRACTS_HYPERCHAIN_UPGRADE_ADDR);
   promises.push(promise3);
-
-  // verified as part of STM
-  // const promise4 = verifyPromise(addresses.StateTransition.Verifier);
-  // promises.push(promise4);
 
   const promise5 = verifyPromise(addresses.TransparentProxyAdmin);
   promises.push(promise5);
@@ -105,13 +95,15 @@ async function main() {
     addresses.StateTransition.GettersFacet,
     addresses.StateTransition.DiamondInit,
     addresses.StateTransition.AdminFacet,
-    addresses.StateTransition.MailboxFacet,
     addresses.StateTransition.ExecutorFacet,
     addresses.StateTransition.Verifier,
   ]) {
     const promise = verifyPromise(address);
     promises.push(promise);
   }
+
+  const promise = verifyPromise(addresses.StateTransition.MailboxFacet, [eraChainId]);
+  promises.push(promise);
 
   const promise8 = verifyPromise(addresses.StateTransition.StateTransitionImplementation, [
     addresses.Bridgehub.BridgehubProxy,
@@ -138,6 +130,7 @@ async function main() {
       protocolVersion,
     },
   ]);
+
   const promise9 = verifyPromise(addresses.StateTransition.StateTransitionProxy, [
     addresses.StateTransition.StateTransitionImplementation,
     addresses.TransparentProxyAdmin,
@@ -145,19 +138,10 @@ async function main() {
   ]);
   promises.push(promise9);
 
-  // bridges
-
+  // // bridges
+  // // Note: do this manually and pass in  to verify:verify the following:  contract:"contracts/bridge/L1ERC20Bridge.sol:L1ERC20Bridge"
   const promise10 = verifyPromise(addresses.Bridges.ERC20BridgeImplementation, [addresses.Bridges.SharedBridgeProxy]);
   promises.push(promise10);
-  const initCalldata3 = new Interface(hardhat.artifacts.readArtifactSync("L1ERC20Bridge").abi).encodeFunctionData(
-    "initialize"
-  );
-  const promise11 = verifyPromise(addresses.Bridges.ERC20BridgeProxy, [
-    addresses.Bridges.ERC20BridgeImplementation,
-    addresses.TransparentProxyAdmin,
-    initCalldata3,
-  ]);
-  promises.push(promise11);
 
   const eraDiamondProxy = getAddressFromEnv("CONTRACTS_ERA_DIAMOND_PROXY_ADDR");
   const tokens = getTokens();

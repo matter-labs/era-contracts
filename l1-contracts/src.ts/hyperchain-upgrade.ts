@@ -104,43 +104,6 @@ export async function upgradeToHyperchains1(
     deployer.addresses.Bridges.L2SharedBridgeProxy
   );
   await tx2.wait();
-
-  if (deployer.verbose) {
-    console.log("Setting validators in hyperchain");
-  }
-  // we have to set it via the STM
-  const stm = StateTransitionManagerFactory.connect(
-    deployer.addresses.StateTransition.DiamondProxy,
-    deployer.deployWallet
-  );
-  const tx3 = await stm.setValidator(deployer.chainId, deployer.addresses.ValidatorTimeLock, true);
-  await tx3.wait();
-
-  if (deployer.verbose) {
-    console.log("Setting validators in validator timelock");
-  }
-
-  // adding to validator timelock
-  // const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
-  // const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
-  // const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
-
-  // const tx4 = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, {
-  //   gasPrice,
-  // });
-  // const receiptRegisterValidator = await tx4.wait();
-
-  // if (deployer.verbose) {
-  //   console.log(`Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${tx4.hash}`);
-  // }
-
-  // const tx5 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, {
-  //   gasPrice,
-  // });
-  // const receipt5 = await tx5.wait();
-  // if (deployer.verbose) {
-  //   console.log(`Validator 2 registered, gas used: ${receipt5.gasUsed.toString()}`);
-  // }
 }
 
 // this should be called after the diamond cut has been proposed and executed
@@ -226,7 +189,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
 
   await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
   await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
-  await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+  // await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
 }
 
 async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
