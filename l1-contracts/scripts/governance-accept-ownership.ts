@@ -116,7 +116,7 @@ main()
 
 async function transferOwnership1StepTo(wallet: ethers.Wallet, contractAddress: string, newOwner: string) {
   const contract = new ethers.Contract(contractAddress, ownable2StepInterface, wallet);
-  console.log("Transfering ownership of contract: ", contractAddress, " to: ", newOwner);
+  console.log("Transferring ownership of contract: ", contractAddress, " to: ", newOwner);
   const tx = await contract.transferOwnership(newOwner);
   console.log("Tx hash", tx.hash);
   await tx.wait();
