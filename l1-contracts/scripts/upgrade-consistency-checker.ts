@@ -15,43 +15,43 @@ import { FacetCut, getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = '0x7315cf22Ffcb7bDb21aAA0D65112fBB4716111A4';
-const validatorTimelockDeployTx = '0x14e27087d35a71861829a7f4ef472cfd0c84f91f87f607f522fc4f88f6c8733b';
-const validatorTimelock = '0x72518E0269E72650243bC98c7Ce9c5b3736B565D';
-const upgradeHyperchains = '0xC04629FC3266F3c1209f31b9ab1176C5f195b312';
-const proxyAdmin = '0xF5c6b1aec9d019cC7Ec5Fc6609D9978617b5E193';
+const genesisUpgrade = '0xDdc72e56A3b90793271FF0EA9a762294f163F992';
+const validatorTimelockDeployTx = '0x1ada4121db6e83bfe38f1f92e31c0931e2f0f2b830429841a7d264c56cceb8b0';
+const validatorTimelock = '0xc47CBbc601dbB65439e7b02B0d19bbA9Dba57442';
+const upgradeHyperchains = '0xc029cE1EB5C61C4a3B2a6EE920bb3B7b026bc00b';
 
-const diamondInit = '0x4f74AbD5df12F80757388d1918E5BB964bee23fF';
+const verifier = '0x82856fED36d36e1d4db24398bC2056C440cB45FC';
+const proxyAdmin = '0xCb7F8e556Ef02771eA32F54e767D6F9742ED31c2';
 
-const bridgeHubImpl = '0xd7edDc9E0FD36650Bb7aD5e928a0c305E3132025';
-const bridgeHub = '0x4dDcec5eCD9B44E900869Eb2696bb57Bc5413582';
+const bridgeHubImpl = '0x22c456Cb8E657bD48e14E9a54CE20169d78CB0F7';
+const bridgeHub = '0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE';
 
-const executorFacet = '0x568018Faa74955146Ea7aebC505a3e28cfCF1DcA';
-const mailboxFacetDeployTx = '0x19b67214f91c2122968fe74d82d90e7d060ea760bcaf6d8db5d1085f9ecd4618';
-const mailboxFacet = '0xe7B9B2048f58AafACD708D2D71348ddbde01da1D';
-const gettersFacet = '0xd11012099Faa1Ce1E746425A550c966d8Df0319F';
-const adminFacet = '0xAe800b0E4148fa63218681611E3058B9d5d0a4fa';
+const executorFacet = '0xd56f4696ecbE9ADc2e1539F5311ae6C92F4B2BAd';
+const adminFacet = '0x21924127192db478faDf6Ae07f57df928EBCA6AE';
+const mailboxFacetDeployTx = '0xad8028a8a1c7fe71e40fb6e32b80f5893b6b26af5475d9a014b9510faf460090';
+const mailboxFacet = '0x445aD49fC6d1845ec774783659aA5351381b0c49';
+const gettersFacet = '0xbF4C2dfBe9E722F0A87E104c3af5780d49872745';
 
-const verifier = '0xd1396F2Ea18EaEBE9b95205dAE3949E837d383D7';
+const diamondInit = '0x17384Fd6Cc64468b69df514A940caC89B602d01c';
 
-const stmImplDeployTx = '0x3ccba9f0285bf51a8b87d7b0c63b7404a07d1d135ffb3d69b085c23404b43c59';
-const stmImpl = '0xc05B2734379A31972a58E52A6D64611bb855Be45';
-const stmDeployTx = '0x15c992fe9392ae99be918472992d2597e162a884cda48d21d38a7205e009b0bb';
-const stm = '0x95416daeF5b50a62Ea5A246be565e9bAFB159683';
+const stmImplDeployTx = '0x6dacf003368a922b9f916393f3c11c869c1f614c16345667cabd1d8b890ec0cb';
+const stmImpl = '0x91E088D2F36500c4826E5623c9C14Dd90912c23E';
+const stmDeployTx = '0x11ceebf3d0b95a4a49f798c937fd3e0085dc01a4e5d497b60b5072b13e58235a';
+const stm = '0x6F03861D12E6401623854E494beACd66BC46e6F0';
 
-const legacyBridgeImplDeployTx = '0xde74e9d2c71c0fe0c908cecbe4ff219cb498496c2e641fe2631c22d597ca19e5';
-const legacyBridgeImpl = '0x7aBB32De60Ed3bFC393f5e956ED0657046c8594e';
+const sharedBridgeImplDeployTx = '0x6dacf003368a922b9f916393f3c11c869c1f614c16345667cabd1d8b890ec0cb';
+const sharedBridgeImpl = '0x91E088D2F36500c4826E5623c9C14Dd90912c23E';
+const sharedBridgeProxy = '0x6F03861D12E6401623854E494beACd66BC46e6F0';
 
-const sharedBridgeImplDeployTx = '0x138c786a9c8e682d4afb325df449282f6fe6926b2b140bc3ad7898e5ef52403c';
-const sharedBridgeImpl = '0x67487118dD9Db5a28e2908F85684cD477d654260';
-const sharedBridgeProxy = '0xA8695C6371ef45DeBcf3bab4de6ca1e39787903F';
+const legacyBridgeImplDeployTx = '0xc0640213aa843f812c44d63723b5dc03064d8e5a32d85e94689e3273df6c3ef5';
+const legacyBridgeImpl = '0x8fE595B3f92AA34962d7A8aF106Fa50A3e4FC6fA';
 
 const expectedL1WethAddress = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9';
 const initialOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
 const expectedOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
 const expectedDelay = 0;
 const eraChainId = 270;
-const expectedSalt = '0x0000000000000000000000000000000000000000000000000000000000000003';
+const expectedSalt = '0x0000000000000000000000000000000000000000000000000000000000000005';
 const expectedHyperchainAddr = '0x6d6e010A2680E2E5a3b097ce411528b36d880EF6';
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = '0x53dc316f108d1b64412be840e0ab89193e94ba6c4af8b9ca57d39ad4d782e0f4';
