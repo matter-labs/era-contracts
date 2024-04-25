@@ -1,3 +1,4 @@
+require("@nomicfoundation/hardhat-foundry");
 import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
 import "@nomicfoundation/hardhat-chai-matchers";

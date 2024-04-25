@@ -49,6 +49,7 @@
     "update-l2-erc20-metadata": "ts-node src/update-l2-erc20-metadata.ts"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
     "dotenv": "^16.0.3",
     "hardhat": "^2.22.3"
   }
