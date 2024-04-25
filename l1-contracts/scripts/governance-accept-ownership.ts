@@ -76,7 +76,6 @@ async function main() {
     .option("--stm-addr <stateTransitionManagerAddr>")
     .option("--l1-shared-bridge-addr <l1SharedBridgeAddr>")
     .option("--bridgehub-addr <bridgehubAddr>")
-    .option("--proxy-admin-addr <proxyAdminAddr>")
     .action(async (cmd) => {
       // Moving ownership for ValidatorTimelock
       const validatorTimelockAddr = ethers.utils.getAddress(cmd.validatorTimelockAddr);
