@@ -120,16 +120,12 @@ object "EVMInterpreter" {
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
 
-            // TALK ABOUT THE DIFFERENCE BETWEEN VERBATIM AND DOING A STATIC CALL.
-            // IN SOLIDITY A STATIC CALL IS REPLACED BY A VERBATIM IF THE ADDRES IS ONE
-            // OF THE ONES IN THE SYSTEM CONTRACT LIST WHATEVER.
-            // IN YUL NO SUCH REPLACEMENTE TAKES PLACE, YOU NEED TO DO THE VERBATIM CALL
-            // MANUALLY.
-
             let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
-            // TODO: Check if caller is not EVM and override evmGasLeft and isStatic with their
-            // appropriate values if so.
+            if iszero(isCallerEVM) {
+                evmGasLeft := getEVMGas()
+                isStatic := getIsStaticFromCallFlags()
+            }
 
             // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
             // segment of memory.
@@ -146,6 +142,8 @@ object "EVMInterpreter" {
                 // Includes gas
                 returnOffset := sub(returnOffset, 32)
                 returnLen := add(returnLen, 32)
+
+                mstore(returnOffset, evmGasLeft)
             }
 
             return(returnOffset, returnLen)
