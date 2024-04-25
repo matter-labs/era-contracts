@@ -106,7 +106,7 @@ for { } true { } {
         sp := pushStackItem(sp, exp(a, exponent))
 
         let expSizeByte := 0
-        if not(iszero(exponent)) {
+        if exponent {
             expSizeByte := div(add(exponent, 256), 256)
         }
 
@@ -593,6 +593,10 @@ for { } true { } {
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
+        if isStatic {
+            revert(0, 0)
+        }
+
         let key, value,gasSpent
 
         key, sp := popStackItem(sp)
@@ -1144,6 +1148,10 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF5 { // OP_CREATE2
+        if isStatic {
+            revert(0, 0)
+        }
+
         let value, offset, size, salt
 
         value, sp := popStackItem(sp)
@@ -1205,16 +1213,6 @@ for { } true { } {
         retOffset, sp := popStackItem(sp)
         retSize, sp := popStackItem(sp)
 
-        // retOffset, addr := _performStaticCall(
-        //     _isEVM(addr),
-        //     gas(),
-        //     addr,
-        //     add(MEM_OFFSET_INNER(), argsOffset),
-        //     argsSize,
-        //     add(MEM_OFFSET_INNER(), retOffset),
-        //     retSize
-        // )
-
         let success
         if _isEVM(addr) {
             _pushEVMFrame(gas(), true)
@@ -1258,6 +1256,9 @@ for { } true { } {
         returnOffset := add(MEM_OFFSET_INNER(), offset)
         break
     }
+    case 0xF4 { // OP_DELEGATECALL
+        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
+    }
     case 0xFD { // OP_REVERT
         let offset,size
 
@@ -1280,6 +1281,7 @@ for { } true { } {
     }
     default {
         printString("INVALID OPCODE")
+        printHex(opcode)
         revert(0, 0)
     }
 }
