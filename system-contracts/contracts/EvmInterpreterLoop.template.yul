@@ -474,9 +474,8 @@ for { } true { } {
             default { 
                 evmGasLeft := chargeGas(evmGasLeft,100) 
             }
-        switch _isEVM(addr) 
-            case 0  { printString("NO EVM") sp := pushStackItem(sp, extcodehash(addr)) }
-            default { printString("IS EVM") sp := pushStackItem(sp, extcodehash(addr)) }
+
+        sp := pushStackItem(sp, extcodehash(addr))
     }
     case 0x40 { // OP_BLOCKHASH
         let blockNumber
