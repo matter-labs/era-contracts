@@ -43,7 +43,8 @@ const sharedBridgeImpl = '0x54C7a61A9E578301E4eB85fFBf5d6678cB364252';
 const sharedBridgeProxy = '0x5f1BD8EaD8246f488D54E9B267b2B9E872EFA45D';
 
 const expectedL1WethAddress = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9';
-const expectedOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
+const initialOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
+const expectedOwner = '0xEE73438083629026FAfA1f5F5bBE2bBD6Bad6331';
 const expectedDelay = 0;
 const eraChainId = 270;
 const expectedSalt = '0x0000000000000000000000000000000000000000000000000000000000000001';
@@ -112,7 +113,7 @@ async function checkValidatorTimelock() {
     validatorTimelockDeployTx,
     contract,
     artifact.bytecode,
-    [expectedOwner, expectedDelay, eraChainId]
+    [initialOwner, expectedDelay, eraChainId]
   );
 
   console.log('ValidatorTimelock is correct!');
@@ -225,6 +226,11 @@ async function checkSTM() {
   if (storedBatchHashZero.toLowerCase() != expectedStoredBatchHashZero.toLowerCase()) {
     throw new Error('STM storedBatchHashZero is not correct');
   }
+  
+  const currentOwner = await contract.owner();
+  if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
+    throw new Error('STM owner is not correct');
+  }
 
   // TODO: add check for initCutHash
   console.log('STM is correct!');
@@ -292,6 +298,23 @@ async function checkLegacyBridge() {
   console.log('L1 shared bridge impl correct!');
 }
 
+async function checkProxyAdmin() {
+  await checkIdenticalBytecode(proxyAdmin, 'ProxyAdmin');
+
+  const artifact = (await hardhat.artifacts.readArtifact('ProxyAdmin'));
+  const contract = new ethers.Contract(
+    proxyAdmin,
+    artifact.abi,
+    l1Provider
+  );
+
+  const currentOwner = await contract.owner();
+  if (currentOwner.toLowerCase() != expectedOwner.toLowerCase()) {
+    throw new Error('ProxyAdmin owner is not correct');
+  }
+
+  console.log('ProxyAdmin is correct!');
+}
 
 async function main() {
   const program = new Command();
@@ -302,7 +325,6 @@ async function main() {
     .action(async (cmd) => {
       await checkIdenticalBytecode(genesisUpgrade, 'GenesisUpgrade');
       await checkIdenticalBytecode(upgradeHyperchains, 'UpgradeHyperchains');
-      await checkIdenticalBytecode(proxyAdmin, 'ProxyAdmin');
       await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
       await checkIdenticalBytecode(gettersFacet, "GettersFacet");
       await checkIdenticalBytecode(adminFacet, "AdminFacet");
@@ -310,6 +332,8 @@ async function main() {
       await checkIdenticalBytecode(verifier, "TestnetVerifier");
 
       await checkMailbox();
+
+      await checkProxyAdmin();
 
       await checkValidatorTimelock();
       await checkBridgehub();
