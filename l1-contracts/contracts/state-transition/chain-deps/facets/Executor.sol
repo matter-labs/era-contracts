@@ -44,15 +44,15 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             "us"
         );
 
-        // Check that batch contain all meta information for L2 logs.
-        // Get the chained hash of priority transaction hashes.
+        // Check that batch contains all meta information for L2 logs.
+        // Get the chained hash of the priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         bytes32[] memory blobCommitments = new bytes32[](MAX_NUMBER_OF_BLOBS);
         if (pricingMode == PubdataPricingMode.Validium) {
-            // skipping data validation for validium, we just check that the data is empty
+            // Skipping data validation for validium, we just check that the data is empty
             require(logOutput.pubdataHash == 0x00, "v0h");
-            require(_newBatch.pubdataCommitments.length == 1, "EF: v0l");
+            require(_newBatch.pubdataCommitments.length == 1, "v0l");
         } else if (pubdataSource == uint8(PubdataSource.Blob)) {
             // In this scenario, pubdataCommitments is a list of: opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)) = 144 bytes
             blobCommitments = _verifyBlobInformation(_newBatch.pubdataCommitments[1:], logOutput.blobHashes);
@@ -145,7 +145,7 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         // See SystemLogKey enum in Constants.sol for ordering.
         uint256 processedLogs;
 
-        // linear traversal of the logs
+        // Linear traversal of the logs
         for (uint256 i = 0; i < emittedL2Logs.length; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
             // slither-disable-next-line unused-return
@@ -231,8 +231,8 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
         StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfo[] calldata _newBatchesData
     ) internal {
-        // check that we have the right protocol version
-        // three comments:
+        // Check that we have the right protocol version
+        // Three comments:
         // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
         // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
         // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
@@ -242,9 +242,9 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
             IStateTransitionManager(s.stateTransitionManager).protocolVersionIsActive(s.protocolVersion),
             "Executor facet: wrong protocol version"
         );
-        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // With the new changes for EIP-4844, namely the restriction on the number of blobs per block, we only allow for a single batch to be committed at a time.
         require(_newBatchesData.length == 1, "e4");
-        // Check that we commit batches after last committed batch
+        // Check that we commit batches after the last committed batch
         require(s.storedBatchHashes[s.totalBatchesCommitted] == _hashStoredBatchInfo(_lastCommittedBatchData), "i"); // incorrect previous batch data
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
