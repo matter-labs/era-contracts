@@ -106,7 +106,7 @@ for { } true { } {
         sp := pushStackItem(sp, exp(a, exponent))
 
         let expSizeByte := 0
-        if not(iszero(exponent)) {
+        if exponent {
             expSizeByte := div(add(exponent, 256), 256)
         }
 
@@ -294,7 +294,6 @@ for { } true { } {
 
         sp := pushStackItem(sp, balance(addr))
 
-        // TODO: Handle cold/warm slots and updates, etc for gas costs.
         switch wasWarm
         case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
         default { evmGasLeft := chargeGas(evmGasLeft, 100) }
@@ -610,6 +609,10 @@ for { } true { } {
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
+        if isStatic {
+            revert(0, 0)
+        }
+
         let key, value,gasSpent
 
         key, sp := popStackItem(sp)
@@ -1161,6 +1164,10 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF5 { // OP_CREATE2
+        if isStatic {
+            revert(0, 0)
+        }
+
         let value, offset, size, salt
 
         value, sp := popStackItem(sp)
@@ -1203,10 +1210,14 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
-        // A function was implemented in order to avoid stack depth errors.
-        dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
+        let dynamicGas, frameGasLeft, gasToPay
 
-        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+        // A function was implemented in order to avoid stack depth errors.
+        frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
+        
+        // Check if the following is ok
+        evmGasLeft := chargeGas(evmGasLeft, gasToPay)
+        evmGasLeft := add(evmGasLeft, frameGasLeft)
     }
     case 0xFA { // OP_STATICCALL
         let addr, argsOffset, argsSize, retOffset, retSize
@@ -1217,16 +1228,6 @@ for { } true { } {
         argsSize, sp := popStackItem(sp)
         retOffset, sp := popStackItem(sp)
         retSize, sp := popStackItem(sp)
-
-        // retOffset, addr := _performStaticCall(
-        //     _isEVM(addr),
-        //     gas(),
-        //     addr,
-        //     add(MEM_OFFSET_INNER(), argsOffset),
-        //     argsSize,
-        //     add(MEM_OFFSET_INNER(), retOffset),
-        //     retSize
-        // )
 
         let success
         if _isEVM(addr) {
@@ -1271,6 +1272,9 @@ for { } true { } {
         returnOffset := add(MEM_OFFSET_INNER(), offset)
         break
     }
+    case 0xF4 { // OP_DELEGATECALL
+        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
+    }
     case 0xFD { // OP_REVERT
         let offset,size
 
@@ -1291,11 +1295,9 @@ for { } true { } {
 
         invalid()
     }
-    // TODO: REST OF OPCODES
     default {
-        // TODO: Revert properly here and report the unrecognized opcode
         printString("INVALID OPCODE")
-        sstore(0, opcode)
-        return(0, 64)
+        printHex(opcode)
+        revert(0, 0)
     }
 }
