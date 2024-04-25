@@ -1227,16 +1227,6 @@ for { } true { } {
         retOffset, sp := popStackItem(sp)
         retSize, sp := popStackItem(sp)
 
-        // retOffset, addr := _performStaticCall(
-        //     _isEVM(addr),
-        //     gas(),
-        //     addr,
-        //     add(MEM_OFFSET_INNER(), argsOffset),
-        //     argsSize,
-        //     add(MEM_OFFSET_INNER(), retOffset),
-        //     retSize
-        // )
-
         let success
         if _isEVM(addr) {
             _pushEVMFrame(gas(), true)
@@ -1281,35 +1271,7 @@ for { } true { } {
         break
     }
     case 0xF4 { // OP_DELEGATECALL
-        let addr, argsOffset, argsSize, retOffset, retSize
-
-        addr, sp := popStackItem(sp)
-        addr, sp := popStackItem(sp)
-        argsOffset, sp := popStackItem(sp)
-        argsSize, sp := popStackItem(sp)
-        retOffset, sp := popStackItem(sp)
-        retSize, sp := popStackItem(sp)
-
-        if iszero(_isEVM(addr)) {
-            revert(0, 0)
-        }
-
-        _pushEVMFrame(gas(), isStatic)
-        addr := delegatecall(
-            // We can not just pass all gas here to prevert overflow of zkEVM gas counter
-            gas(),
-            addr,
-            add(MEM_OFFSET_INNER(), argsOffset),
-            argsSize,
-            0,
-            0
-        )
-
-        pop(_saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize))
-
-        _popEVMFrame()
-
-        sp := pushStackItem(sp, addr)
+        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
     }
     case 0xFD { // OP_REVERT
         let offset,size
@@ -1335,7 +1297,7 @@ for { } true { } {
     default {
         // TODO: Revert properly here and report the unrecognized opcode
         printString("INVALID OPCODE")
-        sstore(0, opcode)
-        return(0, 64)
+        printHex(opcode)
+        revert(0, 0)
     }
 }
