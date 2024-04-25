@@ -6,8 +6,9 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { web3Url } from "./utils";
-import { ethers } from "ethers";
+import { BigNumber, ethers } from "ethers";
 import { Provider, utils } from "zksync-ethers";
+import { FacetCut, getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
@@ -19,6 +20,8 @@ const validatorTimelockDeployTx = '0xf68ca3fbae59c78806275435c2aaef879ccc041cbb6
 const validatorTimelock = '0x93eea8d6f6580a4AEAD296EE2d975f4732763495';
 const upgradeHyperchains = '0x5b87652B3E4f4c9475933EB9E54E06a0b0BCC69f';
 const proxyAdmin = '0xE5d2199a0B23F98004bcf6aDAB885De6e4F3C187';
+
+const diamondInit = '0xec9bC474567913B3827D312B573B8F5f3708455A';
 
 const bridgeHubImpl = '0xDF217D2a1a2AfF81b726D5b4CCDB3d368bF58dD2';
 const bridgeHub = '0x5E4b0dd107a6a9DB8c4a40135D88Bbfd6aD71907';
@@ -33,6 +36,7 @@ const verifier = '0xa6BdDC3Ec5ED82C24e1d3246D388F518CF9938cB';
 
 const stmImplDeployTx = '0xf3bcb674d41bed3c73fc299f41e7f0d78f93ac2ab473e0d197dad63c14957004';
 const stmImpl = '0x0126A5dF4939bA05f7887B643DEFe8C6657a4eD5';
+const stmDeployTx = '0x67286423a0146ee14f76505c7ad0f053db11302450445bd04d79651dfa8dbc25';
 const stm = '0x21e9230F3bfE4c3BbEaC8EbaaE7caFA2E92D74f9';
 
 const legacyBridgeImplDeployTx = '0x603b973fdc6997082861e1d7e092e03c38dba9468d04f5af59ffe29c631ac456';
@@ -53,6 +57,10 @@ const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = '0x53dc316f108d1b64412be840e0ab89193e94ba6c4af8b9ca57d39ad4d782e0f4';
 const expectedL2BridgeAddress = '0xCEB8d4888d2025aEaAD0272175281e0CaFC33152';
 const expectedL1LegacyBridge = '0x7303B5Ce64f1ADB0558572611a0b90620b6dd5F4';
+const expectedGenesisBatchCommitment = '0x49276362411c40c07ab01d3dfa9428abca95e361d8c980cd39f1ab6a9c561c0c';
+const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
+const expectedProtocolVersion = 23;
+const expectedGenesisRoot = '0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5';
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
@@ -89,6 +97,100 @@ async function extractInitCode(data: string) {
   }
 
   return initCode;
+}
+
+async function extractProxyInitializationData(contract: ethers.Contract, data: string) {
+  const initCode = await extractInitCode(data);
+
+  const artifact = (await hardhat.artifacts.readArtifact('TransparentUpgradeableProxy'));
+  const proxyInterface = new ethers.utils.Interface(artifact.abi);
+
+  // Deployment tx is a concatenation of the init code and the constructor data
+  // constructor has the following type `constructor(address _logic, address admin_, bytes memory _data)`
+
+  const constructorData = '0x' + initCode.slice(artifact.bytecode.length);
+
+  const [,, initializeCode] = ethers.utils.defaultAbiCoder.decode(['address', 'address', 'bytes'], constructorData);
+
+  // Now time to parse the initialize code
+  const parsedData = contract.interface.parseTransaction({ data: initializeCode} );
+  // console.log(parsedData);
+  const initializeData = {
+    ...parsedData.args._initializeData
+  };
+
+  const usedInitialOwner = initializeData.owner;
+  if (usedInitialOwner.toLowerCase() !== initialOwner.toLowerCase()) {
+    throw new Error('Initial owner is not correct');
+  }
+
+  const usedValidatorTimelock = initializeData.validatorTimelock;
+  if (usedValidatorTimelock.toLowerCase() !== validatorTimelock.toLowerCase()) {
+    throw new Error('Validator timelock is not correct');
+  }
+  const usedGenesisUpgrade = initializeData.genesisUpgrade;
+  if (usedGenesisUpgrade.toLowerCase() !== genesisUpgrade.toLowerCase()) {
+    throw new Error('Genesis upgrade is not correct');
+  }
+  const usedGenesisBatchHash = initializeData.genesisBatchHash;
+  if (usedGenesisBatchHash.toLowerCase() !== expectedGenesisRoot.toLowerCase()) {
+    throw new Error('Genesis batch hash is not correct');
+  }
+  const usedGenesisIndexRepeatedStorageChanges = initializeData.genesisIndexRepeatedStorageChanges;
+  if(!usedGenesisIndexRepeatedStorageChanges.eq(expectedIndexRepeatedStorageChanges)) {
+    throw new Error('Genesis index repeated storage changes is not correct');
+  }
+
+  const usedGenesisBatchCommitment = initializeData.genesisBatchCommitment;
+  if (usedGenesisBatchCommitment.toLowerCase() !== expectedGenesisBatchCommitment.toLowerCase()) {
+    throw new Error('Genesis batch commitment is not correct');
+  }
+
+  const usedProtocolVersion = initializeData.protocolVersion;
+  if (!usedProtocolVersion.eq(expectedProtocolVersion)) {
+    throw new Error('Protocol version is not correct');
+  }
+
+  const diamondCut = initializeData.diamondCut;
+
+  if(diamondCut.initAddress.toLowerCase() !== diamondInit.toLowerCase()) {  
+    throw new Error('Diamond init address is not correct');
+  }
+
+  let expectedFacetCuts: FacetCut[] = Object.values(
+    await getCurrentFacetCutsForAdd(
+      adminFacet,
+      gettersFacet,
+      mailboxFacet,
+      executorFacet
+    )
+  );
+  const usedFacetCuts = diamondCut.facetCuts.map((fc: any) => {
+    return {
+      facet: fc.facet,
+      selectors: fc.selectors,
+      action: fc.action,
+      isFreezable: fc.isFreezable
+    }
+  });;
+
+  // Now sort to compare
+  expectedFacetCuts.sort((a, b) => a.facet.localeCompare(b.facet));
+  usedFacetCuts.sort((a, b) => a.facet.localeCompare(b.facet));
+
+  if(expectedFacetCuts.length !== usedFacetCuts.length) {
+    throw new Error('Facet cuts length is not correct');
+  }
+
+  console.log('Automated comparison of STM init data complete!');
+  console.log('Below manual comparison is still needed: \n');
+
+  // TODO: add deep comparison of objects
+  console.log('Expected facet cuts: \n', expectedFacetCuts);
+  console.log('\nUsed facet cuts: \n', usedFacetCuts);
+
+  // TODO: add checks for the initCalldata
+  console.log('\nUsed calldata', diamondCut.initCalldata);
 }
 
 async function checkValidatorTimelock() {
@@ -202,11 +304,13 @@ async function checkSTMImpl() {
 
 async function checkSTM() {
   const artifact = (await hardhat.artifacts.readArtifact('StateTransitionManager'));
+
   const contract = new ethers.Contract(
     stm,
     artifact.abi,
     l1Provider
   );
+
 
   const usedBH = await contract.BRIDGE_HUB();
   if (usedBH.toLowerCase() != bridgeHub.toLowerCase()) {
@@ -232,8 +336,9 @@ async function checkSTM() {
     throw new Error('STM owner is not correct');
   }
 
-  // TODO: add check for initCutHash
   console.log('STM is correct!');
+
+  await extractProxyInitializationData(contract, (await l1Provider.getTransaction(stmDeployTx)).data);
 }
 
 async function checkL1SharedBridgeImpl() {
@@ -330,6 +435,7 @@ async function main() {
       await checkIdenticalBytecode(adminFacet, "AdminFacet");
       await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
       await checkIdenticalBytecode(verifier, "TestnetVerifier");
+      await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
       await checkMailbox();
 
@@ -338,13 +444,13 @@ async function main() {
       await checkValidatorTimelock();
       await checkBridgehub();
 
-      await checkSTMImpl();
-      await checkSTM();
-
       await checkL1SharedBridgeImpl();
       await checkSharedBridge();
 
       await checkLegacyBridge();
+
+      await checkSTMImpl();
+      await checkSTM();
     });
 
 
@@ -357,3 +463,7 @@ main()
     console.error("Error:", err);
     process.exit(1);
   });
+
+function expectedDiamondCut() {
+
+}
