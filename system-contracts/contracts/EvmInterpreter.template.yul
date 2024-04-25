@@ -158,9 +158,6 @@ object "EVMInterpreter" {
                 isStatic := getIsStaticFromCallFlags()
             }
 
-            // TODO: Check if caller is not EVM and override evmGasLeft and isStatic with their
-            // appropriate values if so.
-
             // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
