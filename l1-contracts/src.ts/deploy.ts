@@ -86,12 +86,11 @@ export class Deployer {
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
 
-    const verifierParams =
-        {
-            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
-            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
-            recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-          };
+    const verifierParams = {
+      recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
+      recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
+      recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
@@ -236,7 +235,9 @@ export class Deployer {
     const rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
-      console.log(`Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address}`);
+      console.log(
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address}`
+      );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
     }
 
@@ -458,11 +459,9 @@ export class Deployer {
       salt: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     };
     if (printFileName) {
-      console.log("Operation: ", operation);
-      const transactions = JSON.parse(fs.readFileSync(`${printFileName}/transactions.json`).toString());
-      transactions.furtherOperations = transactions.furtherOperations || [];
-      transactions.furtherOperations.push(operation);
-      fs.writeFileSync(printFileName, JSON.stringify(transactions, null, 2));
+      console.log("Operation:", operation);
+      console.log("Schedule operation: ", governance.interface.encodeFunctionData("scheduleTransparent", [operation, 0]));
+      console.log(`Execute operation value: ${value}, calldata`, governance.interface.encodeFunctionData("execute", [operation]));
       return;
     }
     const scheduleTx = await governance.scheduleTransparent(operation, 0);

@@ -46,6 +46,7 @@ export default {
       },
     },
   },
+  defaultNetwork: "stage",
   networks: {
     hardhat: {
       zksync: true,
@@ -54,6 +55,14 @@ export default {
       url: "http://127.0.0.1:8011",
       ethNetwork: "localhost",
       zksync: true,
+    },
+    stage: {
+      url: "https://z2-dev-api.zksync.dev/",
+      ethNetwork: "sepolia",
+      zksync: true,
+    },
+    sepolia: {
+      url: "https://eth-sepolia.g.alchemy.com/v2/lJQd8kSLSrrfo6H99NXeWcwaw2zN-W0o",
     },
   },
   paths: {

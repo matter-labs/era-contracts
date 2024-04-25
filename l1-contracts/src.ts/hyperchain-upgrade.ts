@@ -122,7 +122,7 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   }
   await upgradeL2Bridge(deployer, printFileName);
 
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     if (deployer.verbose) {
       console.log("Upgrading L1 ERC20 bridge");
     }
@@ -241,7 +241,7 @@ async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
 }
 
 async function upgradeL1ERC20Bridge(deployer: Deployer, printFileName?: string) {
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
     // upgrade ERC20.
