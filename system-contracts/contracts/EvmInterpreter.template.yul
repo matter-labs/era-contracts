@@ -146,6 +146,8 @@ object "EVMInterpreter" {
                 // Includes gas
                 returnOffset := sub(returnOffset, 32)
                 returnLen := add(returnLen, 32)
+
+                mstore(returnOffset, evmGasLeft)
             }
 
             return(returnOffset, returnLen)
