@@ -61,6 +61,11 @@ const expectedGenesisBatchCommitment = '0x49276362411c40c07ab01d3dfa9428abca95e3
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
 const expectedProtocolVersion = 23;
 const expectedGenesisRoot = '0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5';
+const expectedRecursionNodeLevelVkHash = '0x5a3ef282b21e12fe1f4438e5bb158fc5060b160559c5158c6389d62d9fe3d080';
+const expectedRecursionLeafLevelVkHash = '0x400a4b532c6f072c00d1806ef299300d4c104f4ac55bd8698ade78894fcadc0a';
+const expectedRecursionCircuitsSetVksHash = '0x0000000000000000000000000000000000000000000000000000000000000000';  
+const expectedBootloaderHash = '0x010008e7f0f15ed191392960117f88fe371348982b28a033c7207ed2c09bc0f4';
+const expectedDefaultAccountHash = '0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32';
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
@@ -182,15 +187,81 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error('Facet cuts length is not correct');
   }
 
-  console.log('Automated comparison of STM init data complete!');
-  console.log('Below manual comparison is still needed: \n');
+  for(let i = 0; i < expectedFacetCuts.length; i++) {
+    const used = usedFacetCuts[i];
+    const expected = expectedFacetCuts[i];
 
-  // TODO: add deep comparison of objects
-  console.log('Expected facet cuts: \n', expectedFacetCuts);
-  console.log('\nUsed facet cuts: \n', usedFacetCuts);
+    if(used.facet !== expected.facet) {
+      throw new Error(`Facet ${i} is not correct`);
+    }
 
-  // TODO: add checks for the initCalldata
-  console.log('\nUsed calldata', diamondCut.initCalldata);
+    // For the array of selectors it is just easier to hexconcat them and compare
+    const usedSelectors = ethers.utils.hexConcat(Array.from(used.selectors).sort() as any[]);
+    const expectedSelectors = ethers.utils.hexConcat(expected.selectors.sort());
+    if (usedSelectors !== expectedSelectors) {
+      throw new Error(`Facet ${i} selectors are not correct`);
+    }
+
+    if (used.action !== expected.action) {
+      throw new Error(`Facet ${i} action is not correct`);
+    }
+
+    if (used.isFreezable !== expected.isFreezable) {
+      throw new Error(`Facet ${i} isFreezable is not correct`);
+    }
+  }
+
+  const [
+    usedVerifier,
+    
+    // We just unpack verifier params here
+    recursionNodeLevelVkHash,
+    recursionLeafLevelVkHash,
+    recursionCircuitsSetVksHash,
+    
+    l2BootloaderBytecodeHash,
+    l2DefaultAccountBytecodeHash,
+    // priorityTxMaxGasLimit,
+
+    // // We unpack fee params
+    // pubdataPricingMode,
+    // batchOverheadL1Gas,
+    // maxPubdataPerBatch,
+    // priorityTxMaxPubdata,
+    // maxL2GasPerBatch,
+    // minimalL2GasPrice,
+
+    // blobVersionedHashRetriever
+  ] = ethers.utils.defaultAbiCoder.decode([
+    'address', 'bytes32', 'bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint256',
+    'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address'
+  ], diamondCut.initCalldata);
+
+  if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
+    throw new Error('Verifier is not correct');
+  }
+
+  if (recursionNodeLevelVkHash.toLowerCase() !== expectedRecursionNodeLevelVkHash.toLowerCase()) {
+    throw new Error('Recursion node level vk hash is not correct');
+  }
+
+  if (recursionLeafLevelVkHash.toLowerCase() !== expectedRecursionLeafLevelVkHash.toLowerCase()) {
+    throw new Error('Recursion leaf level vk hash is not correct');
+  }
+
+  if (recursionCircuitsSetVksHash.toLowerCase() !== expectedRecursionCircuitsSetVksHash.toLowerCase()) {
+    throw new Error('Recursion circuits set vks hash is not correct');
+  }
+
+  if (l2BootloaderBytecodeHash.toLowerCase() !== expectedBootloaderHash.toLowerCase()) {
+    throw new Error('L2 bootloader bytecode hash is not correct');
+  }
+
+  if (l2DefaultAccountBytecodeHash.toLowerCase() !== expectedDefaultAccountHash.toLowerCase()) {
+    throw new Error('L2 default account bytecode hash is not correct');
+  }
+
+  console.log('STM init data correct!');
 }
 
 async function checkValidatorTimelock() {
