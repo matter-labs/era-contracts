@@ -91,15 +91,12 @@ async function main() {
         console.log('Using L1 Shared Bridge address: ', l1SharedBridgeAddr);
         const bridgehubAddr = ethers.utils.getAddress(cmd.bridgehubAddr);
         console.log('Using Bridgehub address: ', bridgehubAddr);
-        const proxyAdminAddr = ethers.utils.getAddress(cmd.proxyAdminAddr);
-        console.log('Using Proxy Admin address: ', proxyAdminAddr);
 
         const addresses = [
             validatorTimelockAddr,
             stmAddr,
             l1SharedBridgeAddr,
             bridgehubAddr,
-            proxyAdminAddr
         ]
 
         const govCalls = addresses.map(acceptOwnershipCall);
