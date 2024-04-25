@@ -15,43 +15,43 @@ import { FacetCut, getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const genesisUpgrade = '0xF8c553608927Bde789697D28784aa2EB4E8FC5c7';
-const validatorTimelockDeployTx = '0xf68ca3fbae59c78806275435c2aaef879ccc041cbb61e0616a378db6332dc868';
-const validatorTimelock = '0x93eea8d6f6580a4AEAD296EE2d975f4732763495';
-const upgradeHyperchains = '0x5b87652B3E4f4c9475933EB9E54E06a0b0BCC69f';
-const proxyAdmin = '0xE5d2199a0B23F98004bcf6aDAB885De6e4F3C187';
+const genesisUpgrade = '0x7315cf22Ffcb7bDb21aAA0D65112fBB4716111A4';
+const validatorTimelockDeployTx = '0x14e27087d35a71861829a7f4ef472cfd0c84f91f87f607f522fc4f88f6c8733b';
+const validatorTimelock = '0x72518E0269E72650243bC98c7Ce9c5b3736B565D';
+const upgradeHyperchains = '0xC04629FC3266F3c1209f31b9ab1176C5f195b312';
+const proxyAdmin = '0xF5c6b1aec9d019cC7Ec5Fc6609D9978617b5E193';
 
-const diamondInit = '0xec9bC474567913B3827D312B573B8F5f3708455A';
+const diamondInit = '0x4f74AbD5df12F80757388d1918E5BB964bee23fF';
 
-const bridgeHubImpl = '0xDF217D2a1a2AfF81b726D5b4CCDB3d368bF58dD2';
-const bridgeHub = '0x5E4b0dd107a6a9DB8c4a40135D88Bbfd6aD71907';
+const bridgeHubImpl = '0xd7edDc9E0FD36650Bb7aD5e928a0c305E3132025';
+const bridgeHub = '0x4dDcec5eCD9B44E900869Eb2696bb57Bc5413582';
 
-const executorFacet = '0x9ef4C650010CE13F53b8ec4592A8238D3ABF1574';
-const mailboxFacetDeployTx = '0x7f3c98ee50a03c9672af770d80947ab6ebbcb398a0d4795ecc16224b11429d86';
-const mailboxFacet = '0xfB1D39FD6535aB499B8857993445Cd27e9904797';
-const gettersFacet = '0x1cFc9B11e82FBfe7C3cb3CD04061bD5b133B22A6';
-const adminFacet = '0xf03F9A728355102297E5E1b68d488215Ff1572e1';
+const executorFacet = '0x568018Faa74955146Ea7aebC505a3e28cfCF1DcA';
+const mailboxFacetDeployTx = '0x19b67214f91c2122968fe74d82d90e7d060ea760bcaf6d8db5d1085f9ecd4618';
+const mailboxFacet = '0xe7B9B2048f58AafACD708D2D71348ddbde01da1D';
+const gettersFacet = '0xd11012099Faa1Ce1E746425A550c966d8Df0319F';
+const adminFacet = '0xAe800b0E4148fa63218681611E3058B9d5d0a4fa';
 
-const verifier = '0xa6BdDC3Ec5ED82C24e1d3246D388F518CF9938cB';
+const verifier = '0xd1396F2Ea18EaEBE9b95205dAE3949E837d383D7';
 
-const stmImplDeployTx = '0xf3bcb674d41bed3c73fc299f41e7f0d78f93ac2ab473e0d197dad63c14957004';
-const stmImpl = '0x0126A5dF4939bA05f7887B643DEFe8C6657a4eD5';
-const stmDeployTx = '0x67286423a0146ee14f76505c7ad0f053db11302450445bd04d79651dfa8dbc25';
-const stm = '0x21e9230F3bfE4c3BbEaC8EbaaE7caFA2E92D74f9';
+const stmImplDeployTx = '0x3ccba9f0285bf51a8b87d7b0c63b7404a07d1d135ffb3d69b085c23404b43c59';
+const stmImpl = '0xc05B2734379A31972a58E52A6D64611bb855Be45';
+const stmDeployTx = '0x15c992fe9392ae99be918472992d2597e162a884cda48d21d38a7205e009b0bb';
+const stm = '0x95416daeF5b50a62Ea5A246be565e9bAFB159683';
 
-const legacyBridgeImplDeployTx = '0x603b973fdc6997082861e1d7e092e03c38dba9468d04f5af59ffe29c631ac456';
-const legacyBridgeImpl = '0x1A5D16e838d7C508d738B562355F198d4B6F59Fa';
+const legacyBridgeImplDeployTx = '0xde74e9d2c71c0fe0c908cecbe4ff219cb498496c2e641fe2631c22d597ca19e5';
+const legacyBridgeImpl = '0x7aBB32De60Ed3bFC393f5e956ED0657046c8594e';
 
-const sharedBridgeImplDeployTx = '0x45e76c1574a8989de898cf16b3506f71be0c87baeb40d175ce46c5564032b839';
-const sharedBridgeImpl = '0x54C7a61A9E578301E4eB85fFBf5d6678cB364252';
-const sharedBridgeProxy = '0x5f1BD8EaD8246f488D54E9B267b2B9E872EFA45D';
+const sharedBridgeImplDeployTx = '0x138c786a9c8e682d4afb325df449282f6fe6926b2b140bc3ad7898e5ef52403c';
+const sharedBridgeImpl = '0x67487118dD9Db5a28e2908F85684cD477d654260';
+const sharedBridgeProxy = '0xA8695C6371ef45DeBcf3bab4de6ca1e39787903F';
 
 const expectedL1WethAddress = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9';
 const initialOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
-const expectedOwner = '0xEE73438083629026FAfA1f5F5bBE2bBD6Bad6331';
+const expectedOwner = '0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7';
 const expectedDelay = 0;
 const eraChainId = 270;
-const expectedSalt = '0x0000000000000000000000000000000000000000000000000000000000000001';
+const expectedSalt = '0x0000000000000000000000000000000000000000000000000000000000000003';
 const expectedHyperchainAddr = '0x6d6e010A2680E2E5a3b097ce411528b36d880EF6';
 const maxNumberOfHyperchains = 100;
 const expectedStoredBatchHashZero = '0x53dc316f108d1b64412be840e0ab89193e94ba6c4af8b9ca57d39ad4d782e0f4';
@@ -61,6 +61,11 @@ const expectedGenesisBatchCommitment = '0x49276362411c40c07ab01d3dfa9428abca95e3
 const expectedIndexRepeatedStorageChanges = BigNumber.from(54);
 const expectedProtocolVersion = 23;
 const expectedGenesisRoot = '0xabdb766b18a479a5c783a4b80e12686bc8ea3cc2d8a3050491b701d72370ebb5';
+const expectedRecursionNodeLevelVkHash = '0xf520cd5b37e74e19fdb369c8d676a04dce8a19457497ac6686d2bb95d94109c8';
+const expectedRecursionLeafLevelVkHash = '0x435202d277dd06ef3c64ddd99fda043fc27c2bd8b7c66882966840202c27f4f6';
+const expectedRecursionCircuitsSetVksHash = '0x0000000000000000000000000000000000000000000000000000000000000000';  
+const expectedBootloaderHash = '0x010008e7f0f15ed191392960117f88fe371348982b28a033c7207ed2c09bc0f4';
+const expectedDefaultAccountHash = '0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32';
 
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
@@ -182,15 +187,81 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     throw new Error('Facet cuts length is not correct');
   }
 
-  console.log('Automated comparison of STM init data complete!');
-  console.log('Below manual comparison is still needed: \n');
+  for(let i = 0; i < expectedFacetCuts.length; i++) {
+    const used = usedFacetCuts[i];
+    const expected = expectedFacetCuts[i];
 
-  // TODO: add deep comparison of objects
-  console.log('Expected facet cuts: \n', expectedFacetCuts);
-  console.log('\nUsed facet cuts: \n', usedFacetCuts);
+    if(used.facet !== expected.facet) {
+      throw new Error(`Facet ${i} is not correct`);
+    }
 
-  // TODO: add checks for the initCalldata
-  console.log('\nUsed calldata', diamondCut.initCalldata);
+    // For the array of selectors it is just easier to hexconcat them and compare
+    const usedSelectors = ethers.utils.hexConcat(Array.from(used.selectors).sort() as any[]);
+    const expectedSelectors = ethers.utils.hexConcat(expected.selectors.sort());
+    if (usedSelectors !== expectedSelectors) {
+      throw new Error(`Facet ${i} selectors are not correct`);
+    }
+
+    if (used.action !== expected.action) {
+      throw new Error(`Facet ${i} action is not correct`);
+    }
+
+    if (used.isFreezable !== expected.isFreezable) {
+      throw new Error(`Facet ${i} isFreezable is not correct`);
+    }
+  }
+
+  const [
+    usedVerifier,
+    
+    // We just unpack verifier params here
+    recursionNodeLevelVkHash,
+    recursionLeafLevelVkHash,
+    recursionCircuitsSetVksHash,
+    
+    l2BootloaderBytecodeHash,
+    l2DefaultAccountBytecodeHash,
+    // priorityTxMaxGasLimit,
+
+    // // We unpack fee params
+    // pubdataPricingMode,
+    // batchOverheadL1Gas,
+    // maxPubdataPerBatch,
+    // priorityTxMaxPubdata,
+    // maxL2GasPerBatch,
+    // minimalL2GasPrice,
+
+    // blobVersionedHashRetriever
+  ] = ethers.utils.defaultAbiCoder.decode([
+    'address', 'bytes32', 'bytes32', 'bytes32', 'bytes32', 'bytes32', 'uint256',
+    'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address'
+  ], diamondCut.initCalldata);
+
+  if (usedVerifier.toLowerCase() !== verifier.toLowerCase()) {
+    throw new Error('Verifier is not correct');
+  }
+
+  if (recursionNodeLevelVkHash.toLowerCase() !== expectedRecursionNodeLevelVkHash.toLowerCase()) {
+    throw new Error('Recursion node level vk hash is not correct');
+  }
+
+  if (recursionLeafLevelVkHash.toLowerCase() !== expectedRecursionLeafLevelVkHash.toLowerCase()) {
+    throw new Error('Recursion leaf level vk hash is not correct');
+  }
+
+  if (recursionCircuitsSetVksHash.toLowerCase() !== expectedRecursionCircuitsSetVksHash.toLowerCase()) {
+    throw new Error('Recursion circuits set vks hash is not correct');
+  }
+
+  if (l2BootloaderBytecodeHash.toLowerCase() !== expectedBootloaderHash.toLowerCase()) {
+    throw new Error('L2 bootloader bytecode hash is not correct');
+  }
+
+  if (l2DefaultAccountBytecodeHash.toLowerCase() !== expectedDefaultAccountHash.toLowerCase()) {
+    throw new Error('L2 default account bytecode hash is not correct');
+  }
+
+  console.log('STM init data correct!');
 }
 
 async function checkValidatorTimelock() {
