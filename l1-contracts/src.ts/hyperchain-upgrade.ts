@@ -121,13 +121,13 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   if (deployer.verbose) {
     console.log("Upgrading L2 bridge");
   }
-  await upgradeL2Bridge(deployer, printFileName);
+  await upgradeL2Bridge(deployer, gasPrice, printFileName);
 
   if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     if (deployer.verbose) {
       console.log("Upgrading L1 ERC20 bridge");
     }
-    await upgradeL1ERC20Bridge(deployer, printFileName);
+    await upgradeL1ERC20Bridge(deployer,gasPrice,  printFileName);
   }
 
   // note, withdrawals will not work until this step, but deposits will
@@ -147,26 +147,47 @@ export async function updateValidatorsViaGovernance(deployer:Deployer, printFile
     deployer.addresses.StateTransition.DiamondProxy,
     deployer.deployWallet
   );
+  const data2 = stm.interface.encodeFunctionData("setValidatorTimelock", [
+    deployer.addresses.ValidatorTimeLock]);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data2, printFileName);
+
   const data3 = stm.interface.encodeFunctionData("setValidator", [
     deployer.chainId,
     deployer.addresses.ValidatorTimeLock,
     true,
   ]);
   await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data3, printFileName);
+}
+
+export async function updateValidatorsViaHotKey(deployer:Deployer, printFileName?: string){
 
   if (deployer.verbose) {
     console.log("Setting validators in validator timelock");
   }
+  const gasPrice = await deployer.deployWallet.getGasPrice();
+
 
   // adding to validator timelock
   const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
   const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
   const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
-  const txRegisterValidator = validatorTimelock.interface.encodeFunctionData("addValidator", [deployer.chainId, validatorOneAddress]);
-  await deployer.executeUpgrade(deployer.addresses.ValidatorTimeLock, 0, txRegisterValidator, printFileName);
+  const addStmTx = await validatorTimelock.setStateTransitionManager(deployer.addresses.StateTransition.StateTransitionProxy, { gasPrice });
+  await addStmTx.wait();
+  const txRegisterValidator = await validatorTimelock.addValidator(deployer.chainId, validatorOneAddress, { gasPrice });
+  const receiptRegisterValidator = await txRegisterValidator.wait();
+  if (deployer.verbose) {
+    console.log(
+      `Validator registered, gas used: ${receiptRegisterValidator.gasUsed.toString()}, tx hash: ${
+        txRegisterValidator.hash
+      }`
+    );
+  }
 
-  const tx3 =  validatorTimelock.interface.encodeFunctionData("addValidator", [deployer.chainId, validatorTwoAddress]);
-  await deployer.executeUpgrade(deployer.addresses.ValidatorTimeLock, 0, tx3, printFileName);
+  const tx3 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, { gasPrice });
+  const receipt3 = await tx3.wait();
+  if (deployer.verbose) {
+    console.log(`Validator 2 registered, gas used: ${receipt3.gasUsed.toString()}`);
+  }
 }
 
 // This sets the Shared Bridge parameters. We need to do this separately, as these params will be known after the upgrade
@@ -224,7 +245,7 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
   // await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
 }
 
-async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
+async function upgradeL2Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
   const l2BridgeImplementationAddress = process.env.CONTRACTS_L2_SHARED_BRIDGE_IMPL_ADDR!;
 
   // upgrade from L1 governance. This has to come from governacne on L1.
@@ -248,7 +269,6 @@ async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
     l2BridgeCalldata,
   ]);
   const factoryDeps = [];
-  const gasPrice = await deployer.deployWallet.getGasPrice();
   const requiredValueForL2Tx = await deployer
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
@@ -272,7 +292,7 @@ async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
   );
 }
 
-async function upgradeL1ERC20Bridge(deployer: Deployer, printFileName?: string) {
+async function upgradeL1ERC20Bridge(deployer: Deployer, gasPrice: BigNumberish, printFileName?: string) {
   if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
