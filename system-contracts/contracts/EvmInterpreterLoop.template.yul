@@ -1203,7 +1203,6 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
-        let dynamicGas
         // A function was implemented in order to avoid stack depth errors.
         dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
 
