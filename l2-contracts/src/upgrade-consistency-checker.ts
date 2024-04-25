@@ -5,7 +5,6 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as hardhat from "hardhat";
 import { Command } from "commander";
-import { web3Url } from "./utils";
 import { ethers } from "ethers";
 import { Provider, utils } from "zksync-ethers";
 
@@ -14,7 +13,9 @@ import { Provider, utils } from "zksync-ethers";
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const l2BridgeImplAddr = ''
+const l2BridgeImplAddr = '0xce0a8c005a73e35d95cec41a9e8b75668470fb8f';
+
+const eraChainId = 270;
 
 const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
 
@@ -29,6 +30,23 @@ async function checkIdenticalBytecode(addr: string, contract: string) {
   }
 }
 
+async function checkL2SharedBridgeImpl() {
+  await checkIdenticalBytecode(l2BridgeImplAddr, 'L2SharedBridge');
+
+  // In Era we can retrieve the immutable from the simulator
+  const contract = new ethers.Contract(
+    '0x0000000000000000000000000000000000008005',
+    immutableSimulatorAbi(),
+    l2Provider
+  );
+
+  const usedEraChainId = ethers.BigNumber.from(await contract.getImmutable(l2BridgeImplAddr, 0)); 
+  if(!usedEraChainId.eq(ethers.BigNumber.from(eraChainId))) {
+    throw new Error('Era chain id is not correct');
+  }
+  console.log('L2SharedBridge is correct!');
+}
+
 async function main() {
   const program = new Command();
 
@@ -36,7 +54,7 @@ async function main() {
 
   program
     .action(async (cmd) => {
-      await checkIdenticalBytecode(l2BridgeImplAddr, 'GenesisUpgrade');
+      await checkL2SharedBridgeImpl();
     });
 
 
@@ -49,3 +67,63 @@ main()
     console.error("Error:", err);
     process.exit(1);
   });
+
+
+function immutableSimulatorAbi() {
+  return [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_dest",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_index",
+          "type": "uint256"
+        }
+      ],
+      "name": "getImmutable",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_dest",
+          "type": "address"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "index",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "value",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ImmutableData[]",
+          "name": "_immutables",
+          "type": "tuple[]"
+        }
+      ],
+      "name": "setImmutables",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ]
+}
