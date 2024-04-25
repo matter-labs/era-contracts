@@ -1,7 +1,6 @@
 import * as hardhat from "hardhat";
 import "@nomiclabs/hardhat-ethers";
 
-import * as fs from "fs";
 import type { BigNumberish, providers, Signer, Wallet } from "ethers";
 import { ethers } from "ethers";
 import { hexlify, Interface } from "ethers/lib/utils";
@@ -460,8 +459,14 @@ export class Deployer {
     };
     if (printFileName) {
       console.log("Operation:", operation);
-      console.log("Schedule operation: ", governance.interface.encodeFunctionData("scheduleTransparent", [operation, 0]));
-      console.log(`Execute operation value: ${value}, calldata`, governance.interface.encodeFunctionData("execute", [operation]));
+      console.log(
+        "Schedule operation: ",
+        governance.interface.encodeFunctionData("scheduleTransparent", [operation, 0])
+      );
+      console.log(
+        `Execute operation value: ${value}, calldata`,
+        governance.interface.encodeFunctionData("execute", [operation])
+      );
       return;
     }
     const scheduleTx = await governance.scheduleTransparent(operation, 0);

@@ -11,11 +11,12 @@ import type { Deployer } from "./deploy";
 
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
+import { AdminFacetFactory, StateTransitionManagerFactory } from "../typechain";
 
 import { L1SharedBridgeFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE } from "./utils";
+import { ADDRESS_ONE , getAddressFromEnv} from "./utils";
 
 import {
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -136,6 +137,38 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   // await migrateAssets(deployer, printFileName);
 }
 
+export async function updateValidatorsViaGovernance(deployer:Deployer, printFileName?: string){
+  if (deployer.verbose) {
+    console.log("Setting validators in hyperchain");
+  }
+
+  // we have to set it via the STM
+  const stm = StateTransitionManagerFactory.connect(
+    deployer.addresses.StateTransition.DiamondProxy,
+    deployer.deployWallet
+  );
+  const data3 = stm.interface.encodeFunctionData("setValidator", [
+    deployer.chainId,
+    deployer.addresses.ValidatorTimeLock,
+    true,
+  ]);
+  await deployer.executeUpgrade(deployer.addresses.StateTransition.StateTransitionProxy, 0, data3, printFileName);
+
+  if (deployer.verbose) {
+    console.log("Setting validators in validator timelock");
+  }
+
+  // adding to validator timelock
+  const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
+  const validatorTwoAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_BLOBS_ETH_ADDR");
+  const validatorTimelock = deployer.validatorTimelock(deployer.deployWallet);
+  const txRegisterValidator = validatorTimelock.interface.encodeFunctionData("addValidator", [deployer.chainId, validatorOneAddress]);
+  await deployer.executeUpgrade(deployer.addresses.ValidatorTimeLock, 0, txRegisterValidator, printFileName);
+
+  const tx3 =  validatorTimelock.interface.encodeFunctionData("addValidator", [deployer.chainId, validatorTwoAddress]);
+  await deployer.executeUpgrade(deployer.addresses.ValidatorTimeLock, 0, tx3, printFileName);
+}
+
 // This sets the Shared Bridge parameters. We need to do this separately, as these params will be known after the upgrade
 export async function upgradeToHyperchains3(deployer: Deployer, printFileName?: string) {
   const sharedBridge = L1SharedBridgeFactory.connect(
@@ -143,14 +176,14 @@ export async function upgradeToHyperchains3(deployer: Deployer, printFileName?: 
     deployer.deployWallet
   );
   const data2 = sharedBridge.interface.encodeFunctionData("setEraPostDiamondUpgradeFirstBatch", [
-    process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH ?? 1,
+    process.env.CONTRACTS_ERA_POST_DIAMOND_UPGRADE_FIRST_BATCH,
   ]);
   const data3 = sharedBridge.interface.encodeFunctionData("setEraPostLegacyBridgeUpgradeFirstBatch", [
-    process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH ?? 1,
+    process.env.CONTRACTS_ERA_POST_LEGACY_BRIDGE_UPGRADE_FIRST_BATCH,
   ]);
   const data4 = sharedBridge.interface.encodeFunctionData("setEraLegacyBridgeLastDepositTime", [
-    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH ?? 1,
-    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER ?? 0,
+    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_BATCH,
+    process.env.CONTRACTS_ERA_LEGACY_UPGRADE_LAST_DEPOSIT_TX_NUMBER,
   ]);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data2, printFileName);
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, data3, printFileName);
@@ -163,33 +196,32 @@ async function deployNewContracts(deployer: Deployer, gasPrice: BigNumberish, cr
 
   // Create2 factory already deployed
 
-  await deployer.deployGenesisUpgrade(create2Salt, {
-    gasPrice,
-    nonce,
-  });
-  nonce++;
+  // await deployer.deployGenesisUpgrade(create2Salt, {
+  //   gasPrice,
+  //   nonce,
+  // });
+  // nonce++;
 
   await deployer.deployValidatorTimelock(create2Salt, { gasPrice, nonce });
   nonce++;
 
-  await deployer.deployHyperchainsUpgrade(create2Salt, {
-    gasPrice,
-    nonce,
-  });
-  nonce++;
-  await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
+  // await deployer.deployHyperchainsUpgrade(create2Salt, {
+  //   gasPrice,
+  //   nonce,
+  // });
+  // nonce++;
+  // await deployer.deployVerifier(create2Salt, { gasPrice, nonce });
 
-  if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
-    await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
-  }
-  await deployer.deployBridgehubContract(create2Salt, gasPrice);
+  // if (process.env.CHAIN_ETH_NETWORK != "hardhat") {
+  //   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
+  // }
+  // await deployer.deployBridgehubContract(create2Salt, gasPrice);
 
-  await deployer.deployStateTransitionManagerContract(create2Salt, [], gasPrice);
-  await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
+  // await deployer.deployStateTransitionManagerContract(create2Salt, [], gasPrice);
+  // await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
-  await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
-  await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
-  // await deployer.deployERC20BridgeProxy(create2Salt, { gasPrice });
+  // await deployer.deploySharedBridgeContracts(create2Salt, gasPrice);
+  // await deployer.deployERC20BridgeImplementation(create2Salt, { gasPrice });
 }
 
 async function upgradeL2Bridge(deployer: Deployer, printFileName?: string) {
