@@ -768,7 +768,7 @@ export class Deployer {
     }
 
     if (validiumMode) {
-      const tx5 = await diamondProxy.setValidiumMode(PubdataPricingMode.Validium);
+      const tx5 = await diamondProxy.setPubdataPricingMode(PubdataPricingMode.Validium);
       const receipt5 = await tx5.wait();
       if (this.verbose) {
         console.log(`Validium mode set, gas used: ${receipt5.gasUsed.toString()}`);
