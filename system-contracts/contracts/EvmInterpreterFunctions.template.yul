@@ -563,9 +563,11 @@ function getEVMGas() -> evmGas {
     let _gas := gas()
     let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
 
-    if or(gt(_gas, requiredGas), eq(requiredGas, _gas)) {
-        evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+    if lt(_gas, requiredGas) {
+        // zkevm gas was not enough
+        revert(0, 0)
     }
+    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
 }
 
 function _getZkEVMGas(_evmGas) -> zkevmGas {
