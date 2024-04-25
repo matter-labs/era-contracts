@@ -294,7 +294,6 @@ for { } true { } {
 
         sp := pushStackItem(sp, balance(addr))
 
-        // TODO: Handle cold/warm slots and updates, etc for gas costs.
         switch wasWarm
         case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
         default { evmGasLeft := chargeGas(evmGasLeft, 100) }
@@ -1195,11 +1194,14 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
-        let dynamicGas
-        // A function was implemented in order to avoid stack depth errors.
-        dynamicGas, sp := performCall(sp, evmGasLeft, isStatic)
+        let dynamicGas, frameGasLeft, gasToPay
 
-        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
+        // A function was implemented in order to avoid stack depth errors.
+        frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
+        
+        // Check if the following is ok
+        evmGasLeft := chargeGas(evmGasLeft, gasToPay)
+        evmGasLeft := add(evmGasLeft, frameGasLeft)
     }
     case 0xFA { // OP_STATICCALL
         let addr, argsOffset, argsSize, retOffset, retSize
@@ -1277,9 +1279,7 @@ for { } true { } {
 
         invalid()
     }
-    // TODO: REST OF OPCODES
     default {
-        // TODO: Revert properly here and report the unrecognized opcode
         printString("INVALID OPCODE")
         printHex(opcode)
         revert(0, 0)
