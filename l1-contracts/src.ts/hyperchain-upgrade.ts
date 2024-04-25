@@ -443,3 +443,12 @@ async function migrateAssets(deployer: Deployer) {
   // daiTransferData;
   await deployer.executeUpgrade(deployer.addresses.Bridges.SharedBridgeProxy, 0, daiTransferData);
 }
+
+export async function transferProxyAdminErc20Bridge(deployer: Deployer){
+  const bridgeProxy: ITransparentUpgradeableProxy = ITransparentUpgradeableProxyFactory.connect(
+    deployer.addresses.Bridges.ERC20BridgeProxy,
+    deployer.deployWallet
+  );
+  const tx = bridgeProxy.changeAdmin(deployer.addresses.TransparentProxyAdmin);
+  
+}
