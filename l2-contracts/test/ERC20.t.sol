@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
-import {L2SharedBridge} from "l2-contracts/bridge/L2SharedBridge.sol";
-import {L2StandardERC20} from "l2-contracts/bridge/L2StandardERC20.sol";
+import {L2SharedBridge} from "../contracts/bridge/L2SharedBridge.sol";
+import {L2StandardERC20} from "../contracts/bridge/L2StandardERC20.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
