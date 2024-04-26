@@ -123,7 +123,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
 
   // Now time to parse the initialize code
   const parsedData = contract.interface.parseTransaction({ data: initializeCode });
-  // console.log(parsedData);
   const initializeData = {
     ...parsedData.args._initializeData,
   };
