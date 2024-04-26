@@ -68,6 +68,10 @@ const expectedRecursionCircuitsSetVksHash = "0x000000000000000000000000000000000
 const expectedBootloaderHash = "0x010008e7f0f15ed191392960117f88fe371348982b28a033c7207ed2c09bc0f4";
 const expectedDefaultAccountHash = "0x01000563374c277a2c1e34659a2a1e87371bb6d852ce142022d497bfb50b9e32";
 
+const expectedGovernance = "0xEE73438083629026FAfA1f5F5bBE2bBD6Bad6331";
+const validatorOne = "0x0000000000000000000000000000000000000000"; // to do find
+const validatorTwo = "0x0000000000000000000000000000000000000000"; // to do find
+
 const l1Provider = new ethers.providers.JsonRpcProvider(web3Url());
 
 async function checkIdenticalBytecode(addr: string, contract: string) {
@@ -290,6 +294,16 @@ async function checkValidatorTimelock() {
     throw new Error("ValidatorTimelock stateTransitionManager is not correct");
   }
 
+  const validatorOneIsSet = await contract.validators(eraChainId, validatorOne);
+  if (!validatorOneIsSet) {
+    throw new Error("ValidatorTimelock validatorOne is not correct");
+  }
+
+  const validatorTwoIsSet = await contract.validators(eraChainId, validatorTwo);
+  if (!validatorTwoIsSet) {
+    throw new Error("ValidatorTimelock validatorTwo is not correct");
+  }
+
   await checkCorrectInitCode(validatorTimelockDeployTx, contract, artifact.bytecode, [
     initialOwner,
     expectedDelay,
@@ -347,6 +361,46 @@ async function checkMailbox() {
 
   await checkCorrectInitCode(mailboxFacetDeployTx, contract, artifact.bytecode, [eraChainId]);
   console.log("Mailbox is correct!");
+}
+
+async function checkUpgradeHyperchainParams() {
+  const artifact = await hardhat.artifacts.readArtifact("GettersFacet");
+  const contract = new ethers.Contract(expectedHyperchainAddr, artifact.abi, l1Provider);
+
+  // Note: there is no getters for chainId
+  const setBridgehub = await contract.getBridgehub();
+  if (setBridgehub != bridgeHub) {
+    throw new Error("Bridgehub is not set in Era correctly");
+  }
+  const setStateTransitionManager = await contract.getStateTransitionManager();
+  if (setStateTransitionManager != stm) {
+    throw new Error("Bridgehub is not set in Era correctly");
+  }
+  const setBaseTokenBridge = await contract.getBaseTokenBridge();
+  if (setBaseTokenBridge != sharedBridgeProxy) {
+    throw new Error("Bridgehub is not set in Era correctly");
+  }
+  const setBaseToken = await contract.getBaseToken();
+  if (setBaseToken != utils.ETH_ADDRESS_IN_CONTRACTS) {
+    throw new Error("Bridgehub is not set in Era correctly");
+  }
+  const baseTokenGasPriceMultiplierNominator = await contract.baseTokenGasPriceMultiplierNominator();
+  if (baseTokenGasPriceMultiplierNominator != 1) {
+    throw new Error("baseTokenGasPriceMultiplierNominator is not set in Era correctly");
+  }
+  const baseTokenGasPriceMultiplierDenominator = await contract.baseTokenGasPriceMultiplierDenominator();
+  if (baseTokenGasPriceMultiplierDenominator != 1) {
+    throw new Error("baseTokenGasPriceMultiplierDenominator is not set in Era correctly");
+  }
+  const admin = await contract.getAdmin();
+  if (admin != expectedGovernance) {
+    throw new Error("admin is not set in Era correctly");
+  }
+  const validatorTimelockIsRegistered = await contract.isValidator(validatorTimelock);
+  if (!validatorTimelockIsRegistered) {
+    throw new Error("Bridgehub is not set in Era correctly");
+  }
+  console.log("Validator timelock and admin is set correctly in Era!");
 }
 
 async function checkSTMImpl() {
@@ -470,6 +524,7 @@ async function main() {
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();
+    await checkUpgradeHyperchainParams();
 
     await checkProxyAdmin();
 
