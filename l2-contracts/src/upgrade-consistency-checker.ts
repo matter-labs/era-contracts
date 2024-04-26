@@ -6,14 +6,14 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { ethers } from "ethers";
-import { Provider, utils } from "zksync-ethers";
+import { Provider } from "zksync-ethers";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
 // 2. Getter methods in STM.
 
 // List the contracts that should become the upgrade targets
-const l2BridgeImplAddr = '0xce0a8c005a73e35d95cec41a9e8b75668470fb8f';
+const l2BridgeImplAddr = "0xce0a8c005a73e35d95cec41a9e8b75668470fb8f";
 
 const eraChainId = 270;
 
@@ -24,39 +24,40 @@ async function checkIdenticalBytecode(addr: string, contract: string) {
   const currentCode = await l2Provider.getCode(addr);
 
   if (ethers.utils.keccak256(currentCode) == ethers.utils.keccak256(correctCode)) {
-    console.log(contract, 'bytecode is correct');
+    console.log(contract, "bytecode is correct");
   } else {
-    throw new Error(contract + ' bytecode is not correct');
+    throw new Error(contract + " bytecode is not correct");
   }
 }
 
 async function checkL2SharedBridgeImpl() {
-  await checkIdenticalBytecode(l2BridgeImplAddr, 'L2SharedBridge');
+  await checkIdenticalBytecode(l2BridgeImplAddr, "L2SharedBridge");
 
   // In Era we can retrieve the immutable from the simulator
   const contract = new ethers.Contract(
-    '0x0000000000000000000000000000000000008005',
+    "0x0000000000000000000000000000000000008005",
     immutableSimulatorAbi(),
     l2Provider
   );
 
-  const usedEraChainId = ethers.BigNumber.from(await contract.getImmutable(l2BridgeImplAddr, 0)); 
-  if(!usedEraChainId.eq(ethers.BigNumber.from(eraChainId))) {
-    throw new Error('Era chain id is not correct');
+  const usedEraChainId = ethers.BigNumber.from(await contract.getImmutable(l2BridgeImplAddr, 0));
+  if (!usedEraChainId.eq(ethers.BigNumber.from(eraChainId))) {
+    throw new Error("Era chain id is not correct");
   }
-  console.log('L2SharedBridge is correct!');
+  console.log("L2SharedBridge is correct!");
 }
 
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("upgrade-consistency-checker").description("upgrade shared bridge for era diamond proxy");
-
   program
-    .action(async (cmd) => {
-      await checkL2SharedBridgeImpl();
-    });
+    .version("0.1.0")
+    .name("upgrade-consistency-checker")
+    .description("upgrade shared bridge for era diamond proxy");
 
+  program.action(async () => {
+    await checkL2SharedBridgeImpl();
+  });
 
   await program.parseAsync(process.argv);
 }
@@ -68,62 +69,61 @@ main()
     process.exit(1);
   });
 
-
 function immutableSimulatorAbi() {
   return [
     {
-      "inputs": [
+      inputs: [
         {
-          "internalType": "address",
-          "name": "_dest",
-          "type": "address"
+          internalType: "address",
+          name: "_dest",
+          type: "address",
         },
         {
-          "internalType": "uint256",
-          "name": "_index",
-          "type": "uint256"
-        }
+          internalType: "uint256",
+          name: "_index",
+          type: "uint256",
+        },
       ],
-      "name": "getImmutable",
-      "outputs": [
+      name: "getImmutable",
+      outputs: [
         {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
+          internalType: "bytes32",
+          name: "",
+          type: "bytes32",
+        },
       ],
-      "stateMutability": "view",
-      "type": "function"
+      stateMutability: "view",
+      type: "function",
     },
     {
-      "inputs": [
+      inputs: [
         {
-          "internalType": "address",
-          "name": "_dest",
-          "type": "address"
+          internalType: "address",
+          name: "_dest",
+          type: "address",
         },
         {
-          "components": [
+          components: [
             {
-              "internalType": "uint256",
-              "name": "index",
-              "type": "uint256"
+              internalType: "uint256",
+              name: "index",
+              type: "uint256",
             },
             {
-              "internalType": "bytes32",
-              "name": "value",
-              "type": "bytes32"
-            }
+              internalType: "bytes32",
+              name: "value",
+              type: "bytes32",
+            },
           ],
-          "internalType": "struct ImmutableData[]",
-          "name": "_immutables",
-          "type": "tuple[]"
-        }
+          internalType: "struct ImmutableData[]",
+          name: "_immutables",
+          type: "tuple[]",
+        },
       ],
-      "name": "setImmutables",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    }
-  ]
+      name: "setImmutables",
+      outputs: [],
+      stateMutability: "nonpayable",
+      type: "function",
+    },
+  ];
 }
