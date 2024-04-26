@@ -11,7 +11,7 @@ import type { Deployer } from "./deploy";
 
 import type { ITransparentUpgradeableProxy } from "../typechain/ITransparentUpgradeableProxy";
 import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUpgradeableProxyFactory";
-import { StateTransitionManagerFactory, L1SharedBridgeFactory, MigrationSTMFactory, ValidatorTimelockFactory } from "../typechain";
+import { StateTransitionManagerFactory, L1SharedBridgeFactory, ValidatorTimelockFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
 import { ADDRESS_ONE, getAddressFromEnv } from "./utils";
@@ -111,14 +111,14 @@ export async function upgradeToHyperchains1(
     deployer.addresses.StateTransition.StateTransitionProxy,
     deployer.deployWallet
   );
-  const tx3 =  await stm.setValidatorTimelock(deployer.addresses.ValidatorTimeLock);
+  const tx3 = await stm.setValidatorTimelock(deployer.addresses.ValidatorTimeLock);
   await tx3.wait();
 
   if (deployer.verbose) {
     console.log("Setting dummy STM in Validator timelock");
   }
 
-  let ethTxOptions : ethers.providers.TransactionRequest;
+  let ethTxOptions: ethers.providers.TransactionRequest;
   ethTxOptions.gasLimit ??= 10_000_000;
   const migrationSTMAddress = await deployer.deployViaCreate2(
     "MigrationSTM",
@@ -127,11 +127,8 @@ export async function upgradeToHyperchains1(
     ethTxOptions
   );
 
-  const validatorTimelock = ValidatorTimelockFactory.connect(
-    migrationSTMAddress,
-    deployer.deployWallet
-  );
-  const tx4 =  await validatorTimelock.setStateTransitionManager(migrationSTMAddress);
+  const validatorTimelock = ValidatorTimelockFactory.connect(migrationSTMAddress, deployer.deployWallet);
+  const tx4 = await validatorTimelock.setStateTransitionManager(migrationSTMAddress);
   await tx4.wait();
 
   const validatorOneAddress = getAddressFromEnv("ETH_SENDER_SENDER_OPERATOR_COMMIT_ETH_ADDR");
@@ -141,11 +138,17 @@ export async function upgradeToHyperchains1(
   const tx6 = await validatorTimelock.addValidator(deployer.chainId, validatorTwoAddress, { gasPrice });
   const receipt6 = await tx6.wait();
 
-
-  const tx7 =  await validatorTimelock.setStateTransitionManager(deployer.addresses.StateTransition.StateTransitionProxy);
+  const tx7 = await validatorTimelock.setStateTransitionManager(
+    deployer.addresses.StateTransition.StateTransitionProxy
+  );
   const receipt7 = await tx7.wait();
   if (deployer.verbose) {
-    console.log("Validators added, stm transferred back", receipt5.transactionHash, receipt6.transactionHash, receipt7.transactionHash);
+    console.log(
+      "Validators added, stm transferred back",
+      receipt5.transactionHash,
+      receipt6.transactionHash,
+      receipt7.transactionHash
+    );
   }
 }
 

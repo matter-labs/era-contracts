@@ -54,8 +54,8 @@ async function main() {
         verbose: true,
       });
 
-      console.log(deployer)
-    //   await updateValidatorsViaGovernance(deployer, cmd.printFilePath);
+      console.log(deployer);
+      //   await updateValidatorsViaGovernance(deployer, cmd.printFilePath);
     });
 
   await program.parseAsync(process.argv);
