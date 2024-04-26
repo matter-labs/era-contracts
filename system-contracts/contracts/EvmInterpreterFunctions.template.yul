@@ -672,7 +672,17 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     switch warmAddress(addr)
         case 0 { extraCost := 2600 }
         default { extraCost := 100 }
-    extraCost := add(extraCost,expandMemory(add(retOffset,retSize)))
+    {
+        let maxExpand := add(retOffset, retSize)
+        switch lt(maxExpand,add(argsOffset, argsSize))  // Check if this makes sense
+        case 0 {
+            maxExpand := expandMemory(add(argsOffset, argsSize))
+        }
+        default {
+            maxExpand := expandMemory(maxExpand)
+        }
+        extraCost := add(extraCost,maxExpand)
+    }
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
     if gt(gasToPass, maxGasToPass) { 
         gasToPass := maxGasToPass
@@ -745,7 +755,17 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     if and(isAddrEmpty(addr), gt(value, 0)) {
         extraCost := add(extraCost,25000)
     }
-    extraCost := add(extraCost,expandMemory(add(retOffset,retSize)))
+    {
+        let maxExpand := add(retOffset, retSize)
+        switch lt(maxExpand,add(argsOffset, argsSize)) 
+        case 0 {
+            maxExpand := expandMemory(add(argsOffset, argsSize))
+        }
+        default {
+            maxExpand := expandMemory(maxExpand)
+        }
+        extraCost := add(extraCost,maxExpand)
+    }
     gasToPass := capGas(evmGasLeft,gasToPass)
 
     argsOffset := add(argsOffset,MEM_OFFSET_INNER())
@@ -930,10 +950,34 @@ function isAddrEmpty(addr) -> isEmpty {
     }
 }
 
-function genericCreate(addr, offset, size, sp) -> result {
+function _fetchConstructorReturnGas() -> gasLeft { // 0x16bc5cfd
+    let selector := 0x24e5ab4a
+
+    mstore8(0, 0x24)
+    mstore8(1, 0xe5)
+    mstore8(2, 0xab)
+    mstore8(3, 0x4a)
+
+    let success := staticcall(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, 4, 0, 32)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    gasLeft := mload(0)
+}
+
+function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, evmGasLeft {
     pop(warmAddress(addr))
 
     _eraseReturndataPointer()
+
+    let gasForTheCall := capGas(evmGasLeftOld,INF_PASS_GAS())
+
+    if lt(balance(addr),value) {
+        revert(0,0)
+    }
 
     let nonceNewAddr := getNonce(addr)
     let bytecodeNewAddr := extcodesize(addr)
@@ -959,9 +1003,25 @@ function genericCreate(addr, offset, size, sp) -> result {
     // Length of the init code
     mstore(sub(offset, 0x20), size)
 
-    _pushEVMFrame(gas(), false)
+    _pushEVMFrame(gasForTheCall, false)
 
-    result := call(gas(), DEPLOYER_SYSTEM_CONTRACT(), 0, sub(offset, 0x64), add(size, 0x64), 0, 0)
+    result := call(INF_PASS_GAS(), DEPLOYER_SYSTEM_CONTRACT(), value, sub(offset, 0x64), add(size, 0x64), 0, 0)
+
+    let gasLeft
+    switch result
+        case 0 {
+            gasLeft := _saveReturndataAfterEVMCall(0, 0)
+        }
+        default {
+            gasLeft := _fetchConstructorReturnGas()
+        }
+
+    printString("gas left")
+    printHex(gasLeft)
+    printString("gas for call")
+    printHex(gasForTheCall)
+    let gasUsed := sub(gasForTheCall, gasLeft)
+    evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
 
     _popEVMFrame()
 

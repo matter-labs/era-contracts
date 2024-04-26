@@ -8,6 +8,10 @@ let opcode
 for { } true { } {
     opcode := readIP(ip)
 
+    printString("Opcode: ")
+    printHex(opcode)
+    printHex(evmGasLeft)
+
     ip := add(ip, 1)
 
     switch opcode
@@ -528,7 +532,7 @@ for { } true { } {
 
         offset, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(add(offset, 32))
+        let expansionGas := expandMemory(offset)
 
         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
         sp := pushStackItem(sp, memValue)
@@ -540,7 +544,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(add(offset, 32))
+        let expansionGas := expandMemory(offset)
 
         mstore(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
@@ -551,7 +555,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(add(offset, 1))
+        let expansionGas := expandMemory(offset)
 
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
@@ -669,6 +673,8 @@ for { } true { } {
     }
     case 0x60 { // OP_PUSH1
         let value := readBytes(ip,1)
+        printString("Push1: ")
+        printHex(value)
 
         sp := pushStackItem(sp, value)
         ip := add(ip, 1)
@@ -1153,14 +1159,16 @@ for { } true { } {
             mul(2, div(add(size, 31), 32))
             )
         ))
-
+        
         let addr := getNewAddress(address())
 
-        let result := genericCreate(addr, offset, size, sp)
+        let result
+        result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) //code_deposit_cost missing
 
         switch result
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
+        
     }
     case 0xF5 { // OP_CREATE2
         if isStatic {
@@ -1187,22 +1195,24 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, add(
             32000, add(
             expandMemory(add(offset, size)),
-            mul(2, div(add(size, 31), 32))
+            mul(8, div(add(size, 31), 32))
             )
         ))
-
-        let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
-        mstore8(0, 0xFF)
-        mstore(0x01, shl(0x60, address()))
-        mstore(0x15, salt)
-        mstore(0x35, hashedBytecode)
+        {
+            let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
+            mstore8(0, 0xFF)
+            mstore(0x01, shl(0x60, address()))
+            mstore(0x15, salt)
+            mstore(0x35, hashedBytecode)
+        }
 
         let addr := and(
             keccak256(0, 0x55),
             0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         )
 
-        let result := genericCreate(addr, offset, size, sp)
+        let result
+        result, evmGasLeft := genericCreate(addr, offset, size, sp, value, evmGasLeft) //code_deposit_cost missing
 
         switch result
             case 0 { sp := pushStackItem(sp, 0) }
