@@ -77,18 +77,11 @@ export class Deployer {
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
 
-    const verifierParams =
-      process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
-        ? {
-            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
-            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
-            recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-          }
-        : {
-            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH"),
-            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH"),
-            recursionCircuitsSetVksHash: getHashFromEnv("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH"),
-          };
+    const verifierParams = {
+      recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
+      recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
+      recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
@@ -233,8 +226,10 @@ export class Deployer {
     const rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
+      console.log(
+        `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${proxyAdmin.address}`
+      );
       console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
-      console.log(`Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}`);
     }
 
     this.addresses.TransparentProxyAdmin = proxyAdmin.address;
