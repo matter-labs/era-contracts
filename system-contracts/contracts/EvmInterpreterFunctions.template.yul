@@ -681,7 +681,7 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     let frameGasLeft
     let success
     if _isEVM(addr) {
-        _pushEVMFrame(gas(), true)
+        _pushEVMFrame(gasToPass, true)
         // TODO Check the following comment from zkSync .sol.
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
         success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, 0, 0)
@@ -695,7 +695,6 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
         gasToPass := _getZkEVMGas(gasToPass)
         let zkevmGasBefore := gas()
         success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
-
         _saveReturndataAfterZkEVMCall()
 
         let gasUsed := _calcEVMGas(sub(zkevmGasBefore, gas()))
@@ -705,7 +704,6 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
             frameGasLeft := sub(gasToPass, gasUsed)
         }
     }
-
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
 
     sp := pushStackItem(sp, success)
