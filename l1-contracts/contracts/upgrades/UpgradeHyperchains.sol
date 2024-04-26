@@ -36,6 +36,7 @@ contract UpgradeHyperchains is BaseZkSyncUpgrade {
         s.baseTokenGasPriceMultiplierNominator = 1;
         s.baseTokenGasPriceMultiplierDenominator = 1;
         s.admin = chainAdmin;
+        s.validators[validatorTimelock] = true;
 
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
