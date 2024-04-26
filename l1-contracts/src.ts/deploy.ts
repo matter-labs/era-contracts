@@ -225,7 +225,7 @@ export class Deployer {
     if (this.verbose) {
       console.log("Deploying Proxy Admin");
     }
-
+    // Note: we cannot deploy using Create2, as the owner of the ProxyAdmin is msg.sender
     const contractFactory = await hardhat.ethers.getContractFactory("ProxyAdmin", {
       signer: this.deployWallet,
     });

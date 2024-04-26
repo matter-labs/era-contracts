@@ -118,7 +118,7 @@ export async function upgradeToHyperchains1(
     console.log("Setting dummy STM in Validator timelock");
   }
 
-  let ethTxOptions: ethers.providers.TransactionRequest;
+  const ethTxOptions: ethers.providers.TransactionRequest = {};
   ethTxOptions.gasLimit ??= 10_000_000;
   const migrationSTMAddress = await deployer.deployViaCreate2(
     "MigrationSTM",
@@ -127,7 +127,10 @@ export async function upgradeToHyperchains1(
     ethTxOptions
   );
 
-  const validatorTimelock = ValidatorTimelockFactory.connect(migrationSTMAddress, deployer.deployWallet);
+  const validatorTimelock = ValidatorTimelockFactory.connect(
+    deployer.addresses.ValidatorTimeLock,
+    deployer.deployWallet
+  );
   const tx4 = await validatorTimelock.setStateTransitionManager(migrationSTMAddress);
   await tx4.wait();
 
