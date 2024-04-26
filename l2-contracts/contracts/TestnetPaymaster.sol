@@ -51,7 +51,7 @@ contract TestnetPaymaster is IPaymaster {
                 // If the revert reason is empty or represented by just a function selector,
                 // we replace the error with a more user-friendly message
                 if (revertReason.length <= 4) {
-                    revert("Failed to transferFrom from user's account");
+                    revert("Failed to transfer from the account of the user");
                 } else {
                     assembly {
                         revert(add(0x20, revertReason), mload(revertReason))
