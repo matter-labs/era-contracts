@@ -6,7 +6,7 @@
 import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { ethers } from "ethers";
-import { Provider, utils } from "zksync-ethers";
+import { Provider } from "zksync-ethers";
 
 // Things that still have to be manually double checked:
 // 1. Contracts must be verified.
@@ -55,7 +55,7 @@ async function main() {
     .name("upgrade-consistency-checker")
     .description("upgrade shared bridge for era diamond proxy");
 
-  program.action(async (cmd) => {
+  program.action(async () => {
     await checkL2SharedBridgeImpl();
   });
 

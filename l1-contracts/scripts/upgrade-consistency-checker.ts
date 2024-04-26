@@ -7,7 +7,7 @@ import * as hardhat from "hardhat";
 import { Command } from "commander";
 import { web3Url } from "./utils";
 import { BigNumber, ethers } from "ethers";
-import { Provider, utils } from "zksync-ethers";
+import { utils } from "zksync-ethers";
 import type { FacetCut } from "../src.ts/diamondCut";
 import { getCurrentFacetCutsForAdd } from "../src.ts/diamondCut";
 
@@ -81,6 +81,7 @@ async function checkIdenticalBytecode(addr: string, contract: string) {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCorrectInitCode(txHash: string, contract: ethers.Contract, bytecode: string, params: any[]) {
   const deployTx = await l1Provider.getTransaction(txHash);
   const usedInitCode = await extractInitCode(deployTx.data);
@@ -108,7 +109,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   const initCode = await extractInitCode(data);
 
   const artifact = await hardhat.artifacts.readArtifact("TransparentUpgradeableProxy");
-  const proxyInterface = new ethers.utils.Interface(artifact.abi);
 
   // Deployment tx is a concatenation of the init code and the constructor data
   // constructor has the following type `constructor(address _logic, address admin_, bytes memory _data)`
@@ -165,6 +165,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
   const expectedFacetCuts: FacetCut[] = Object.values(
     await getCurrentFacetCutsForAdd(adminFacet, gettersFacet, mailboxFacet, executorFacet)
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const usedFacetCuts = diamondCut.facetCuts.map((fc: any) => {
     return {
       facet: fc.facet,
@@ -191,6 +192,7 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     }
 
     // For the array of selectors it is just easier to hexconcat them and compare
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const usedSelectors = ethers.utils.hexConcat(Array.from(used.selectors).sort() as any[]);
     const expectedSelectors = ethers.utils.hexConcat(expected.selectors.sort());
     if (usedSelectors !== expectedSelectors) {
@@ -457,7 +459,7 @@ async function main() {
     .name("upgrade-consistency-checker")
     .description("upgrade shared bridge for era diamond proxy");
 
-  program.action(async (cmd) => {
+  program.action(async () => {
     await checkIdenticalBytecode(genesisUpgrade, "GenesisUpgrade");
     await checkIdenticalBytecode(upgradeHyperchains, "UpgradeHyperchains");
     await checkIdenticalBytecode(executorFacet, "ExecutorFacet");
@@ -492,5 +494,3 @@ main()
     console.error("Error:", err);
     process.exit(1);
   });
-
-function expectedDiamondCut() {}
