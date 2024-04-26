@@ -8,13 +8,14 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { web3Provider, GAS_MULTIPLIER } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { ethTestConfig } from "../src.ts/utils";
-// import { updateValidatorsViaGovernance } from "../src.ts/hyperchain-upgrade";
+import { transferERC20BridgeToProxyAdmin } from "../src.ts/hyperchain-upgrade";
 
 const provider = web3Provider();
 
 async function main() {
   const program = new Command();
 
+  // used for emergency operations.
   program.version("0.1.0").name("deploy").description("deploy L1 contracts");
 
   program
@@ -54,8 +55,7 @@ async function main() {
         verbose: true,
       });
 
-      console.log(deployer)
-    //   await updateValidatorsViaGovernance(deployer, cmd.printFilePath);
+      await transferERC20BridgeToProxyAdmin(deployer, gasPrice, cmd.printFilePath);
     });
 
   await program.parseAsync(process.argv);
