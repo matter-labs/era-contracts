@@ -44,9 +44,8 @@ export async function loadDefaultEnvVarsForTests(deployWallet: Wallet) {
   process.env.CONTRACTS_GENESIS_BATCH_COMMITMENT = ethers.constants.HashZero;
   // process.env.CONTRACTS_GENESIS_UPGRADE_ADDR = ADDRESS_ONE;
   process.env.CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT = "72000000";
-  process.env.CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH = ethers.constants.HashZero;
-  process.env.CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH = ethers.constants.HashZero;
-  process.env.CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH = ethers.constants.HashZero;
+  process.env.CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH = ethers.constants.HashZero;
+  process.env.CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH = ethers.constants.HashZero;
   // process.env.CONTRACTS_SHARED_BRIDGE_UPGRADE_STORAGE_SWITCH = "1";
   process.env.ETH_CLIENT_CHAIN_ID = (await deployWallet.getChainId()).toString();
   process.env.CONTRACTS_ERA_CHAIN_ID = "270";
@@ -261,17 +260,10 @@ export class EraDeployer extends Deployer {
     );
     facetCuts = facetCuts.concat(extraFacets ?? []);
 
-    const verifierParams =
-      process.env["CONTRACTS_PROVER_AT_GENESIS"] == "fri"
-        ? {
+    const verifierParams = {
             recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
             recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
             recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-          }
-        : {
-            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_NODE_LEVEL_VK_HASH"),
-            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_RECURSION_LEAF_LEVEL_VK_HASH"),
-            recursionCircuitsSetVksHash: getHashFromEnv("CONTRACTS_RECURSION_CIRCUITS_SET_VKS_HASH"),
           };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
