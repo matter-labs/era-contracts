@@ -261,10 +261,10 @@ export class EraDeployer extends Deployer {
     facetCuts = facetCuts.concat(extraFacets ?? []);
 
     const verifierParams = {
-            recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
-            recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
-            recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-          };
+      recursionNodeLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_NODE_LEVEL_VK_HASH"),
+      recursionLeafLevelVkHash: getHashFromEnv("CONTRACTS_FRI_RECURSION_LEAF_LEVEL_VK_HASH"),
+      recursionCircuitsSetVksHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    };
     const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
     const DiamondInit = new Interface(hardhat.artifacts.readArtifactSync("DiamondInit").abi);
 
