@@ -70,8 +70,8 @@ function MAX_MEMORY_FRAME() -> max {
     max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
 }
 
-function MAX_UINT() -> max {
-    max := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+function MAX_UINT() -> max_uint {
+    max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 }
 
 // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
@@ -308,28 +308,28 @@ function chargeGas(prevGas, toCharge) -> gasRemaining {
     gasRemaining := sub(prevGas, toCharge)
 }
 
-function max(a, b) -> max {
+function getMax(a, b) -> max {
     max := b
     if gt(a, b) {
         max := a
     }
 }
 
-function min(a, b) -> min {
+function getMin(a, b) -> min {
     min := b
     if lt(a, b) {
         min := a
     }
 }
 
-function bitLength(n) -> bitLength {
+function bitLength(n) -> bitLen {
     for { } gt(n, 0) { } { // while(n > 0)
-        if (iszero(n)) {
-            bitLength := 1
+        if iszero(n) {
+            bitLen := 1
             break
         }
         n := shr(1, n)
-        bitLength := add(bitLength, 1)
+        bitLen := add(bitLen, 1)
     }
 }
 
@@ -379,38 +379,43 @@ function getGasForPrecompiles(addr, gasFromCaller, argsOffset, argsSize) -> gasT
         // https://eips.ethereum.org/EIPS/eip-2565
         case 0x05 { // modexp
             let mulComplex
-            let words := max(mload(argsOffset), mload(add(argsOffset, 0x40))) // shr(3, x) == x/8
-            switch true
-                case and(lt(words, 64), eq(words, 64)){
-                    // if x <= 64: return x ** 2
-                    mulComplex := (words, words)
-                }
-                case and(lt(words, 1024), eq(words, 1024)){
-                    // elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
-                    mulComplex := sub(add(shr(2, (words, words)), mul(96, words)), 3072)
-                }
-                default {
-                    //  else: return x ** 2 // 16 + 480 * x - 199680
-                    mulComplex := sub(add(shr(4, (words, words)), mul(480, words)), 199680)
-                }
+            let Bsize := mload(argsOffset)
             let Esize := mload(add(argsOffset, 0x20))
 
+            {
+                let words := getMax(Bsize, mload(add(argsOffset, 0x40))) // shr(3, x) == x/8
+                if and(lt(words, 64), eq(words, 64)){
+                    // if x <= 64: return x ** 2
+                    mulComplex := mul(words, words)
+                }
+                if and(and(lt(words, 1024), eq(words, 1024)), gt(words, 64)){
+                    // elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+                    mulComplex := sub(add(shr(2, mul(words, words)), mul(96, words)), 3072)
+                }
+                if gt(words, 64) {
+                    //  else: return x ** 2 // 16 + 480 * x - 199680
+                    mulComplex := sub(add(shr(4, mul(words, words)), mul(480, words)), 199680)
+                }
+            }
+            
             // [96 + Bsize; 96 + Bsize + Esize]	E
-            let exponentFirst256, exponentIsZero
+            let exponentFirst256, exponentIsZero, exponentBitLen
             if or(lt(Esize, 32), eq(Esize, 32)) {
                 // Maybe there isn't exactly 32 bytes, so a mask should be applied
-                exponentFirst256 := := mload(add(add(argsOffset, 0x60), Bsize))
+                exponentFirst256 := mload(add(add(argsOffset, 0x60), Bsize))
+                exponentBitLen := bitLength(exponentFirst256)
                 exponentIsZero := iszero(and(exponentFirst256, bitMaskFromBytes(Esize)))
             }
             if gt(Esize, 32) {
                 exponentFirst256 := mload(add(add(argsOffset, 0x60), Bsize))
                 exponentIsZero := iszero(exponentFirst256)
                 let exponentNext
-                let memSteps := sub(Esize, 32)
-                for { let i := 1 } lt(i,  memSteps) { add(i, 1) } { // check every 32bytes
+                // This is done because the first 32bytes of the exponent were loaded
+                for { let i := 0 } lt(i,  div(Esize, 32)) { i := add(i, 1) Esize := sub(Esize, 32)  } { // check every 32bytes
                     // Maybe there isn't exactly 32 bytes, so a mask should be applied
                     exponentNext := mload(add(add(add(argsOffset, 0x60), Bsize), add(mul(i, 32), 32)))
-                    if (iszero(iszero(and(exponentNext, bitMaskFromBytes())))) {
+                    exponentBitLen := add(bitLength(exponentNext), mul(mul(32, 8), add(i, 1)))
+                    if iszero(iszero(and(exponentNext, bitMaskFromBytes(Esize)))) {
                         exponentIsZero := false
                     }
                 }
@@ -421,14 +426,14 @@ function getGasForPrecompiles(addr, gasFromCaller, argsOffset, argsSize) -> gasT
             let iterationCount := 1
             // elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
             if and(lt(Esize, 32), iszero(exponentIsZero)) {
-                iterationCount := sub(expBitLength, 1)
+                iterationCount := sub(exponentBitLen, 1)
             }
             // elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
             if gt(Esize, 32) {
-                iterationCount := add(mul(8, sub(Esize, 32)), sub(bitLength(and(exponentFirst256, MAX_UINT))), 1)
+                iterationCount := add(mul(8, sub(Esize, 32)), sub(bitLength(and(exponentFirst256, MAX_UINT())), 1))
             }
 
-            gasToCharge := max(200, div(mul(mulComplex, iteration_count), 3))
+            gasToCharge := getMax(200, div(mul(mulComplex, iterationCount), 3))
         }
         // ecAdd ecMul ecPairing EIP below
         // https://eips.ethereum.org/EIPS/eip-1108
