@@ -399,17 +399,14 @@ for { } true { } {
         sp := pushStackItem(sp, gasprice())
     }
     case 0x3B { // OP_EXTCODESIZE
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+        
         let addr
         addr, sp := popStackItem(sp)
 
-        // Check if its warm or cold
-        switch warmAddress(addr)
-            case true {
-                evmGasLeft := chargeGas(evmGasLeft, 100)
-            }
-            default {
-                evmGasLeft := chargeGas(evmGasLeft, 2600)
-            }
+        if iszero(warmAddress(addr)) {
+            evmGasLeft := chargeGas(evmGasLeft, 2600)
+        }
 
         // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
         // if a contract is created it works, but if the address is a zkSync's contract
