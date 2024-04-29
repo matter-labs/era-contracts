@@ -15,87 +15,94 @@ for { } true { } {
         break
     }
     case 0x01 { // OP_ADD
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, add(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x02 { // OP_MUL
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, mul(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x03 { // OP_SUB
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, sub(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x04 { // OP_DIV
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, div(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x05 { // OP_SDIV
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, sdiv(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x06 { // OP_MOD
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, mod(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x07 { // OP_SMOD
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, smod(a, b))
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x16 { // OP_AND
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, and(a,b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x17 { // OP_OR
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, or(a,b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x0A { // OP_EXP
         let a, exponent
