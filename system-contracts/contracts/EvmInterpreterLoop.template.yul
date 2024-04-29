@@ -572,25 +572,28 @@ for { } true { } {
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
     }
     case 0x54 { // OP_SLOAD
-        let key,value,isWarm
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
+        let key, value, isWarm
 
         key, sp := popStackItem(sp)
 
-        isWarm := isSlotWarm(key)
-        switch isWarm
-        case 0 { evmGasLeft := chargeGas(evmGasLeft,2100) }
-        default { evmGasLeft := chargeGas(evmGasLeft,100) }
+        if iszero(isSlotWarm(key)) {
+            evmGasLeft := chargeGas(evmGasLeft, 2000)
+        }
 
         value := sload(key)
 
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         if isStatic {
             revert(0, 0)
         }
 
-        let key, value,gasSpent
+        let key, value, gasSpent
 
         key, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
@@ -600,19 +603,25 @@ for { } true { } {
             // the context has enough funds to compensate at least for the read.
             // Im not sure if we need this before: require(gasLeft > GAS_CALL_STIPEND);
             let currentValue := sload(key)
-            let wasWarm,originalValue := warmSlot(key,currentValue)
-            gasSpent := 100
-            if and(not(eq(value,currentValue)),eq(originalValue,currentValue)) {
-                switch originalValue
-                case 0 { gasSpent := 20000}
-                default { gasSpent := 2900}
+            let wasWarm, originalValue := warmSlot(key, currentValue)
+
+            if eq(value, currentValue) {
+                continue
             }
+
+            if eq(originalValue, currentValue) {
+                gasSpent := 20000
+                if originalValue {
+                    gasSpent := 2900
+                }
+            }
+
             if iszero(wasWarm) {
-                gasSpent := add(gasSpent,2100)
+                gasSpent := add(gasSpent, 2100)
             }
         }
 
-        evmGasLeft := chargeGas(evmGasLeft, gasSpent) //gasSpent
+        evmGasLeft := chargeGas(evmGasLeft, gasSpent)
         sstore(key, value)
     }
     // NOTE: We don't currently do full jumpdest validation
