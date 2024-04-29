@@ -337,23 +337,24 @@ for { } true { } {
         sp := pushStackItem(sp, calldatasize())
     }
     case 0x37 { // OP_CALLDATACOPY
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let destOffset, offset, size
 
         destOffset, sp := popStackItem(sp)
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        let dest := add(destOffset, MEM_OFFSET_INNER())
-        let end := sub(add(dest, size), 1)
-        evmGasLeft := chargeGas(evmGasLeft, 3)
+        checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()))
+        checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()))
 
-        checkMemOverflow(end)
+        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        // minimum_word_size = (size + 31) / 32
+        let minWordSize := shr(add(size, 31), 5)
+        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(destOffset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        if or(gt(end, mload(MEM_OFFSET())), eq(end, mload(MEM_OFFSET()))) {
-            evmGasLeft := chargeGas(evmGasLeft, expandMemory(end))
-        }
-
-        calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
+        calldatacopy(add(destOffset, MEM_OFFSET_INNER()), offset, size)
     }
     case 0x38 { // OP_CODESIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
