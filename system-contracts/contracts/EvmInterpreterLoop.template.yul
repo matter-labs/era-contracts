@@ -8,10 +8,6 @@ let opcode
 for { } true { } {
     opcode := readIP(ip)
 
-    printString("Opcode: ")
-    printHex(opcode)
-    printHex(evmGasLeft)
-
     ip := add(ip, 1)
 
     switch opcode
@@ -459,7 +455,7 @@ for { } true { } {
         // minimum_word_size = (size + 31) / 32
         // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
         // static_gas = 0
-        let dynamicGas := add(mul(6, shr(add(len, 31), 5)), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(6, shr(5,add(len, 31))), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
@@ -671,8 +667,6 @@ for { } true { } {
     }
     case 0x60 { // OP_PUSH1
         let value := readBytes(ip,1)
-        printString("Push1: ")
-        printHex(value)
 
         sp := pushStackItem(sp, value)
         ip := add(ip, 1)

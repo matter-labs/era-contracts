@@ -1019,11 +1019,7 @@ function genericCreate(addr, offset, size, sp, value, evmGasLeftOld) -> result, 
         default {
             gasLeft := _fetchConstructorReturnGas()
         }
-
-    printString("gas left")
-    printHex(gasLeft)
-    printString("gas for call")
-    printHex(gasForTheCall)
+        
     let gasUsed := sub(gasForTheCall, gasLeft)
     evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
 
