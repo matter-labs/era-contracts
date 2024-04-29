@@ -338,15 +338,13 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        let dest := add(destOffset, MEM_OFFSET_INNER())
-        let end := sub(add(dest, size), 1)
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
-        checkMemOverflow(end)
+        checkMemOverflow(add(add(destOffset,MEM_OFFSET_INNER()), size))
 
-        if or(gt(end, mload(MEM_OFFSET())), eq(end, mload(MEM_OFFSET()))) {
-            evmGasLeft := chargeGas(evmGasLeft, expandMemory(end))
-        }
+        evmGasLeft := chargeGas(evmGasLeft, expandMemory(add(destOffset, size)))
+        let minWordSize := shr(5,add(size, 31))
+        evmGasLeft := chargeGas(evmGasLeft, mul(3, minWordSize))
 
         calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
     }
