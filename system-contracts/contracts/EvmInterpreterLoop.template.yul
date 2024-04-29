@@ -302,7 +302,7 @@ for { } true { } {
         addr, sp := popStackItem(sp)
 
         if iszero(warmAddress(addr)) {
-            evmGasLeft := chargeGas(evmGasLeft, 2600)
+            evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
         sp := pushStackItem(sp, balance(addr))
@@ -400,12 +400,12 @@ for { } true { } {
     }
     case 0x3B { // OP_EXTCODESIZE
         evmGasLeft := chargeGas(evmGasLeft, 100)
-        
+
         let addr
         addr, sp := popStackItem(sp)
 
         if iszero(warmAddress(addr)) {
-            evmGasLeft := chargeGas(evmGasLeft, 2600)
+            evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
         // TODO: check, the .sol uses extcodesize directly, but it doesnt seem to work
