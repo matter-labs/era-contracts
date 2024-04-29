@@ -205,7 +205,7 @@ for { } true { } {
 
         sp := pushStackItem(sp, iszero(a))
 
-        evmGasLeft := chargeGas(evmGasLeft, 3)
+        //evmGasLeft := chargeGas(evmGasLeft, 3) TODO: Add this back
     }
     case 0x18 { // OP_XOR
         let a, b
@@ -279,7 +279,7 @@ for { } true { } {
         // an expansion, which costs gas.
         // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let minWordSize := shr(add(size, 31), 5)
+        let minWordSize := shr(5,add(size, 31))
         let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
         let usedGas := add(30, dynamicGas)
         evmGasLeft := chargeGas(evmGasLeft, usedGas)
@@ -532,7 +532,7 @@ for { } true { } {
 
         offset, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(offset)
+        let expansionGas := expandMemory(offset) // TODO: add +32 here
 
         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
         sp := pushStackItem(sp, memValue)
@@ -544,7 +544,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(offset)
+        let expansionGas := expandMemory(offset) // TODO: add +32 here
 
         mstore(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
@@ -555,7 +555,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(offset)
+        let expansionGas := expandMemory(offset) // TODO: add +8 here
 
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
@@ -1247,7 +1247,10 @@ for { } true { } {
         break
     }
     case 0xF4 { // OP_DELEGATECALL
-        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
+        let gasUsed
+        sp, isStatic, gasUsed := delegateCall(sp, isStatic, evmGasLeft)
+
+        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     }
     case 0xFD { // OP_REVERT
         let offset,size

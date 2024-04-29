@@ -816,13 +816,13 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     sp := pushStackItem(sp,success) 
 }
 
-function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
-    let addr, _gas, argsOffset, argsSize, retOffset, retSize
+function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost {
+    let addr, gasToPass, argsOffset, argsSize, retOffset, retSize
 
     sp := oldSp
     isStatic := oldIsStatic
 
-    _gas, sp := popStackItem(sp)
+    gasToPass, sp := popStackItem(sp)
     addr, sp := popStackItem(sp)
     argsOffset, sp := popStackItem(sp)
     argsSize, sp := popStackItem(sp)
@@ -833,10 +833,21 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
         revert(0, 0)
     }
 
-    let memoryExpansionCost := expandMemory(add(argsOffset, argsSize))
-    memoryExpansionCost := expandMemory(add(retOffset, retSize))
-
-    let extraCost := 0
+    switch warmAddress(addr)
+        case 0 { extraCost := 2600 }
+        default { extraCost := 100 }
+    {
+        let maxExpand := add(retOffset, retSize)
+        switch lt(maxExpand,add(argsOffset, argsSize)) 
+        case 0 {
+            maxExpand := expandMemory(add(argsOffset, argsSize))
+        }
+        default {
+            maxExpand := expandMemory(maxExpand)
+        }
+        extraCost := add(extraCost,maxExpand)
+    }
+    gasToPass := capGas(evmGasLeft,gasToPass)
 
     // TODO: Do this
     // if warmAccount(addr) {
@@ -844,14 +855,6 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
     // } else {
     //     extraCost = GAS_COLD_ACCOUNT_ACCESS;
     // }
-
-    let gasToPay, gasToPass := getMessageCallGas(
-        0,
-        _gas,
-        evmGasLeft,
-        memoryExpansionCost,
-        extraCost
-    )
 
     _pushEVMFrame(gasToPass, isStatic)
     addr := delegatecall(
@@ -864,10 +867,11 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
         0
     )
 
-    pop(_saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize))
+    let frameGasLeft := _saveReturndataAfterEVMCall(add(MEM_OFFSET_INNER(), retOffset), retSize)
 
     _popEVMFrame()
 
+    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     sp := pushStackItem(sp, addr)
 }
 
