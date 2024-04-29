@@ -363,7 +363,8 @@ for { } true { } {
         sp := pushStackItem(sp, bytecodeLen)
     }
     case 0x39 { // OP_CODECOPY
-        let bytecodeLen := mload(BYTECODE_OFFSET())
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let dst, offset, len
 
         dst, sp := popStackItem(sp)
@@ -371,23 +372,25 @@ for { } true { } {
         len, sp := popStackItem(sp)
 
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
-        // let minWordSize := div(add(len, 31), 32) Used inside the mul
-        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
-        evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+        // minimum_word_size = (size + 31) / 32
+        let minWordSize := shr(5, add(len, 31))
+        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dst, len)))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        let end := len
-        if lt(bytecodeLen, len) {
-            end := bytecodeLen
+        dst := add(dst, MEM_OFFSET_INNER())
+        offset := add(add(offset, BYTECODE_OFFSET()), 32)
+
+        checkMemOverflow(add(dst, len))
+        // Check bytecode overflow
+        if gt(add(offset, len), sub(MEM_OFFSET(), 1)) {
+            revert(0, 0)
         }
 
-        for { let i := 0 } lt(i, end) { i := add(i, 1) } {
+        for { let i := 0 } lt(i, len) { i := add(i, 1) } {
             mstore8(
-                add(MEM_OFFSET_INNER(), add(dst, i)),
-                shr(248, mload(add(BYTECODE_OFFSET(), add(32, add(offset, i)))))
+                add(dst, i),
+                shr(248, mload(add(offset, i)))
             )
-        }
-        for { let i := end } lt(i, len) { i := add(i, 1) } {
-            mstore8(add(MEM_OFFSET_INNER(), add(dst, i)), 0)
         }
     }
     case 0x3A { // OP_GASPRICE
