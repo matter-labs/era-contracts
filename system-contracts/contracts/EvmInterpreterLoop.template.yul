@@ -1045,6 +1045,8 @@ for { } true { } {
         evmGasLeft := swapStackItem(sp, evmGasLeft, 16)
     }
     case 0xA0 { // OP_LOG0
+        evmGasLeft := chargeGas(evmGasLeft, 375)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1053,17 +1055,17 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
-        {
-            let gasUsed := add(add(375, mul(8, size)), expandMemory(add(offset, size)))
-            evmGasLeft := chargeGas(evmGasLeft, gasUsed)
-        }
+        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         log0(add(offset, MEM_OFFSET_INNER()), size)
     }
     case 0xA1 { // OP_LOG1
+        evmGasLeft := chargeGas(evmGasLeft, 375)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1073,11 +1075,12 @@ for { } true { } {
         size, sp := popStackItem(sp)
         topic1, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
-        let gasUsed := add(add(750, mul(8, size)), expandMemory(add(offset, size)))
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        dynamicGas := add(dynamicGas, 375)
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         log1(add(offset, MEM_OFFSET_INNER()), size, topic1)
     }
@@ -1086,24 +1089,24 @@ for { } true { } {
             revert(0, 0)
         }
 
-        let offset, size
+        let offset, size, topic1, topic2
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
+        topic1, sp := popStackItem(sp)
+        topic2, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
-        let gasUsed := add(add(1125, mul(8, size)), expandMemory(add(offset, size)))
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        dynamicGas := add(dynamicGas, 750)
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
-        {
-            let topic1, topic2
-            topic1, sp := popStackItem(sp)
-            topic2, sp := popStackItem(sp)
-            log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
-        }
+        log2(add(offset, MEM_OFFSET_INNER()), size, topic1, topic2)
     }
     case 0xA3 { // OP_LOG3
+        evmGasLeft := chargeGas(evmGasLeft, 375)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1112,11 +1115,12 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
-        let gasUsed := add(add(1500, mul(8, size)), expandMemory(add(offset, size)))
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        dynamicGas := add(dynamicGas, 1125)
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         {
             let topic1, topic2, topic3
@@ -1127,6 +1131,8 @@ for { } true { } {
         }
     }
     case 0xA4 { // OP_LOG4
+        evmGasLeft := chargeGas(evmGasLeft, 375)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1135,11 +1141,12 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         size, sp := popStackItem(sp)
 
-        checkMemOverflow(add(offset, MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), size))
 
-        let gasUsed := add(add(1875, mul(8, size)), expandMemory(add(offset, size)))
-        evmGasLeft := chargeGas(evmGasLeft, gasUsed)
+        // dynamicGas = 375 * topic_count + 8 * size + memory_expansion_cost
+        let dynamicGas := add(shl(3, size), expandMemory(add(offset, size)))
+        dynamicGas := add(dynamicGas, 1500)
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         {
             let topic1, topic2, topic3, topic4
