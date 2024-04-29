@@ -10,9 +10,6 @@ for { } true { } {
 
     ip := add(ip, 1)
 
-    printString("OPCODE")
-    printHex(opcode)
-
     switch opcode
     case 0x00 { // OP_STOP
         break
