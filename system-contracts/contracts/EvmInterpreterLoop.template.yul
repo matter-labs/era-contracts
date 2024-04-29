@@ -84,25 +84,27 @@ for { } true { } {
 
         sp := pushStackItem(sp, smod(a, b))
     }
-    case 0x16 { // OP_AND
-        evmGasLeft := chargeGas(evmGasLeft, 3)
+    case 0x08 { // OP_ADDMOD
+        evmGasLeft := chargeGas(evmGasLeft, 8)
 
-        let a, b
+        let a, b, N
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
+        N, sp := popStackItem(sp)
 
-        sp := pushStackItem(sp, and(a,b))
+        sp := pushStackItem(sp, addmod(a, b, N))
     }
-    case 0x17 { // OP_OR
-        evmGasLeft := chargeGas(evmGasLeft, 3)
+    case 0x09 { // OP_MULMOD
+        evmGasLeft := chargeGas(evmGasLeft, 8)
 
-        let a, b
+        let a, b, N
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
+        N, sp := popStackItem(sp)
 
-        sp := pushStackItem(sp, or(a,b))
+        sp := pushStackItem(sp, mulmod(a, b, N))
     }
     case 0x0A { // OP_EXP
         let a, exponent
@@ -128,28 +130,6 @@ for { } true { } {
         x, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, signextend(b, x))
-    }
-    case 0x08 { // OP_ADDMOD
-        evmGasLeft := chargeGas(evmGasLeft, 8)
-
-        let a, b, N
-
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
-        N, sp := popStackItem(sp)
-
-        sp := pushStackItem(sp, addmod(a, b, N))
-    }
-    case 0x09 { // OP_MULMOD
-        evmGasLeft := chargeGas(evmGasLeft, 8)
-
-        let a, b, N
-
-        a, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
-        N, sp := popStackItem(sp)
-
-        sp := pushStackItem(sp, mulmod(a, b, N))
     }
     case 0x10 { // OP_LT
         evmGasLeft := chargeGas(evmGasLeft, 3)
@@ -210,6 +190,26 @@ for { } true { } {
 
         sp := pushStackItem(sp, iszero(a))
     }
+    case 0x16 { // OP_AND
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
+        let a, b
+
+        a, sp := popStackItem(sp)
+        b, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, and(a,b))
+    }
+    case 0x17 { // OP_OR
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
+        let a, b
+
+        a, sp := popStackItem(sp)
+        b, sp := popStackItem(sp)
+
+        sp := pushStackItem(sp, or(a,b))
+    }
     case 0x18 { // OP_XOR
         evmGasLeft := chargeGas(evmGasLeft, 3)
 
@@ -269,7 +269,6 @@ for { } true { } {
 
         sp := pushStackItem(sp, sar(shift, value))
     }
-
     case 0x20 { // OP_KECCAK256
         let offset, size
 
@@ -567,43 +566,6 @@ for { } true { } {
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
     }
-    // NOTE: We don't currently do full jumpdest validation
-    // (i.e. validating a jumpdest isn't in PUSH data)
-    case 0x56 { // OP_JUMP
-        evmGasLeft := chargeGas(evmGasLeft, 8)
-
-        let counter
-
-        counter, sp := popStackItem(sp)
-
-        ip := add(add(BYTECODE_OFFSET(), 32), counter)
-
-        // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip)
-        if iszero(eq(nextOpcode, 0x5B)) {
-            revert(0, 0)
-        }
-    }
-    case 0x57 { // OP_JUMPI
-        evmGasLeft := chargeGas(evmGasLeft, 10)
-
-        let counter, b
-
-        counter, sp := popStackItem(sp)
-        b, sp := popStackItem(sp)
-
-        if iszero(b) {
-            continue
-        }
-
-        ip := add(add(BYTECODE_OFFSET(), 32), counter)
-
-        // Check next opcode is JUMPDEST
-        let nextOpcode := readIP(ip)
-        if iszero(eq(nextOpcode, 0x5B)) {
-            revert(0, 0)
-        }
-    }
     case 0x54 { // OP_SLOAD
         let key,value,isWarm
 
@@ -648,6 +610,49 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, gasSpent) //gasSpent
         sstore(key, value)
     }
+    // NOTE: We don't currently do full jumpdest validation
+    // (i.e. validating a jumpdest isn't in PUSH data)
+    case 0x56 { // OP_JUMP
+        evmGasLeft := chargeGas(evmGasLeft, 8)
+
+        let counter
+
+        counter, sp := popStackItem(sp)
+
+        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+        // Check next opcode is JUMPDEST
+        let nextOpcode := readIP(ip)
+        if iszero(eq(nextOpcode, 0x5B)) {
+            revert(0, 0)
+        }
+    }
+    case 0x57 { // OP_JUMPI
+        evmGasLeft := chargeGas(evmGasLeft, 10)
+
+        let counter, b
+
+        counter, sp := popStackItem(sp)
+        b, sp := popStackItem(sp)
+
+        if iszero(b) {
+            continue
+        }
+
+        ip := add(add(BYTECODE_OFFSET(), 32), counter)
+
+        // Check next opcode is JUMPDEST
+        let nextOpcode := readIP(ip)
+        if iszero(eq(nextOpcode, 0x5B)) {
+            revert(0, 0)
+        }
+    }
+    case 0x58 { // OP_PC
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        // PC = ip - 32 (bytecode size) - 1 (current instruction)
+        sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
+    }
     case 0x59 { // OP_MSIZE
         evmGasLeft := chargeGas(evmGasLeft,2)
 
@@ -657,12 +662,6 @@ for { } true { } {
         size := shl(5,size)
         sp := pushStackItem(sp,size)
 
-    }
-    case 0x58 { // OP_PC
-        evmGasLeft := chargeGas(evmGasLeft, 2)
-
-        // PC = ip - 32 (bytecode size) - 1 (current instruction)
-        sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
     }
     case 0x5A { // OP_GAS
         evmGasLeft := chargeGas(evmGasLeft, 2)
@@ -1174,6 +1173,33 @@ for { } true { } {
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
     }
+    case 0xF1 { // OP_CALL
+        let dynamicGas, frameGasLeft, gasToPay
+
+        // A function was implemented in order to avoid stack depth errors.
+        frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
+
+        // Check if the following is ok
+        evmGasLeft := chargeGas(evmGasLeft, gasToPay)
+        evmGasLeft := add(evmGasLeft, frameGasLeft)
+    }
+    case 0xF3 { // OP_RETURN
+        let offset,size
+
+        offset, sp := popStackItem(sp)
+        size, sp := popStackItem(sp)
+
+        ensureAcceptableMemLocation(offset)
+        ensureAcceptableMemLocation(size)
+        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
+
+        returnLen := size
+        returnOffset := add(MEM_OFFSET_INNER(), offset)
+        break
+    }
+    case 0xF4 { // OP_DELEGATECALL
+        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
+    }
     case 0xF5 { // OP_CREATE2
         if isStatic {
             revert(0, 0)
@@ -1220,16 +1246,6 @@ for { } true { } {
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
     }
-    case 0xF1 { // OP_CALL
-        let dynamicGas, frameGasLeft, gasToPay
-
-        // A function was implemented in order to avoid stack depth errors.
-        frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
-        
-        // Check if the following is ok
-        evmGasLeft := chargeGas(evmGasLeft, gasToPay)
-        evmGasLeft := add(evmGasLeft, frameGasLeft)
-    }
     case 0xFA { // OP_STATICCALL
         let addr, argsOffset, argsSize, retOffset, retSize
 
@@ -1268,23 +1284,6 @@ for { } true { } {
         }
 
         sp := pushStackItem(sp, success)
-    }
-    case 0xF3 { // OP_RETURN
-        let offset,size
-
-        offset, sp := popStackItem(sp)
-        size, sp := popStackItem(sp)
-
-        ensureAcceptableMemLocation(offset)
-        ensureAcceptableMemLocation(size)
-        evmGasLeft := chargeGas(evmGasLeft,expandMemory(add(offset,size)))
-
-        returnLen := size
-        returnOffset := add(MEM_OFFSET_INNER(), offset)
-        break
-    }
-    case 0xF4 { // OP_DELEGATECALL
-        sp, isStatic := delegateCall(sp, isStatic, evmGasLeft)
     }
     case 0xFD { // OP_REVERT
         let offset,size
