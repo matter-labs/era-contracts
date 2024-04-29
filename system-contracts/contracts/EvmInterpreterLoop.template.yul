@@ -354,9 +354,10 @@ for { } true { } {
         calldatacopy(add(MEM_OFFSET_INNER(), destOffset), offset, size)
     }
     case 0x38 { // OP_CODESIZE
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+
         let bytecodeLen := mload(BYTECODE_OFFSET())
         sp := pushStackItem(sp, bytecodeLen)
-        evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x39 { // OP_CODECOPY
         let bytecodeLen := mload(BYTECODE_OFFSET())
@@ -387,8 +388,9 @@ for { } true { } {
         }
     }
     case 0x3A { // OP_GASPRICE
-        sp := pushStackItem(sp, gasprice())
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, gasprice())
     }
     case 0x3B { // OP_EXTCODESIZE
         let addr
@@ -443,6 +445,7 @@ for { } true { } {
     }
     case 0x3D { // OP_RETURNDATASIZE
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
         let rdz := mload(LAST_RETURNDATA_SIZE_OFFSET())
         sp := pushStackItem(sp, rdz)
     }
@@ -485,10 +488,11 @@ for { } true { } {
         sp := pushStackItem(sp, extcodehash(addr))
     }
     case 0x40 { // OP_BLOCKHASH
+        evmGasLeft := chargeGas(evmGasLeft, 20)
+
         let blockNumber
         blockNumber, sp := popStackItem(sp)
 
-        evmGasLeft := chargeGas(evmGasLeft, 20)
         sp := pushStackItem(sp, blockhash(blockNumber))
     }
     case 0x41 { // OP_COINBASE
@@ -524,11 +528,11 @@ for { } true { } {
         sp := pushStackItem(sp, basefee())
     }
     case 0x50 { // OP_POP
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+
         let _y
 
         _y, sp := popStackItem(sp)
-
-        evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x51 { // OP_MLOAD
         let offset
