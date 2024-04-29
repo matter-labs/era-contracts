@@ -649,8 +649,9 @@ for { } true { } {
         sstore(key, value)
     }
     case 0x59 { // OP_MSIZE
-        let size
         evmGasLeft := chargeGas(evmGasLeft,2)
+
+        let size
 
         size := mload(MEM_OFFSET())
         size := shl(5,size)
@@ -658,10 +659,10 @@ for { } true { } {
 
     }
     case 0x58 { // OP_PC
+        evmGasLeft := chargeGas(evmGasLeft, 2)
+
         // PC = ip - 32 (bytecode size) - 1 (current instruction)
         sp := pushStackItem(sp, sub(sub(ip, BYTECODE_OFFSET()), 33))
-
-        evmGasLeft := chargeGas(evmGasLeft, 2)
     }
     case 0x5A { // OP_GAS
         evmGasLeft := chargeGas(evmGasLeft, 2)
