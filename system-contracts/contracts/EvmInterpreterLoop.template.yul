@@ -283,7 +283,7 @@ for { } true { } {
         // an expansion, which costs gas.
         // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let minWordSize := shr(add(size, 31), 5)
+        let minWordSize := shr(5, add(size, 31))
         let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
@@ -350,7 +350,7 @@ for { } true { } {
 
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
-        let minWordSize := shr(add(size, 31), 5)
+        let minWordSize := shr(5, add(size, 31))
         let dynamicGas := add(mul(3, minWordSize), expandMemory(add(destOffset, size)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
