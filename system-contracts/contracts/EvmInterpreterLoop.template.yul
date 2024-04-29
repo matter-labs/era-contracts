@@ -117,7 +117,7 @@ for { } true { } {
         sp := pushStackItem(sp, exp(a, exponent))
 
         if exponent {
-            expSizeByte := div(add(exponent, 256), 256) // TODO: Replace with shr(8, add(exponent, 256))
+            let expSizeByte := div(add(exponent, 256), 256) // TODO: Replace with shr(8, add(exponent, 256))
             evmGasLeft := chargeGas(evmGasLeft, mul(50, expSizeByte))
         }
     }
