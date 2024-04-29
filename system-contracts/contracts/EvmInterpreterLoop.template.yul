@@ -416,26 +416,23 @@ for { } true { } {
             default { sp := pushStackItem(sp, _fetchDeployedCodeLen(addr)) }
     }
     case 0x3C { // OP_EXTCODECOPY
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let addr, dest, offset, len
         addr, sp := popStackItem(sp)
         dest, sp := popStackItem(sp)
         offset, sp := popStackItem(sp)
         len, sp := popStackItem(sp)
 
-        // Check if its warm or cold
-        // minimum_word_size = (size + 31) / 32
-        // static_gas = 0
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
-        let dynamicGas
-        switch warmAddress(addr)
-            case true {
-                dynamicGas := 100
-            }
-            default {
-                dynamicGas := 2600
-            }
-
-        dynamicGas := add(dynamicGas, add(mul(3, shr(5, add(len, 31))), expandMemory(add(offset, len))))
+        // minimum_word_size = (size + 31) / 32
+        let dynamicGas := add(
+            mul(3, shr(5, add(len, 31))),
+            expandMemory(add(dest, len))
+        )
+        if iszero(warmAddress(addr)) {
+            dynamicGas := add(dynamicGas, 2500)
+        }
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         // TODO: Check if Zeroing out the memory is necessary
