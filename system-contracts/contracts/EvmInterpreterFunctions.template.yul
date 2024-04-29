@@ -819,6 +819,8 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
                                     extraCost
                                 )
 
+    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOfsset, argsSize))
+
     let success
 
     if isStatic {
@@ -897,6 +899,8 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
         memoryExpansionCost,
         extraCost
     )
+
+    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOfsset, argsSize))
 
     _pushEVMFrame(gasToPass, isStatic)
     addr := delegatecall(
