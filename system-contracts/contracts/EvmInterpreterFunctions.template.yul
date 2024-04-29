@@ -608,9 +608,12 @@ function getEVMGas() -> evmGas {
     let _gas := gas()
     let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
 
-    if or(gt(_gas, requiredGas), eq(requiredGas, _gas)) {
-        evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+    if lt(sub(_gas,shl(30,1)), requiredGas) {
+        // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
+        // and we need to make sure that the gas provided over that is enough for security reasons
+        revert(0, 0)
     }
+    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
 }
 
 function _getZkEVMGas(_evmGas) -> zkevmGas {
