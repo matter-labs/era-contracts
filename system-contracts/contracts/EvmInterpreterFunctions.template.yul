@@ -199,6 +199,12 @@ function _getRawCodeHash(account) -> hash {
     hash := mload(0)
 }
 
+function getIsStaticFromCallFlags() -> isStatic {
+    isStatic := verbatim_0i_1o("get_global::call_flags")
+    // TODO: make it a constnat
+    isStatic := iszero(iszero(and(isStatic, 0x04)))
+}
+
 function _getCodeHash(account) -> hash {
     // function getCodeHash(uint256 _input) external view override returns (bytes32)
     // 0xe03fe177
@@ -217,12 +223,6 @@ function _getCodeHash(account) -> hash {
     }
 
     hash := mload(0)
-}
-
-function getIsStaticFromCallFlags() -> isStatic {
-    isStatic := verbatim_0i_1o("get_global::call_flags")
-    // TODO: make it a constnat
-    isStatic := iszero(iszero(and(isStatic, 0x04)))
 }
 
 // Basically performs an extcodecopy, while returning the length of the bytecode.
@@ -370,7 +370,6 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
             elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
             elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
             return max(iteration_count, 1)
-
         def calculate_gas_cost(base_length, modulus_length, exponent_length, exponent):
             multiplication_complexity = calculate_multiplication_complexity(base_length, modulus_length)
             iteration_count = calculate_iteration_count(exponent_length, exponent)
@@ -398,7 +397,7 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
                     mulComplex := sub(add(shr(4, mul(words, words)), mul(480, words)), 199680)
                 }
             }
-            
+
             // [96 + Bsize; 96 + Bsize + Esize]	E
             let exponentFirst256, exponentIsZero, exponentBitLen
             if or(lt(Esize, 32), eq(Esize, 32)) {
@@ -556,24 +555,6 @@ function warmSlot(key,currentValue) -> isWarm, originalValue {
     originalValue := mload(32)
 }
 
-function warmAddress(addr) -> isWarm {
-    // TODO: Unhardcode this selector 0x8db2ba78
-    mstore8(0, 0x8d)
-    mstore8(1, 0xb2)
-    mstore8(2, 0xba)
-    mstore8(3, 0x78)
-    mstore(4, addr)
-
-    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
-
-    if iszero(success) {
-        // This error should never happen
-        revert(0, 0)
-    }
-
-    isWarm := mload(0)
-}
-
 function getNewAddress(addr) -> newAddr {
     let digest, nonce, addressEncoded, nonceEncoded, nonceEncodedLength, listLength, listLengthEconded
 
@@ -638,6 +619,59 @@ function getNewAddress(addr) -> newAddr {
     )
 }
 
+function incrementNonce(addr) {
+    mstore8(0, 0x30)
+    mstore8(1, 0x63)
+    mstore8(2, 0x95)
+    mstore8(3, 0xc6)
+    mstore(4, addr)
+
+    let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+
+    if iszero(result) {
+        revert(0, 0)
+    }
+}
+
+function ensureAcceptableMemLocation(location) {
+    if gt(location,MAX_POSSIBLE_MEM()) {
+        revert(0,0) // Check if this is whats needed
+    }
+}
+
+function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
+    newOffset := offset
+    newSize := size
+    if eq(isCallerEVM,1) {
+        // include gas
+        let previousValue := mload(sub(offset,32))
+        mstore(sub(offset,32),evmGasLeft)
+        //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
+        // but it appears to rewrite were we want to store the gas
+
+        newOffset := sub(offset, 32)
+        newSize := add(size, 32)
+    }
+}
+
+function warmAddress(addr) -> isWarm {
+    // TODO: Unhardcode this selector 0x8db2ba78
+    mstore8(0, 0x8d)
+    mstore8(1, 0xb2)
+    mstore8(2, 0xba)
+    mstore8(3, 0x78)
+    mstore(4, addr)
+
+    let success := call(gas(), EVM_GAS_MANAGER_CONTRACT(), 0, 0, 36, 0, 32)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    isWarm := mload(0)
+}
+
 function getNonce(addr) -> nonce {
     mstore8(0, 0xfb)
     mstore8(1, 0x1a)
@@ -654,18 +688,28 @@ function getNonce(addr) -> nonce {
     nonce := mload(0)
 }
 
-function incrementNonce(addr) {
-    mstore8(0, 0x30)
-    mstore8(1, 0x63)
-    mstore8(2, 0x95)
-    mstore8(3, 0xc6)
-    mstore(4, addr)
+function _isEVM(_addr) -> isEVM {
+    // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector;
+    // function isAccountEVM(address _addr) external view returns (bool);
+    let selector := 0x8c040477
+    // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
+    //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
+    // );
 
-    let result := call(gas(), NONCE_HOLDER_SYSTEM_CONTRACT(), 0, 0, 36, 0, 0)
+    mstore8(0, 0x8c)
+    mstore8(1, 0x04)
+    mstore8(2, 0x04)
+    mstore8(3, 0x77)
+    mstore(4, _addr)
 
-    if iszero(result) {
+    let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+
+    if iszero(success) {
+        // This error should never happen
         revert(0, 0)
     }
+
+    isEVM := mload(0)
 }
 
 function _pushEVMFrame(_passGas, _isStatic) {
@@ -792,7 +836,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
-    
+
     let extraCost
 
     switch warmAddress(addr)
@@ -809,7 +853,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     retOffset := add(retOffset,MEM_OFFSET_INNER())
     checkMemOverflow(argsOffset)
     checkMemOverflow(retOffset)
-    
+
     // Check gas
     gasToPay, gasToPass := getMessageCallGas(
                                     value, 
@@ -839,10 +883,8 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     }
 
     if and(_isEVM(addr), iszero(isStatic)) {
-        printString("isEVM")
         _pushEVMFrame(gasToPass, isStatic)
         success := call(gasToPass, addr, value, argsOffset, argsSize, 0, 0)
-        printHex(success)
         frameGasLeft := _saveReturndataAfterEVMCall(retOffset, retSize)
         _popEVMFrame()
     }
@@ -952,30 +994,6 @@ function getMessageCallGas (
         }
 }
 
-function _isEVM(_addr) -> isEVM {
-    // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector;
-    // function isAccountEVM(address _addr) external view returns (bool);
-    let selector := 0x8c040477
-    // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
-    //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
-    // );
-
-    mstore8(0, 0x8c)
-    mstore8(1, 0x04)
-    mstore8(2, 0x04)
-    mstore8(3, 0x77)
-    mstore(4, _addr)
-
-    let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
-
-    if iszero(success) {
-        // This error should never happen
-        revert(0, 0)
-    }
-
-    isEVM := mload(0)
-}
-
 function _performStaticCall(
     _calleeIsEVM,
     _calleeGas,
@@ -1070,25 +1088,4 @@ function genericCreate(addr, offset, size, sp) -> result {
     mstore(sub(offset, 0x60), back)
     back, sp := popStackItem(sp)
     mstore(sub(offset, 0x80), back)
-}
-
-function ensureAcceptableMemLocation(location) {
-    if gt(location,MAX_POSSIBLE_MEM()) {
-        revert(0,0) // Check if this is whats needed
-    }
-}
-
-function addGasIfEvmRevert(isCallerEVM,offset,size,evmGasLeft) -> newOffset,newSize {
-    newOffset := offset
-    newSize := size
-    if eq(isCallerEVM,1) {
-        // include gas
-        let previousValue := mload(sub(offset,32))
-        mstore(sub(offset,32),evmGasLeft)
-        //mstore(sub(offset,32),previousValue) // Im not sure why this is needed, it was like this in the solidity code,
-        // but it appears to rewrite were we want to store the gas
-
-        newOffset := sub(offset, 32)
-        newSize := add(size, 32)
-    }
 }

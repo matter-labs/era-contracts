@@ -10,9 +10,6 @@ for { } true { } {
 
     ip := add(ip, 1)
 
-    printString("OPCODE")
-    printHex(opcode)
-
     switch opcode
     case 0x00 { // OP_STOP
         break
@@ -1216,7 +1213,7 @@ for { } true { } {
 
         // A function was implemented in order to avoid stack depth errors.
         frameGasLeft, gasToPay, sp := performCall(sp, evmGasLeft, isStatic)
-        
+
         // Check if the following is ok
         evmGasLeft := chargeGas(evmGasLeft, gasToPay)
         evmGasLeft := add(evmGasLeft, frameGasLeft)
@@ -1259,13 +1256,6 @@ for { } true { } {
         }
 
         sp := pushStackItem(sp, success)
-    }
-    case 0xFA { // OP_STATICCALL
-        let dynamicGas
-        // A function was implemented in order to avoid stack depth errors.
-        dynamicGas, sp := performCall(sp, evmGasLeft, false)
-
-        evmGasLeft := chargeGas(evmGasLeft,dynamicGas)
     }
     case 0xF3 { // OP_RETURN
         let offset,size
