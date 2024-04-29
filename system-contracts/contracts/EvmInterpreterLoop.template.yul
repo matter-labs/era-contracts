@@ -107,6 +107,8 @@ for { } true { } {
         sp := pushStackItem(sp, mulmod(a, b, N))
     }
     case 0x0A { // OP_EXP
+        evmGasLeft := chargeGas(evmGasLeft, 10)
+
         let a, exponent
 
         a, sp := popStackItem(sp)
@@ -114,12 +116,10 @@ for { } true { } {
 
         sp := pushStackItem(sp, exp(a, exponent))
 
-        let expSizeByte := 0
         if exponent {
-            expSizeByte := div(add(exponent, 256), 256)
+            expSizeByte := div(add(exponent, 256), 256) // TODO: Replace with shr(8, add(exponent, 256))
+            evmGasLeft := chargeGas(evmGasLeft, mul(50, expSizeByte))
         }
-
-        evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
     }
     case 0x0B { // OP_SIGNEXTEND
         evmGasLeft := chargeGas(evmGasLeft, 5)
