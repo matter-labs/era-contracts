@@ -563,9 +563,12 @@ function getEVMGas() -> evmGas {
     let _gas := gas()
     let requiredGas := add(EVM_GAS_STIPEND(), OVERHEAD())
 
-    if or(gt(_gas, requiredGas), eq(requiredGas, _gas)) {
-        evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
+    if lt(sub(_gas,shl(30,1)), requiredGas) {
+        // This cheks if enough zkevm gas was provided, we are substracting 2^30 since that's the stipend, 
+        // and we need to make sure that the gas provided over that is enough for security reasons
+        revert(0, 0)
     }
+    evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
 }
 
 function _getZkEVMGas(_evmGas) -> zkevmGas {
@@ -651,7 +654,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     checkMemOverflow(retOffset)
     
     // Check gas
-    gasToPay, gasToPass := _getMessageCallGas(
+    gasToPay, gasToPass := getMessageCallGas(
                                     value, 
                                     gasToPass,
                                     evmGasLeft,
@@ -699,38 +702,6 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
     }
 
     sp := pushStackItem(sp,success)
-}
-
-function _getMessageCallGas (
-    _value,
-    _gas,
-    _gasLeft,
-    _memoryCost,
-    _extraGas
-) -> gasPlusExtra, gasPlusStipend {
-    let callStipend := 2300
-    if iszero(_value) {
-        callStipend := 0
-    }
-
-    switch lt(_gasLeft, add(_extraGas, _memoryCost))
-        case 0
-        {
-            let _gasTemp := sub(sub(_gasLeft, _extraGas), _memoryCost)
-            // From the Tangerine Whistle fork, gas is capped at all but one 64th (remaining_gas / 64)
-            // of the remaining gas of the current context. If a call tries to send more, the gas is 
-            // changed to match the maximum allowed.
-            let maxGasToPass := sub(_gasTemp, shr(6, _gasTemp)) // _gas >> 6 == _gas/64
-            if gt(_gas, maxGasToPass) {
-                _gas := maxGasToPass
-            }
-            gasPlusExtra := add(_gas, _extraGas)
-            gasPlusStipend := add(_gas, callStipend)
-        }
-        default {
-            gasPlusExtra := add(_gas, _extraGas)
-            gasPlusStipend := add(_gas, callStipend)
-        }
 }
 
 function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
