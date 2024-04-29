@@ -295,17 +295,17 @@ for { } true { } {
         sp := pushStackItem(sp, address())
     }
     case 0x31 { // OP_BALANCE
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let addr
 
         addr, sp := popStackItem(sp)
 
-        let wasWarm := warmAddress(addr)
+        if iszero(warmAddress(addr)) {
+            evmGasLeft := chargeGas(evmGasLeft, 2600)
+        }
 
         sp := pushStackItem(sp, balance(addr))
-
-        switch wasWarm
-        case 0 { evmGasLeft := chargeGas(evmGasLeft, 2600) }
-        default { evmGasLeft := chargeGas(evmGasLeft, 100) }
     }
     case 0x32 { // OP_ORIGIN
         evmGasLeft := chargeGas(evmGasLeft, 2)
