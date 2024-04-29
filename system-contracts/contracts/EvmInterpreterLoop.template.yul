@@ -570,13 +570,13 @@ for { } true { } {
     // NOTE: We don't currently do full jumpdest validation
     // (i.e. validating a jumpdest isn't in PUSH data)
     case 0x56 { // OP_JUMP
+        evmGasLeft := chargeGas(evmGasLeft, 8)
+
         let counter
 
         counter, sp := popStackItem(sp)
 
         ip := add(add(BYTECODE_OFFSET(), 32), counter)
-
-        evmGasLeft := chargeGas(evmGasLeft, 8)
 
         // Check next opcode is JUMPDEST
         let nextOpcode := readIP(ip)
@@ -585,12 +585,12 @@ for { } true { } {
         }
     }
     case 0x57 { // OP_JUMPI
+        evmGasLeft := chargeGas(evmGasLeft, 10)
+
         let counter, b
 
         counter, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
-
-        evmGasLeft := chargeGas(evmGasLeft, 10)
 
         if iszero(b) {
             continue
