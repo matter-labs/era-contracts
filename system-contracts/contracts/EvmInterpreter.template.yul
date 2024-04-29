@@ -58,37 +58,6 @@ object "EVMInterpreter" {
             }
         }
 
-        function loadCalldataIntoActivePtr() {
-            verbatim_1i_0o("active_ptr_data_load", 0xFFFF)
-        }
-
-        function getActivePtrDataSize() -> size {
-            size := verbatim_0i_1o("active_ptr_data_size")
-        }
-
-        function copyActivePtrData(_dest, _source, _size) {
-            verbatim_3i_0o("active_ptr_data_copy", _dest, _source, _size)
-        }
-
-        function GAS_CONSTANTS() -> divisor, stipend, overhead {
-            divisor := 5
-            stipend := shl(30, 1)
-            overhead := 2000
-        }
-
-        function getEVMGas() -> evmGas {
-            let GAS_DIVISOR, EVM_GAS_STIPEND, OVERHEAD := GAS_CONSTANTS()
-
-            let gasLeft := gas()
-            let requiredGas := add(EVM_GAS_STIPEND, OVERHEAD)
-
-            evmGas := div(sub(gasLeft, requiredGas), GAS_DIVISOR)
-
-            if lt(gasLeft, requiredGas) {
-                evmGas := 0
-            }
-        }
-
         function validateCorrectBytecode(offset, len, gasToReturn) -> returnGas {
             if len {
                 // let firstByte := shr(mload(offset), 248)
@@ -161,13 +130,6 @@ object "EVMInterpreter" {
             // First, copy the contract's bytecode to be executed into tEdhe `BYTECODE_OFFSET`
             // segment of memory.
             getDeployedBytecode()
-
-            // stack pointer - index to first stack element; empty stack = -1
-            let sp := sub(STACK_OFFSET(), 32)
-            // instruction pointer - index to next instruction. Not called pc because it's an
-            // actual yul/evm instruction.
-            let ip := add(BYTECODE_OFFSET(), 32)
-            let opcode
 
             let returnOffset := MEM_OFFSET_INNER()
             let returnLen := 0

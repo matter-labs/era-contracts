@@ -506,8 +506,6 @@ function incrementNonce(addr) {
     if iszero(result) {
         revert(0, 0)
     }
-
-    isEVM := mload(0)
 }
 
 function _pushEVMFrame(_passGas, _isStatic) {
@@ -820,6 +818,30 @@ function getMessageCallGas (
             gasPlusExtra := add(_gas, _extraGas)
             gasPlusStipend := add(_gas, callStipend)
         }
+}
+
+function _isEVM(_addr) -> isEVM {
+    // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector;
+    // function isAccountEVM(address _addr) external view returns (bool);
+    let selector := 0x8c040477
+    // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
+    //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
+    // );
+
+    mstore8(0, 0x8c)
+    mstore8(1, 0x04)
+    mstore8(2, 0x04)
+    mstore8(3, 0x77)
+    mstore(4, _addr)
+
+    let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 32)
+
+    if iszero(success) {
+        // This error should never happen
+        revert(0, 0)
+    }
+
+    isEVM := mload(0)
 }
 
 function _performStaticCall(
