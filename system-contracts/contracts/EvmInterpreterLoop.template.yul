@@ -549,7 +549,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
-        let expansionGas := expandMemory(offset) // TODO: add +8 here
+        let expansionGas := expandMemory(offset) // TODO: add +1 here
 
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
         evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
@@ -1160,7 +1160,6 @@ for { } true { } {
         switch result
             case 0 { sp := pushStackItem(sp, 0) }
             default { sp := pushStackItem(sp, addr) }
-        
     }
     case 0xF5 { // OP_CREATE2
         if isStatic {
