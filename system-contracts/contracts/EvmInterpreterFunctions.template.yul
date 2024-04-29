@@ -348,17 +348,17 @@ function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
         case 0x02 { // SHA2-256
             gasToCharge := 60
             let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
-            gasToCharge := mul(12, dataWordSize)
+            gasToCharge := add(gasToCharge, mul(12, dataWordSize))
         }
         case 0x03 { // RIPEMD-160
             gasToCharge := 600
             let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
-            gasToCharge := mul(120, dataWordSize)
+            gasToCharge := add(gasToCharge, mul(120, dataWordSize))
         }
         case 0x04 { // identity
             gasToCharge := 15
             let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
-            gasToCharge := mul(3, dataWordSize)
+            gasToCharge := add(gasToCharge, mul(3, dataWordSize))
         }
         // [0; 31] (32 bytes)	Bsize	Byte size of B
         // [32; 63] (32 bytes)	Esize	Byte size of E
@@ -819,7 +819,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> frameGasLeft, gasToPay, sp 
                                     extraCost
                                 )
 
-    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOfsset, argsSize))
+    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOffset, argsSize))
 
     let success
 
@@ -900,7 +900,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic {
         extraCost
     )
 
-    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOfsset, argsSize))
+    gasToPay := add(gasToPay, getGasForPrecompiles(addr, argsOffset, argsSize))
 
     _pushEVMFrame(gasToPass, isStatic)
     addr := delegatecall(
