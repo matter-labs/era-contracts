@@ -533,37 +533,43 @@ for { } true { } {
         _y, sp := popStackItem(sp)
     }
     case 0x51 { // OP_MLOAD
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let offset
 
         offset, sp := popStackItem(sp)
 
         let expansionGas := expandMemory(add(offset, 32))
+        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         let memValue := mload(add(MEM_OFFSET_INNER(), offset))
         sp := pushStackItem(sp, memValue)
-        evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
     }
     case 0x52 { // OP_MSTORE
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let offset, value
 
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
         let expansionGas := expandMemory(add(offset, 32))
+        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         mstore(add(MEM_OFFSET_INNER(), offset), value)
-        evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
     }
     case 0x53 { // OP_MSTORE8
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let offset, value
 
         offset, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
         let expansionGas := expandMemory(add(offset, 1))
+        evmGasLeft := chargeGas(evmGasLeft, expansionGas)
 
         mstore8(add(MEM_OFFSET_INNER(), offset), value)
-        evmGasLeft := chargeGas(evmGasLeft, add(3, expansionGas))
     }
     case 0x54 { // OP_SLOAD
         let key,value,isWarm
