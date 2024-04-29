@@ -281,7 +281,7 @@ for { } true { } {
 
         // When an offset is first accessed (either read or write), memory may trigger 
         // an expansion, which costs gas.
-        // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
+        // dynamicGas = 6 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
         let minWordSize := shr(5, add(size, 31))
         let dynamicGas := add(mul(6, minWordSize), expandMemory(add(offset, size)))
@@ -348,7 +348,7 @@ for { } true { } {
         checkMemOverflow(add(add(offset, size), MEM_OFFSET_INNER()))
         checkMemOverflow(add(add(destOffset, size), MEM_OFFSET_INNER()))
 
-        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
         let minWordSize := shr(5, add(size, 31))
         let dynamicGas := add(mul(3, minWordSize), expandMemory(add(destOffset, size)))
@@ -371,7 +371,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         len, sp := popStackItem(sp)
 
-        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         // minimum_word_size = (size + 31) / 32
         let minWordSize := shr(5, add(len, 31))
         let dynamicGas := add(mul(3, minWordSize), expandMemory(add(dst, len)))
@@ -424,7 +424,7 @@ for { } true { } {
         offset, sp := popStackItem(sp)
         len, sp := popStackItem(sp)
 
-        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
+        // dynamicGas = 3 * minimum_word_size + memory_expansion_cost + address_access_cost
         // minimum_word_size = (size + 31) / 32
         let dynamicGas := add(
             mul(3, shr(5, add(len, 31))),
@@ -466,7 +466,7 @@ for { } true { } {
         checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
 
         // minimum_word_size = (size + 31) / 32
-        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        // dynamicGas = 3 * minimum_word_size + memory_expansion_cost
         let minWordSize := shr(5, add(len, 31))
         let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
