@@ -474,17 +474,14 @@ for { } true { } {
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
     }
     case 0x3F { // OP_EXTCODEHASH
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let addr
         addr, sp := popStackItem(sp)
 
-
-        switch warmAddress(addr)
-            case 0 { 
-                evmGasLeft := chargeGas(evmGasLeft,2600) 
-            }
-            default { 
-                evmGasLeft := chargeGas(evmGasLeft,100) 
-            }
+        if iszero(warmAddress(addr)) {
+            evmGasLeft := chargeGas(evmGasLeft, 2500) 
+        }
 
         sp := pushStackItem(sp, extcodehash(addr))
     }
