@@ -339,7 +339,8 @@ function bitMaskFromBytes(nBytes) -> bitMask {
 // The gas cost mentioned here is purely the cost of the contract, 
 // and does not consider the cost of the call itself nor the instructions 
 // to put the parameters in memory. 
-function getGasForPrecompiles(addr, gasFromCaller, argsOffset, argsSize) -> gasToCharge {
+// Take into account MEM_OFFSET_INNER() when passing the argsOfsset
+function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
     switch addr
         case 0x01 { // ecRecover
             gasToCharge := 3000
