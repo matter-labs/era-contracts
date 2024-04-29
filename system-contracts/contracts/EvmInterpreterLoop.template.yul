@@ -450,11 +450,12 @@ for { } true { } {
         sp := pushStackItem(sp, rdz)
     }
     case 0x3E { // OP_RETURNDATACOPY
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let dest, offset, len
         dest, sp := popStackItem(sp)
         offset, sp := popStackItem(sp)
         len, sp := popStackItem(sp)
-
 
         // TODO: check if these conditions are met
         // The addition offset + size overflows.
@@ -462,13 +463,13 @@ for { } true { } {
         if gt(add(offset, len), LAST_RETURNDATA_SIZE_OFFSET()) {
             revert(0, 0)
         }
-        checkMemOverflow(add(add(offset, MEM_OFFSET_INNER()), len))
+        checkMemOverflow(add(add(dest, MEM_OFFSET_INNER()), len))
 
         // minimum_word_size = (size + 31) / 32
-        // dynamic_gas = 6 * minimum_word_size + memory_expansion_cost
-        // static_gas = 0
-        let dynamicGas := add(mul(6, shr(add(len, 31), 5)), expandMemory(add(offset, len)))
-        evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
+        // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
+        let minWordSize := shr(5, add(len, 31))
+        let dynamicGas := add(mul(3, minWordSize), expandMemory(add(offset, len)))
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
 
         copyActivePtrData(add(MEM_OFFSET_INNER(), dest), offset, len)
     }
