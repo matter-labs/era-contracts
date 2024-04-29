@@ -120,16 +120,18 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, add(10, mul(50, expSizeByte)))
     }
     case 0x0B { // OP_SIGNEXTEND
+        evmGasLeft := chargeGas(evmGasLeft, 5)
+
         let b, x
 
         b, sp := popStackItem(sp)
         x, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, signextend(b, x))
-
-        evmGasLeft := chargeGas(evmGasLeft, 5)
     }
     case 0x08 { // OP_ADDMOD
+        evmGasLeft := chargeGas(evmGasLeft, 8)
+
         let a, b, N
 
         a, sp := popStackItem(sp)
@@ -137,10 +139,10 @@ for { } true { } {
         N, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, addmod(a, b, N))
-
-        evmGasLeft := chargeGas(evmGasLeft, 8)
     }
     case 0x09 { // OP_MULMOD
+        evmGasLeft := chargeGas(evmGasLeft, 8)
+
         let a, b, N
 
         a, sp := popStackItem(sp)
@@ -148,126 +150,124 @@ for { } true { } {
         N, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, mulmod(a, b, N))
-
-        evmGasLeft := chargeGas(evmGasLeft, 8)
     }
     case 0x10 { // OP_LT
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, lt(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x11 { // OP_GT
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, gt(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x12 { // OP_SLT
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, slt(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x13 { // OP_SGT
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, sgt(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x14 { // OP_EQ
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, eq(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x15 { // OP_ISZERO
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a
 
         a, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, iszero(a))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x18 { // OP_XOR
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a, b
 
         a, sp := popStackItem(sp)
         b, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, xor(a, b))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x19 { // OP_NOT
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let a
 
         a, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, not(a))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x1A { // OP_BYTE
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let i, x
 
         i, sp := popStackItem(sp)
         x, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, byte(i, x))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x1B { // OP_SHL
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let shift, value
 
         shift, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, shl(shift, value))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x1C { // OP_SHR
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let shift, value
 
         shift, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, shr(shift, value))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x1D { // OP_SAR
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let shift, value
 
         shift, sp := popStackItem(sp)
         value, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, sar(shift, value))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
 
     case 0x20 { // OP_KECCAK256
