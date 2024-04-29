@@ -288,9 +288,9 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, usedGas)
     }
     case 0x30 { // OP_ADDRESS
-        sp := pushStackItem(sp, address())
-
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, address())
     }
     case 0x31 { // OP_BALANCE
         let addr
@@ -306,33 +306,33 @@ for { } true { } {
         default { evmGasLeft := chargeGas(evmGasLeft, 100) }
     }
     case 0x32 { // OP_ORIGIN
-        sp := pushStackItem(sp, origin())
-
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, origin())
     }
     case 0x33 { // OP_CALLER
-        sp := pushStackItem(sp, caller())
-
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, caller())
     }
     case 0x34 { // OP_CALLVALUE
-        sp := pushStackItem(sp, callvalue())
-
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, callvalue())
     }
     case 0x35 { // OP_CALLDATALOAD
+        evmGasLeft := chargeGas(evmGasLeft, 3)
+
         let i
 
         i, sp := popStackItem(sp)
 
         sp := pushStackItem(sp, calldataload(i))
-
-        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x36 { // OP_CALLDATASIZE
-        sp := pushStackItem(sp, calldatasize())
-
         evmGasLeft := chargeGas(evmGasLeft, 2)
+
+        sp := pushStackItem(sp, calldatasize())
     }
     case 0x37 { // OP_CALLDATACOPY
         let destOffset, offset, size
