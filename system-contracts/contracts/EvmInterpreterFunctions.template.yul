@@ -869,8 +869,9 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
             frameGasLeft := sub(gasToPass, gasUsed)
         }
     }
-    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
 
+    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp, success)
 }
 function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
@@ -968,6 +969,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     }
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp,success) 
 }
 
@@ -1027,6 +1029,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     _popEVMFrame()
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp, addr)
 }
 
