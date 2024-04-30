@@ -1159,6 +1159,8 @@ for { } true { } {
 
     }
     case 0xF0 { // OP_CREATE
+        evmGasLeft := chargeGas(evmGasLeft, 32000)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1179,13 +1181,16 @@ for { } true { } {
             revert(0, 0)
         }
 
-        evmGasLeft := chargeGas(evmGasLeft, add(
-            32000, add(
-            expandMemory(add(offset, size)),
-            mul(2, div(add(size, 31), 32))
-            )
-        ))
-        
+        // dynamicGas = init_code_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+        // minimum_word_size = (size + 31) / 32
+        // init_code_cost = 2 * minimum_word_size
+        // code_deposit_cost = 200 * deployed_code_size
+        let dynamicGas := add(
+            shr(4, add(size, 31)),
+            expandMemory(add(offset, size))
+        )
+        evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
+
         let addr := getNewAddress(address())
 
         let result
