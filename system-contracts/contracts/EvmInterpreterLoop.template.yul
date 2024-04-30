@@ -1201,11 +1201,13 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xF1 { // OP_CALL
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let gasUsed
 
         // A function was implemented in order to avoid stack depth errors.
         gasUsed, sp := performCall(sp, evmGasLeft, isStatic)
-        
+
         // Check if the following is ok
         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     }
@@ -1224,6 +1226,8 @@ for { } true { } {
         break
     }
     case 0xF4 { // OP_DELEGATECALL
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let gasUsed
         sp, isStatic, gasUsed := delegateCall(sp, isStatic, evmGasLeft)
 
@@ -1284,6 +1288,8 @@ for { } true { } {
             default { sp := pushStackItem(sp, addr) }
     }
     case 0xFA { // OP_STATICCALL
+        evmGasLeft := chargeGas(evmGasLeft, 100)
+
         let gasUsed
         gasUsed, sp := performStaticCall(sp,evmGasLeft)
         evmGasLeft := chargeGas(evmGasLeft,gasUsed)

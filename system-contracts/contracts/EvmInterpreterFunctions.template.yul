@@ -671,9 +671,14 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     retOffset, sp := popStackItem(sp)
     retSize, sp := popStackItem(sp)
 
-    switch warmAddress(addr)
-        case 0 { extraCost := 2600 }
-        default { extraCost := 100 }
+    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
+    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
+
+    extraCost := 0
+    if iszero(warmAddress(addr)) {
+        extraCost := 2500
+    }
+
     {
         let maxExpand := add(retOffset, retSize)
         switch lt(maxExpand,add(argsOffset, argsSize))  // Check if this makes sense
@@ -738,22 +743,23 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     retOffset, sp := popStackItem(sp)
     retSize, sp := popStackItem(sp)
 
-
     // static_gas = 0
     // dynamic_gas = memory_expansion_cost + code_execution_cost + address_access_cost + positive_value_cost + value_to_empty_account_cost
     // code_execution_cost is the cost of the called code execution (limited by the gas parameter).
     // If address is warm, then address_access_cost is 100, otherwise it is 2600. See section access sets.
     // If value is not 0, then positive_value_cost is 9000. In this case there is also a call stipend that is given to make sure that a basic fallback function can be called. 2300 is thus removed from the cost, and also added to the gas input.
     // If value is not 0 and the address given points to an empty account, then value_to_empty_account_cost is 25000. An account is empty if its balance is 0, its nonce is 0 and it has no code.
-    
 
-    switch warmAddress(addr)
-        case 0 { extraCost := 2600 }
-        default { extraCost := 100 }
+    extraCost := 0
+    if iszero(warmAddress(addr)) {
+        extraCost := 2500
+    }
+
     if gt(value, 0) {
         extraCost := add(extraCost,6700)
         gasToPass := add(gasToPass,2300)
     }
+
     if and(isAddrEmpty(addr), gt(value, 0)) {
         extraCost := add(extraCost,25000)
     }
@@ -772,8 +778,9 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
 
     argsOffset := add(argsOffset,MEM_OFFSET_INNER())
     retOffset := add(retOffset,MEM_OFFSET_INNER())
-    checkMemOverflow(argsOffset)
-    checkMemOverflow(retOffset)
+
+    checkMemOverflow(add(argsOffset, argsSize))
+    checkMemOverflow(add(retOffset, retSize))
 
     let frameGasLeft
     let success
@@ -831,13 +838,18 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     retOffset, sp := popStackItem(sp)
     retSize, sp := popStackItem(sp)
 
+    checkMemOverflow(add(add(argsOffset, argsSize), MEM_OFFSET_INNER()))
+    checkMemOverflow(add(add(retOffset, retSize), MEM_OFFSET_INNER()))
+
     if iszero(_isEVM(addr)) {
         revert(0, 0)
     }
 
-    switch warmAddress(addr)
-        case 0 { extraCost := 2600 }
-        default { extraCost := 100 }
+    extraCost := 0
+    if iszero(warmAddress(addr)) {
+        extraCost := 2500
+    }
+
     {
         let maxExpand := add(retOffset, retSize)
         switch lt(maxExpand,add(argsOffset, argsSize)) 
