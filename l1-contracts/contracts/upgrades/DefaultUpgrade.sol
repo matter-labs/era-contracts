@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {Diamond} from "../zksync/libraries/Diamond.sol";
-import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
-
-// solhint-disable max-line-length
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, PUBDATA_PUBLISHER_ADDRESS} from "./Utils.sol";
-import {SystemLogKey} from "solpp/zksync/interfaces/IExecutor.sol";
+import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 // solhint-enable max-line-length
 
@@ -33,6 +31,7 @@ contract UtilsTest is Test {
 
         assertEq(
             l2Log,
+            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
                 bytes2(0x0001), // servicePrefix
                 bytes2(0x0000), // 0x0000
@@ -46,7 +45,7 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs();
 
-        assertEq(logs.length, 9, "logs length should be correct");
+        assertEq(logs.length, 13, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -121,28 +120,6 @@ contract UtilsTest is Test {
         );
 
         assertEq(
-            logs[5],
-            Utils.constructL2Log(
-                true,
-                L2_BOOTLOADER_ADDRESS,
-                uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-                keccak256("")
-            ),
-            "log[5] should be correct"
-        );
-
-        assertEq(
-            logs[6],
-            Utils.constructL2Log(
-                true,
-                L2_BOOTLOADER_ADDRESS,
-                uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-                bytes32("")
-            ),
-            "log[6] should be correct"
-        );
-
-        assertEq(
             logs[7],
             Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_ONE_HASH_KEY), bytes32(0)),
             "log[7] should be correct"
@@ -153,5 +130,37 @@ contract UtilsTest is Test {
             Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_TWO_HASH_KEY), bytes32(0)),
             "log[8] should be correct"
         );
+
+        assertEq(
+            logs[9],
+            Utils.constructL2Log(
+                true,
+                PUBDATA_PUBLISHER_ADDRESS,
+                uint256(SystemLogKey.BLOB_THREE_HASH_KEY),
+                bytes32(0)
+            ),
+            "log[9] should be correct"
+        );
+
+        assertEq(
+            logs[10],
+            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FOUR_HASH_KEY), bytes32(0)),
+            "log[8] should be correct"
+        );
+
+        assertEq(
+            logs[11],
+            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_FIVE_HASH_KEY), bytes32(0)),
+            "log[11] should be correct"
+        );
+
+        assertEq(
+            logs[12],
+            Utils.constructL2Log(true, PUBDATA_PUBLISHER_ADDRESS, uint256(SystemLogKey.BLOB_SIX_HASH_KEY), bytes32(0)),
+            "log[12] should be correct"
+        );
     }
+
+    // add this to be excluded from coverage report
+    function test() internal virtual {}
 }

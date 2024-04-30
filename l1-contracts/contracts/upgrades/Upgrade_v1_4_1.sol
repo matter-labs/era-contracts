@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
-import {Diamond} from "../zksync/libraries/Diamond.sol";
-import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {PubdataPricingMode, FeeParams} from "../zksync/Storage.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
+import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
+import {PubdataPricingMode, FeeParams} from "../state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
+    uint32 constant PRIORITY_TX_BATCH_OVERHEAD_L1_GAS = 1_000_000;
+    uint32 constant PRIORITY_TX_PUBDATA_PER_BATCH = 120_000;
+    uint32 constant PRIORITY_TX_MAX_GAS_PER_BATCH = 80_000_000;
+    uint32 constant PRIORITY_TX_MAX_PUBDATA = 99_000;
+    uint64 constant PRIORITY_TX_MINIMAL_GAS_PRICE = 250_000_000;
+
     /// This event is an exact copy of the "IAdmin.NewFeeParams" event. Since they have the same name and parameters,
     /// these will be tracked by indexers in the same manner.
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -33,11 +39,11 @@ contract Upgrade_v1_4_1 is BaseZkSyncUpgrade {
         changeFeeParams(
             FeeParams({
                 pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: $(PRIORITY_TX_BATCH_OVERHEAD_L1_GAS),
-                maxPubdataPerBatch: $(PRIORITY_TX_PUBDATA_PER_BATCH),
-                maxL2GasPerBatch: $(PRIORITY_TX_MAX_GAS_PER_BATCH),
-                priorityTxMaxPubdata: $(PRIORITY_TX_MAX_PUBDATA),
-                minimalL2GasPrice: $(PRIORITY_TX_MINIMAL_GAS_PRICE)
+                batchOverheadL1Gas: PRIORITY_TX_BATCH_OVERHEAD_L1_GAS,
+                maxPubdataPerBatch: PRIORITY_TX_PUBDATA_PER_BATCH,
+                maxL2GasPerBatch: PRIORITY_TX_MAX_GAS_PER_BATCH,
+                priorityTxMaxPubdata: PRIORITY_TX_MAX_PUBDATA,
+                minimalL2GasPrice: PRIORITY_TX_MINIMAL_GAS_PRICE
             })
         );
 

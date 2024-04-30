@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
+
+import {Utils} from "../Utils/Utils.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
-import {Utils} from "../Utils/Utils.sol";
-import {IExecutor} from "../../../../../cache/solpp-generated-contracts/zksync/interfaces/IExecutor.sol";
+
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;
@@ -35,13 +37,13 @@ contract AuthorizationTest is ExecutorTest {
         });
     }
 
-    function test_RevertWhen_CommitingByUnauthorisedAddress() public {
+    function test_RevertWhen_CommittingByUnauthorisedAddress() public {
         IExecutor.CommitBatchInfo[] memory commitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         commitBatchInfoArray[0] = commitBatchInfo;
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
         executor.commitBatches(storedBatchInfo, commitBatchInfoArray);
     }
 
@@ -51,7 +53,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(owner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
         executor.proveBatches(storedBatchInfo, storedBatchInfoArray, proofInput);
     }
 
@@ -61,7 +63,7 @@ contract AuthorizationTest is ExecutorTest {
 
         vm.prank(randomSigner);
 
-        vm.expectRevert(bytes.concat("1h"));
+        vm.expectRevert(bytes.concat("Hyperchain: not validator"));
         executor.executeBatches(storedBatchInfoArray);
     }
 }
