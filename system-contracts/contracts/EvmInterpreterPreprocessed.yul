@@ -666,12 +666,8 @@ object "EVMInterpreter" {
         function GAS_DIVISOR() -> gas_div { gas_div := 5 }
         function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
         function OVERHEAD() -> overhead { overhead := 2000 }
-        
-        function GAS_CONSTANTS() -> divisor, stipend, overhead {
-            divisor := GAS_DIVISOR()
-            stipend := EVM_GAS_STIPEND()
-            overhead := OVERHEAD()
-        }
+        // From precompiles/CodeOracle
+        function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
         
         function _calcEVMGas(_zkevmGas) -> calczkevmGas {
             calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
@@ -689,11 +685,12 @@ object "EVMInterpreter" {
             evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
         }
         
-        function _getZkEVMGas(_evmGas) -> zkevmGas {
+        function _getZkEVMGas(addr) -> zkevmGas {
             /*
                 TODO: refine the formula, especially with regard to decommitment costs
             */
-            zkevmGas := mul(_evmGas, GAS_DIVISOR())
+            let byteSize := extcodesize(addr)
+            zkevmGas := mul(byteSize, DECOMMIT_COST_PER_WORD())
         }
         
         function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
@@ -778,7 +775,7 @@ object "EVMInterpreter" {
         
             // zkEVM native
             if iszero(_isEVM(addr)) {
-                gasToPass := _getZkEVMGas(gasToPass)
+                gasToPass := _getZkEVMGas(addr)
                 let zkevmGasBefore := gas()
                 success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
                 _saveReturndataAfterZkEVMCall()
@@ -876,7 +873,7 @@ object "EVMInterpreter" {
         
             // zkEVM native
             if and(iszero(_isEVM(addr)), iszero(isStatic)) {
-                gasToPass := _getZkEVMGas(gasToPass)
+                gasToPass := _getZkEVMGas(addr)
                 let zkevmGasBefore := gas()
                 success := call(gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                 _saveReturndataAfterZkEVMCall()
@@ -1004,7 +1001,7 @@ object "EVMInterpreter" {
         
             // zkEVM native
             if iszero(_calleeIsEVM) {
-                _calleeGas := _getZkEVMGas(_calleeGas)
+                _calleeGas := _getZkEVMGas(_callee)
                 let zkevmGasBefore := gas()
                 success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
         
@@ -3021,12 +3018,8 @@ object "EVMInterpreter" {
             function GAS_DIVISOR() -> gas_div { gas_div := 5 }
             function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 30
             function OVERHEAD() -> overhead { overhead := 2000 }
-            
-            function GAS_CONSTANTS() -> divisor, stipend, overhead {
-                divisor := GAS_DIVISOR()
-                stipend := EVM_GAS_STIPEND()
-                overhead := OVERHEAD()
-            }
+            // From precompiles/CodeOracle
+            function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
             
             function _calcEVMGas(_zkevmGas) -> calczkevmGas {
                 calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
@@ -3044,11 +3037,12 @@ object "EVMInterpreter" {
                 evmGas := div(sub(_gas, requiredGas), GAS_DIVISOR())
             }
             
-            function _getZkEVMGas(_evmGas) -> zkevmGas {
+            function _getZkEVMGas(addr) -> zkevmGas {
                 /*
                     TODO: refine the formula, especially with regard to decommitment costs
                 */
-                zkevmGas := mul(_evmGas, GAS_DIVISOR())
+                let byteSize := extcodesize(addr)
+                zkevmGas := mul(byteSize, DECOMMIT_COST_PER_WORD())
             }
             
             function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
@@ -3133,7 +3127,7 @@ object "EVMInterpreter" {
             
                 // zkEVM native
                 if iszero(_isEVM(addr)) {
-                    gasToPass := _getZkEVMGas(gasToPass)
+                    gasToPass := _getZkEVMGas(addr)
                     let zkevmGasBefore := gas()
                     success := staticcall(gasToPass, addr, add(MEM_OFFSET_INNER(), argsOffset), argsSize, add(MEM_OFFSET_INNER(), retOffset), retSize)
                     _saveReturndataAfterZkEVMCall()
@@ -3231,7 +3225,7 @@ object "EVMInterpreter" {
             
                 // zkEVM native
                 if and(iszero(_isEVM(addr)), iszero(isStatic)) {
-                    gasToPass := _getZkEVMGas(gasToPass)
+                    gasToPass := _getZkEVMGas(addr)
                     let zkevmGasBefore := gas()
                     success := call(gasToPass, addr, value, argsOffset, argsSize, retOffset, retSize)
                     _saveReturndataAfterZkEVMCall()
@@ -3359,7 +3353,7 @@ object "EVMInterpreter" {
             
                 // zkEVM native
                 if iszero(_calleeIsEVM) {
-                    _calleeGas := _getZkEVMGas(_calleeGas)
+                    _calleeGas := _getZkEVMGas(_callee)
                     let zkevmGasBefore := gas()
                     success := staticcall(_calleeGas, _callee, _inputOffset, _inputLen, _outputOffset, _outputLen)
             
