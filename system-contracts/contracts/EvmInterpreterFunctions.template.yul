@@ -219,6 +219,12 @@ function _getCodeHash(account) -> hash {
     hash := mload(0)
 }
 
+function getIsStaticFromCallFlags() -> isStatic {
+    isStatic := verbatim_0i_1o("get_global::call_flags")
+    // TODO: make it a constnat
+    isStatic := iszero(iszero(and(isStatic, 0x04)))
+}
+
 // Basically performs an extcodecopy, while returning the length of the bytecode.
 function _fetchDeployedCode(addr, _offset, _len) -> codeLen {
     let codeHash := _getRawCodeHash(addr)
