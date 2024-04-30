@@ -199,12 +199,6 @@ function _getRawCodeHash(account) -> hash {
     hash := mload(0)
 }
 
-function getIsStaticFromCallFlags() -> isStatic {
-    isStatic := verbatim_0i_1o("get_global::call_flags")
-    // TODO: make it a constnat
-    isStatic := iszero(iszero(and(isStatic, 0x04)))
-}
-
 function _getCodeHash(account) -> hash {
     // function getCodeHash(uint256 _input) external view override returns (bytes32)
     // 0xe03fe177
