@@ -32,16 +32,7 @@ contract RegisterHyperchainScript is Script {
 
     struct ContractsConfig {
         uint256 bridgehubCreateNewChainSalt;
-        PubdataPricingMode diamondInitPubdataPricingMode;
-        uint256 diamondInitBatchOverheadL1Gas;
-        uint256 diamondInitMaxPubdataPerBatch;
-        uint256 diamondInitMaxL2GasPerBatch;
-        uint256 diamondInitPriorityTxMaxPubdata;
-        uint256 diamondInitMinimalL2GasPrice;
-        bytes32 recursionNodeLevelVkHash;
-        bytes32 recursionLeafLevelVkHash;
-        bytes32 recursionCircuitsSetVksHash;
-        uint256 priorityTxMaxGasLimit;
+        bytes diamondCutData;
         bool validiumMode;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
@@ -108,30 +99,7 @@ contract RegisterHyperchainScript is Script {
         config.addresses.diamondInit = toml.readAddress("$.deployed_addresses.state_transition.diamond_init_addr");
         config.addresses.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
 
-        config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
-            toml.readUint("$.contracts_config.diamond_init_pubdata_pricing_mode")
-        );
-        config.contracts.diamondInitBatchOverheadL1Gas = toml.readUint(
-            "$.contracts_config.diamond_init_batch_overhead_l1_gas"
-        );
-        config.contracts.diamondInitMaxPubdataPerBatch = toml.readUint(
-            "$.contracts_config.diamond_init_max_pubdata_per_batch"
-        );
-        config.contracts.diamondInitMaxL2GasPerBatch = toml.readUint(
-            "$.contracts_config.diamond_init_max_l2_gas_per_batch"
-        );
-        config.contracts.diamondInitPriorityTxMaxPubdata = toml.readUint(
-            "$.contracts_config.diamond_init_priority_tx_max_pubdata"
-        );
-        config.contracts.diamondInitMinimalL2GasPrice = toml.readUint(
-            "$.contracts_config.diamond_init_minimal_l2_gas_price"
-        );
-        config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts_config.recursion_node_level_vk_hash");
-        config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts_config.recursion_leaf_level_vk_hash");
-        config.contracts.recursionCircuitsSetVksHash = toml.readBytes32(
-            "$.contracts_config.recursion_circuits_set_vks_hash"
-        );
-        config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts_config.priority_tx_max_gas_limit");
+        config.contracts.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
 
         // Grab config from l1 deployment config
         root = vm.projectRoot();
@@ -186,63 +154,6 @@ contract RegisterHyperchainScript is Script {
     }
 
     function registerHyperchain() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: config.addresses.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(config.addresses.adminFacet.code)
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: config.addresses.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(config.addresses.gettersFacet.code)
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: config.addresses.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(config.addresses.mailboxFacet.code)
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: config.addresses.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(config.addresses.executorFacet.code)
-        });
-
-        VerifierParams memory verifierParams = VerifierParams({
-            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-        });
-
-        FeeParams memory feeParams = FeeParams({
-            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-        });
-
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            verifier: IVerifier(config.addresses.verifier),
-            verifierParams: verifierParams,
-            l2BootloaderBytecodeHash: bytes32(Utils.getBatchBootloaderBytecodeHash()),
-            l2DefaultAccountBytecodeHash: bytes32(Utils.readSystemContractsBytecode("DefaultAccount")),
-            priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            blobVersionedHashRetriever: config.addresses.blobVersionedHashRetriever
-        });
-
-        Diamond.DiamondCutData memory initData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: config.addresses.diamondInit,
-            initCalldata: abi.encode(initializeData)
-        });
-
         IBridgehub bridgehub = IBridgehub(config.addresses.bridgehub);
 
         vm.broadcast();
@@ -253,7 +164,7 @@ contract RegisterHyperchainScript is Script {
             _baseToken: config.addresses.baseToken,
             _salt: config.contracts.bridgehubCreateNewChainSalt,
             _admin: msg.sender,
-            _initData: abi.encode(initData)
+            _initData: config.contracts.diamondCutData
         });
         console.log("Hyperchain registered");
 
