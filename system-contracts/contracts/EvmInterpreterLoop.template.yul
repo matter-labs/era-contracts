@@ -182,7 +182,7 @@ for { } true { } {
         sp := pushStackItem(sp, eq(a, b))
     }
     case 0x15 { // OP_ISZERO
-        //evmGasLeft := chargeGas(evmGasLeft, 3) TODO: Add this back
+        evmGasLeft := chargeGas(evmGasLeft, 3)
 
         let a
 
