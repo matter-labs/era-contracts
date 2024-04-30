@@ -7,13 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Utils} from "./Utils.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
 contract RegisterHyperchainScript is Script {
