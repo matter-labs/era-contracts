@@ -612,9 +612,6 @@ function getEVMGas() -> evmGas {
 }
 
 function _getZkEVMGas(addr) -> zkevmGas {
-    /*
-        TODO: refine the formula, especially with regard to decommitment costs
-    */
     let byteSize := extcodesize(addr)
     zkevmGas := mul(byteSize, DECOMMIT_COST_PER_WORD())
 }
