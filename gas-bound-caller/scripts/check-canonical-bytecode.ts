@@ -1,19 +1,22 @@
 // hardhat import should be the first import in the file
-import * as hre from 'hardhat';
+import * as hre from "hardhat";
 import { Command } from "commander";
-import { readCanonicalArtifact, writeCanonicalArtifact } from './utils';
+import { readCanonicalArtifact, writeCanonicalArtifact } from "./utils";
 
 async function main() {
   const program = new Command();
 
-  program.version("0.1.0").name("check canonical bytecode").description("Checks that the localy built artifacts match the canonical bytecode");
+  program
+    .version("0.1.0")
+    .name("check canonical bytecode")
+    .description("Checks that the localy built artifacts match the canonical bytecode");
 
   program.command("check").action(async () => {
     const compiledBytecode = (await hre.artifacts.readArtifact("GasBoundCaller")).bytecode;
     const canonicalBytecode = readCanonicalArtifact();
 
-    if(compiledBytecode.toLocaleLowerCase() != canonicalBytecode.toLocaleLowerCase()) {
-        throw new Error('Compiled bytecode is not correct');
+    if (compiledBytecode.toLocaleLowerCase() != canonicalBytecode.toLocaleLowerCase()) {
+      throw new Error("Compiled bytecode is not correct");
     }
   });
 
@@ -21,10 +24,10 @@ async function main() {
     const compiledBytecode = (await hre.artifacts.readArtifact("GasBoundCaller")).bytecode;
     const canonicalBytecode = readCanonicalArtifact();
 
-    if(compiledBytecode.toLocaleLowerCase() != canonicalBytecode.toLocaleLowerCase()) {
-        writeCanonicalArtifact(compiledBytecode);
+    if (compiledBytecode.toLocaleLowerCase() != canonicalBytecode.toLocaleLowerCase()) {
+      writeCanonicalArtifact(compiledBytecode);
     } else {
-        console.log('There is nothing to fix');
+      console.log("There is nothing to fix");
     }
   });
 

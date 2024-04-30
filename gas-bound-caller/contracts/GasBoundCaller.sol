@@ -85,10 +85,10 @@ contract GasBoundCaller {
         }
 
         assembly {
-            // This place does interfere with the memory layout, however, it is done right before 
+            // This place does interfere with the memory layout, however, it is done right before
             // the `return` statement, so it is safe to do.
             // We need to transform `bytes memory returnData` into (bytes memory returndata, gasSpentOnPubdata)
-            // `bytes memory returnData` is encoded as `length` + `data`. 
+            // `bytes memory returnData` is encoded as `length` + `data`.
             // We need to prepend it with 0x40 and `pubdataGas`.
             //
             // It is assumed that the position of returndata is >= 0x40, since 0x40 is the free memory pointer location.

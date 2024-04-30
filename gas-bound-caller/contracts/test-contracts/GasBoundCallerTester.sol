@@ -41,10 +41,10 @@ contract GasBoundCallerTester is GasBoundCaller {
             // `2/3` to ensure that the constant is good with sufficient overhead
             SystemContractHelper.burnGas(uint32(gasleft() - (2 * CALL_RETURN_OVERHEAD) / 3), 0);
             assembly {
-                // This place does interfere with the memory layout, however, it is done right before 
+                // This place does interfere with the memory layout, however, it is done right before
                 // the `return` statement, so it is safe to do.
                 // We need to transform `bytes memory returnData` into (bytes memory returndata, gasSpentOnPubdata)
-                // `bytes memory returnData` is encoded as `length` + `data`. 
+                // `bytes memory returnData` is encoded as `length` + `data`.
                 // We need to prepend it with 0x40 and `pubdataGas`.
                 //
                 // It is assumed that the position of returndata is >= 0x40, since 0x40 is the free memory pointer location.
@@ -80,7 +80,9 @@ contract GasBoundCallerTester is GasBoundCaller {
         bytes memory expectedReturndata,
         uint256 expectedPubdataGas
     ) external payable {
-        (bool success, bytes memory returnData) = address(this).call{gas: _gasToPass}(abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data));
+        (bool success, bytes memory returnData) = address(this).call{gas: _gasToPass}(
+            abi.encodeWithSelector(GasBoundCaller.gasBoundCall.selector, _to, _maxTotalGas, _data)
+        );
 
         require(success);
 

@@ -1,7 +1,7 @@
 import { REAL_SYSTEM_CONTEXT_ADDRESS } from "../../system-contracts/test/shared/constants";
 import { deployContractOnAddress, getWallets } from "../../system-contracts/test/shared/utils";
 import type { GasBoundCallerTester } from "../typechain";
-import { GasBoundCallerTesterFactory} from "../typechain";
+import { GasBoundCallerTesterFactory } from "../typechain";
 import type { ISystemContext } from "../typechain/ISystemContext";
 import { ISystemContextFactory } from "../typechain/ISystemContextFactory";
 import { expect } from "chai";
@@ -60,9 +60,14 @@ describe("GasBoundCaller tests", function () {
   it("Should work correctly if gas provided is enough to cover both gas and pubdata", async () => {
     // This tx should succeed, since enough gas was provided to it
     await (
-      await tester.gasBoundCall(tester.address, 80_000_000, tester.interface.encodeFunctionData("spender", [0, 100, '0x']), {
-        gasLimit: 80_000_000,
-      })
+      await tester.gasBoundCall(
+        tester.address,
+        80_000_000,
+        tester.interface.encodeFunctionData("spender", [0, 100, "0x"]),
+        {
+          gasLimit: 80_000_000,
+        }
+      )
     ).wait();
   });
 
@@ -77,8 +82,8 @@ describe("GasBoundCaller tests", function () {
           gasSpentOnPubdata,
           tester.address,
           gasSpentOnPubdata,
-          tester.interface.encodeFunctionData("spender", [0, pubdataToSend, '0x']),
-          '0x', 
+          tester.interface.encodeFunctionData("spender", [0, pubdataToSend, "0x"]),
+          "0x",
           gasSpentOnPubdata,
           {
             gasLimit: 80_000_000,
@@ -98,8 +103,8 @@ describe("GasBoundCaller tests", function () {
         gasSpentOnPubdata,
         tester.address,
         80_000_000,
-        tester.interface.encodeFunctionData("spender", [0, pubdataToSend, '0x12345678']),
-        '0x12345678', 
+        tester.interface.encodeFunctionData("spender", [0, pubdataToSend, "0x12345678"]),
+        "0x12345678",
         gasSpentOnPubdata,
         {
           // Since we'll also spend some funds on execution, this
