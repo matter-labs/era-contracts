@@ -594,6 +594,7 @@ function EVM_GAS_STIPEND() -> gas_stipend { gas_stipend := shl(30, 1) } // 1 << 
 function OVERHEAD() -> overhead { overhead := 2000 }
 // From precompiles/CodeOracle
 function DECOMMIT_COST_PER_WORD() -> cost { cost := 4 }
+function UINT32_MAX() -> ret { ret := 4294967295 } // 2^32 - 1
 
 function _calcEVMGas(_zkevmGas) -> calczkevmGas {
     calczkevmGas := div(_zkevmGas, GAS_DIVISOR())
@@ -614,6 +615,9 @@ function getEVMGas() -> evmGas {
 function _getZkEVMGas(addr) -> zkevmGas {
     let byteSize := extcodesize(addr)
     zkevmGas := mul(byteSize, DECOMMIT_COST_PER_WORD())
+    if gt(zkevmGas, UINT32_MAX()) {
+        zkevmGas := UINT32_MAX()
+    }
 }
 
 function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft{
