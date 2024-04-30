@@ -201,7 +201,7 @@ for { } true { } {
 
         sp := pushStackItem(sp, iszero(a))
 
-        //evmGasLeft := chargeGas(evmGasLeft, 3) TODO: Add this back
+        evmGasLeft := chargeGas(evmGasLeft, 3)
     }
     case 0x18 { // OP_XOR
         let a, b
@@ -359,7 +359,7 @@ for { } true { } {
 
         // dynamic_gas = 3 * minimum_word_size + memory_expansion_cost
         // let minWordSize := div(add(len, 31), 32) Used inside the mul
-        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(offset, len)))
+        let dynamicGas := add(mul(3, div(add(len, 31), 32)), expandMemory(add(dst, len)))
         evmGasLeft := chargeGas(evmGasLeft, add(3, dynamicGas))
 
         let end := len
