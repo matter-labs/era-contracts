@@ -530,9 +530,8 @@ function getNonce(addr) -> nonce {
 }
 
 function _isEVM(_addr) -> isEVM {
-    // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector;
+    // bytes4 selector = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.isAccountEVM.selector; (0x8c040477)
     // function isAccountEVM(address _addr) external view returns (bool);
-    let selector := 0x8c040477
     // IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
     //      address(SYSTEM_CONTRACTS_OFFSET + 0x02)
     // );
@@ -957,8 +956,8 @@ function isAddrEmpty(addr) -> isEmpty {
     }
 }
 
-function _fetchConstructorReturnGas() -> gasLeft { // 0x16bc5cfd
-    let selector := 0x24e5ab4a
+function _fetchConstructorReturnGas() -> gasLeft {
+    //selector is 0x24e5ab4a
 
     mstore8(0, 0x24)
     mstore8(1, 0xe5)
