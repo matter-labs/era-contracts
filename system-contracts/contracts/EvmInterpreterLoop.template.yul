@@ -1230,6 +1230,8 @@ for { } true { } {
         evmGasLeft := chargeGas(evmGasLeft, gasUsed)
     }
     case 0xF5 { // OP_CREATE2
+        evmGasLeft := chargeGas(evmGasLeft, 32000)
+
         if isStatic {
             revert(0, 0)
         }
@@ -1251,12 +1253,16 @@ for { } true { } {
             revert(0, 0)
         }
 
+        // dynamicGas = init_code_cost + hash_cost + memory_expansion_cost + deployment_code_execution_cost + code_deposit_cost
+        // minimum_word_size = (size + 31) / 32
+        // init_code_cost = 2 * minimum_word_size
+        // hash_cost = 6 * minimum_word_size
+        // code_deposit_cost = 200 * deployed_code_size
         evmGasLeft := chargeGas(evmGasLeft, add(
-            32000, add(
             expandMemory(add(offset, size)),
-            mul(8, div(add(size, 31), 32))
-            )
+            shr(2, add(size, 31))
         ))
+
         {
             let hashedBytecode := keccak256(add(MEM_OFFSET_INNER(), offset), size)
             mstore8(0, 0xFF)
