@@ -34,6 +34,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
     /// @dev The address of the legacy L1 erc20 bridge counterpart.
+    /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
     address public override l1Bridge;
 
     /// @dev Contract is expected to be used as proxy implementation.
