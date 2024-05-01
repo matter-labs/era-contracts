@@ -10,6 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {Governance} from "contracts/governance/Governance.sol";
 
 contract RegisterHyperchainScript is Script {
     using stdToml for string;
@@ -32,7 +33,10 @@ contract RegisterHyperchainScript is Script {
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
+        address governanceSecurityCouncilAddress;
+        uint256 governanceMinDelay;
         address newDiamondProxy;
+        address governance;
     }
 
     Config config;
@@ -42,6 +46,7 @@ contract RegisterHyperchainScript is Script {
 
         initializeConfig();
 
+        deployGovernance();
         checkTokenAddress();
         registerTokenOnBridgehub();
         registerHyperchain();
@@ -97,6 +102,12 @@ contract RegisterHyperchainScript is Script {
         config.baseTokenGasPriceMultiplierDenominator = uint128(
             toml.readUint("$.hyperchain.base_token_gas_price_multiplier_denominator")
         );
+        config.governanceMinDelay = uint256(
+            toml.readUint("$.hyperchain.governance_min_delay")
+        );
+        config.governanceSecurityCouncilAddress = toml.readAddress(
+            "$.hyperchain.governance_security_council_address"
+        );
     }
 
     function checkTokenAddress() internal view {
@@ -126,6 +137,16 @@ contract RegisterHyperchainScript is Script {
             bridgehub.addToken(config.baseToken);
             console.log("Token registered on Bridgehub");
         }
+    }
+    
+    function deployGovernance() internal {
+       Governance governance = new Governance(
+            config.ownerAddress,
+            config.governanceSecurityCouncilAddress,
+            config.governanceMinDelay
+        );
+        console.log("Governance deployed at:", address(governance));
+        config.governance = address(governance);
     }
 
     function registerHyperchain() internal {
@@ -192,7 +213,7 @@ contract RegisterHyperchainScript is Script {
         IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
         vm.broadcast();
-        hyperchain.setPendingAdmin(config.ownerAddress);
+        hyperchain.setPendingAdmin(config.governance);
         console.log("Owner set");
     }
 
