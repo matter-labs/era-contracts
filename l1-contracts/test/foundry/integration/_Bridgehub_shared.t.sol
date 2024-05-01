@@ -27,7 +27,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
 
-
 contract StateTransitionManagerFactory is Test {
     function getStateTransitionManagerAddress(address bridgeHubAddress) public returns (StateTransitionManager) {
         return new StateTransitionManager(bridgeHubAddress, type(uint256).max);
@@ -67,18 +66,19 @@ contract BridgeHubIntegration is Test {
         bridgeHub.addToken(tokenAddress);
     }
 
-    // function initializeChainParams(uint256 _chainId) private {
+    function initializeNewChainParams(uint256 _chainId) private {
+        address hyperChainAddress = bridgeHub.getHyperchain(_chainId);
 
-    //     bridgeHub.getHyperchain(_chainId);
-    //     mockChainContract.setFeeParams();
-    //     mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
-    // }
+        AdminFacet adminFacet = AdminFacet(hyperChainAddress);
+        adminFacet.setTokenMultiplier(1, 1);
+    }
 
     function registerNewChain(uint256 _chainId) internal returns (uint256 chainId) {
         Diamond.DiamondCutData memory diamondCutData = getDiamondCutData(diamondAddress);
 
         vm.prank(bridgeHubOwner);
-        uint256 chainId = bridgeHub.createNewChain(
+
+        chainId = bridgeHub.createNewChain(
             _chainId,
             stmAddress,
             address(token),
@@ -86,8 +86,6 @@ contract BridgeHubIntegration is Test {
             admin,
             abi.encode(diamondCutData)
         );
-
-
     }
 
     function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
@@ -240,7 +238,7 @@ contract IntegrationTests is BridgeHubIntegration {
     address mockL2Contract;
 
     uint256 mockMintValue = 1 ether;
-    uint256 mockL2Value = 10000;
+    uint256 mockL2Value = 1000;
     uint256 mockL2GasLimit = 10000000;
     uint256 mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
 
@@ -286,41 +284,66 @@ contract IntegrationTests is BridgeHubIntegration {
         return l2TxnReqDirect;
     }
 
-    function test_checkCreationOfHyperchains() public {
+    function test_creationOfHyperchains() public {
         for (uint i = startChainId; i < chainIds.length; i++) {
             address newHyperchain = bridgeHub.getHyperchain(i);
             assert(newHyperchain != address(0));
         }
     }
 
-    // function test_hyperchainsChangeBridgehub() public {
-    //     vm.txGasPrice(0.05 ether);
-    //     vm.deal(alice, 1 ether);
-    //     token.mint(alice, mockMintValue);
-    //     vm.deal(bob, 1 ether);
-    //     token.mint(bob, mockMintValue);
+    function test_bridgeHubChangesSharedBridge() public {
+        vm.txGasPrice(0.05 ether);
+        vm.deal(alice, 1 ether);
+        vm.deal(bob, 1 ether);
 
-    //     assertEq(token.balanceOf(alice), mockMintValue);
-    //     assertEq(token.balanceOf(bob), mockMintValue);
+        token.mint(alice, mockMintValue);
+        token.mint(bob, mockMintValue);
 
-    //     L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect( chainIds[0]);
-    //     L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(chainIds[1]);
+        assertEq(token.balanceOf(alice), mockMintValue);
+        assertEq(token.balanceOf(bob), mockMintValue);
 
-    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-    //     address firstHyperChainAddress = bridgeHub.getHyperchain(10);
 
-    //     vm.prank(alice);
-    //     token.transfer(address(this), aliceRequest.mintValue);
-    //     token.approve(address(sharedBridge), aliceRequest.mintValue);
-  
-    //     vm.mockCall(
-    //         address(firstHyperChainAddress),
-    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
-    //         abi.encode(canonicalHash)
-    //     );
+        uint256 firstChainId = chainIds[0];
+        uint256 secondChainId = chainIds[1];
 
-    //     vm.prank(alice);
-    //     bytes32 resultantHash =   bridgeHub.requestL2TransactionDirect(aliceRequest);
-    //     assertEq(canonicalHash, resultantHash);
-    // }
+        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(firstChainId);
+        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(secondChainId);
+
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+        address firstHyperChainAddress = bridgeHub.getHyperchain(firstChainId);
+        address secondHyperChainAddress = bridgeHub.getHyperchain(secondChainId);
+    
+        vm.startPrank(alice);
+        assertEq(token.balanceOf(alice), mockMintValue);
+        token.approve(address(sharedBridge), mockMintValue);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        assertEq(token.balanceOf(bob), mockMintValue);
+        token.approve(address(sharedBridge), mockMintValue);
+        vm.stopPrank();
+
+        vm.mockCall(
+            firstHyperChainAddress,
+            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        vm.mockCall(
+            secondHyperChainAddress,
+            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        vm.prank(alice);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect(aliceRequest);
+        assertEq(canonicalHash, resultantHash);
+
+        vm.prank(bob);
+        bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect(bobRequest);
+        assertEq(canonicalHash, resultantHash2);
+
+        assertEq(sharedBridge.chainBalance(firstChainId, address(token)), mockMintValue);
+        assertEq(sharedBridge.chainBalance(secondChainId, address(token)), mockMintValue);
+    }
 }
