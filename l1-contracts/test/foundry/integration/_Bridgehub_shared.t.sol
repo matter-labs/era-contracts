@@ -333,7 +333,55 @@ contract IntegrationTests is BridgeHubIntegration, HyperchainFactory, L2TxMocker
         bob = makeAddr("bob");
     }
 
-    function test_bridgeHubChangesSharedBridge_NonEth() public {
+    function test_hyperchainTokenDirectDeposit_Eth() public {
+        clearSharedBridgeBalances();
+
+        vm.txGasPrice(0.05 ether);
+        vm.deal(alice, 1 ether);
+        vm.deal(bob, 1 ether);
+
+        uint256 firstChainId = hyperchainIds[0];
+        uint256 secondChainId = hyperchainIds[1];
+
+        assertTrue(getHyperchainBaseToken(firstChainId) == ETH_TOKEN_ADDRESS);
+        assertTrue(getHyperchainBaseToken(secondChainId) == ETH_TOKEN_ADDRESS);
+
+        L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect(firstChainId, 1 ether);
+        L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(secondChainId, 1 ether);
+
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+        address firstHyperChainAddress = getHyperchainAddress(firstChainId);
+        address secondHyperChainAddress = getHyperchainAddress(secondChainId);
+
+        vm.mockCall(
+            firstHyperChainAddress,
+            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        vm.mockCall(
+            secondHyperChainAddress,
+            abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        vm.prank(alice);
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: alice.balance}(aliceRequest);
+        assertEq(canonicalHash, resultantHash);
+
+        vm.prank(bob);
+        bytes32 resultantHash2 = bridgeHub.requestL2TransactionDirect{value: bob.balance}(bobRequest);
+        assertEq(canonicalHash, resultantHash2);
+
+        assertEq(alice.balance, 0);
+        assertEq(bob.balance, 0);
+
+        assertEq(address(sharedBridge).balance, 2 ether);
+        assertEq(sharedBridge.chainBalance(firstChainId, ETH_TOKEN_ADDRESS), 1 ether);
+        assertEq(sharedBridge.chainBalance(secondChainId, ETH_TOKEN_ADDRESS), 1 ether);
+    }
+
+    function test_hyperchainTokenDirectDeposit_NonEth() public {
         clearSharedBridgeBalances();
 
         uint256 mockMintValue = 1 ether;
