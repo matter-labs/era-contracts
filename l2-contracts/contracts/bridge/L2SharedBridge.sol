@@ -20,8 +20,8 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridge is IL2SharedBridge, Initializable {
-    /// @dev The address of the legacy L1 erc20 bridge counterpart.
-    address public override l1Bridge;
+    /// @dev The address of the L1 shared bridge counterpart.
+    address public override l1SharedBridge;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -33,8 +33,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
-    /// @dev The address of the L1 shared bridge counterpart.
-    address public override l1SharedBridge;
+    /// @dev The address of the legacy L1 erc20 bridge counterpart.
+    address public override l1Bridge;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
