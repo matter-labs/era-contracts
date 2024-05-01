@@ -60,7 +60,9 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   }
   const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
 
-  let l2SharedBridgeImplmenetationBytecode = localLegacyBridgeTesting ? hre.artifacts.readArtifactSync("DevL2SharedBridge").bytecode : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
+  let l2SharedBridgeImplmenetationBytecode = localLegacyBridgeTesting
+    ? hre.artifacts.readArtifactSync("DevL2SharedBridge").bytecode
+    : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
 
   if (!l2SharedBridgeImplmenetationBytecode) {
     throw new Error("l2SharedBridgeImplmenetationBytecode not found");
@@ -119,8 +121,8 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
   const l2GovernorAddress = applyL1ToL2Alias(deployer.addresses.Governance);
 
   let proxyInitializationParams;
-  if(localLegacyBridgeTesting) {
-    console.log('\n\nLocal testing!\n\n');
+  if (localLegacyBridgeTesting) {
+    console.log("\n\nLocal testing!\n\n");
     const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("DevL2SharedBridge").abi);
     proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initializeDevBridge", [
       l1SharedBridge.address,
@@ -129,7 +131,7 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
       l2GovernorAddress,
     ]);
   } else {
-    console.log('\n\nNot local testing!\n\n');
+    console.log("\n\nNot local testing!\n\n");
     const l2SharedBridgeInterface = new Interface(hre.artifacts.readArtifactSync("L2SharedBridge").abi);
     proxyInitializationParams = l2SharedBridgeInterface.encodeFunctionData("initialize", [
       l1SharedBridge.address,
@@ -138,7 +140,6 @@ export async function deploySharedBridgeProxyOnL2ThroughL1(
       l2GovernorAddress,
     ]);
   }
-
 
   /// prepare constructor data
   const l2SharedBridgeProxyConstructorData = ethers.utils.arrayify(

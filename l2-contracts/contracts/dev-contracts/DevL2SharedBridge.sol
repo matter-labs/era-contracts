@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.20;
 
-import { L2SharedBridge } from "../bridge/L2SharedBridge.sol"; 
-import { L2StandardERC20 } from "../bridge/L2StandardERC20.sol";
+import {L2SharedBridge} from "../bridge/L2SharedBridge.sol";
+import {L2StandardERC20} from "../bridge/L2StandardERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @author Matter Labs
@@ -24,7 +24,7 @@ contract DevL2SharedBridge is L2SharedBridge {
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         l2TokenBeacon.transferOwnership(_aliasedOwner);
 
-        // Unfortunately the `l1LegacyBridge` is not an internal variable in the parent contract. 
+        // Unfortunately the `l1LegacyBridge` is not an internal variable in the parent contract.
         // To keep the changes to the production code minimal, we'll just manually set the variable here.
         assembly {
             sstore(4, _l1LegacyBridge)
