@@ -21,23 +21,19 @@ contract RegisterHyperchainScript is Script {
         address deployerAddress;
         address ownerAddress;
         uint256 hyperchainChainId;
-
         bool validiumMode;
         uint256 bridgehubCreateNewChainSalt;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
-
         address baseToken;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
-
         address bridgehub;
         address stateTransitionProxy;
         address validatorTimelock;
         bytes diamondCutData;
         address newDiamondProxy;
     }
-
 
     Config config;
 
@@ -93,12 +89,8 @@ contract RegisterHyperchainScript is Script {
         config.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
         config.validiumMode = toml.readBool("$.hyperchain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress(
-            "$.hyperchain.validator_sender_operator_commit_eth"
-        );
-        config.validatorSenderOperatorBlobsEth = toml.readAddress(
-            "$.hyperchain.validator_sender_operator_blobs_eth"
-        );
+        config.validatorSenderOperatorCommitEth = toml.readAddress("$.hyperchain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorBlobsEth = toml.readAddress("$.hyperchain.validator_sender_operator_blobs_eth");
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.hyperchain.base_token_gas_price_multiplier_nominator")
         );
@@ -179,10 +171,10 @@ contract RegisterHyperchainScript is Script {
     }
 
     function configureZkSyncStateTransition() internal {
-        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.newDiamondProxy);
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
         vm.startBroadcast();
-        zkSyncStateTransition.setTokenMultiplier(
+        hyperchain.setTokenMultiplier(
             config.baseTokenGasPriceMultiplierNominator,
             config.baseTokenGasPriceMultiplierDenominator
         );
@@ -197,11 +189,10 @@ contract RegisterHyperchainScript is Script {
     }
 
     function setPendingAdmin() internal {
-        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.newDiamondProxy);
+        IZkSyncHyperchain hyperchain = IZkSyncHyperchain(config.newDiamondProxy);
 
-        vm.startBroadcast();
-        zkSyncStateTransition.setPendingAdmin(config.ownerAddress);
-        vm.stopBroadcast();
+        vm.broadcast();
+        hyperchain.setPendingAdmin(config.ownerAddress);
         console.log("Owner set");
     }
 
