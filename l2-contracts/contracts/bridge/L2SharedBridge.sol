@@ -68,7 +68,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
-            require(_l1LegacyBridge != address(0), "bf2");
+            require(_l1Bridge != address(0), "bf2");
             l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
