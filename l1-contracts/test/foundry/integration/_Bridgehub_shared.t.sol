@@ -11,18 +11,22 @@ import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamond
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {L1SharedBridge} from "contracts/bridge/L1SharedBridge.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Utils} from "foundry-test/unit/concrete/Utils/Utils.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {UtilsFacet} from "foundry-test/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {GenesisUpgrade} from "contracts/upgrades/GenesisUpgrade.sol";
 import {StateTransitionManagerInitializeData} from "contracts/state-transition/IStateTransitionManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
+
 
 contract StateTransitionManagerFactory is Test {
     function getStateTransitionManagerAddress(address bridgeHubAddress) public returns (StateTransitionManager) {
@@ -42,23 +46,16 @@ contract BridgeHubIntegration is Test {
     address bridgeHubAddress;
     address eraDiamondProxy;
     address l1WethAddress;
+    address l2SharedBridge;
 
     Diamond.FacetCut[] facetCuts;
     TestnetVerifier testnetVerifier;
+    L1SharedBridge sharedBridge;
+    Bridgehub bridgeHub;
+    TestnetERC20Token token;
 
     uint256 chainId;
     uint256 eraChainId;
-    uint256 lastChainId;
-
-    L1SharedBridge l1sharedBridge;
-    Bridgehub internal bridgeHub;
-    // currently single base token
-    TestnetERC20Token token;
-
-    // returns bridgehub address to be used by state transition manager constructor
-    function getBridgehubAddress() public returns (address) {
-        return address(bridgeHub);
-    }
 
     function registerStateTransitionManager(address _stmAddress) internal {
         vm.prank(bridgeHubOwner);
@@ -70,18 +67,27 @@ contract BridgeHubIntegration is Test {
         bridgeHub.addToken(tokenAddress);
     }
 
-    function registerNewChain() internal {
+    // function initializeChainParams(uint256 _chainId) private {
+
+    //     bridgeHub.getHyperchain(_chainId);
+    //     mockChainContract.setFeeParams();
+    //     mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
+    // }
+
+    function registerNewChain(uint256 _chainId) internal returns (uint256 chainId) {
         Diamond.DiamondCutData memory diamondCutData = getDiamondCutData(diamondAddress);
 
         vm.prank(bridgeHubOwner);
-        lastChainId = bridgeHub.createNewChain(
-            lastChainId,
+        uint256 chainId = bridgeHub.createNewChain(
+            _chainId,
             stmAddress,
             address(token),
             uint256(12),
             admin,
             abi.encode(diamondCutData)
         );
+
+
     }
 
     function getDiamondCutData(address _diamondInit) internal returns (Diamond.DiamondCutData memory) {
@@ -90,6 +96,10 @@ contract BridgeHubIntegration is Test {
         bytes memory initCalldata = abi.encode(initializeData);
 
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+    }
+
+    function getSTM() internal returns (StateTransitionManager) {
+        return StateTransitionManager(stmAddress);
     }
 
     function initializeSTM() internal {
@@ -125,17 +135,17 @@ contract BridgeHubIntegration is Test {
         admin = makeAddr("admin");
         l1WethAddress = makeAddr("weth");
         validator = makeAddr("validator");
+        l2SharedBridge = makeAddr("l2sharedBridge");
+
         testnetVerifier = new TestnetVerifier();
         chainId = 1;
         eraChainId = 9;
-        lastChainId = 9;
 
         bridgeHub = new Bridgehub();
         bridgeHubAddress = address(bridgeHub);
 
-        address defaultOwner = bridgeHub.owner();
-
-        vm.prank(defaultOwner);
+        // skipped intializing upgradeable proxy for now
+        vm.prank(bridgeHub.owner());
         bridgeHub.transferOwnership(bridgeHubOwner);
 
         vm.prank(bridgeHubOwner);
@@ -146,9 +156,6 @@ contract BridgeHubIntegration is Test {
 
         vm.prank(admin);
         bridgeHub.acceptAdmin();
-
-        StateTransitionManager stm = new StateTransitionManager(bridgeHubAddress, type(uint256).max);
-        stmAddress = address(stm);
 
         facetCuts.push(
             Diamond.FacetCut({
@@ -183,21 +190,43 @@ contract BridgeHubIntegration is Test {
             })
         );
 
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MailboxFacet(eraChainId)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getMailboxSelectors()
+            })
+        );
+
         initializeSTM();
         registerStateTransitionManager(stmAddress);
 
         token = new TestnetERC20Token("ERC20Base", "UWU", 18);
         registerNewToken(address(token));
 
-        l1sharedBridge = new L1SharedBridge({
+        sharedBridge = new L1SharedBridge({
             _l1WethAddress: l1WethAddress,
             _bridgehub: IBridgehub(address(bridgeHub)),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
 
+        // skipped intializing upgradeable proxy for now
+        vm.prank(sharedBridge.owner());
+        sharedBridge.transferOwnership(bridgeHubOwner);
+
         vm.prank(bridgeHubOwner);
-        bridgeHub.setSharedBridge(address(l1sharedBridge));
+        sharedBridge.acceptOwnership();
+
+        // mock l2 side of shared bridge
+        vm.startPrank(bridgeHubOwner);
+        sharedBridge.initializeChainGovernance(chainId, l2SharedBridge);
+        sharedBridge.initializeChainGovernance(eraChainId, l2SharedBridge);
+        vm.stopPrank();
+
+        vm.prank(bridgeHubOwner);
+        bridgeHub.setSharedBridge(address(sharedBridge));
     }
 
     // add this to be excluded from coverage report
@@ -205,9 +234,93 @@ contract BridgeHubIntegration is Test {
 }
 
 contract IntegrationTests is BridgeHubIntegration {
-    function test_depositToBridgeHub() public {
-        registerNewChain();
+    address alice;
+    address bob;
+    address mockRefundRecipient;
+    address mockL2Contract;
 
-        assert(bridgeHub.getHyperchain(lastChainId) != address(0));
+    uint256 mockMintValue = 1 ether;
+    uint256 mockL2Value = 10000;
+    uint256 mockL2GasLimit = 10000000;
+    uint256 mockL2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+
+    bytes mockL2Calldata;
+    bytes[] mockFactoryDeps;
+
+    uint256 startChainId = 10;
+    uint256[] chainIds;
+
+    function addNewChain() internal {
+        chainIds.push(registerNewChain(startChainId + chainIds.length));
     }
+
+    constructor() {
+        mockL2Calldata = "";
+        mockFactoryDeps = new bytes[](1);
+        mockFactoryDeps[0] = "11111111111111111111111111111111";
+        mockL2Contract = makeAddr("mockl2contract");
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
+        mockRefundRecipient = makeAddr("refundrecipient");
+
+        addNewChain();
+        addNewChain();
+        addNewChain();
+    }
+
+    function createMockL2TransactionRequestDirect(
+        uint256 chainId
+    ) internal returns (L2TransactionRequestDirect memory) {
+        L2TransactionRequestDirect memory l2TxnReqDirect;
+
+        l2TxnReqDirect.chainId = chainId;
+        l2TxnReqDirect.mintValue = mockMintValue;
+        l2TxnReqDirect.l2Contract = mockL2Contract;
+        l2TxnReqDirect.l2Value = mockL2Value;
+        l2TxnReqDirect.l2Calldata = mockL2Calldata;
+        l2TxnReqDirect.l2GasLimit = mockL2GasLimit;
+        l2TxnReqDirect.l2GasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+        l2TxnReqDirect.factoryDeps = mockFactoryDeps;
+        l2TxnReqDirect.refundRecipient = mockRefundRecipient;
+
+        return l2TxnReqDirect;
+    }
+
+    function test_checkCreationOfHyperchains() public {
+        for (uint i = startChainId; i < chainIds.length; i++) {
+            address newHyperchain = bridgeHub.getHyperchain(i);
+            assert(newHyperchain != address(0));
+        }
+    }
+
+    // function test_hyperchainsChangeBridgehub() public {
+    //     vm.txGasPrice(0.05 ether);
+    //     vm.deal(alice, 1 ether);
+    //     token.mint(alice, mockMintValue);
+    //     vm.deal(bob, 1 ether);
+    //     token.mint(bob, mockMintValue);
+
+    //     assertEq(token.balanceOf(alice), mockMintValue);
+    //     assertEq(token.balanceOf(bob), mockMintValue);
+
+    //     L2TransactionRequestDirect memory aliceRequest = createMockL2TransactionRequestDirect( chainIds[0]);
+    //     L2TransactionRequestDirect memory bobRequest = createMockL2TransactionRequestDirect(chainIds[1]);
+
+    //     bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+    //     address firstHyperChainAddress = bridgeHub.getHyperchain(10);
+
+    //     vm.prank(alice);
+    //     token.transfer(address(this), aliceRequest.mintValue);
+    //     token.approve(address(sharedBridge), aliceRequest.mintValue);
+  
+    //     vm.mockCall(
+    //         address(firstHyperChainAddress),
+    //         abi.encodeWithSelector(MailboxFacet.bridgehubRequestL2Transaction.selector),
+    //         abi.encode(canonicalHash)
+    //     );
+
+    //     vm.prank(alice);
+    //     bytes32 resultantHash =   bridgeHub.requestL2TransactionDirect(aliceRequest);
+    //     assertEq(canonicalHash, resultantHash);
+    // }
 }
