@@ -20,8 +20,8 @@ import {SystemContractsCaller} from "../SystemContractsCaller.sol";
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2SharedBridge is IL2SharedBridge, Initializable {
-    /// @dev The address of the L1 bridge counterpart.
-    address public override l1Bridge;
+    /// @dev The address of the L1 shared bridge counterpart.
+    address public override l1SharedBridge;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -33,7 +33,9 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     /// @dev A mapping l2 token address => l1 token address
     mapping(address l2TokenAddress => address l1TokenAddress) public override l1TokenAddress;
 
-    address private l1LegacyBridge;
+    /// @dev The address of the legacy L1 erc20 bridge counterpart.
+    /// This is non-zero only on Era, and should not be renamed for backward compatibility with the SDKs.
+    address public override l1Bridge;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Disable the initialization to prevent Parity hack.
@@ -45,20 +47,21 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
     }
 
     /// @notice Initializes the bridge contract for later use. Expected to be used in the proxy.
-    /// @param _l1Bridge The address of the L1 Bridge contract.
+    /// @param _l1SharedBridge The address of the L1 Bridge contract.
+    /// @param _l1Bridge The address of the legacy L1 Bridge contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _aliasedOwner The address of the governor contract.
     function initialize(
+        address _l1SharedBridge,
         address _l1Bridge,
-        address _l1LegacyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        require(_l1Bridge != address(0), "bf");
+        require(_l1SharedBridge != address(0), "bf");
         require(_l2TokenProxyBytecodeHash != bytes32(0), "df");
         require(_aliasedOwner != address(0), "sf");
 
-        l1Bridge = _l1Bridge;
+        l1SharedBridge = _l1SharedBridge;
 
         if (block.chainid != ERA_CHAIN_ID) {
             address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
@@ -66,8 +69,8 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
             l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
             l2TokenBeacon.transferOwnership(_aliasedOwner);
         } else {
-            require(_l1LegacyBridge != address(0), "bf2");
-            l1LegacyBridge = _l1LegacyBridge;
+            require(_l1Bridge != address(0), "bf2");
+            l1Bridge = _l1Bridge;
             // l2StandardToken and l2TokenBeacon are already deployed on ERA, and stored in the proxy
         }
     }
@@ -88,7 +91,7 @@ contract L2SharedBridge is IL2SharedBridge, Initializable {
         // Only the L1 bridge counterpart can initiate and finalize the deposit.
         require(
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1Bridge ||
-                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1LegacyBridge,
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == l1SharedBridge,
             "mq"
         );
 
