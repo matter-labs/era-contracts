@@ -56,6 +56,17 @@ contract RegisterHyperchainScript is Script {
         saveOutput();
     }
 
+    // This function should be called by the owner to accept the admin role
+    function acceptAdmin() public {
+        console.log("Accept admin Hyperchain");
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-config/accept-admin.toml");
+        string memory toml = vm.readFile(path);
+        address diamondProxy = toml.readAddress("$.diamond_proxy_addr");
+        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(diamondProxy);
+        vm.broadcast();
+        zkSyncStateTransition.acceptAdmin();
+    }
 
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
