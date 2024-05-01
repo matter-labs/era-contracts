@@ -18,37 +18,26 @@ contract RegisterHyperchainScript is Script {
     bytes32 constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewHyperchain(uint256,address)");
 
     struct Config {
-        ContractsConfig contracts;
-        AddressesConfig addresses;
         address deployerAddress;
         address ownerAddress;
         uint256 hyperchainChainId;
-    }
 
-    struct ContractsConfig {
-        uint256 bridgehubCreateNewChainSalt;
-        bytes diamondCutData;
         bool validiumMode;
+        uint256 bridgehubCreateNewChainSalt;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
+
+        address baseToken;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
-    }
 
-    struct AddressesConfig {
-        address baseToken;
         address bridgehub;
         address stateTransitionProxy;
-        address adminFacet;
-        address gettersFacet;
-        address mailboxFacet;
-        address executorFacet;
-        address verifier;
-        address blobVersionedHashRetriever;
-        address diamondInit;
         address validatorTimelock;
+        bytes diamondCutData;
         address newDiamondProxy;
     }
+
 
     Config config;
 
@@ -62,14 +51,16 @@ contract RegisterHyperchainScript is Script {
         registerHyperchain();
         addValidators();
         configureZkSyncStateTransition();
+        setPendingAdmin();
 
         saveOutput();
     }
 
+
     function initializeConfig() internal {
         // Grab config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, "/script-config/register-hyperchain.toml");
         string memory toml = vm.readFile(path);
 
         config.deployerAddress = msg.sender;
@@ -79,87 +70,73 @@ contract RegisterHyperchainScript is Script {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.ownerAddress = toml.readAddress("$.owner_addr");
 
-        config.addresses.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        config.addresses.stateTransitionProxy = toml.readAddress(
+        config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        config.stateTransitionProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
-        config.addresses.adminFacet = toml.readAddress("$.deployed_addresses.state_transition.admin_facet_addr");
-        config.addresses.gettersFacet = toml.readAddress("$.deployed_addresses.state_transition.getters_facet_addr");
-        config.addresses.mailboxFacet = toml.readAddress("$.deployed_addresses.state_transition.mailbox_facet_addr");
-        config.addresses.executorFacet = toml.readAddress("$.deployed_addresses.state_transition.executor_facet_addr");
-        config.addresses.verifier = toml.readAddress("$.deployed_addresses.state_transition.verifier_addr");
-        config.addresses.blobVersionedHashRetriever = toml.readAddress(
-            "$.deployed_addresses.blob_versioned_hash_retriever_addr"
-        );
-        config.addresses.diamondInit = toml.readAddress("$.deployed_addresses.state_transition.diamond_init_addr");
-        config.addresses.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
+        config.validatorTimelock = toml.readAddress("$.deployed_addresses.validator_timelock_addr");
 
-        config.contracts.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
-
-        // Grab config from l1 deployment config
-        root = vm.projectRoot();
-        path = string.concat(root, "/script-config/config-deploy-l1.toml");
-        toml = vm.readFile(path);
+        config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
 
         config.hyperchainChainId = toml.readUint("$.hyperchain.hyperchain_chain_id");
-        config.contracts.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
-        config.addresses.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
-        config.contracts.validiumMode = toml.readBool("$.hyperchain.validium_mode");
-        config.contracts.validatorSenderOperatorCommitEth = toml.readAddress(
+        config.bridgehubCreateNewChainSalt = toml.readUint("$.hyperchain.bridgehub_create_new_chain_salt");
+        config.baseToken = toml.readAddress("$.hyperchain.base_token_addr");
+        config.validiumMode = toml.readBool("$.hyperchain.validium_mode");
+        config.validatorSenderOperatorCommitEth = toml.readAddress(
             "$.hyperchain.validator_sender_operator_commit_eth"
         );
-        config.contracts.validatorSenderOperatorBlobsEth = toml.readAddress(
+        config.validatorSenderOperatorBlobsEth = toml.readAddress(
             "$.hyperchain.validator_sender_operator_blobs_eth"
         );
-        config.contracts.baseTokenGasPriceMultiplierNominator = uint128(
+        config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.hyperchain.base_token_gas_price_multiplier_nominator")
         );
-        config.contracts.baseTokenGasPriceMultiplierDenominator = uint128(
+        config.baseTokenGasPriceMultiplierDenominator = uint128(
             toml.readUint("$.hyperchain.base_token_gas_price_multiplier_denominator")
         );
     }
 
-    function checkTokenAddress() internal {
-        if (config.addresses.baseToken == address(0)) {
+    function checkTokenAddress() internal view {
+        if (config.baseToken == address(0)) {
             revert("Token address is not set");
         }
 
         // Check if it's ethereum address
-        if (config.addresses.baseToken == ADDRESS_ONE) {
+        if (config.baseToken == ADDRESS_ONE) {
             return;
         }
 
-        if (config.addresses.baseToken.code.length == 0) {
+        if (config.baseToken.code.length == 0) {
             revert("Token address is not a contract address");
         }
 
-        console.log("Using base token address:", config.addresses.baseToken);
+        console.log("Using base token address:", config.baseToken);
     }
 
     function registerTokenOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.addresses.bridgehub);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
-        if (bridgehub.tokenIsRegistered(config.addresses.baseToken)) {
+        if (bridgehub.tokenIsRegistered(config.baseToken)) {
             console.log("Token already registered on Bridgehub");
         } else {
             vm.broadcast();
-            bridgehub.addToken(config.addresses.baseToken);
+            bridgehub.addToken(config.baseToken);
             console.log("Token registered on Bridgehub");
         }
     }
 
     function registerHyperchain() internal {
-        IBridgehub bridgehub = IBridgehub(config.addresses.bridgehub);
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
 
         vm.broadcast();
         vm.recordLogs();
         bridgehub.createNewChain({
             _chainId: config.hyperchainChainId,
-            _stateTransitionManager: config.addresses.stateTransitionProxy,
-            _baseToken: config.addresses.baseToken,
-            _salt: config.contracts.bridgehubCreateNewChainSalt,
+            _stateTransitionManager: config.stateTransitionProxy,
+            _baseToken: config.baseToken,
+            _salt: config.bridgehubCreateNewChainSalt,
             _admin: msg.sender,
-            _initData: config.contracts.diamondCutData
+            _initData: config.diamondCutData
         });
         console.log("Hyperchain registered");
 
@@ -175,28 +152,28 @@ contract RegisterHyperchainScript is Script {
         if (diamondProxyAddress == address(0)) {
             revert("Diamond proxy address not found");
         }
-        config.addresses.newDiamondProxy = diamondProxyAddress;
+        config.newDiamondProxy = diamondProxyAddress;
         console.log("Hyperchain diamond proxy deployed at:", diamondProxyAddress);
     }
 
     function addValidators() internal {
-        ValidatorTimelock validatorTimelock = ValidatorTimelock(config.addresses.validatorTimelock);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast();
-        validatorTimelock.addValidator(config.hyperchainChainId, config.contracts.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.hyperchainChainId, config.contracts.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidator(config.hyperchainChainId, config.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidator(config.hyperchainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");
     }
 
     function configureZkSyncStateTransition() internal {
-        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.addresses.newDiamondProxy);
+        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.newDiamondProxy);
 
         vm.startBroadcast();
         zkSyncStateTransition.setTokenMultiplier(
-            config.contracts.baseTokenGasPriceMultiplierNominator,
-            config.contracts.baseTokenGasPriceMultiplierDenominator
+            config.baseTokenGasPriceMultiplierNominator,
+            config.baseTokenGasPriceMultiplierDenominator
         );
 
         // TODO: support validium mode when available
@@ -208,8 +185,17 @@ contract RegisterHyperchainScript is Script {
         console.log("ZkSync State Transition configured");
     }
 
+    function setPendingAdmin() internal {
+        IZkSyncHyperchain zkSyncStateTransition = IZkSyncHyperchain(config.newDiamondProxy);
+
+        vm.startBroadcast();
+        zkSyncStateTransition.setPendingAdmin(config.ownerAddress);
+        vm.stopBroadcast();
+        console.log("Owner set");
+    }
+
     function saveOutput() internal {
-        string memory toml = vm.serializeAddress("root", "diamond_proxy_addr", config.addresses.newDiamondProxy);
+        string memory toml = vm.serializeAddress("root", "diamond_proxy_addr", config.newDiamondProxy);
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-register-hyperchain.toml");
         vm.writeToml(toml, path);
