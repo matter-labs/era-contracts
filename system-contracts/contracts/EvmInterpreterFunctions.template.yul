@@ -70,6 +70,10 @@ function MAX_MEMORY_FRAME() -> max {
     max := add(MEM_OFFSET_INNER(), MAX_POSSIBLE_MEM())
 }
 
+function MAX_UINT() -> max_uint {
+    max_uint := 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+}
+
 // It is the responsibility of the caller to ensure that ip >= BYTECODE_OFFSET + 32
 function readIP(ip) -> opcode {
     // TODO: Why not do this at the beginning once instead of every time?
@@ -302,6 +306,161 @@ function chargeGas(prevGas, toCharge) -> gasRemaining {
     }
 
     gasRemaining := sub(prevGas, toCharge)
+}
+
+function getMax(a, b) -> max {
+    max := b
+    if gt(a, b) {
+        max := a
+    }
+}
+
+function getMin(a, b) -> min {
+    min := b
+    if lt(a, b) {
+        min := a
+    }
+}
+
+function bitLength(n) -> bitLen {
+    for { } gt(n, 0) { } { // while(n > 0)
+        if iszero(n) {
+            bitLen := 1
+            break
+        }
+        n := shr(1, n)
+        bitLen := add(bitLen, 1)
+    }
+}
+
+function bitMaskFromBytes(nBytes) -> bitMask {
+    bitMask := sub(exp(2, mul(nBytes, 8)), 1) // 2**(nBytes*8) - 1
+}
+// The gas cost mentioned here is purely the cost of the contract, 
+// and does not consider the cost of the call itself nor the instructions 
+// to put the parameters in memory. 
+// Take into account MEM_OFFSET_INNER() when passing the argsOfsset
+function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
+    switch addr
+        case 0x01 { // ecRecover
+            gasToCharge := 3000
+        }
+        case 0x02 { // SHA2-256
+            gasToCharge := 60
+            let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
+            gasToCharge := add(gasToCharge, mul(12, dataWordSize))
+        }
+        case 0x03 { // RIPEMD-160
+            gasToCharge := 600
+            let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
+            gasToCharge := add(gasToCharge, mul(120, dataWordSize))
+        }
+        case 0x04 { // identity
+            gasToCharge := 15
+            let dataWordSize := shr(5, add(argsSize, 31)) // (argsSize+31)/32
+            gasToCharge := add(gasToCharge, mul(3, dataWordSize))
+        }
+        // [0; 31] (32 bytes)	Bsize	Byte size of B
+        // [32; 63] (32 bytes)	Esize	Byte size of E
+        // [64; 95] (32 bytes)	Msize	Byte size of M
+        /*       
+        def calculate_iteration_count(exponent_length, exponent):
+            iteration_count = 0
+            if exponent_length <= 32 and exponent == 0: iteration_count = 0
+            elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
+            elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+            return max(iteration_count, 1)
+        def calculate_gas_cost(base_length, modulus_length, exponent_length, exponent):
+            multiplication_complexity = calculate_multiplication_complexity(base_length, modulus_length)
+            iteration_count = calculate_iteration_count(exponent_length, exponent)
+            return max(200, math.floor(multiplication_complexity * iteration_count / 3))
+        */
+        // modexp gas cost EIP below
+        // https://eips.ethereum.org/EIPS/eip-2565
+        case 0x05 { // modexp
+            let mulComplex
+            let Bsize := mload(argsOffset)
+            let Esize := mload(add(argsOffset, 0x20))
+
+            {
+                let words := getMax(Bsize, mload(add(argsOffset, 0x40))) // shr(3, x) == x/8
+                if and(lt(words, 64), eq(words, 64)){
+                    // if x <= 64: return x ** 2
+                    mulComplex := mul(words, words)
+                }
+                if and(and(lt(words, 1024), eq(words, 1024)), gt(words, 64)){
+                    // elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+                    mulComplex := sub(add(shr(2, mul(words, words)), mul(96, words)), 3072)
+                }
+                if gt(words, 64) {
+                    //  else: return x ** 2 // 16 + 480 * x - 199680
+                    mulComplex := sub(add(shr(4, mul(words, words)), mul(480, words)), 199680)
+                }
+            }
+
+            // [96 + Bsize; 96 + Bsize + Esize]	E
+            let exponentFirst256, exponentIsZero, exponentBitLen
+            if or(lt(Esize, 32), eq(Esize, 32)) {
+                // Maybe there isn't exactly 32 bytes, so a mask should be applied
+                exponentFirst256 := mload(add(add(argsOffset, 0x60), Bsize))
+                exponentBitLen := bitLength(exponentFirst256)
+                exponentIsZero := iszero(and(exponentFirst256, bitMaskFromBytes(Esize)))
+            }
+            if gt(Esize, 32) {
+                exponentFirst256 := mload(add(add(argsOffset, 0x60), Bsize))
+                exponentIsZero := iszero(exponentFirst256)
+                let exponentNext
+                // This is done because the first 32bytes of the exponent were loaded
+                for { let i := 0 } lt(i,  div(Esize, 32)) { i := add(i, 1) Esize := sub(Esize, 32)  } { // check every 32bytes
+                    // Maybe there isn't exactly 32 bytes, so a mask should be applied
+                    exponentNext := mload(add(add(add(argsOffset, 0x60), Bsize), add(mul(i, 32), 32)))
+                    exponentBitLen := add(bitLength(exponentNext), mul(mul(32, 8), add(i, 1)))
+                    if iszero(iszero(and(exponentNext, bitMaskFromBytes(Esize)))) {
+                        exponentIsZero := false
+                    }
+                }
+            }
+
+            // if exponent_length <= 32 and exponent == 0: iteration_count = 0
+            // return max(iteration_count, 1)
+            let iterationCount := 1
+            // elif exponent_length <= 32: iteration_count = exponent.bit_length() - 1
+            if and(lt(Esize, 32), iszero(exponentIsZero)) {
+                iterationCount := sub(exponentBitLen, 1)
+            }
+            // elif exponent_length > 32: iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+            if gt(Esize, 32) {
+                iterationCount := add(mul(8, sub(Esize, 32)), sub(bitLength(and(exponentFirst256, MAX_UINT())), 1))
+            }
+
+            gasToCharge := getMax(200, div(mul(mulComplex, iterationCount), 3))
+        }
+        // ecAdd ecMul ecPairing EIP below
+        // https://eips.ethereum.org/EIPS/eip-1108
+        case 0x06 { // ecAdd
+            // The gas cost is fixed at 150. However, if the input
+            // does not allow to compute a valid result, all the gas sent is consumed.
+            gasToCharge := 150
+        }
+        case 0x07 { // ecMul
+            // The gas cost is fixed at 6000. However, if the input
+            // does not allow to compute a valid result, all the gas sent is consumed.
+            gasToCharge := 6000
+        }
+        // 35,000 * k + 45,000 gas, where k is the number of pairings being computed.
+        // The input must always be a multiple of 6 32-byte values.
+        case 0x08 { // ecPairing
+            gasToCharge := 45000
+            let k := div(argsSize, 0xC0) // 0xC0 == 6*32
+            gasToCharge := add(gasToCharge, mul(k, 35000))
+        }
+        case 0x09 { // blake2f
+            // argsOffset[0; 3] (4 bytes) Number of rounds (big-endian uint)
+            gasToCharge := and(mload(argsOffset), 0xFFFFFFFF) // last 4bytes
+        }
+        default {
+            gasToCharge := 0
+        }
 }
 
 function checkMemOverflow(location) {
@@ -716,8 +875,9 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
             frameGasLeft := sub(gasToPass, gasUsed)
         }
     }
-    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
 
+    extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp, success)
 }
 function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
@@ -815,6 +975,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     }
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp,success) 
 }
 
@@ -874,6 +1035,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     _popEVMFrame()
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
+    extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
     sp := pushStackItem(sp, addr)
 }
 
