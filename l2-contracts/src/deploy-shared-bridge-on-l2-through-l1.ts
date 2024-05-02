@@ -60,7 +60,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   }
   const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
 
-  let l2SharedBridgeImplmenetationBytecode = localLegacyBridgeTesting
+  const l2SharedBridgeImplmenetationBytecode = localLegacyBridgeTesting
     ? hre.artifacts.readArtifactSync("DevL2SharedBridge").bytecode
     : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
 
