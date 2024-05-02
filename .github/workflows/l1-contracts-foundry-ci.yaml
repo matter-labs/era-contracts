@@ -105,7 +105,9 @@ jobs:
 
       - name: Run RegisterHyperchain script
         working-directory: ./l1-contracts-foundry
-        run: forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: |
+          cat ./script-out/output-deploy-l1.toml >> ./script-config/register-hyperchain.toml
+          forge script ./script/RegisterHyperchain.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts-foundry

@@ -106,6 +106,7 @@ contract DeployL1Script is Script {
         address governanceSecurityCouncilAddress;
         uint256 governanceMinDelay;
         uint256 maxNumberOfHyperchains;
+        bytes diamondCutData;
     }
 
     struct TokensConfig {
@@ -412,6 +413,8 @@ contract DeployL1Script is Script {
             initCalldata: abi.encode(initializeData)
         });
 
+        config.contracts.diamondCutData = abi.encode(diamondCut);
+
         StateTransitionManagerInitializeData memory diamondInitData = StateTransitionManagerInitializeData({
             owner: config.ownerAddress,
             validatorTimelock: addresses.validatorTimelock,
@@ -652,10 +655,11 @@ contract DeployL1Script is Script {
             "recursion_circuits_set_vks_hash",
             config.contracts.recursionCircuitsSetVksHash
         );
-        string memory contractsConfig = vm.serializeUint(
+        vm.serializeUint("contracts_config", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
+        string memory contractsConfig = vm.serializeBytes(
             "contracts_config",
-            "priority_tx_max_gas_limit",
-            config.contracts.priorityTxMaxGasLimit
+            "diamond_cut_data",
+            config.contracts.diamondCutData
         );
 
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
