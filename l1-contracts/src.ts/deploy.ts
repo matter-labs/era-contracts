@@ -233,13 +233,12 @@ export class Deployer {
     const rec = await proxyAdmin.deployTransaction.wait();
 
     if (this.verbose) {
+      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
       console.log(
         `Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}, tx hash ${rec.transactionHash}, expected address: ${
           proxyAdmin.address
         }`
       );
-      console.log(`CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR=${proxyAdmin.address}`);
-      console.log(`Proxy admin deployed, gasUsed: ${rec.gasUsed.toString()}`);
     }
 
     this.addresses.TransparentProxyAdmin = proxyAdmin.address;
