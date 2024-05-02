@@ -839,14 +839,7 @@ function performStaticCall(oldSp,evmGasLeft) -> extraCost, sp {
     }
 
     {
-        let maxExpand := add(retOffset, retSize)
-        switch lt(maxExpand,add(argsOffset, argsSize))  // Check if this makes sense
-        case 0 {
-            maxExpand := expandMemory(add(argsOffset, argsSize))
-        }
-        default {
-            maxExpand := expandMemory(maxExpand)
-        }
+        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
         extraCost := add(extraCost,maxExpand)
     }
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
@@ -892,6 +885,18 @@ function capGas(evmGasLeft,oldGasToPass) -> gasToPass {
         gasToPass := maxGasToPass
     }
 }
+
+function getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize) -> maxExpand{
+    maxExpand := add(retOffset, retSize)
+    switch lt(maxExpand,add(argsOffset, argsSize)) 
+    case 0 {
+        maxExpand := expandMemory(maxExpand)
+    }
+    default {
+        maxExpand := expandMemory(add(argsOffset, argsSize))
+    }
+}
+
 function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
     let gasToPass,addr,value,argsOffset,argsSize,retOffset,retSize
 
@@ -924,14 +929,7 @@ function performCall(oldSp, evmGasLeft, isStatic) -> extraCost, sp {
         extraCost := add(extraCost,25000)
     }
     {
-        let maxExpand := add(retOffset, retSize)
-        switch lt(maxExpand,add(argsOffset, argsSize)) 
-        case 0 {
-            maxExpand := expandMemory(add(argsOffset, argsSize))
-        }
-        default {
-            maxExpand := expandMemory(maxExpand)
-        }
+        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
         extraCost := add(extraCost,maxExpand)
     }
     gasToPass := capGas(evmGasLeft,gasToPass)
@@ -1012,14 +1010,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     }
 
     {
-        let maxExpand := add(retOffset, retSize)
-        switch lt(maxExpand,add(argsOffset, argsSize)) 
-        case 0 {
-            maxExpand := expandMemory(add(argsOffset, argsSize))
-        }
-        default {
-            maxExpand := expandMemory(maxExpand)
-        }
+        let maxExpand := getMaxExpansionMemory(retOffset,retSize,argsOffset,argsSize)
         extraCost := add(extraCost,maxExpand)
     }
     gasToPass := capGas(evmGasLeft,gasToPass)
