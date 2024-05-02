@@ -60,11 +60,11 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   }
   const eraChainId = process.env.CONTRACTS_ERA_CHAIN_ID;
 
-  const l2SharedBridgeImplmenetationBytecode = localLegacyBridgeTesting
+  const l2SharedBridgeImplementationBytecode = localLegacyBridgeTesting
     ? hre.artifacts.readArtifactSync("DevL2SharedBridge").bytecode
     : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
 
-  if (!l2SharedBridgeImplmenetationBytecode) {
+  if (!l2SharedBridgeImplementationBytecode) {
     throw new Error("l2SharedBridgeImplmenetationBytecode not found");
   }
   if (deployer.verbose) {
@@ -74,7 +74,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   }
   const l2SharedBridgeImplAddress = computeL2Create2Address(
     deployer.deployWallet,
-    l2SharedBridgeImplmenetationBytecode,
+    l2SharedBridgeImplementationBytecode,
     defaultAbiCoder.encode(["uint256"], [eraChainId]),
     ethers.constants.HashZero
   );
@@ -92,7 +92,7 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
   const tx2 = await create2DeployFromL1(
     chainId,
     deployer.deployWallet,
-    l2SharedBridgeImplmenetationBytecode,
+    l2SharedBridgeImplementationBytecode,
     defaultAbiCoder.encode(["uint256"], [eraChainId]),
     ethers.constants.HashZero,
     priorityTxMaxGasLimit,
