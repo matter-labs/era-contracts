@@ -1032,7 +1032,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
     // }
 
     _pushEVMFrame(gasToPass, isStatic)
-    addr := delegatecall(
+    let success := delegatecall(
         // We can not just pass all gas here to prevert overflow of zkEVM gas counter
         gasToPass,
         addr,
@@ -1048,7 +1048,7 @@ function delegateCall(oldSp, oldIsStatic, evmGasLeft) -> sp, isStatic, extraCost
 
     extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
     extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-    sp := pushStackItem(sp, addr)
+    sp := pushStackItem(sp, success)
 }
 
 function getMessageCallGas (

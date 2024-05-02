@@ -1106,7 +1106,7 @@ object "EVMInterpreter" {
             // }
         
             _pushEVMFrame(gasToPass, isStatic)
-            addr := delegatecall(
+            let success := delegatecall(
                 // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                 gasToPass,
                 addr,
@@ -1122,7 +1122,7 @@ object "EVMInterpreter" {
         
             extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
             extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-            sp := pushStackItem(sp, addr)
+            sp := pushStackItem(sp, success)
         }
         
         function getMessageCallGas (
@@ -3686,7 +3686,7 @@ object "EVMInterpreter" {
                 // }
             
                 _pushEVMFrame(gasToPass, isStatic)
-                addr := delegatecall(
+                let success := delegatecall(
                     // We can not just pass all gas here to prevert overflow of zkEVM gas counter
                     gasToPass,
                     addr,
@@ -3702,7 +3702,7 @@ object "EVMInterpreter" {
             
                 extraCost := add(extraCost,sub(gasToPass,frameGasLeft))
                 extraCost := add(extraCost, getGasForPrecompiles(addr, argsOffset, argsSize))
-                sp := pushStackItem(sp, addr)
+                sp := pushStackItem(sp, success)
             }
             
             function getMessageCallGas (
