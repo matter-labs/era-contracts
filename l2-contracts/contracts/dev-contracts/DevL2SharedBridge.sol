@@ -12,22 +12,22 @@ contract DevL2SharedBridge is L2SharedBridge {
     constructor(uint256 _eraChainId) L2SharedBridge(_eraChainId) {}
 
     function initializeDevBridge(
+        address _l1SharedBridge,
         address _l1Bridge,
-        address _l1LegacyBridge,
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        l1Bridge = _l1Bridge;
+        l1SharedBridge = _l1SharedBridge;
 
         address l2StandardToken = address(new L2StandardERC20{salt: bytes32(0)}());
         l2TokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
         l2TokenProxyBytecodeHash = _l2TokenProxyBytecodeHash;
         l2TokenBeacon.transferOwnership(_aliasedOwner);
 
-        // Unfortunately the `l1LegacyBridge` is not an internal variable in the parent contract.
+        // Unfortunately the `l1Bridge` is not an internal variable in the parent contract.
         // To keep the changes to the production code minimal, we'll just manually set the variable here.
         assembly {
-            sstore(4, _l1LegacyBridge)
+            sstore(4, _l1Bridge)
         }
     }
 }
