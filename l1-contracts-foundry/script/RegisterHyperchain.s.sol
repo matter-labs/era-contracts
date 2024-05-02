@@ -102,12 +102,8 @@ contract RegisterHyperchainScript is Script {
         config.baseTokenGasPriceMultiplierDenominator = uint128(
             toml.readUint("$.hyperchain.base_token_gas_price_multiplier_denominator")
         );
-        config.governanceMinDelay = uint256(
-            toml.readUint("$.hyperchain.governance_min_delay")
-        );
-        config.governanceSecurityCouncilAddress = toml.readAddress(
-            "$.hyperchain.governance_security_council_address"
-        );
+        config.governanceMinDelay = uint256(toml.readUint("$.hyperchain.governance_min_delay"));
+        config.governanceSecurityCouncilAddress = toml.readAddress("$.hyperchain.governance_security_council_address");
     }
 
     function checkTokenAddress() internal view {
@@ -138,9 +134,9 @@ contract RegisterHyperchainScript is Script {
             console.log("Token registered on Bridgehub");
         }
     }
-    
+
     function deployGovernance() internal {
-       Governance governance = new Governance(
+        Governance governance = new Governance(
             config.ownerAddress,
             config.governanceSecurityCouncilAddress,
             config.governanceMinDelay

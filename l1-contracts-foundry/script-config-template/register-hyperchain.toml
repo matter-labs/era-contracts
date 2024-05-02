@@ -8,3 +8,5 @@ validator_sender_operator_commit_eth = "0x00000000000000000000000000000000000000
 validator_sender_operator_blobs_eth = "0x0000000000000000000000000000000000000001"
 base_token_gas_price_multiplier_nominator = 1
 base_token_gas_price_multiplier_denominator = 1
+governance_min_delay = 0
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
