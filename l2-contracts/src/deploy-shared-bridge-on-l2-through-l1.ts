@@ -65,10 +65,10 @@ export async function deploySharedBridgeImplOnL2ThroughL1(
     : hre.artifacts.readArtifactSync("L2SharedBridge").bytecode;
 
   if (!l2SharedBridgeImplementationBytecode) {
-    throw new Error("l2SharedBridgeImplmenetationBytecode not found");
+    throw new Error("l2SharedBridgeImplementationBytecode not found");
   }
   if (deployer.verbose) {
-    console.log("l2SharedBridgeImplmenetationBytecode loaded");
+    console.log("l2SharedBridgeImplementationBytecode loaded");
 
     console.log("Computing L2SharedBridge Implementation Address");
   }
