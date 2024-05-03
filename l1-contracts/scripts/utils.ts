@@ -5,6 +5,7 @@ import * as chalk from "chalk";
 import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import { isLocalNetwork } from "../src.ts/utils";
 
 const warning = chalk.bold.yellow;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
@@ -47,7 +48,7 @@ export function web3Provider() {
   }
 
   // Short polling interval for local network
-  if (network === "localhost" || network === "hardhat") {
+  if (isLocalNetwork()) {
     provider.pollingInterval = 100;
   }
 

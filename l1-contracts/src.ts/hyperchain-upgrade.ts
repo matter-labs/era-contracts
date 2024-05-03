@@ -20,7 +20,7 @@ import { ITransparentUpgradeableProxyFactory } from "../typechain/ITransparentUp
 import { L1SharedBridgeFactory, StateTransitionManagerFactory } from "../typechain";
 
 import { Interface } from "ethers/lib/utils";
-import { ADDRESS_ONE, getAddressFromEnv } from "./utils";
+import { ADDRESS_ONE, getAddressFromEnv, isLocalNetwork } from "./utils";
 import type { L2CanonicalTransaction, ProposedUpgrade, VerifierParams } from "./utils";
 
 import {
@@ -84,7 +84,7 @@ export async function upgradeToHyperchains2(deployer: Deployer, gasPrice: BigNum
   }
   await upgradeL2Bridge(deployer);
 
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (isLocalNetwork()) {
     if (deployer.verbose) {
       console.log("Upgrading L1 ERC20 bridge");
     }
@@ -347,7 +347,7 @@ async function upgradeL2Bridge(deployer: Deployer) {
     .bridgehubContract(deployer.deployWallet)
     .l2TransactionBaseCost(deployer.chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA); //"1000000000000000000";
 
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (isLocalNetwork()) {
     // on the main branch the l2SharedBridge governor is incorrectly set to deploy wallet, so we can just make the call
     const hyperchain = deployer.stateTransitionContract(deployer.deployWallet);
     const tx = await hyperchain.requestL2Transaction(
@@ -382,7 +382,7 @@ async function upgradeL2Bridge(deployer: Deployer) {
 }
 
 async function upgradeL1ERC20Bridge(deployer: Deployer) {
-  if (process.env.CHAIN_ETH_NETWORK === "localhost") {
+  if (isLocalNetwork()) {
     // we need to wait here for a new block
     await new Promise((resolve) => setTimeout(resolve, 5000));
     // upgrade ERC20.

@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { ethers } from "ethers";
 import { SingletonFactoryFactory } from "../typechain";
 
-import { getAddressFromEnv } from "./utils";
+import { getAddressFromEnv, isZKMode } from "./utils";
 
 export async function deployViaCreate2(
   deployWallet: ethers.Wallet,
@@ -79,6 +79,17 @@ export async function deployBytecodeViaCreate2(
   }
 
   return [expectedAddress, tx.hash];
+}
+
+export async function deployContractWithArgs(
+  wallet: ethers.Wallet,
+  contractName: string,
+  args: any[],
+  ethTxOptions: ethers.providers.TransactionRequest
+) {
+  const factory = await hardhat.ethers.getContractFactory(contractName, wallet);
+
+  return await factory.deploy(...args, ethTxOptions);
 }
 
 export interface DeployedAddresses {

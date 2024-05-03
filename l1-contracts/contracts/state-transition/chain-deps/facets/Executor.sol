@@ -662,8 +662,10 @@ contract ExecutorFacet is ZkSyncHyperchainBase, IExecutor {
     }
 
     function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
-        assembly {
-            versionedHash := blobhash(_index)
-        }
+        // FIXME: enable blobs
+        revert("Blobs not supported on this codebase yet");
+        // assembly {
+        //     versionedHash := blobhash(_index)
+        // }
     }
 }

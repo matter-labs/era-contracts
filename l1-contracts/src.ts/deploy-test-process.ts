@@ -28,6 +28,7 @@ import {
   PubdataPricingMode,
   ADDRESS_ONE,
   EMPTY_STRING_KECCAK,
+  isLocalNetwork,
 } from "./utils";
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
@@ -128,7 +129,7 @@ export async function initialPreUpgradeContractsDeployment(
   const create2Salt = ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
-  if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
+  if (isLocalNetwork()) {
     await deployer.deployCreate2Factory({ gasPrice, nonce });
     nonce++;
 

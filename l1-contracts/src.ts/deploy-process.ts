@@ -12,7 +12,7 @@ import type { FacetCut } from "./diamondCut";
 import type { Deployer } from "./deploy";
 import { getTokens } from "./deploy-token";
 
-import { ADDRESS_ONE } from "../src.ts/utils";
+import { ADDRESS_ONE, isLocalNetwork } from "../src.ts/utils";
 
 export const L2_BOOTLOADER_BYTECODE_HASH = "0x1000100000000000000000000000000000000000000000000000000000000000";
 export const L2_DEFAULT_ACCOUNT_BYTECODE_HASH = "0x1001000000000000000000000000000000000000000000000000000000000000";
@@ -29,9 +29,13 @@ export async function initialBridgehubDeployment(
   create2Salt = create2Salt || ethers.utils.hexlify(ethers.utils.randomBytes(32));
 
   // Create2 factory already deployed on the public networks, only deploy it on local node
-  if (process.env.CHAIN_ETH_NETWORK === "localhost" || process.env.CHAIN_ETH_NETWORK === "hardhat") {
-    await deployer.deployCreate2Factory({ gasPrice, nonce });
-    nonce++;
+  if (isLocalNetwork()) {
+    if (!deployer.zkMode) {
+      await deployer.deployCreate2Factory({ gasPrice, nonce });
+      nonce++;
+    } else {
+      await deployer.updateCreate2FactoryZkMode();
+    }
 
     await deployer.deployMulticall3(create2Salt, { gasPrice, nonce });
     nonce++;
@@ -60,7 +64,11 @@ export async function initialBridgehubDeployment(
   await deployer.deployGovernance(create2Salt, { gasPrice, nonce });
   await deployer.deployTransparentProxyAdmin(create2Salt, { gasPrice });
   await deployer.deployBridgehubContract(create2Salt, gasPrice);
-  await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+  if (deployer.zkMode) {
+    await deployer.updateBlobVersionedHashRetrieverZkMode();
+  } else {
+    await deployer.deployBlobVersionedHashRetriever(create2Salt, { gasPrice });
+  }
   await deployer.deployStateTransitionManagerContract(create2Salt, extraFacets, gasPrice);
   await deployer.setStateTransitionManagerInValidatorTimelock({ gasPrice });
 
