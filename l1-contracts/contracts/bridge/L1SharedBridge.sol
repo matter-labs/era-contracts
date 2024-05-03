@@ -162,7 +162,7 @@ contract L1SharedBridge is IL1SharedBridge, ReentrancyGuard, Ownable2StepUpgrade
 
     /// @dev Transfer tokens from legacy erc20 bridge or mailbox and set chainBalance as part of migration process.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    /// @param _target The hyperchain contract address from where to transfer funds.
+    /// @param _target The hyperchain or bridge contract address from where to transfer funds.
     /// @param _targetChainId The chain ID of the corresponding hyperchain.
     function transferFundsFromLegacy(address _token, address _target, uint256 _targetChainId) external onlyOwner {
         if (_token == ETH_TOKEN_ADDRESS) {
