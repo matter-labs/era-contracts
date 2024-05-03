@@ -726,6 +726,10 @@ export class Deployer {
       .topics[1];
 
     nonce++;
+    if (useGovernance) {
+      // deploying through governance requires two transactions
+      nonce++;
+    }
 
     this.addresses.BaseToken = baseTokenAddress;
 
