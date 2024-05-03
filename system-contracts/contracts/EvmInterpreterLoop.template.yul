@@ -584,6 +584,10 @@ for { } true { } {
 
         value := sload(key)
 
+        if iszero(isSlotWarm(key)) {
+            let _wasW, _orgV := warmSlot(key, value)
+        }
+
         sp := pushStackItem(sp,value)
     }
     case 0x55 { // OP_SSTORE
@@ -610,9 +614,9 @@ for { } true { } {
             }
 
             if eq(originalValue, currentValue) {
-                gasSpent := 20000
+                gasSpent := 19900
                 if originalValue {
-                    gasSpent := 2900
+                    gasSpent := 2800
                 }
             }
 
