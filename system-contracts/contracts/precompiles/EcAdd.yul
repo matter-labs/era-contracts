@@ -1,3 +1,9 @@
+/**
+ * @author Matter Labs
+ * @custom:security-contact security@matterlabs.dev
+ * @notice The contract used to emulate EVM's ecadd precompile.
+ * @dev It uses `precompileCall` to call the zkEVM built-in precompiles.
+ */
 object "EcAdd" {
     code {
         return(0, 0)
@@ -40,9 +46,31 @@ object "EcAdd" {
                 ret := 111032442853175714102588374283752698368366046808579839647964533820976443843465
             }
 
+            /// @dev The gas cost of processing ecadd circuit precompile.
+            function ECADD_GAS_COST() -> ret {
+                ret := 300
+            }
+
             //////////////////////////////////////////////////////////////////
             //                      HELPER FUNCTIONS
             //////////////////////////////////////////////////////////////////
+
+            // @dev Packs precompile parameters into one word.
+            // Note: functions expect to work with 32/64 bits unsigned integers.
+            // Caller should ensure the type matching before!
+            function unsafePackPrecompileParams(
+                uint32_inputOffsetInWords,
+                uint32_inputLengthInWords,
+                uint32_outputOffsetInWords,
+                uint32_outputLengthInWords,
+                uint64_perPrecompileInterpreted
+            ) -> rawParams {
+                rawParams := uint32_inputOffsetInWords
+                rawParams := or(rawParams, shl(32, uint32_inputLengthInWords))
+                rawParams := or(rawParams, shl(64, uint32_outputOffsetInWords))
+                rawParams := or(rawParams, shl(96, uint32_outputLengthInWords))
+                rawParams := or(rawParams, shl(192, uint64_perPrecompileInterpreted))
+            }
 
             /// @dev Executes the `precompileCall` opcode.
             function precompileCall(precompileParams, gasToBurn) -> ret {
@@ -413,28 +441,35 @@ object "EcAdd" {
 
             // P1 + P2 = P3
 
-            x1 := intoMontgomeryForm(x1)
-            y1 := intoMontgomeryForm(y1)
-            x2 := intoMontgomeryForm(x2)
-            y2 := intoMontgomeryForm(y2)
+            m_x1 := intoMontgomeryForm(x1)
+            m_y1 := intoMontgomeryForm(y1)
+            m_x2 := intoMontgomeryForm(x2)
+            m_y2 := intoMontgomeryForm(y2)
 
             // Ensure that the points are in the curve (Y^2 = X^3 + 3).
-            if or(iszero(pointIsInCurve(x1, y1)), iszero(pointIsInCurve(x2, y2))) {
+            if or(iszero(pointIsInCurve(m_x1, m_y1)), iszero(pointIsInCurve(m_x2, m_y2))) {
                 burnGas()
             }
 
-            // (y2 - y1) / (x2 - x1)
-            let slope := montgomeryDiv(submod(y2, y1, P()), submod(x2, x1, P()))
-            // x3 = slope^2 - x1 - x2
-            let x3 := submod(montgomeryMul(slope, slope), addmod(x1, x2, P()), P())
-            // y3 = slope * (x1 - x3) - y1
-            let y3 := submod(montgomeryMul(slope, submod(x1, x3, P())), y1, P())
+            mstore(0, x1)
+            mstore(32, y1)
+            mstore(64, x2)
+            mstore(96, y2)
 
-            x3 := outOfMontgomeryForm(x3)
-            y3 := outOfMontgomeryForm(y3)
+            let precompileParams := unsafePackPrecompileParams(
+                0, // input offset in words
+                4, // input length in words (x1, y1, x2, y2)
+                0, // output offset in words
+                2, // output length in words (x, y)
+                0  // No special meaning, ecadd circuit doesn't check this value
+            )
+            let gasToPay := ECADD_GAS_COST()
 
-            mstore(0, x3)
-            mstore(32, y3)
+            let success := precompileCall(precompileParams, gasToPay)
+            if iszero(success) {
+                return(0, 0)
+            }
+
             return(0, 64)
         }
     }
